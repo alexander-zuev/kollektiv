@@ -11,7 +11,6 @@ python = "^3.12"
 anthropic = "^0.34.1"
 openai = "^1.42.0"
 firecrawl-py = "^0.0.20"
-chromadb = "^0.5.5"
 colorama = "^0.4.6"
 requests = "^2.32.3"
 tiktoken = "^0.7.0"
@@ -21,6 +20,8 @@ langchain = "^0.2.15"
 langchain-text-splitters = "^0.2.2"
 google-cloud-aiplatform = "^1.64.0"
 llama-index = "^0.11.3"
+chromadb = "^0.5.5"
+protobuf = "3.20.3"
 
 
 [build-system]

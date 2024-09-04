@@ -7,8 +7,6 @@ import json
 import os
 from openai import OpenAI
 
-
-
 from src.utils.config import OPENAI_API_KEY, PERSIST_DIRECTORY, LOG_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
 
@@ -51,14 +49,13 @@ class DocumentProcessor:
 
         return {'ids': ids, 'documents': documents}
 
-
-
 class VectorDB:
     def __init__(self,
                  persist_dir: str = PERSIST_DIRECTORY,
                  collection_name: str = "supabase_collection",
                  embedding_function: str = "text-embedding-3-small",
                  openai_api_key: str = OPENAI_API_KEY):
+        self.embedding_function = None
         self.persist_dir = persist_dir
         self.collection_name = collection_name
         self.client = None
@@ -168,12 +165,21 @@ db.add_documents(processed_docs)
 
 # query
 user_query = input("Input your query here: ")
-search_result = db.query(user_query)
-processed_results = db.process_query_results(search_result)
-#pprint(processed_results)
+# search_result = db.query(user_query)
+# processed_results = db.process_query_results(search_result)
+# pprint(processed_results)
 
 # Generate multi-queries
 openai_client = OpenAIClient()
 openai_client.init()
 multiple_queries = openai_client.generate_multi_query(user_query, model='gpt-4o-mini')
-pprint(multiple_queries)
+for query in multiple_queries:
+    print(query)
+
+# Get additional documents
+
+# Unify documents
+
+# Re-rank
+
+# Send to the generation
