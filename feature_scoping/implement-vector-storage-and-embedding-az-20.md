@@ -171,7 +171,7 @@ I need to define something similar but using ChromaDB and vector embeddings from
 ## Component Structure
 
 1. `DocumentProcessor` class:
-   - load_chunks() Loads the data
+   - load_json() Loads the data
    - prepare_documents() Pre-processes the chunks to be ready for feeding into the vector db (headers + content)
 2. `VectorDB` class:
    - Initialize ChromaDB client and collection
@@ -194,3 +194,169 @@ I need to define something similar but using ChromaDB and vector embeddings from
      - Prepares the output list
    - Output:
      - Outputs the most relevant documents
+
+Let's go through each class and set them up properly:
+
+VectorDB
+
+pythonCopyimport chromadb
+from chromadb.config import Settings
+from typing import List, Dict
+
+class VectorDB:
+    def __init__(self, persist_directory: str, collection_name: str):
+        self.persist_directory = persist_directory
+        self.collection_name = collection_name
+        self.client = None
+        self.collection = None
+
+    def init(self):
+        self.client = chromadb.Client(Settings(
+            chroma_db_impl="duckdb+parquet",
+            persist_directory=self.persist_directory
+        ))
+        self.collection = self.client.get_or_create_collection(name=self.collection_name)
+
+    def add_documents(self, documents: List[Dict]):
+        ids = [doc['id'] for doc in documents]
+        texts = [doc['text'] for doc in documents]
+        metadatas = [doc['metadata'] for doc in documents]
+        self.collection.add(ids=ids, documents=texts, metadatas=metadatas)
+
+    def query(self, query_text: str, n_results: int = 10) -> List[Dict]:
+        results = self.collection.query(query_texts=[query_text], n_results=n_results)
+        return [
+            {'id': id, 'text': doc, 'metadata': meta}
+            for id, doc, meta in zip(results['ids'][0], results['documents'][0], results['metadatas'][0])
+        ]
+
+# Usage
+vector_db = VectorDB('/path/to/persist', 'my_collection')
+vector_db.init()
+
+LLMClient
+
+pythonCopyfrom openai import OpenAI
+
+class LLMClient:
+    def __init__(self, api_key: str):
+        self.client = OpenAI(api_key=api_key)
+
+    def generate_text(self, prompt: str, max_tokens: int = 100) -> str:
+        response = self.client.chat.completions.create(
+            model="gpt-4-0125-preview",  # or your preferred model
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens
+        )
+        return response.choices[0].message.content.strip()
+
+# Usage
+llm_client = LLMClient('your-openai-api-key')
+
+QueryExpander
+
+pythonCopyfrom typing import List
+
+class QueryExpander:
+    def __init__(self, llm_client: LLMClient):
+        self.llm_client = llm_client
+
+    def expand_query(self, original_query: str, n_expansions: int = 3) -> List[str]:
+        prompt = f"Generate {n_expansions} different versions of the following query: '{original_query}'"
+        expansions = self.llm_client.generate_text(prompt).split('\n')
+        return [original_query] + expansions[:n_expansions]
+
+# Usage
+query_expander = QueryExpander(llm_client)
+
+ReRanker
+
+pythonCopyimport cohere
+from typing import List, Dict
+
+class ReRanker:
+    def __init__(self, api_key: str):
+        self.co = cohere.Client(api_key)
+
+    def rerank(self, query: str, documents: List[Dict], top_n: int = 5) -> List[Dict]:
+        docs = [doc['text'] for doc in documents]
+        reranked = self.co.rerank(
+            model='rerank-english-v2.0',
+            query=query,
+            documents=docs,
+            top_n=top_n
+        )
+        return [documents[result.index] for result in reranked]
+
+# Usage
+reranker = ReRanker('your-cohere-api-key')
+
+ResultsRetriever
+
+pythonCopyfrom typing import List, Dict
+
+class ResultsRetriever:
+    def __init__(self, vector_db: VectorDB, query_expander: QueryExpander, reranker: ReRanker):
+        self.vector_db = vector_db
+        self.query_expander = query_expander
+        self.reranker = reranker
+
+    def retrieve(self, query: str, n_results: int = 5) -> List[Dict]:
+        expanded_queries = self.query_expander.expand_query(query)
+        all_results = []
+        for expanded_query in expanded_queries:
+            results = self.vector_db.query(expanded_query, n_results=n_results)
+            all_results.extend(results)
+
+        # Remove duplicates
+        unique_results = {doc['id']: doc for doc in all_results}.values()
+        
+        # Rerank the combined results
+        reranked_results = self.reranker.rerank(query, list(unique_results), top_n=n_results)
+        
+        return reranked_results
+
+# Usage
+results_retriever = ResultsRetriever(vector_db, query_expander, reranker)
+Now, let's put it all together in a main script:
+pythonCopy# main.py
+
+from document_processor import DocumentProcessor
+from vector_db import VectorDB
+from llm_client import LLMClient
+from query_expander import QueryExpander
+from reranker import ReRanker
+from results_retriever import ResultsRetriever
+
+def main():
+    # Initialize components
+    doc_processor = DocumentProcessor('path/to/your/chunks.json')
+    vector_db = VectorDB('/path/to/persist', 'my_collection')
+    vector_db.init()
+    
+    llm_client = LLMClient('your-openai-api-key')
+    query_expander = QueryExpander(llm_client)
+    reranker = ReRanker('your-cohere-api-key')
+    
+    results_retriever = ResultsRetriever(vector_db, query_expander, reranker)
+
+    # Load and prepare documents
+    chunks = doc_processor.load_chunks()
+    documents = doc_processor.prepare_documents(chunks)
+
+    # Add documents to vector database
+    vector_db.add_documents(documents)
+
+    # Example query
+    query = "What is Supabase?"
+    results = results_retriever.retrieve(query)
+
+    # Print results
+    for result in results:
+        print(f"Document ID: {result['id']}")
+        print(f"Text: {result['text'][:200]}...")  # Print first 200 characters
+        print(f"Source URL: {result['metadata']['source_url']}")
+        print("---")
+
+if __name__ == "__main__":
+    main()
