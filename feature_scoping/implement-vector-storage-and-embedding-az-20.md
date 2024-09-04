@@ -170,10 +170,10 @@ I need to define something similar but using ChromaDB and vector embeddings from
 
 ## Component Structure
 
-1. `DocumentProcessor` class:
+1. `DocumentProcessor` class: (DONE)
    - load_json() Loads the data
    - prepare_documents() Pre-processes the chunks to be ready for feeding into the vector db (headers + content)
-2. `VectorDB` class:
+2. `VectorDB` class: (DONE)
    - Initialize ChromaDB client and collection
    - Methods:
      - `init` - initialize chromadb client with persistent storage
