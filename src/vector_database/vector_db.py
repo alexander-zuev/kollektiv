@@ -31,7 +31,7 @@ class DocumentProcessor:
             logger.error(f"Invalid JSON in file: {self.file_path}")
             raise
 
-    def prepare_documents(self, chunks: List[Dict]) -> Dict:
+    def prepare_documents(self, chunks: List[Dict]) -> Dict[str, List[str]]:
         ids =[]
         documents = []
         for chunk in chunks:
@@ -50,10 +50,6 @@ class DocumentProcessor:
 
         return {'ids': ids, 'documents': documents}
 
-# Test usage
-doc_processor = DocumentProcessor("processed_supabase_docs_20240901_193122.json")
-docs = doc_processor.load_json()
-processed_docs = doc_processor.prepare_documents(docs)
 
 
 class VectorDB:
@@ -84,11 +80,26 @@ class VectorDB:
             logger.error(f"Error initializing ChromaDB: {e}")
             raise
 
-    def add_documents(self, processed_docs: List[Dict]):
-        ids = []
-        documents = []
-        self.collection.add(
-            ids=ids,
-            documents=documents
-        )
+    def add_documents(self, processed_docs: Dict[str, List[str]]) -> None:
+        try:
+            ids = processed_docs['ids']
+            documents = processed_docs['documents']
+            self.collection.add(
+                ids=ids,
+                documents=documents
+            )
+            docs_n = len(ids)
+            logger.info(f"Added {docs_n} documents to ChromaDB")
+        except Exception as e:
+            logger.error(f"Error adding documents to ChromaDB: {e}")
+            raise
 
+
+# Test usage
+doc_processor = DocumentProcessor("processed_supabase_docs_20240901_193122.json")
+docs = doc_processor.load_json()
+processed_docs = doc_processor.prepare_documents(docs)
+
+db = VectorDB()
+db.init()
+db.add_documents(processed_docs)
