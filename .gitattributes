@@ -1,3 +1,4 @@
 src/document_ingestion/data/**/*.json filter=lfs diff=lfs merge=lfs -text
 vector_db_persist/chroma.sqlite3 filter=lfs diff=lfs merge=lfs -text
+*sqlite3 filter=lfs diff=lfs merge=lfs -text
 *.sqlite3 filter=lfs diff=lfs merge=lfs -text
