@@ -152,129 +152,45 @@ I need to define something similar but using ChromaDB and vector embeddings from
   - Document chunks
   - Generated embeddings
   - Associated metadata
-- Search functionality to retrieve relevant chunks based on queries
+- Search functionality
+- Multi-query functionality
+- Re-ranking functionality
+- Final output formatting
 
 ## High-level Approach
 
 1. Set up ChromaDB client
 2. Create a collection for storing document chunks
 3. Process input JSON file
-4. For each chunk:
-   - Generate embedding using OpenAI API
-   - Add chunk to ChromaDB collection with embedding and metadata
+4. Generate embeddings using in-built Chroma API
 5. Implement search functionality using ChromaDB's query methods
+6. Implement multi-query expansion using gpt-4o-mini
+7. Implement re-ranking using Cohere API
 6. Provide methods to save and load the database state
 
 ## Component Structure
 
-1. `VectorDB` class:
+1. `DocumentProcessor` class:
+   - load_chunks() Loads the data
+   - prepare_documents() Pre-processes the chunks to be ready for feeding into the vector db (headers + content)
+2. `VectorDB` class:
    - Initialize ChromaDB client and collection
    - Methods:
-     - `add_chunks(chunks)`: Add chunks to the database
-     - `search(query, filters=None, k=5, similarity_threshold=0.7)`: Perform similarity search with optional filtering
-     - `update_chunks(chunks)`: Update existing chunks
-     - `delete_chunks(chunk_ids)`: Remove chunks from the database
-     - `get_stats()`: Retrieve database statistics
-
-2. `EmbeddingGenerator` class:
-   - Interface with OpenAI API
-   - Methods:
-     - `generate_embeddings(texts)`: Generate embeddings for given texts
-     - `generate_query_embedding(query)`: Generate embedding for a search query
-
-3. `ChunkProcessor` class:
-   - Process input JSON file
-   - Methods:
-     - `load_chunks(file_path)`: Load and parse the input JSON file
-     - `prepare_chunks(chunks)`: Prepare chunks for insertion into VectorDB
-     - `batch_chunks(chunks, batch_size=100)`: Create batches of chunks for processing
-
-4. `QueryCache` class:
-   - Manage caching of query embeddings
-   - Methods:
-     - `get(query)`: Retrieve cached embedding for a query
-     - `set(query, embedding)`: Cache embedding for a query
-     - `clear()`: Clear the cache
-
-5. `SearchResult` class:
-   - Represent and format search results
-   - Methods:
-     - `format_result(chunk, similarity_score)`: Format a single search result
-     - `sort_results(results)`: Sort results by relevance
-
-## Implementation details
-
-### Search Implementation
-
-1. **ChromaDB Search Capabilities**
-   - ChromaDB provides built-in similarity search functionality.
-   - We'll use the `collection.query()` method for searching.
-
-2. **Search Types to Implement**
-   a. **Similarity Search**
-      - Use ChromaDB's default cosine similarity search.
-      - Implement as the primary search method.
-
-   b. **Metadata Filtering**
-      - Utilize ChromaDB's ability to filter results based on metadata.
-      - Useful for narrowing search to specific document sections or types.
-
-   c. **Hybrid Search**
-      - Combine similarity search with metadata filtering for more precise results.
-
-3. **Search Implementation Details**
-   - Convert user query to embedding using OpenAI API.
-   - Use `collection.query()` with the query embedding.
-   - Implement optional metadata filters in the query.
-   - Return top N results based on similarity score.
-
-4. **Advanced Search Features**
-   - Implement semantic search using the embeddings.
-   - Add support for boolean queries (AND, OR, NOT) using metadata filters.
-   - Implement faceted search using metadata fields.
-
-### Data Loading Process
-
-1. **JSON Processing**
-   - Use Python's `json` module to load the input JSON file.
-   - Extract individual chunks from the loaded data.
-
-2. **Chunk Processing**
-   - Create a `ChunkProcessor` class to handle chunk preparation.
-   - Extract relevant fields from each chunk (content, metadata, etc.).
-
-3. **Batch Processing**
-   - Implement batch processing to handle large datasets efficiently.
-   - Define an optimal batch size (e.g., 100 chunks per batch) for embedding generation and database insertion.
-
-4. **Embedding Generation**
-   - Use OpenAI's API to generate embeddings for each chunk's content.
-   - Implement rate limiting and error handling for API calls.
-
-5. **ChromaDB Insertion**
-   - Use `collection.add()` method to insert chunks with their embeddings and metadata.
-   - Ensure proper mapping of chunk fields to ChromaDB's expected format.
-
-### Lessons from Anthropic's Example
-
-1. **Query Caching**
-   - Implement a query cache similar to Anthropic's example.
-   - Store embeddings of previously searched queries to reduce API calls.
-
-2. **Similarity Threshold**
-   - Adopt the concept of a similarity threshold for filtering results.
-   - Implement as an optional parameter in the search method.
-
-3. **Metadata Handling**
-   - Store comprehensive metadata for each chunk, similar to Anthropic's approach.
-   - Use metadata for advanced filtering and result presentation.
-
-4. **Persistence**
-   - Implement save and load functionality for the database.
-   - Use ChromaDB's built-in persistence instead of pickle files.
-
-5. **Batch Embedding Generation**
-   - Adopt the batch processing approach for embedding generation.
-   - Adjust batch size based on OpenAI API limits and performance testing.
-
-## Edge cases
+     - `init` - initialize chromadb client with persistent storage
+     - `add_documents` - loads the documents into the database
+     - `query()` - use query func
+3. `LLMClient` - initiates llm client to be used for this classs
+4. `QueryExpander` - expands the original query
+   - Uses LLMClient to expand queries
+   - Unifies the resulting documents
+5. `ReRanker` - uses Cohere API to re-rank the results
+6. `ResultsRetriever` - orchestrates end to end flow
+   - Input: user query
+   - Steps:
+     - Generate multi-queries
+     - Generate multiple documents
+     - Unify documents
+     - Passes them to re-ranker
+     - Prepares the output list
+   - Output:
+     - Outputs the most relevant documents
