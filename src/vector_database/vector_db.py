@@ -94,12 +94,38 @@ class VectorDB:
             logger.error(f"Error adding documents to ChromaDB: {e}")
             raise
 
+    def query(self, user_query: str, n_results: int = 5):
+        search_results = self.collection.query(
+            query_texts=[user_query],
+            n_results=n_results,
+            include=['documents', 'distances', 'embeddings']
+        )
+        return search_results
+
+    def process_query_results(self, search_results: Dict[str, Any]):
+        documents = search_results['documents'][0]
+        distances = search_results['distances'][0]
+
+        output = []
+        for docs, dist in zip(documents, distances):
+            output.append(f"Distance: {dist:.2f}\n\n{docs}")
+        return output
+
+
+
 
 # Test usage
 doc_processor = DocumentProcessor("processed_supabase_docs_20240901_193122.json")
 docs = doc_processor.load_json()
 processed_docs = doc_processor.prepare_documents(docs)
 
+# load documents into db
 db = VectorDB()
 db.init()
 db.add_documents(processed_docs)
+
+# query
+user_query = input("Input your query here: ")
+search_result = db.query(user_query)
+processed_results = db.process_query_results(search_result)
+pprint(processed_results)
