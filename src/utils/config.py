@@ -16,6 +16,9 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 # OpenAI API KEY
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Cohere API Key
+COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+
 # File Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
