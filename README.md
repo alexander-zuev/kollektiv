@@ -1,4 +1,4 @@
-# RAG v0.1
+# 🌟 RAG 4 Docs - Chat with (any) documentation
 
 ## Overview
 This project implements a Retrieval-Augmented Generation (RAG) system for improving LLM responses with external knowledge.
@@ -19,8 +19,11 @@ This project implements a Retrieval-Augmented Generation (RAG) system for improv
 - Create a `.env` file in the project root
 - Add the following variables:
   ```
-  FIRECRAWL_API_KEY=your_firecrawl_api_key
-  OPENAI_API_KEY=your_openai_api_key
+  FIRECRAWL_API_KEY="api_key"
+  OPENAI_API_KEY="api_key"
+  ANTHROPIC_API_KEY="api_key"
+  GOOGLE_API_KEY="your_google_api_key"
+  COHERE_API_KEY="api_key"
   ```
 
 ## Usage
