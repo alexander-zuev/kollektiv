@@ -10,6 +10,7 @@ import cohere
 
 from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
+from src.generation.claude_assistant import Claude
 
 # Set up logger
 logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
@@ -214,9 +215,11 @@ class Reranker:
         for result in response.results:
             relevance_score = result.relevance_score
             index = result.index
+            text = result.document.text
 
             if relevance_score >= relevance_threshold:
                 relevant_results[index] = {
+                    'text' : text,
                     'index' : index,
                     'relevant_score' : relevance_score,
                 }
@@ -225,7 +228,7 @@ class Reranker:
 
 
 
-    def rerank(self, query: str, documents: Dict[str, Any], relevance_threshold: float = 0.01):
+    def rerank(self, query: str, documents: Dict[str, Any], relevance_threshold: float = 0.01, return_documents=True):
         """
         Use Cohere rerank API to score and rank documents based on the query.
         Excludes irrelevant documents.
@@ -239,6 +242,7 @@ class Reranker:
             model = self.model_name,
             query = query,
             documents = document_texts,
+            return_documents=True
         )
 
         logger.info(f"Received {len(response.results)} documents from Cohere.")
@@ -280,14 +284,14 @@ combined_queries = openai_client.combine_queries(user_query, multiple_queries)
 
 # Get additional documents
 expanded_search_results = db.query(combined_queries)
-print("EXPANDED RESULTS")
+# print("EXPANDED RESULTS")
 expanded_results = db.process_results_to_print(expanded_search_results)
-pprint(expanded_results)
+# pprint(expanded_results)
 
 # Unify documents
 unique_documents = db.deduplicate_documents(expanded_search_results)
-print("UNIQUE DOCS:")
-pprint(unique_documents)
+# print("UNIQUE DOCS:")
+# pprint(unique_documents)
 
 # Re-rank
 reranker = Reranker()
@@ -295,5 +299,9 @@ reranker.init()
 ranked_documents = reranker.rerank(user_query, unique_documents)
 pprint(ranked_documents)
 
-
 # Send to the generation
+claude = Claude()
+claude.init()
+response = claude.get_augmented_response(user_query, ranked_documents)
+print("FINAL REPLY")
+print(response)
