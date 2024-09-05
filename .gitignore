@@ -292,8 +292,8 @@ cython_debug/
 structure.txt
 
 # Parsed docs
-!src/document_ingestion/data/raw
-!/src/document_ingestion/data/formatted
+!src/input_processing/data/raw
+!/src/input_processing/data/formatted
 
 #logs
 logs

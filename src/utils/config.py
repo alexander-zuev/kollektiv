@@ -13,13 +13,16 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 # Google Configuration
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
+# OpenAI API KEY
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 # File Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 LOG_DIR = os.path.join(BASE_DIR, "logs")
-JOB_FILE_DIR = os.path.join(BASE_DIR, "src", "document_ingestion", "data", "jobs")
+JOB_FILE_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "jobs")
 JOB_FILE_PATH = os.path.join(JOB_FILE_DIR, "jobs.json")
-RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "document_ingestion", "data", "raw")
-PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "document_ingestion", "data", "processed")
+RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "raw")
+PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "processed")
 
 # Ensure directories exist
 os.makedirs(JOB_FILE_DIR, exist_ok=True)
