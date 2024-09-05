@@ -7,7 +7,7 @@ import json
 import os
 from openai import OpenAI
 
-from src.utils.config import OPENAI_API_KEY, PERSIST_DIRECTORY, LOG_DIR, PROCESSED_DATA_DIR
+from src.utils.config import OPENAI_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
 
 # Set up logger
@@ -51,12 +51,10 @@ class DocumentProcessor:
 
 class VectorDB:
     def __init__(self,
-                 persist_dir: str = PERSIST_DIRECTORY,
                  collection_name: str = "supabase_collection",
                  embedding_function: str = "text-embedding-3-small",
                  openai_api_key: str = OPENAI_API_KEY):
         self.embedding_function = None
-        self.persist_dir = persist_dir
         self.collection_name = collection_name
         self.client = None
         self.collection = None

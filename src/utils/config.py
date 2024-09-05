@@ -23,7 +23,6 @@ JOB_FILE_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "jobs")
 JOB_FILE_PATH = os.path.join(JOB_FILE_DIR, "jobs.json")
 RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "raw")
 PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "processed")
-PERSIST_DIRECTORY = os.path.join(BASE_DIR, "vector_db_persist")
 
 # Ensure directories exist
 os.makedirs(JOB_FILE_DIR, exist_ok=True)
