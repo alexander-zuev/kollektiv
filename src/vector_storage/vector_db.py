@@ -2,7 +2,7 @@ from pprint import pprint
 
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Tuple, Union
 import json
 import os
 from openai import OpenAI
@@ -16,7 +16,7 @@ from src.generation.claude_assistant import Claude
 logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
 
 class DocumentProcessor:
-    def __init__(self, file_name: str):
+    def __init__(self, file_name: str = "processed_supabase_docs_20240901_193122.json"):
         self.file_name = file_name
         self.file_path = os.path.join(PROCESSED_DATA_DIR, file_name)
 
@@ -78,19 +78,55 @@ class VectorDB:
             logger.error(f"Error initializing ChromaDB: {e}")
             raise
 
+    def check_documents_exist(self, document_ids: List[str]) -> Tuple[bool, List[str]]:
+        """Checks, if chunks are already added to the database based on chunk ids"""
+
+        try:
+            # Get all current document ids from the db
+            result = self.collection.get(
+                ids=document_ids,
+                include=[]
+            )
+
+            # get the existing set of ids
+            existing_ids = set(result['ids'])
+
+            # find missing ids
+            missing_ids = list(set(document_ids) - existing_ids)
+
+            all_exist = len(missing_ids) == 0
+
+            if not all_exist:
+                logger.warning("Some ids do not exist in the database")
+            return all_exist, missing_ids
+
+        except Exception as e:
+            logger.error(f"Error checking document existence {e}")
+            return False, document_ids
+
     def add_documents(self, processed_docs: Dict[str, List[str]]) -> None:
         try:
             ids = processed_docs['ids']
             documents = processed_docs['documents']
-            self.collection.add(
-                ids=ids,
-                documents=documents
-            )
-            docs_n = len(ids)
-            logger.info(f"Added {docs_n} documents to ChromaDB")
+
+            # check if documents exist
+            all_exist, missing_ids = self.check_documents_exist(ids)
+
+            if all_exist:
+                logger.info("All documents already exist in the db. skipping addition.")
+                return
+
+            else: # try to add all documents (handling only simplified case
+                self.collection.add(
+                    ids=ids,
+                    documents=documents
+                )
+                docs_n = len(ids)
+                logger.info(f"Added {docs_n} documents to ChromaDB")
         except Exception as e:
             logger.error(f"Error adding documents to ChromaDB: {e}")
             raise
+
 
     def query(self, user_query: Union[str, List[str]], n_results: int = 5):
         """
@@ -256,6 +292,44 @@ class Reranker:
 
         return relevant_results
 
+
+class ResultRetriever:
+    def __init__(self, file_name: str):
+        self.file_name = file_name
+        self.doc_processor = None
+        self.db = None
+        self.llm_client = None
+        self.reranker = None
+
+    def initialize_components(self):
+        """Initialize all necessary components."""
+        try:
+            #
+            self.doc_processor = DocumentProcessor(self.file_name)
+
+            # db
+            self.db = VectorDB()
+            self.db.init()
+
+            # llm client
+            self.llm_client = OpenAIClient()
+            self.llm_client.init()
+
+            # reranker
+            self.reranker = Reranker()
+            self.reranker.init()
+
+            logger.info("All components initialized successfully")
+
+        except Exception as e:
+            logger.error(f"Error initializing components: {e}")
+            raise
+
+    def retrieve(self, user_query):
+        """Given the user query run the full end to end flow"""
+        pass
+
+
 # Test usage
 doc_processor = DocumentProcessor("processed_supabase_docs_20240901_193122.json")
 docs = doc_processor.load_json()
@@ -268,7 +342,7 @@ db.add_documents(processed_docs)
 
 # query
 user_query = input("Input your query here: ")
-# search_result = db.query(user_query)
+search_result = db.query(user_query)
 # pprint(search_result)
 # processed_results = db.process_query_results(search_result)
 # pprint(processed_results)
