@@ -2,7 +2,7 @@
 
 ## 🌟 Overview
 
-RAG over Docs is a Retrieval-Augmented Generation (RAG) system designed to improve LLM responses when working with recent or private documentation. This project aims to reduce hallucinations and inaccuracies in LLM outputs by providing access to up-to-date information.
+RAG for Docs is a Retrieval-Augmented Generation (RAG) system designed to improve LLM responses when working with recent or private documentation. This project aims to reduce hallucinations and inaccuracies in LLM outputs by providing access to up-to-date information.
 
 ## ❓Why?
 - Large Language Models (LLMs) often lack access to the most recent documentation or private knowledge, leading to:
