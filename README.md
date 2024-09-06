@@ -12,7 +12,7 @@ What if LLMs could tap into a source of up to date information on libraries, too
 Imagine you could use the power of reasoning of modern LLMs but not be limited by their knowledgde cutoff date?
 
 ## 🎯 Goal
-This project addresses these issues by implementing a RAG system that can access and utilize current documentation so that you can ask it to use any tool correctly?
+This project addresses these issues by implementing a RAG system that can access and utilize current documentation so that you can ask it to use any tool **in a correct way (without hallucinating or providing wrong implementation details**
 
 ## ⚙️ Key Features
 
