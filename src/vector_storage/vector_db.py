@@ -182,7 +182,7 @@ class OpenAIClient:
             logger.error(f"Error initializing OpenAI client: {e}")
             raise
 
-    def generate_multi_query(self, user_query: str, model: str = self.model_name) -> List[str]:
+    def generate_multi_query(self, user_query: str, model: str = None) -> List[str]:
         prompt = """
         You are a meticoulous, accurate, and knowledgeable AI assistant.
         You are helping users retrieve relevan information from a vector database.
@@ -195,6 +195,8 @@ class OpenAIClient:
         - Ensure each question is complete and directly related to the original inquiry.
         - List each question on a separate line without numbering.
         """
+        if model is None:
+            model = self.model_name
 
         try:
             messages = [
@@ -283,13 +285,13 @@ class Reranker:
         )
 
         logger.info(f"Received {len(response.results)} documents from Cohere.")
-        pprint(response.results)
+        # pprint(response.results)
 
         # filter irrelevant results
         logger.info(f"Filtering out the results with less than {relevance_threshold} relevance "
                     f"score")
         relevant_results = self.filter_irrelevant_results(response, relevance_threshold)
-        logger.info(f"{len(relevant_results)} documents remaining.")
+        logger.info(f"{len(relevant_results)} documents remaining after filtering.")
 
         return relevant_results
 
@@ -341,31 +343,32 @@ class ResultRetriever:
             # expand the queries
             multiple_queries = self.llm_client.generate_multi_query(user_query)
             combined_queries = self.llm_client.combine_queries(user_query, multiple_queries)
-            print(f"Debugging ranked documents {combined_queries}")
+            logger.debug(f"Debugging ranked documents {combined_queries}")
 
             # get expanded search results
             search_results = self.db.query(combined_queries)
             unique_documents = self.db.deduplicate_documents(search_results)
-            print(f"Debugging ranked documents {unique_documents}")
+            logger.debug(f"Debugging ranked documents {unique_documents}")
 
             # rerank the results
             ranked_documents = self.reranker.rerank(user_query, unique_documents)
-            print(f"Debugging ranked documents {ranked_documents}")
+            logger.debug(f"Debugging ranked documents {ranked_documents}")
 
-            logger.info("End to end flow works")
+            logger.debug("End to end flow works")
             return ranked_documents
         except Exception as e:
             logger.error(f"Error retrieving documents: {e}")
+            raise
 
-# nitialize the ranker
+# Test usage
+# initialize the ranker
 retriever = ResultRetriever()
 retriever.initialize_components()
 
 # get user query
 user_query = input("What do you want to know about: ")
 results = retriever.retrieve(user_query)
-print("debugging results")
-pprint(results)
+# pprint(results)
 
 # Send to the generation
 claude = Claude()
