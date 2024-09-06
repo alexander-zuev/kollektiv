@@ -74,6 +74,7 @@ class VectorDB:
                 "supabase-collection", embedding_function=self.embedding_function
             )
             logger.info(f"Successfully initialized ChromaDb with collection: {self.collection_name}")
+            logger.info(f"A total number of documents in the database: {self.collection.count()}")
         except Exception as e:
             logger.error(f"Error initializing ChromaDB: {e}")
             raise
@@ -181,7 +182,7 @@ class OpenAIClient:
             logger.error(f"Error initializing OpenAI client: {e}")
             raise
 
-    def generate_multi_query(self, user_query: str, model: str) -> List[str]:
+    def generate_multi_query(self, user_query: str, model: str = self.model_name) -> List[str]:
         prompt = """
         You are a meticoulous, accurate, and knowledgeable AI assistant.
         You are helping users retrieve relevan information from a vector database.
@@ -292,9 +293,8 @@ class Reranker:
 
         return relevant_results
 
-
 class ResultRetriever:
-    def __init__(self, file_name: str):
+    def __init__(self, file_name: str = "processed_supabase_docs_20240901_193122.json"):
         self.file_name = file_name
         self.doc_processor = None
         self.db = None
@@ -325,57 +325,103 @@ class ResultRetriever:
             logger.error(f"Error initializing components: {e}")
             raise
 
-    def retrieve(self, user_query):
+    def load_documents(self) -> None:
+        """Load docs in the database if they are not already present"""
+        try:
+            chunks = self.doc_processor.load_json()
+            processed_chunks = self.doc_processor.prepare_documents(chunks)
+            self.db.add_documents(processed_chunks)
+        except Exception as e:
+            logger.error(f"Error loading documents: {e}")
+            raise
+
+    def retrieve(self, user_query: str):
         """Given the user query run the full end to end flow"""
-        pass
+        try:
+            # expand the queries
+            multiple_queries = self.llm_client.generate_multi_query(user_query)
+            combined_queries = self.llm_client.combine_queries(user_query, multiple_queries)
+            print(f"Debugging ranked documents {combined_queries}")
+
+            # get expanded search results
+            search_results = self.db.query(combined_queries)
+            unique_documents = self.db.deduplicate_documents(search_results)
+            print(f"Debugging ranked documents {unique_documents}")
+
+            # rerank the results
+            ranked_documents = self.reranker.rerank(user_query, unique_documents)
+            print(f"Debugging ranked documents {ranked_documents}")
+
+            logger.info("End to end flow works")
+            return ranked_documents
+        except Exception as e:
+            logger.error(f"Error retrieving documents: {e}")
+
+# nitialize the ranker
+retriever = ResultRetriever()
+retriever.initialize_components()
+
+# get user query
+user_query = input("What do you want to know about: ")
+results = retriever.retrieve(user_query)
+print("debugging results")
+pprint(results)
+
+# Send to the generation
+claude = Claude()
+claude.init()
+response = claude.get_augmented_response(user_query, results)
+print("FINAL REPLY")
+print(response)
+
 
 
 # Test usage
-doc_processor = DocumentProcessor("processed_supabase_docs_20240901_193122.json")
-docs = doc_processor.load_json()
-processed_docs = doc_processor.prepare_documents(docs)
-
+# doc_processor = DocumentProcessor("processed_supabase_docs_20240901_193122.json")
+# docs = doc_processor.load_json()
+# processed_docs = doc_processor.prepare_documents(docs)
+#
 # load documents into db
-db = VectorDB()
-db.init()
-db.add_documents(processed_docs)
-
+# db = VectorDB()
+# db.init()
+# db.add_documents(processed_docs)
+#
 # query
-user_query = input("Input your query here: ")
-search_result = db.query(user_query)
+# user_query = input("Input your query here: ")
+# search_result = db.query(user_query)
 # pprint(search_result)
 # processed_results = db.process_query_results(search_result)
 # pprint(processed_results)
 
 # Generate multi-queries
-openai_client = OpenAIClient()
-openai_client.init()
-multiple_queries = openai_client.generate_multi_query(user_query, model='gpt-4o-mini')
-print("Generated queries:")
-print(multiple_queries)
-combined_queries = openai_client.combine_queries(user_query, multiple_queries)
+# openai_client = OpenAIClient()
+# openai_client.init()
+# multiple_queries = openai_client.generate_multi_query(user_query, model='gpt-4o-mini')
+# print("Generated queries:")
+# print(multiple_queries)
+# combined_queries = openai_client.combine_queries(user_query, multiple_queries)
 # print(combined_queries)
 
 # Get additional documents
-expanded_search_results = db.query(combined_queries)
+# expanded_search_results = db.query(combined_queries)
 # print("EXPANDED RESULTS")
-expanded_results = db.process_results_to_print(expanded_search_results)
+# expanded_results = db.process_results_to_print(expanded_search_results)
 # pprint(expanded_results)
 
 # Unify documents
-unique_documents = db.deduplicate_documents(expanded_search_results)
+# unique_documents = db.deduplicate_documents(expanded_search_results)
 # print("UNIQUE DOCS:")
 # pprint(unique_documents)
 
 # Re-rank
-reranker = Reranker()
-reranker.init()
-ranked_documents = reranker.rerank(user_query, unique_documents)
-pprint(ranked_documents)
-
+# reranker = Reranker()
+# reranker.init()
+# ranked_documents = reranker.rerank(user_query, unique_documents)
+# pprint(ranked_documents)
+#
 # Send to the generation
-claude = Claude()
-claude.init()
-response = claude.get_augmented_response(user_query, ranked_documents)
-print("FINAL REPLY")
-print(response)
+# claude = Claude()
+# claude.init()
+# response = claude.get_augmented_response(user_query, ranked_documents)
+# print("FINAL REPLY")
+# print(response)
