@@ -12,7 +12,7 @@ RAG over Docs is a Retrieval-Augmented Generation (RAG) system designed to impro
 **What if LLMs were not limited by their training data?**
 
 ## 🎯 Goal
-This project addresses these issues by implementing a RAG system that can access and utilize current documentation.
+This project addresses these issues by implementing a RAG system that can access and utilize current documentation so that you can ask it to use any tool correctly?
 
 ## ⚙️ Key Features
 
