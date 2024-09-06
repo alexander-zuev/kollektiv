@@ -180,11 +180,8 @@ I need to define something similar but using ChromaDB and vector embeddings from
      - `add_documents` - loads the documents into the database
      - `query()` - use query func
 3. `LLMClient` - initiates llm client to be used for this classs
-4. `QueryExpander` - expands the original query
-   - Uses LLMClient to expand queries
-   - Unifies the resulting documents
-5. `ReRanker` - uses Cohere API to re-rank the results
-6. `ResultsRetriever` - orchestrates end to end flow
+4. `ReRanker` - uses Cohere API to re-rank the results
+5. `ResultsRetriever` - orchestrates end to end flow
    - Input: user query
    - Steps:
      - Generate multi-queries
