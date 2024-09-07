@@ -360,71 +360,24 @@ class ResultRetriever:
             logger.error(f"Error retrieving documents: {e}")
             raise
 
-# Test usage
-# initialize the ranker
-retriever = ResultRetriever()
-retriever.initialize_components()
 
-# get user query
-user_query = input("What do you want to know about: ")
-results = retriever.retrieve(user_query)
-# pprint(results)
+def main():
+    # Test usage
+    # initialize the ranker
+    retriever = ResultRetriever()
+    retriever.initialize_components()
 
-# Send to the generation
-claude = Claude()
-claude.init()
-response = claude.get_augmented_response(user_query, results)
-print("FINAL REPLY")
-print(response)
+    # get user query
+    user_query = input("What do you want to know about: ")
+    results = retriever.retrieve(user_query)
+    # pprint(results)
 
+    # Send to the generation
+    claude = Claude()
+    claude.init()
+    response = claude.get_augmented_response(user_query, results)
+    print("FINAL REPLY")
+    print(response)
 
-
-# Test usage
-# doc_processor = DocumentProcessor("processed_supabase_docs_20240901_193122.json")
-# docs = doc_processor.load_json()
-# processed_docs = doc_processor.prepare_documents(docs)
-#
-# load documents into db
-# db = VectorDB()
-# db.init()
-# db.add_documents(processed_docs)
-#
-# query
-# user_query = input("Input your query here: ")
-# search_result = db.query(user_query)
-# pprint(search_result)
-# processed_results = db.process_query_results(search_result)
-# pprint(processed_results)
-
-# Generate multi-queries
-# openai_client = OpenAIClient()
-# openai_client.init()
-# multiple_queries = openai_client.generate_multi_query(user_query, model='gpt-4o-mini')
-# print("Generated queries:")
-# print(multiple_queries)
-# combined_queries = openai_client.combine_queries(user_query, multiple_queries)
-# print(combined_queries)
-
-# Get additional documents
-# expanded_search_results = db.query(combined_queries)
-# print("EXPANDED RESULTS")
-# expanded_results = db.process_results_to_print(expanded_search_results)
-# pprint(expanded_results)
-
-# Unify documents
-# unique_documents = db.deduplicate_documents(expanded_search_results)
-# print("UNIQUE DOCS:")
-# pprint(unique_documents)
-
-# Re-rank
-# reranker = Reranker()
-# reranker.init()
-# ranked_documents = reranker.rerank(user_query, unique_documents)
-# pprint(ranked_documents)
-#
-# Send to the generation
-# claude = Claude()
-# claude.init()
-# response = claude.get_augmented_response(user_query, ranked_documents)
-# print("FINAL REPLY")
-# print(response)
+if __name__ == "__main__":
+    main()
