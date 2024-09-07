@@ -1,0 +1,96 @@
+rag-docs/
+├── rag-docs/
+├── .DS_Store
+├── .env.example
+├── .gitattributes
+├── LICENSE
+├── README.md
+├── poetry.lock
+├── project_structure.txt
+├── pyproject.toml
+├── structure.txt
+├── docs/
+│   ├── feature-scoping/
+│   │   ├── implement-chunking-az-19.md
+│   │   ├── implement-vector-storage-and-embedding-az-20.md
+├── logs/
+│   ├── chunking.log
+│   ├── claude_assistant.log
+│   ├── crawling.log
+│   ├── vector_db.log
+├── scripts/
+│   ├── generate_structure.py
+│   ├── project_structure.txt
+├── .idea/
+│   ├── misc.xml
+│   ├── modules.xml
+│   ├── rag-docs.iml
+│   ├── vcs.xml
+│   ├── workspace.xml
+│   ├── inspectionProfiles/
+│   │   ├── profiles_settings.xml
+├── src/
+│   ├── .DS_Store
+│   ├── __init__.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── logger.py
+│   ├── input_processing/
+│   │   ├── .DS_Store
+│   │   ├── __init__.py
+│   │   ├── processing/
+│   │   │   ├── .DS_Store
+│   │   │   ├── __init__.py
+│   │   │   ├── chunking.py
+│   │   │   ├── chunking_strategy.md
+│   │   │   ├── get_summary.py
+│   │   │   ├── test_llama_index_md.py
+│   │   │   ├── local/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── chunking_log.txt
+│   │   │   │   ├── gemini_batch_api.py
+│   │   │   │   ├── test_chunker.py
+│   │   │   │   ├── test_input_processor.py
+│   │   │   │   ├── test_markdown_parser.py
+│   │   ├── utils/
+│   │   │   ├── __init__.py
+│   │   │   ├── visualize_results.py
+│   │   ├── data/
+│   │   │   ├── formatted/
+│   │   │   │   ├── sample_content.md
+│   │   │   │   ├── sample_markdown.md
+│   │   │   │   ├── summary.txt
+│   │   │   ├── jobs/
+│   │   │   ├── processed/
+│   │   │   │   ├── chunked_summarized_supabase_docs.json
+│   │   │   │   ├── chunked_supabase.com_docs__20240830_073045.json
+│   │   │   │   ├── processed_supabase_docs_20240901_181030.json
+│   │   │   │   ├── processed_supabase_docs_20240901_181740.json
+│   │   │   │   ├── processed_supabase_docs_20240901_183826.json
+│   │   │   │   ├── processed_supabase_docs_20240901_191358.json
+│   │   │   │   ├── processed_supabase_docs_20240901_193122.json
+│   │   │   ├── raw/
+│   │   │   │   ├── supabase.com_docs__20240826_201304.json
+│   │   │   │   ├── supabase.com_docs__20240826_212435.json
+│   │   │   │   ├── unique_urls.txt
+│   │   ├── crawling/
+│   │   │   ├── __init__.py
+│   │   │   ├── jobs.json
+│   │   │   ├── manage_jobs.py
+│   │   │   ├── retrieve_results.py
+│   │   │   ├── scraping.py
+│   ├── vector_storage/
+│   │   ├── __init__.py
+│   │   ├── vector_db.py
+│   │   ├── chroma/
+│   │   │   ├── chroma.sqlite3
+│   │   │   ├── 31796cea-9fa0-426a-8559-b4c5364fb0b1/
+│   │   │   │   ├── data_level0.bin
+│   │   │   │   ├── header.bin
+│   │   │   │   ├── index_metadata.pickle
+│   │   │   │   ├── length.bin
+│   │   │   │   ├── link_lists.bin
+│   ├── generation/
+│   │   ├── __init__.py
+│   │   ├── claude_assistant.py

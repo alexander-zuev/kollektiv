@@ -295,5 +295,8 @@ structure.txt
 !src/input_processing/data/raw
 !/src/input_processing/data/formatted
 
-#logs
-logs
+# Ignore everything in the logs directory
+logs/*
+
+# But don't ignore the logs directory itself
+!logs/.gitkeep
