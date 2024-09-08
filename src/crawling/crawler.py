@@ -95,8 +95,8 @@ class FireCrawler:
 
 # Test usage
 crawler = FireCrawler(FIRECRAWL_API_KEY)
-supabase_ai_map = crawler.map_url("https://supabase.com/docs/guides/ai")
-print("Map results:")
-print(f"Total number of links: {supabase_ai_map['total_links']}")
-print("All links:")
-print(supabase_ai_map['links'])
+# supabase_ai_map = crawler.map_url("https://supabase.com/docs/guides/ai")
+# print("Map results:")
+# print(f"Total number of links: {supabase_ai_map['total_links']}")
+# print("All links:")
+# print(supabase_ai_map['links'])
