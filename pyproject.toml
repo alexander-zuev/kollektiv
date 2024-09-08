@@ -23,6 +23,7 @@ chromadb = "^0.5.5"
 protobuf = "3.20.3"
 cohere = "^5.9.0"
 firecrawl-py = "^1.2.3"
+pydantic = "^2.9.0"
 
 
 [build-system]
