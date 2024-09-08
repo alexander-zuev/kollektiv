@@ -19,5 +19,26 @@
     "status": "completed",
     "timestamp": "240908_221308",
     "method": "crawl"
+  },
+  "fa6e8ecf-a203-45b0-a35f-2e4fa11d76df": {
+    "internal_id": "fa6e8ecf-a203-45b0-a35f-2e4fa11d76df",
+    "job_id": "0b2ebd07-2378-4e0f-90e5-cd82fbe8d947",
+    "status": "completed",
+    "timestamp": "2024-09-08 22:21:12",
+    "method": "crawl"
+  },
+  "f95308e5-c33d-40a6-988a-ce9ce7a74a5e": {
+    "internal_id": "f95308e5-c33d-40a6-988a-ce9ce7a74a5e",
+    "job_id": "2f2eb7bc-13f6-49d0-94fa-a6f3cfc25cc9",
+    "status": "completed",
+    "timestamp": "2024-09-08 22:30:13",
+    "method": "crawl"
+  },
+  "afa6b7fd-e6ef-40f8-9245-108dcf0ff1af": {
+    "internal_id": "afa6b7fd-e6ef-40f8-9245-108dcf0ff1af",
+    "job_id": "99468112-effb-48a9-b371-d10058e125c8",
+    "status": "completed",
+    "timestamp": "2024-09-08 22:31:53",
+    "method": "crawl"
   }
 }
