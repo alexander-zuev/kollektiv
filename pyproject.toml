@@ -10,7 +10,6 @@ package-mode = false
 python = "^3.12"
 anthropic = "^0.34.1"
 openai = "^1.42.0"
-firecrawl-py = "^0.0.20"
 colorama = "^0.4.6"
 requests = "^2.32.3"
 tiktoken = "^0.7.0"
@@ -23,6 +22,8 @@ llama-index = "^0.11.3"
 chromadb = "^0.5.5"
 protobuf = "3.20.3"
 cohere = "^5.9.0"
+firecrawl-py = "^1.2.3"
+pydantic = "^2.9.0"
 
 
 [build-system]
