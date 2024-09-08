@@ -1,6 +1,13 @@
+import json
+import os
 import uuid
 from typing import List, Dict, Any, Optional
+
 from pydantic import HttpUrl
+from urllib.parse import urlparse
+import re
+from datetime import datetime
+
 
 from firecrawl import FirecrawlApp
 
@@ -46,23 +53,45 @@ class FireCrawler:
             'links': links,
         }
 
+        self.save_results(result, method="map")
+
         return result
 
     @error_handler(logger)
     def crawl_url(self):
         pass
 
-    def save_results(self, results: List[str]) -> None:
+    @error_handler(logger)
+    def save_results(self, result: Dict[str, Any], method: str) -> None:
         """Takes as an input the results of the job, saves it as a json file in the data directory"""
-        pass
+        filename = self._create_file_name(result['input_url'], method)
+        filepath = os.path.join(self.raw_data_dir, filename)
 
-    def _create_file_name(self):
+        with open(filepath, 'w') as f:
+            json.dump(result, f, indent=2)
+
+        self.logger.info(f"Results saved to file: {filepath}")
+
+    @error_handler(logger)
+    def _create_file_name(self, url: HttpUrl, method: str) -> str:
         """Creates a slugified version of url + method for use as a file name"""
-        pass
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.split('.')[0] # take only two parts of the domain
+        path = parsed_url.path.strip('/').split('/')[0]
 
+        # Combine parts and sanitize
+        parts = [method[:3], domain, path] if path else [method[:3], domain]
+        slug = '_'.join(parts)
+        slug = re.sub(r'[^\w\-]', '', slug)  # Remove any non-word characters
+
+        timestamp = self._get_timestamp()
+
+        return f"{slug}_{timestamp}.json"
+
+    @error_handler(logger)
     def _get_timestamp(self):
         """Returns the current timestamp to be used for saving the results"""
-        pass
+        return datetime.now().strftime("%y%m%d_%H%M%S")
 
 # Test usage
 crawler = FireCrawler(FIRECRAWL_API_KEY)
