@@ -1,5 +1,6 @@
 import uuid
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from pydantic import HttpUrl
 
 from firecrawl import FirecrawlApp
 
@@ -25,10 +26,27 @@ class FireCrawler:
             return app
 
     @error_handler(logger)
-    def map_url(self, url) -> List[str]:
+    def map_url(self, url: HttpUrl) -> Optional[Dict[str, Any]]:
         """Input a website and get all the urls on the website - extremely fast"""
+        self.logger.info(f"Mapping URL: {url}")
+
         site_map = self.app.map_url(url)
-        return site_map
+        self.logger.info("Map results received. Attempting to parse the results.")
+
+        # extract links and calculate total
+        links = site_map
+        total_links = len(links)
+
+        self.logger.info(f"Total number of links received: {total_links}")
+
+        result = {
+            'status' : 'success',
+            'input_url': url,
+            'total_links': total_links,
+            'links': links,
+        }
+
+        return result
 
     @error_handler(logger)
     def crawl_url(self):
@@ -49,3 +67,7 @@ class FireCrawler:
 # Test usage
 crawler = FireCrawler(FIRECRAWL_API_KEY)
 supabase_ai_map = crawler.map_url("https://supabase.com/docs/guides/ai")
+print("Map results:")
+print(f"Total number of links: {supabase_ai_map['total_links']}")
+print("All links:")
+print(supabase_ai_map['links'])
