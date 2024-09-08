@@ -1,8 +1,7 @@
 import json
 import os
-import uuid
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from uuid import uuid4
 
 from pydantic import HttpUrl
@@ -61,24 +60,38 @@ class FireCrawler:
         return result
 
     @error_handler(logger)
-    def async_crawl_url(self, url: HttpUrl, params: Dict[str, Any]) -> str:
+    def async_crawl_url(self, url: HttpUrl, page_limit: int = 25) -> str:
+        # setup params dict
+        params = {
+            'limit': page_limit,
+            'scrapeOptions': {'formats': ['markdown']}
+
+        }
+
         response = self.app.async_crawl_url(url, params)
         job_id = response['id'] # return the id from FireCrawl
 
         # create a job with this id
         self.create_job(job_id=job_id, method="crawl")
 
-        # poll until the results are received
+        # wait until the job is complete
         while True:
             response = self.check_job_status(job_id)
             job_status = response['status']
+            requires_pagination = response.get('next', None)
+
+            if requires_pagination:
+                next_url = response['next']
+
             if job_status == 'completed':
-                results = self._get_all_crawl_results(job_id)
+                results = self._get_all_crawl_results(response, requires_pagination, next_url)
                 break
             if job_status == 'failed':
                 self.logger.error(f"Crawling job failed, ID: {job_id}")
                 return f"Job {job_id} failed"
-            self.logger.info("Re-checking in 30 seconds...")
+            else:
+                self.logger.info(f"Job is in {job_status}, retrying in 30 seconds...")
+
             time.sleep(30)
 
         # save the results
@@ -88,45 +101,36 @@ class FireCrawler:
         self.complete_job(job_id)
         return f"Job {job_id} completed successfully."
 
-    def _get_all_crawl_results(self, job_id: str) -> Dict[str, Any]:
-        """ Fetch all results for a given crawl job, handling pagination """
-        all_data = []
-        next_url = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
-        completed_pages = 0
+    @error_handler(logger)
+    def _get_all_crawl_results(self,
+                               response: Dict[str, Any],
+                               requires_pagination: bool = False,
+                               next_url: [Optional[HttpUrl]] = None) -> (Dict)[str, Any]:
+        """ Fetch all results for a given crawl job, handling pagination"""
 
-        while next_url:
-            partial_results = self._get_next_results(next_url)
-            all_data.extend(partial_results['data'])
-            completed_pages += len(partial_results['data'])
-            total_pages = partial_results['total']
+        if not requires_pagination:
+            results = response['data']
+        else:
+            results = []
+            while next_url:
+                data, next_url = self._get_next_results(next_url)
+                results.extend(data)
+                # how to re-try again?
+                # how to exit?
 
-            next_url = partial_results.get('next')
-            self.logger.info(f"Fetched {completed_pages}/{total_pages} pages")
+        # do I build the results correctly?
+        return results
 
-            if next_url:
-                time.sleep(1)  # Respect rate limits
-
-        return {
-            'data': all_data
-        }
-
-    def _get_next_results(self, job_id: str,) -> Dict[str, Any]:
-        """Fetch the nezt batch of results form the given job_id"""
-        max_retries = 3
-        backoff_factor = 2
-
-        url = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
+    @error_handler
+    def _get_next_results(self, next_url: HttpUrl) -> Union[Dict[str, Any], HttpUrl]:
+        """Retrieves the next batch of the results"""
+        # how to implement re-tries? How to handle them gracefully?
+        url = next_url
         headers = {"Authorization": f"Bearer {self.api_key}"}
-
-        response = requests.request("GET", url, headers=headers)
-        partial_results = {
-            'completed' : response['completed'],
-            'total' : response['total'],
-            'data' : response['data']
-        }
-        pct_remaining = response['completed'] / response['total']
-        self.logger.info(f"Remaining {pct_remaining}%")
-        return partial_results
+        response = requests.get("GET", url, headers=headers)
+        data = response['data']
+        next_url = response['next_url'] # it can be missing -> which means that there are no more results to crawl
+        return data, next_url
 
 
     @error_handler(logger)
@@ -257,9 +261,11 @@ url_to_crawl = "https://supabase.com/docs/guides/ai"
 crawl_status=crawler.app.async_crawl_url(
     url=url_to_crawl,
     params={
-        'limit' : 2,
+        'limit' : 5,
         'scrapeOptions': {'formats': ['markdown',]}
 
     },
 )
 print(crawl_status)
+job_id = crawl_status['id']
+crawler._get_all_crawl_results(job_id)
