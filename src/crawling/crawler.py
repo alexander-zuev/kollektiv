@@ -69,7 +69,7 @@ class FireCrawler:
             'scrapeOptions': {'formats': ['markdown']}
         }
 
-        self.logger.info(f"Crawling URL: {url}")
+        self.logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
         response = self.app.async_crawl_url(url, params)
 
         crawl_job_id = response['id'] # return the id from FireCrawl
@@ -86,13 +86,17 @@ class FireCrawler:
 
         # get all the results
         crawl_results = self._get_all_crawl_results(crawl_job_id)
+        unique_links = self._extract_unique_links(crawl_results)
         self.logger.info(f"Job {crawl_job_id} results received.")
+        self.logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
 
         # save the results
         crawl_results = {
             'input_url': url,
-            'data': crawl_results
+            'data': crawl_results,
+            'unique_links' : unique_links
         }
+
         self.save_results(crawl_results, method="crawl")
 
         # complete the job
@@ -100,7 +104,7 @@ class FireCrawler:
         return crawl_results
 
     @error_handler(logger)
-    def _poll_job_results(self, job_id: str) -> str:
+    def _poll_job_results(self, job_id: str, attempts=None) -> str:
         while True:
             response = self.check_job_status(job_id)
             job_status = response['status']
@@ -108,7 +112,7 @@ class FireCrawler:
             if job_status in ['completed', 'failed']:
                 return job_status
 
-            self.logger.info(f"Job is in {job_status}, retrying in 30 seconds...")
+            self.logger.info(f"Job {job_id} status: {job_status}. Retrying in 30 seconds...")
             time.sleep(30)
 
     @error_handler(logger)
@@ -188,7 +192,7 @@ class FireCrawler:
     @error_handler(logger)
     def _get_timestamp(self):
         """Returns the current timestamp to be used for saving the results"""
-        return datetime.now().strftime("%y-%m-%d_%H%M%S")
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     @error_handler(logger)
     def create_job(self, job_id: str, method: str) -> None:
@@ -258,27 +262,38 @@ class FireCrawler:
     def check_job_status(self, job_id: str) -> Dict[str, Any]:
         """Polls firecrawl for the job result"""
         response = self.app.check_crawl_status(job_id)
-        logger.info(f"Job ID {job_id} status: *** {response['status']} ***")
+        self.logger.info(
+            f"Job {job_id} status: {response['status']}. Completed: {response.get('completed', 'N/A')}/{response.get('total', 'N/A')}")
         return response
 
+    @error_handler(logger)
+    def _extract_unique_links(self, crawl_results: List[Dict[str, Any]]) -> List[str]:
+        """ Extracts unique links in the completed crawl"""
+        unique_links = set(item['metadata']['sourceURL'] for item in crawl_results if 'metadata' in item and 'sourceURL' in item['metadata'])
+        return list(unique_links)
 
 # Test usage
-crawler = FireCrawler(FIRECRAWL_API_KEY)
-# supabase_ai_map = crawler.map_url("https://supabase.com/docs/guides/ai")
-# print("Map results:")
-# print(f"Total number of links: {supabase_ai_map['total_links']}")
-# print("All links:")
-# print(supabase_ai_map['links'])
+def main():
+    crawler = FireCrawler(FIRECRAWL_API_KEY)
 
-# Testing crawl_url
-url_to_crawl = "https://supabase.com/docs/guides/ai"
-results = crawler.async_crawl_url(url_to_crawl, page_limit=50)
+    # supabase_ai_map = crawler.map_url("https://supabase.com/docs/guides/ai")
+    # print("Map results:")
+    # print(f"Total number of links: {supabase_ai_map['total_links']}")
+    # print("All links:")
+    # print(supabase_ai_map['links'])
 
-print(f"Crawl Results for {url_to_crawl}:")
-print(f"Input URL: {results['input_url']}")
-print(f"Total data points: {len(results['data'])}")
-if results['data']:
-    print(f"First data point:")
-    print(json.dumps(results['data'][0], indent=2))
-else:
-    print("No data points found.")
+    # Testing crawl_url
+    url_to_crawl = "https://supabase.com/docs/reference/python"
+    results = crawler.async_crawl_url(url_to_crawl, page_limit=50)
+
+    print(f"Crawl Results for {url_to_crawl}:")
+    print(f"Input URL: {results['input_url']}")
+    print(f"Total data points: {len(results['data'])}")
+    if results['data']:
+        print(f"First data point:")
+        print(json.dumps(results['data'][0], indent=2))
+    else:
+        print("No data points found.")
+
+if __name__ == "__main__":
+    main()
