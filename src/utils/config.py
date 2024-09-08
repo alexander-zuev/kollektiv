@@ -25,6 +25,7 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 JOB_FILE_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "jobs")
 JOB_FILE_PATH = os.path.join(JOB_FILE_DIR, "jobs.json")
 RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "raw")
+NEW_RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "data", "raw")
 PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "processed")
 
 # Ensure directories exist
