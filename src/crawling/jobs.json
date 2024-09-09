@@ -55,5 +55,13 @@
     "status": "started",
     "timestamp": "2024-09-09 09:18:59",
     "method": "crawl"
+  },
+  "3b14751e-8286-4325-b3ad-9395b5f0af4f": {
+    "internal_id": "3b14751e-8286-4325-b3ad-9395b5f0af4f",
+    "job_id": "a06f4164-bc0a-48e8-aed7-80f40801dbba",
+    "input_url": "https://docs.flutterflow.io/",
+    "status": "completed",
+    "timestamp": "2024-09-09 10:53:20",
+    "method": "crawl"
   }
 }

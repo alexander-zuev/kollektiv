@@ -94,8 +94,9 @@ class FireCrawler:
         crawl_results = {
             'input_url': url,
             'total_pages': len(crawl_results),
+            'unique_links': unique_links,
             'data': crawl_results,
-            'unique_links' : unique_links
+
         }
 
         self.save_results(crawl_results, method="crawl")
@@ -314,8 +315,8 @@ def main():
     # print(supabase_ai_map['links'])
 
     # Testing crawl_url
-    url_to_crawl = "https://docs.llamaindex.ai/en/stable/"
-    results = crawler.async_crawl_url(url_to_crawl, page_limit=50)
+    url_to_crawl = "https://docs.flutterflow.io/"
+    results = crawler.async_crawl_url(url_to_crawl, page_limit=75)
 
     print(f"Crawl Results for {url_to_crawl}:")
     print(f"Input URL: {results['input_url']}")
