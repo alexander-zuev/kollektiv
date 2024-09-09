@@ -172,6 +172,9 @@ class FireCrawler:
         with open(filepath, 'w') as f:
             json.dump(result, f, indent=2)
 
+        # build an example file
+        self.build_example_file(filename)
+
         self.logger.info(f"Results saved to file: {filepath}")
 
     @error_handler(logger)
@@ -323,7 +326,7 @@ def main():
     #     print("No data points found.")
 
     crawler.build_example_file(
-        "cra_supabase_docs_2024-09-08 22:33:43.json",)
+        "cra_supabase_docs_2024-09-08 22:21:45.json",)
 
 if __name__ == "__main__":
     main()
