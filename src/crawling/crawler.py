@@ -14,7 +14,7 @@ from requests.exceptions import RequestException
 
 from firecrawl import FirecrawlApp
 
-from src.utils.config import FIRECRAWL_API_KEY, NEW_RAW_DATA_DIR, NEW_JOB_FILE_DIR
+from src.utils.config import FIRECRAWL_API_KEY, NEW_RAW_DATA_DIR, NEW_JOB_FILE_DIR, SRC_ROOT
 from src.utils.logger import setup_logger
 from src.utils.decorators import error_handler
 
@@ -76,7 +76,7 @@ class FireCrawler:
         self.logger.info(f"Received job ID: {crawl_job_id}")
 
         # create a job with this id
-        self.create_job(job_id=crawl_job_id, method="crawl")
+        self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
 
         # check job status
         self.logger.info("***Polling job status***")
@@ -93,6 +93,7 @@ class FireCrawler:
         # save the results
         crawl_results = {
             'input_url': url,
+            'total_pages': len(crawl_results),
             'data': crawl_results,
             'unique_links' : unique_links
         }
@@ -171,6 +172,9 @@ class FireCrawler:
         with open(filepath, 'w') as f:
             json.dump(result, f, indent=2)
 
+        # build an example file
+        self.build_example_file(filename)
+
         self.logger.info(f"Results saved to file: {filepath}")
 
     @error_handler(logger)
@@ -195,7 +199,7 @@ class FireCrawler:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     @error_handler(logger)
-    def create_job(self, job_id: str, method: str) -> None:
+    def create_job(self, job_id: str, method: str, input_url: HttpUrl) -> None:
         """Creates a job, saving information to jobs.json returned by async_crawl_url method."""
         internal_id = str(uuid4())
         path = os.path.join(self.jobs_dir, "jobs.json") # path should be src/crawling
@@ -204,6 +208,7 @@ class FireCrawler:
         job_info = {
             'internal_id': internal_id,
             'job_id': job_id,
+            'input_url' : input_url,
             'status' : 'started',
             'timestamp': self._get_timestamp(),
             'method' : method
@@ -272,6 +277,32 @@ class FireCrawler:
         unique_links = set(item['metadata']['sourceURL'] for item in crawl_results if 'metadata' in item and 'sourceURL' in item['metadata'])
         return list(unique_links)
 
+    @error_handler(logger)
+    def build_example_file(self, filename: str, pages: int = 3) -> None:
+        """Extracts n pages into example file to visualize its structure"""
+        input_filename = filename
+        input_filepath = os.path.join(self.raw_data_dir, input_filename)
+
+        output_filename = "example.md"
+        output_filepath = os.path.join(SRC_ROOT, 'data', 'example', output_filename)
+
+        # ensure directory exists
+        os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+
+        with open(input_filepath, 'r') as f:
+            json_data = json.load(f)
+
+        with open(output_filepath, 'w') as f:
+            for index, item in enumerate(json_data['data']):
+                if 'markdown' in item:
+                    f.write(f"Markdown content for item {index}\n\n {item['markdown']}\n\n----\n\n")
+
+                if index >= pages -1:
+                    break
+
+        logger.info(f"Example file created: {output_filepath}")
+
+
 # Test usage
 def main():
     crawler = FireCrawler(FIRECRAWL_API_KEY)
@@ -283,7 +314,7 @@ def main():
     # print(supabase_ai_map['links'])
 
     # Testing crawl_url
-    url_to_crawl = "https://supabase.com/docs/reference/python"
+    url_to_crawl = "https://docs.llamaindex.ai/en/stable/"
     results = crawler.async_crawl_url(url_to_crawl, page_limit=50)
 
     print(f"Crawl Results for {url_to_crawl}:")

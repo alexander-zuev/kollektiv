@@ -40,5 +40,12 @@
     "status": "completed",
     "timestamp": "2024-09-08 22:31:53",
     "method": "crawl"
+  },
+  "46e54990-0e6b-48f8-82e8-c5cc280a125a": {
+    "internal_id": "46e54990-0e6b-48f8-82e8-c5cc280a125a",
+    "job_id": "414b0041-5dc1-40d8-9aa3-e070cfa819b9",
+    "status": "completed",
+    "timestamp": "2024-09-09 08:58:01",
+    "method": "crawl"
   }
 }

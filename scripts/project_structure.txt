@@ -6,17 +6,17 @@ rag-docs/
 ├── LICENSE
 ├── README.md
 ├── poetry.lock
-├── project_structure.txt
 ├── pyproject.toml
-├── structure.txt
 ├── docs/
 │   ├── feature-scoping/
 │   │   ├── implement-chunking-az-19.md
 │   │   ├── implement-vector-storage-and-embedding-az-20.md
+│   │   ├── re-factor-chunking-az-46.md
 ├── logs/
 │   ├── chunking.log
 │   ├── claude_assistant.log
 │   ├── crawling.log
+│   ├── firecrawler.log
 │   ├── vector_db.log
 ├── scripts/
 │   ├── generate_structure.py
@@ -32,9 +32,13 @@ rag-docs/
 ├── src/
 │   ├── .DS_Store
 │   ├── __init__.py
+│   ├── processing/
+│   │   ├── __init__.py
+│   │   ├── chunking.py
 │   ├── utils/
 │   │   ├── __init__.py
 │   │   ├── config.py
+│   │   ├── decorators.py
 │   │   ├── logger.py
 │   ├── input_processing/
 │   │   ├── .DS_Store
@@ -43,9 +47,6 @@ rag-docs/
 │   │   │   ├── .DS_Store
 │   │   │   ├── __init__.py
 │   │   │   ├── chunking.py
-│   │   │   ├── chunking_strategy.md
-│   │   │   ├── get_summary.py
-│   │   │   ├── test_llama_index_md.py
 │   │   │   ├── local/
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── chunking_log.txt
@@ -74,12 +75,13 @@ rag-docs/
 │   │   │   │   ├── supabase.com_docs__20240826_201304.json
 │   │   │   │   ├── supabase.com_docs__20240826_212435.json
 │   │   │   │   ├── unique_urls.txt
-│   │   ├── crawling/
-│   │   │   ├── __init__.py
-│   │   │   ├── jobs.json
-│   │   │   ├── manage_jobs.py
-│   │   │   ├── retrieve_results.py
-│   │   │   ├── scraping.py
+│   ├── data/
+│   │   ├── example/
+│   │   │   ├── example.md
+│   │   ├── raw/
+│   │   │   ├── cra_supabase_docs_2024-09-08 22:21:45.json
+│   │   │   ├── cra_supabase_docs_2024-09-08 22:33:43.json
+│   │   │   ├── map_supabase_docs_240908_180611.json
 │   ├── vector_storage/
 │   │   ├── __init__.py
 │   │   ├── vector_db.py
@@ -94,3 +96,7 @@ rag-docs/
 │   ├── generation/
 │   │   ├── __init__.py
 │   │   ├── claude_assistant.py
+│   ├── crawling/
+│   │   ├── __init__.py
+│   │   ├── crawler.py
+│   │   ├── jobs.json
