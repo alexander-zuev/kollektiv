@@ -73,7 +73,7 @@ This is the structure of the docs they used in Anthropic tutorial on RAG.
   {
     "chunk_link": "https://docs.anthropic.com/en/docs/welcome#get-started",
     "chunk_heading": "Get started",
-    "text": "Get started\n\n\nIf you\u2019re new to Claude, start here to learn the essentials and make your first API call.\nIntro to ClaudeExplore Claude\u2019s capabilities and development flow.QuickstartLearn how to make your first API call in minutes.Prompt LibraryExplore example prompts for inspiration.\nIntro to ClaudeExplore Claude\u2019s capabilities and development flow.\n\nIntro to Claude\nExplore Claude\u2019s capabilities and development flow.\nQuickstartLearn how to make your first API call in minutes.\n\nQuickstart\nLearn how to make your first API call in minutes.\nPrompt LibraryExplore example prompts for inspiration.\n\nPrompt Library\nExplore example prompts for inspiration.\n"
+    "text": "Get started\n\n\nIf you\u2019re new to Claude, start here to learn the essentials and make your first API call.\nIntro to ClaudeExplore Claude\u2019s capabilities and development flow.QuickstartLearn how to make your first API call in minutes.Prompt LibraryExplore md_example prompts for inspiration.\nIntro to ClaudeExplore Claude\u2019s capabilities and development flow.\n\nIntro to Claude\nExplore Claude\u2019s capabilities and development flow.\nQuickstartLearn how to make your first API call in minutes.\n\nQuickstart\nLearn how to make your first API call in minutes.\nPrompt LibraryExplore md_example prompts for inspiration.\n\nPrompt Library\nExplore md_example prompts for inspiration.\n"
   },
   {
     "chunk_link": "https://docs.anthropic.com/en/docs/welcome#models",

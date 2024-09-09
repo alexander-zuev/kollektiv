@@ -172,7 +172,7 @@ class FireCrawler:
         with open(filepath, 'w') as f:
             json.dump(result, f, indent=2)
 
-        # build an example file
+        # build an md_example file
         self.build_example_file(filename)
 
         self.logger.info(f"Results saved to file: {filepath}")
@@ -279,12 +279,12 @@ class FireCrawler:
 
     @error_handler(logger)
     def build_example_file(self, filename: str, pages: int = 3) -> None:
-        """Extracts n pages into example file to visualize its structure"""
+        """Extracts n pages into md_example file to visualize its structure"""
         input_filename = filename
         input_filepath = os.path.join(self.raw_data_dir, input_filename)
 
         output_filename = "example.md"
-        output_filepath = os.path.join(SRC_ROOT, 'data', 'example', output_filename)
+        output_filepath = os.path.join(SRC_ROOT, 'data', 'md_example', output_filename)
 
         # ensure directory exists
         os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
