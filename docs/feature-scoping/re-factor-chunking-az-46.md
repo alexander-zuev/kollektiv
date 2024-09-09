@@ -86,6 +86,12 @@ methods:
       - First pass -> split into H1 an H2 sections
       - Second pass -> process each major section, splitting into chunks based on token count + content structure
       - Third pass -> adjust chunk boundaries to ensure code blocks are preserved and min/max token counts are respected
+- LlamaIndex results 
+  - The chunks are much smaller than our target of 1000 tokens (soft limit 800).
+  - Many chunks contain only headers or very short snippets of content.
+  - The chunking doesn't seem to respect the hierarchical structure of the markdown (H1, H2, H3).
+  - Code blocks appear to be split across multiple chunks.
+  - There's no visible overlap between chunks.
 - Great chunking resources
   - https://unstructured.io/blog/chunking-for-rag-best-practices
 - I need to employ some kind of content-aware chunking strategy
