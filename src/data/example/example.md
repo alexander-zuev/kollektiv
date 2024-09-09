@@ -1,524 +1,94 @@
 Markdown content for item 0
 
- AI & Vectors
+ [Skip to content](https://docs.llamaindex.ai/en/stable/api_reference/embeddings/adapter/#llama_index.embeddings.adapter.LinearAdapterEmbeddingModel)
 
-# Semantic Text Deduplication
+# Adapter
 
-## Finding duplicate movie reviews with Supabase Vecs.
+## LinearAdapterEmbeddingModel`module-attribute`[\#](https://docs.llamaindex.ai/en/stable/api_reference/embeddings/adapter/\#llama_index.embeddings.adapter.LinearAdapterEmbeddingModel "Permanent link")
 
-* * *
+```
+LinearAdapterEmbeddingModel = AdapterEmbeddingModel
 
-This guide will walk you through a ["Semantic Text Deduplication"](https://github.com/supabase/supabase/blob/master/examples/ai/semantic_text_deduplication.ipynb) example using Colab and Supabase Vecs. You'll learn how to find similar movie reviews using embeddings, and remove any that seem like duplicates. You will:
+```
 
-1. Launch a Postgres database that uses pgvector to store embeddings
-2. Launch a notebook that connects to your database
-3. Load the IMDB dataset
-4. Use the `sentence-transformers/all-MiniLM-L6-v2` model to create an embedding representing the semantic meaning of each review.
-5. Search for all duplicates.
+## AdapterEmbeddingModel [\#](https://docs.llamaindex.ai/en/stable/api_reference/embeddings/adapter/\#llama_index.embeddings.adapter.AdapterEmbeddingModel "Permanent link")
 
-## Project setup [\#](\#project-setup)
+Bases: `BaseEmbedding`
 
-Let's create a new Postgres database. This is as simple as starting a new Project in Supabase:
+Adapter for any embedding model.
 
-1. [Create a new project](https://database.new/) in the Supabase dashboard.
-2. Enter your project details. Remember to store your password somewhere safe.
+This is a wrapper around any embedding model that adds an adapter layer on top of it.
+This is useful for finetuning an embedding model on a downstream task.
+The embedding model can be any model - it does not need to expose gradients.
 
-Your database will be available in less than a minute.
+**Parameters:**
 
-**Finding your credentials:**
+| Name | Type | Description | Default |
+| --- | --- | --- | --- |
+| `base_embed_model` | `BaseEmbedding` | Base embedding model. | _required_ |
+| `adapter_path` | `str` | Path to adapter. | _required_ |
+| `adapter_cls` | `Optional[Type[Any]]` | Adapter class. Defaults to None, in which case a linear adapter is used. | `None` |
+| `transform_query` | `bool` | Whether to transform query embeddings. Defaults to True. | `True` |
+| `device` | `Optional[str]` | Device to use. Defaults to None. | `None` |
+| `embed_batch_size` | `int` | Batch size for embedding. Defaults to 10. | `DEFAULT_EMBED_BATCH_SIZE` |
+| `callback_manager` | `Optional[CallbackManager]` | Callback manager. Defaults to None. | `None` |
 
-You can find your project credentials inside the project [settings](https://supabase.com/dashboard/project/_/settings/), including:
+Source code in `llama-index-integrations/embeddings/llama-index-embeddings-adapter/llama_index/embeddings/adapter/base.py`
 
-- [Database credentials](https://supabase.com/dashboard/project/_/settings/database): connection strings and connection pooler details.
-- [API credentials](https://supabase.com/dashboard/project/_/settings/database): your serverless API URL and `anon` / `service_role` keys.
+|     |     |
+| --- | --- |
+| ```<br> 15<br> 16<br> 17<br> 18<br> 19<br> 20<br> 21<br> 22<br> 23<br> 24<br> 25<br> 26<br> 27<br> 28<br> 29<br> 30<br> 31<br> 32<br> 33<br> 34<br> 35<br> 36<br> 37<br> 38<br> 39<br> 40<br> 41<br> 42<br> 43<br> 44<br> 45<br> 46<br> 47<br> 48<br> 49<br> 50<br> 51<br> 52<br> 53<br> 54<br> 55<br> 56<br> 57<br> 58<br> 59<br> 60<br> 61<br> 62<br> 63<br> 64<br> 65<br> 66<br> 67<br> 68<br> 69<br> 70<br> 71<br> 72<br> 73<br> 74<br> 75<br> 76<br> 77<br> 78<br> 79<br> 80<br> 81<br> 82<br> 83<br> 84<br> 85<br> 86<br> 87<br> 88<br> 89<br> 90<br> 91<br> 92<br> 93<br> 94<br> 95<br> 96<br> 97<br> 98<br> 99<br>100<br>101<br>102<br>103<br>104<br>105<br>106<br>107<br>108<br>109<br>110<br>111<br>112<br>``` | ```<br>class AdapterEmbeddingModel(BaseEmbedding):<br>    """Adapter for any embedding model.<br>    This is a wrapper around any embedding model that adds an adapter layer \<br>        on top of it.<br>    This is useful for finetuning an embedding model on a downstream task.<br>    The embedding model can be any model - it does not need to expose gradients.<br>    Args:<br>        base_embed_model (BaseEmbedding): Base embedding model.<br>        adapter_path (str): Path to adapter.<br>        adapter_cls (Optional[Type[Any]]): Adapter class. Defaults to None, in which \<br>            case a linear adapter is used.<br>        transform_query (bool): Whether to transform query embeddings. Defaults to True.<br>        device (Optional[str]): Device to use. Defaults to None.<br>        embed_batch_size (int): Batch size for embedding. Defaults to 10.<br>        callback_manager (Optional[CallbackManager]): Callback manager. \<br>            Defaults to None.<br>    """<br>    _base_embed_model: BaseEmbedding = PrivateAttr()<br>    _adapter: Any = PrivateAttr()<br>    _transform_query: bool = PrivateAttr()<br>    _device: Optional[str] = PrivateAttr()<br>    _target_device: Any = PrivateAttr()<br>    def __init__(<br>        self,<br>        base_embed_model: BaseEmbedding,<br>        adapter_path: str,<br>        adapter_cls: Optional[Type[Any]] = None,<br>        transform_query: bool = True,<br>        device: Optional[str] = None,<br>        embed_batch_size: int = DEFAULT_EMBED_BATCH_SIZE,<br>        callback_manager: Optional[CallbackManager] = None,<br>    ) -> None:<br>        """Init params."""<br>        import torch<br>        from llama_index.embeddings.adapter.utils import BaseAdapter, LinearLayer<br>        super().__init__(<br>            embed_batch_size=embed_batch_size,<br>            callback_manager=callback_manager,<br>            model_name=f"Adapter for {base_embed_model.model_name}",<br>        )<br>        if device is None:<br>            device = infer_torch_device()<br>            logger.info(f"Use pytorch device: {device}")<br>        self._target_device = torch.device(device)<br>        self._base_embed_model = base_embed_model<br>        if adapter_cls is None:<br>            adapter_cls = LinearLayer<br>        else:<br>            adapter_cls = cast(Type[BaseAdapter], adapter_cls)<br>        adapter = adapter_cls.load(adapter_path)<br>        self._adapter = cast(BaseAdapter, adapter)<br>        self._adapter.to(self._target_device)<br>        self._transform_query = transform_query<br>    @classmethod<br>    def class_name(cls) -> str:<br>        return "AdapterEmbeddingModel"<br>    def _get_query_embedding(self, query: str) -> List[float]:<br>        """Get query embedding."""<br>        import torch<br>        query_embedding = self._base_embed_model._get_query_embedding(query)<br>        if self._transform_query:<br>            query_embedding_t = torch.tensor(query_embedding).to(self._target_device)<br>            query_embedding_t = self._adapter.forward(query_embedding_t)<br>            query_embedding = query_embedding_t.tolist()<br>        return query_embedding<br>    async def _aget_query_embedding(self, query: str) -> List[float]:<br>        """Get query embedding."""<br>        import torch<br>        query_embedding = await self._base_embed_model._aget_query_embedding(query)<br>        if self._transform_query:<br>            query_embedding_t = torch.tensor(query_embedding).to(self._target_device)<br>            query_embedding_t = self._adapter.forward(query_embedding_t)<br>            query_embedding = query_embedding_t.tolist()<br>        return query_embedding<br>    def _get_text_embedding(self, text: str) -> List[float]:<br>        return self._base_embed_model._get_text_embedding(text)<br>    async def _aget_text_embedding(self, text: str) -> List[float]:<br>        return await self._base_embed_model._aget_text_embedding(text)<br>``` |
 
-## Launching a notebook [\#](\#launching-a-notebook)
+Back to top
 
-Launch our [`semantic_text_deduplication`](https://github.com/supabase/supabase/blob/master/examples/ai/semantic_text_deduplication.ipynb) notebook in Colab:
+Hi, how can I help you?
 
-[![](https://supabase.com/docs/img/ai/colab-badge.svg)](https://colab.research.google.com/github/supabase/supabase/blob/master/examples/ai/semantic_text_deduplication.ipynb)
-
-At the top of the notebook, you'll see a button `Copy to Drive`. Click this button to copy the notebook to your Google Drive.
-
-## Connecting to your database [\#](\#connecting-to-your-database)
-
-Inside the Notebook, find the cell which specifies the `DB_CONNECTION`. It will contain some code like this:
-
-`
-_10
-import vecs
-_10
-_10
-DB_CONNECTION = "postgresql://<user>:<password>@<host>:<port>/<db_name>"
-_10
-_10
-# create vector store client
-_10
-vx = vecs.create_client(DB_CONNECTION)
-`
-
-Replace the `DB_CONNECTION` with your own connection string for your database. You can find the Postgres connection string in the [Database Settings](https://supabase.com/dashboard/project/_/settings/database) of your Supabase project.
-
-SQLAlchemy requires the connection string to start with `postgresql://` (instead of `postgres://`). Don't forget to rename this after copying the string from the dashboard.
-
-You must use the "connection pooling" string (domain ending in `*.pooler.supabase.com`) with Google Colab since Colab does not support IPv6.
-
-## Stepping through the notebook [\#](\#stepping-through-the-notebook)
-
-Now all that's left is to step through the notebook. You can do this by clicking the "execute" button ( `ctrl+enter`) at the top left of each code cell. The notebook guides you through the process of creating a collection, adding data to it, and querying it.
-
-You can view the inserted items in the [Table Editor](https://supabase.com/dashboard/project/_/editor/), by selecting the `vecs` schema from the schema dropdown.
-
-![Colab documents](https://supabase.com/docs/img/ai/google-colab/colab-documents.png)
-
-## Deployment [\#](\#deployment)
-
-If you have your own infrastructure for deploying Python apps, you can continue to use `vecs` as described in this guide.
-
-Alternatively if you would like to quickly deploy using Supabase, check out our guide on using the [Hugging Face Inference API](/docs/guides/ai/hugging-face) in Edge Functions using TypeScript.
-
-## Next steps [\#](\#next-steps)
-
-You can now start building your own applications with Vecs. Check our [examples](/docs/guides/ai#examples) for ideas.
+🦙
 
 ----
 
 Markdown content for item 1
 
- AI & Vectors
+ [Skip to content](https://docs.llamaindex.ai/en/stable/api_reference/embeddings/fastembed/#llama_index.embeddings.fastembed.FastEmbedEmbedding)
 
-# Semantic Image Search with Amazon Titan
+# Fastembed
 
-## Implement semantic image search with Amazon Titan and Supabase Vector in Python.
+## FastEmbedEmbedding [\#](https://docs.llamaindex.ai/en/stable/api_reference/embeddings/fastembed/\#llama_index.embeddings.fastembed.FastEmbedEmbedding "Permanent link")
 
-* * *
+Bases: `BaseEmbedding`
 
-[Amazon Bedrock](https://aws.amazon.com/bedrock) is a fully managed service that offers a choice of high-performing foundation models (FMs) from leading AI companies like AI21 Labs, Anthropic, Cohere, Meta, Mistral AI, Stability AI, and Amazon. Each model is accessible through a common API which implements a broad set of features to help build generative AI applications with security, privacy, and responsible AI in mind.
+Qdrant FastEmbedding models.
+FastEmbed is a lightweight, fast, Python library built for embedding generation.
+See more documentation at:
+\\* https://github.com/qdrant/fastembed/
+\\* https://qdrant.github.io/fastembed/.
 
-[Amazon Titan](https://aws.amazon.com/bedrock/titan/) is a family of foundation models (FMs) for text and image generation, summarization, classification, open-ended Q&A, information extraction, and text or image search.
+To use this class, you must install the `fastembed` Python package.
 
-In this guide we'll look at how we can get started with Amazon Bedrock and Supabase Vector in Python using the Amazon Titan multimodal model and the [vecs client](/docs/guides/ai/vecs-python-client).
+`pip install fastembed`
+Example:
+from llama\_index.embeddings.fastembed import FastEmbedEmbedding
+fastembed = FastEmbedEmbedding()
 
-You can find the full application code as a Python Poetry project on [GitHub](https://github.com/supabase/supabase/tree/master/examples/ai/aws_bedrock_image_search).
+Source code in `llama-index-integrations/embeddings/llama-index-embeddings-fastembed/llama_index/embeddings/fastembed/base.py`
 
-## Create a new Python project with Poetry [\#](\#create-a-new-python-project-with-poetry)
+|     |     |
+| --- | --- |
+| ```<br>10<br>11<br>12<br>13<br>14<br>15<br>16<br>17<br>18<br>19<br>20<br>21<br>22<br>23<br>24<br>25<br>26<br>27<br>28<br>29<br>30<br>31<br>32<br>33<br>34<br>35<br>36<br>37<br>38<br>39<br>40<br>41<br>42<br>43<br>44<br>45<br>46<br>47<br>48<br>49<br>50<br>51<br>52<br>53<br>54<br>55<br>56<br>57<br>58<br>59<br>60<br>61<br>62<br>63<br>64<br>65<br>66<br>67<br>68<br>69<br>70<br>71<br>72<br>73<br>74<br>75<br>76<br>77<br>78<br>79<br>80<br>81<br>82<br>83<br>84<br>85<br>86<br>87<br>88<br>89<br>90<br>91<br>92<br>93<br>94<br>95<br>96<br>97<br>98<br>99<br>``` | ```<br>class FastEmbedEmbedding(BaseEmbedding):<br>    """<br>    Qdrant FastEmbedding models.<br>    FastEmbed is a lightweight, fast, Python library built for embedding generation.<br>    See more documentation at:<br>    * https://github.com/qdrant/fastembed/<br>    * https://qdrant.github.io/fastembed/.<br>    To use this class, you must install the `fastembed` Python package.<br>    `pip install fastembed`<br>    Example:<br>        from llama_index.embeddings.fastembed import FastEmbedEmbedding<br>        fastembed = FastEmbedEmbedding()<br>    """<br>    model_name: str = Field(<br>        "BAAI/bge-small-en-v1.5",<br>        description="Name of the FastEmbedding model to use.\n"<br>        "Defaults to 'BAAI/bge-small-en-v1.5'.\n"<br>        "Find the list of supported models at "<br>        "https://qdrant.github.io/fastembed/examples/Supported_Models/",<br>    )<br>    max_length: int = Field(<br>        512,<br>        description="The maximum number of tokens. Defaults to 512.\n"<br>        "Unknown behavior for values > 512.",<br>    )<br>    cache_dir: Optional[str] = Field(<br>        None,<br>        description="The path to the cache directory.\n"<br>        "Defaults to `local_cache` in the parent directory",<br>    )<br>    threads: Optional[int] = Field(<br>        None,<br>        description="The number of threads single onnxruntime session can use.\n"<br>        "Defaults to None",<br>    )<br>    doc_embed_type: Literal["default", "passage"] = Field(<br>        "default",<br>        description="Type of embedding method to use for documents.\n"<br>        "Available options are 'default' and 'passage'.",<br>    )<br>    _model: Any = PrivateAttr()<br>    @classmethod<br>    def class_name(self) -> str:<br>        return "FastEmbedEmbedding"<br>    def __init__(<br>        self,<br>        model_name: Optional[str] = "BAAI/bge-small-en-v1.5",<br>        max_length: Optional[int] = 512,<br>        cache_dir: Optional[str] = None,<br>        threads: Optional[int] = None,<br>        doc_embed_type: Literal["default", "passage"] = "default",<br>    ):<br>        super().__init__(<br>            model_name=model_name,<br>            max_length=max_length,<br>            threads=threads,<br>            doc_embed_type=doc_embed_type,<br>        )<br>        self._model = TextEmbedding(<br>            model_name=model_name,<br>            max_length=max_length,<br>            cache_dir=cache_dir,<br>            threads=threads,<br>        )<br>    def _get_text_embedding(self, text: str) -> List[float]:<br>        embeddings: List[np.ndarray]<br>        if self.doc_embed_type == "passage":<br>            embeddings = list(self._model.passage_embed(text))<br>        else:<br>            embeddings = list(self._model.embed(text))<br>        return embeddings[0].tolist()<br>    def _get_query_embedding(self, query: str) -> List[float]:<br>        query_embeddings: np.ndarray = next(self._model.query_embed(query))<br>        return query_embeddings.tolist()<br>    async def _aget_query_embedding(self, query: str) -> List[float]:<br>        return self._get_query_embedding(query)<br>``` |
 
-[Poetry](https://python-poetry.org/) provides packaging and dependency management for Python. If you haven't already, install poetry via pip:
+Back to top
 
-`
-_10
-pip install poetry
-`
+Hi, how can I help you?
 
-Then initialize a new project:
-
-`
-_10
-poetry new aws_bedrock_image_search
-`
-
-## Spin up a Postgres Database with pgvector [\#](\#spin-up-a-postgres-database-with-pgvector)
-
-If you haven't already, head over to [database.new](https://database.new) and create a new project. Every Supabase project comes with a full Postgres database and the [pgvector extension](/docs/guides/database/extensions/pgvector) preconfigured.
-
-When creating your project, make sure to note down your database password as you will need it to construct the `DB_URL` in the next step.
-
-You can find the database connection string in your Supabase Dashboard [database settings](https://supabase.com/dashboard/project/_/settings/database). Select "Use connection pooling" with `Mode: Session` for a direct connection to your Postgres database. It will look something like this:
-
-`
-_10
-postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
-`
-
-## Install the dependencies [\#](\#install-the-dependencies)
-
-We will need to add the following dependencies to our project:
-
-- [`vecs`](https://github.com/supabase/vecs#vecs): Supabase Vector Python Client.
-- [`boto3`](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html): AWS SDK for Python.
-- [`matplotlib`](https://matplotlib.org/): for displaying our image result.
-
-`
-_10
-poetry add vecs boto3 matplotlib
-`
-
-## Import the necessary dependencies [\#](\#import-the-necessary-dependencies)
-
-At the top of your main python script, import the dependencies and store your `DB URL` from above in a variable:
-
-`
-_10
-import sys
-_10
-import boto3
-_10
-import vecs
-_10
-import json
-_10
-import base64
-_10
-from matplotlib import pyplot as plt
-_10
-from matplotlib import image as mpimg
-_10
-from typing import Optional
-_10
-_10
-DB_CONNECTION = "postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
-`
-
-Next, get the [credentials to your AWS account](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html) and instantiate the `boto3` client:
-
-`
-_10
-bedrock_client = boto3.client(
-_10
-    'bedrock-runtime',
-_10
-    region_name='us-west-2',
-_10
-    # Credentials from your AWS account
-_10
-    aws_access_key_id='<replace_your_own_credentials>',
-_10
-    aws_secret_access_key='<replace_your_own_credentials>',
-_10
-    aws_session_token='<replace_your_own_credentials>',
-_10
-)
-`
-
-## Create embeddings for your images [\#](\#create-embeddings-for-your-images)
-
-In the root of your project, create a new folder called `images` and add some images. You can use the images from the example project on [GitHub](https://github.com/supabase/supabase/tree/master/examples/ai/aws_bedrock_image_search/images) or you can find license free images on [unsplash](https://unsplash.com).
-
-To send images to the Amazon Bedrock API we need to need to encode them as `base64` strings. Create the following helper methods:
-
-`
-_44
-def readFileAsBase64(file_path):
-_44
-    """Encode image as base64 string."""
-_44
-    try:
-_44
-        with open(file_path, "rb") as image_file:
-_44
-            input_image = base64.b64encode(image_file.read()).decode("utf8")
-_44
-        return input_image
-_44
-    except:
-_44
-        print("bad file name")
-_44
-        sys.exit(0)
-_44
-_44
-_44
-def construct_bedrock_image_body(base64_string):
-_44
-    """Construct the request body.
-_44
-_44
-    https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-titan-embed-mm.html
-_44
-    """
-_44
-    return json.dumps(
-_44
-        {
-_44
-            "inputImage": base64_string,
-_44
-            "embeddingConfig": {"outputEmbeddingLength": 1024},
-_44
-        }
-_44
-    )
-_44
-_44
-_44
-def get_embedding_from_titan_multimodal(body):
-_44
-    """Invoke the Amazon Titan Model via API request."""
-_44
-    response = bedrock_client.invoke_model(
-_44
-        body=body,
-_44
-        modelId="amazon.titan-embed-image-v1",
-_44
-        accept="application/json",
-_44
-        contentType="application/json",
-_44
-    )
-_44
-_44
-    response_body = json.loads(response.get("body").read())
-_44
-    print(response_body)
-_44
-    return response_body["embedding"]
-_44
-_44
-_44
-def encode_image(file_path):
-_44
-    """Generate embedding for the image at file_path."""
-_44
-    base64_string = readFileAsBase64(file_path)
-_44
-    body = construct_bedrock_image_body(base64_string)
-_44
-    emb = get_embedding_from_titan_multimodal(body)
-_44
-    return emb
-`
-
-Next, create a `seed` method, which will create a new Supabase Vector Collection, generate embeddings for your images, and upsert the embeddings into your database:
-
-`
-_40
-def seed():
-_40
-    # create vector store client
-_40
-    vx = vecs.create_client(DB_CONNECTION)
-_40
-_40
-    # get or create a collection of vectors with 1024 dimensions
-_40
-    images = vx.get_or_create_collection(name="image_vectors", dimension=1024)
-_40
-_40
-    # Generate image embeddings with Amazon Titan Model
-_40
-    img_emb1 = encode_image('./images/one.jpg')
-_40
-    img_emb2 = encode_image('./images/two.jpg')
-_40
-    img_emb3 = encode_image('./images/three.jpg')
-_40
-    img_emb4 = encode_image('./images/four.jpg')
-_40
-_40
-    # add records to the *images* collection
-_40
-    images.upsert(
-_40
-        records=[\
-_40\
-            (\
-_40\
-                "one.jpg",       # the vector's identifier\
-_40\
-                img_emb1,        # the vector. list or np.array\
-_40\
-                {"type": "jpg"}  # associated  metadata\
-_40\
-            ), (\
-_40\
-                "two.jpg",\
-_40\
-                img_emb2,\
-_40\
-                {"type": "jpg"}\
-_40\
-            ), (\
-_40\
-                "three.jpg",\
-_40\
-                img_emb3,\
-_40\
-                {"type": "jpg"}\
-_40\
-            ), (\
-_40\
-                "four.jpg",\
-_40\
-                img_emb4,\
-_40\
-                {"type": "jpg"}\
-_40\
-            )\
-_40\
-        ]
-_40
-    )
-_40
-    print("Inserted images")
-_40
-_40
-    # index the collection for fast search performance
-_40
-    images.create_index()
-_40
-    print("Created index")
-`
-
-Add this method as a script in your `pyproject.toml` file:
-
-`
-_10
-[tool.poetry.scripts]
-_10
-seed = "image_search.main:seed"
-_10
-search = "image_search.main:search"
-`
-
-After activating the virtual environtment with `poetry shell` you can now run your seed script via `poetry run seed`. You can inspect the generated embeddings in your Supabase Dashboard by visiting the [Table Editor](https://supabase.com/dashboard/project/_/editor), selecting the `vecs` schema, and the `image_vectors` table.
-
-## Perform an image search from a text query [\#](\#perform-an-image-search-from-a-text-query)
-
-With Supabase Vector we can easily query our embeddings. We can use either an image as the search input or alternatively we can generate an embedding from a string input and use that as the query input:
-
-`
-_28
-def search(query_term: Optional[str] = None):
-_28
-    if query_term is None:
-_28
-        query_term = sys.argv[1]
-_28
-_28
-    # create vector store client
-_28
-    vx = vecs.create_client(DB_CONNECTION)
-_28
-    images = vx.get_or_create_collection(name="image_vectors", dimension=1024)
-_28
-_28
-    # Encode text query
-_28
-    text_emb = get_embedding_from_titan_multimodal(json.dumps(
-_28
-        {
-_28
-            "inputText": query_term,
-_28
-            "embeddingConfig": {"outputEmbeddingLength": 1024},
-_28
-        }
-_28
-    ))
-_28
-_28
-    # query the collection filtering metadata for "type" = "jpg"
-_28
-    results = images.query(
-_28
-        data=text_emb,                      # required
-_28
-        limit=1,                            # number of records to return
-_28
-        filters={"type": {"$eq": "jpg"}},   # metadata filters
-_28
-    )
-_28
-    result = results[0]
-_28
-    print(result)
-_28
-    plt.title(result)
-_28
-    image = mpimg.imread('./images/' + result)
-_28
-    plt.imshow(image)
-_28
-    plt.show()
-`
-
-By limiting the query to one result, we can show the most relevant image to the user. Finally we use `matplotlib` to show the image result to the user.
-
-That's it, go ahead and test it out by running `poetry run search` and you will be presented with an image of a "bike in front of a red brick wall".
-
-## Conclusion [\#](\#conclusion)
-
-With just a couple of lines of Python you are able to implement image search as well as reverse image search using the Amazon Titan multimodal model and Supabase Vector.
+🦙
 
 ----
 
 Markdown content for item 2
 
- AI & Vectors
+ # Agentops
 
-# Face similarity search
-
-## Identify the celebrities who look most similar to you using Supabase Vecs.
-
-* * *
-
-This guide will walk you through a ["Face Similarity Search"](https://github.com/supabase/supabase/blob/master/examples/ai/face_similarity.ipynb) example using Colab and Supabase Vecs. You will be able to identify the celebrities who look most similar to you (or any other person). You will:
-
-1. Launch a Postgres database that uses pgvector to store embeddings
-2. Launch a notebook that connects to your database
-3. Load the " `ashraq/tmdb-people-image`" celebrity dataset
-4. Use the `face_recognition` model to create an embedding for every celebrity photo.
-5. Search for similar faces inside the dataset.
-
-## Project setup [\#](\#project-setup)
-
-Let's create a new Postgres database. This is as simple as starting a new Project in Supabase:
-
-1. [Create a new project](https://database.new/) in the Supabase dashboard.
-2. Enter your project details. Remember to store your password somewhere safe.
-
-Your database will be available in less than a minute.
-
-**Finding your credentials:**
-
-You can find your project credentials inside the project [settings](https://supabase.com/dashboard/project/_/settings/), including:
-
-- [Database credentials](https://supabase.com/dashboard/project/_/settings/database): connection strings and connection pooler details.
-- [API credentials](https://supabase.com/dashboard/project/_/settings/database): your serverless API URL and `anon` / `service_role` keys.
-
-## Launching a notebook [\#](\#launching-a-notebook)
-
-Launch our [`semantic_text_deduplication`](https://github.com/supabase/supabase/blob/master/examples/ai/face_similarity.ipynb) notebook in Colab:
-
-[![](https://supabase.com/docs/img/ai/colab-badge.svg)](https://colab.research.google.com/github/supabase/supabase/blob/master/examples/ai/face_similarity.ipynb)
-
-At the top of the notebook, you'll see a button `Copy to Drive`. Click this button to copy the notebook to your Google Drive.
-
-## Connecting to your database [\#](\#connecting-to-your-database)
-
-Inside the Notebook, find the cell which specifies the `DB_CONNECTION`. It will contain some code like this:
-
-`
-_10
-import vecs
-_10
-_10
-DB_CONNECTION = "postgresql://<user>:<password>@<host>:<port>/<db_name>"
-_10
-_10
-# create vector store client
-_10
-vx = vecs.create_client(DB_CONNECTION)
-`
-
-Replace the `DB_CONNECTION` with your own connection string for your database. You can find the Postgres connection string in the [Database Settings](https://supabase.com/dashboard/project/_/settings/database) of your Supabase project.
-
-SQLAlchemy requires the connection string to start with `postgresql://` (instead of `postgres://`). Don't forget to rename this after copying the string from the dashboard.
-
-You must use the "connection pooling" string (domain ending in `*.pooler.supabase.com`) with Google Colab since Colab does not support IPv6.
-
-## Stepping through the notebook [\#](\#stepping-through-the-notebook)
-
-Now all that's left is to step through the notebook. You can do this by clicking the "execute" button ( `ctrl+enter`) at the top left of each code cell. The notebook guides you through the process of creating a collection, adding data to it, and querying it.
-
-You can view the inserted items in the [Table Editor](https://supabase.com/dashboard/project/_/editor/), by selecting the `vecs` schema from the schema dropdown.
-
-![Colab documents](https://supabase.com/docs/img/ai/google-colab/colab-documents.png)
-
-## Next steps [\#](\#next-steps)
-
-You can now start building your own applications with Vecs. Check our [examples](/docs/guides/ai#examples) for ideas.
+Back to top
 
 ----
 

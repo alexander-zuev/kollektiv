@@ -76,7 +76,7 @@ class FireCrawler:
         self.logger.info(f"Received job ID: {crawl_job_id}")
 
         # create a job with this id
-        self.create_job(job_id=crawl_job_id, method="crawl")
+        self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
 
         # check job status
         self.logger.info("***Polling job status***")
@@ -199,7 +199,7 @@ class FireCrawler:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     @error_handler(logger)
-    def create_job(self, job_id: str, method: str) -> None:
+    def create_job(self, job_id: str, method: str, input_url: HttpUrl) -> None:
         """Creates a job, saving information to jobs.json returned by async_crawl_url method."""
         internal_id = str(uuid4())
         path = os.path.join(self.jobs_dir, "jobs.json") # path should be src/crawling
@@ -208,6 +208,7 @@ class FireCrawler:
         job_info = {
             'internal_id': internal_id,
             'job_id': job_id,
+            'input_url' : input_url,
             'status' : 'started',
             'timestamp': self._get_timestamp(),
             'method' : method
@@ -313,20 +314,17 @@ def main():
     # print(supabase_ai_map['links'])
 
     # Testing crawl_url
-    # url_to_crawl = "https://supabase.com/docs/reference/python"
-    # results = crawler.async_crawl_url(url_to_crawl, page_limit=50)
-    #
-    # print(f"Crawl Results for {url_to_crawl}:")
-    # print(f"Input URL: {results['input_url']}")
-    # print(f"Total data points: {len(results['data'])}")
-    # if results['data']:
-    #     print(f"First data point:")
-    #     print(json.dumps(results['data'][0], indent=2))
-    # else:
-    #     print("No data points found.")
+    url_to_crawl = "https://docs.llamaindex.ai/en/stable/"
+    results = crawler.async_crawl_url(url_to_crawl, page_limit=50)
 
-    crawler.build_example_file(
-        "cra_supabase_docs_2024-09-08 22:21:45.json",)
+    print(f"Crawl Results for {url_to_crawl}:")
+    print(f"Input URL: {results['input_url']}")
+    print(f"Total data points: {len(results['data'])}")
+    if results['data']:
+        print(f"First data point:")
+        print(json.dumps(results['data'][0], indent=2))
+    else:
+        print("No data points found.")
 
 if __name__ == "__main__":
     main()
