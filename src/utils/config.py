@@ -28,7 +28,7 @@ NEW_JOB_FILE_DIR = os.path.join(BASE_DIR, "src", "crawling")
 JOB_FILE_PATH = os.path.join(JOB_FILE_DIR, "jobs.json")
 RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "raw")
 NEW_RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "data", "raw")
-PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "processed")
+PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "input_processing", "data", "chunks")
 
 # Ensure directories exist
 os.makedirs(JOB_FILE_DIR, exist_ok=True)

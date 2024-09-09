@@ -48,7 +48,7 @@ class Claude:
             )
             preprocessed_context.append(formatted_document)
 
-            # self.logger.debug(f"Printing pre-processed preprocessed_context {formatted_document}")
+            # self.logger.debug(f"Printing pre-chunks preprocessed_context {formatted_document}")
 
         return preprocessed_context
 
