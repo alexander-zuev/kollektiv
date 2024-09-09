@@ -46,6 +46,46 @@ methods:
 
 **Chunking**
 - What is the content structure of markdown files?
+  - Main header denoted with # 
+  - Then there are multiple sections with ## headers
+  - Some sections have ### sub-headers
+  - Code blocks are enclosed in backticks (`)
+  - There are horizontal rules (---) denoted end of the page (we don't need it, because we can rely on the items in 
+    object list)
+- What should be the chunking strategy:
+  - Page-level chunking
+    - Each chunk will contain information only from one page
+  - Section-level chunking
+    - Break down each page into sections based on H2 headers
+  - Content capture
+    - Between H1 and first H2:
+      - If there is content -> make it a separate chunk
+      - If there's no content -> skip creating chunk for this section (because headers would be captured as metadata)
+    - Between H2 headers
+      - Create a chunk for each H2 section, including any H3 subsections within it
+    - Code block handling
+      - Always keep code blocks intact. Neversplit in the middle of a code block
+      - if a code block causes a chunk to exceed the token limit, make the code block it's own chunk
+    - Token limits:
+      - Hard limit: 1000 tokens
+      - Soft limit: 800 tokens (20% below)
+    - Chunk overlap
+      - 5% of content of the previous chunk -> last sentence + last header
+    - Metadata retention:
+      - sourceUrl
+      - page title
+      - position in doc hierarchy
+    - Handling long sections
+      - If a section is too long -> split it into multiple chunks.
+      - Split at paragraph boundaries or list item boundaries
+    - Minimum chunk size
+      - 100 tokens - but how to enforce this?
+    - Header stacking
+      - If multiple headers appear without content -> group them into single chunk
+    - Implementation
+      - First pass -> split into H1 an H2 sections
+      - Second pass -> process each major section, splitting into chunks based on token count + content structure
+      - Third pass -> adjust chunk boundaries to ensure code blocks are preserved and min/max token counts are respected
 - Great chunking resources
   - https://unstructured.io/blog/chunking-for-rag-best-practices
 - I need to employ some kind of content-aware chunking strategy
