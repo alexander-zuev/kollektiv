@@ -11,7 +11,6 @@ from datetime import datetime
 import requests
 from requests.exceptions import RequestException
 
-
 from firecrawl import FirecrawlApp
 
 from src.utils.config import FIRECRAWL_API_KEY, NEW_RAW_DATA_DIR, NEW_JOB_FILE_DIR, SRC_ROOT
@@ -62,9 +61,10 @@ class FireCrawler:
         return result
 
     @error_handler(logger)
-    def async_crawl_url(self, url: HttpUrl, page_limit: int = 25) -> Dict[str, Any]:
+    def async_crawl_url(self, url: HttpUrl, page_limit: int = 25, max_depth: int = 3) -> Dict[str, Any]:
         # setup params dict
         params = {
+            'maxDepth': max_depth,
             'limit': page_limit,
             'scrapeOptions': {'formats': ['markdown']}
         }
@@ -316,7 +316,7 @@ def main():
 
     # Testing crawl_url
     url_to_crawl = "https://docs.flutterflow.io/"
-    results = crawler.async_crawl_url(url_to_crawl, page_limit=75)
+    results = crawler.async_crawl_url(url_to_crawl, page_limit=50, max_depth=3)
 
     print(f"Crawl Results for {url_to_crawl}:")
     print(f"Input URL: {results['input_url']}")
