@@ -2,9 +2,9 @@ Markdown content for item 0
 
  [Skip to main content](#__docusaurus_skipToContent_fallback)
 
-[**App State**](/resources/data-representation/app-state)
+[**Form Validation**](/resources/forms/form-validation)
 
-Learn how to effectively utilize App State Variables in FlutterFlow to maintain and manage global application states across all pages and components.
+Learn how to add Form Validation widget in your FlutterFlow app.
 
 ----
 
@@ -12,9 +12,27 @@ Markdown content for item 1
 
  [Skip to main content](#__docusaurus_skipToContent_fallback)
 
-[**Apple App Store Deployment**](/deployment/apple-app-store-deployment)
+![$FlutterFlow Logo](https://docs.flutterflow.io/logos/logo_primary_color_onLight@2x.png)
 
-Learn how to seamlessly deploy your apps to the Apple App Store using FlutterFlow.
+# Visual Development Platform
+
+FlutterFlow is a visual development platform that lets you build mobile, web, and desktop apps incredibly fast, without sacrificing quality or features.
+
+[Before You Begin\\
+\\
+Ensure you meet system requirements and grasp technical concepts for smooth building in FlutterFlow.](/before-you-begin/setup-flutterflow) [Explore FlutterFlow\\
+\\
+Dive into the building blocks of the platform: projects, widgets, functions and more.](/resources) [Start Building\\
+\\
+Jump right into a quick start on how to build a simple app.](/quickstart) [What's New in FlutterFlow\\
+\\
+Updates, features, and the latest enhancements in FlutterFlow.](https://community.flutterflow.io/c/whats-new-in-flutterflow) [Community Forum\\
+\\
+Join discussions, ask questions, and share insights with the FlutterFlow community.](https://community.flutterflow.io) [Submit Bug Report\\
+\\
+Encountered a bug in FlutterFlow? Help us improve by submitting a bug report.](/misc/submit-bug-report)
+
+### FlutterFlow Tour [​](/\#flutterflow-tour "Direct link to FlutterFlow Tour")
 
 ----
 
@@ -22,41 +40,33 @@ Markdown content for item 2
 
  [Skip to main content](#__docusaurus_skipToContent_fallback)
 
-[**Creating Collections**](/integrations/database/cloud-firestore/creating-collections)
+[**App State**](/resources/data-representation/app-state)
 
-Learn how to create collections in Firestore for your FlutterFlow app, including organizing documents within collections.
+Learn how to effectively utilize App State Variables in FlutterFlow to maintain and manage global application states across all pages and components.
 
-[**Creating Subcollections**](/integrations/database/cloud-firestore/creating-subcollections)
+[**Constants**](/resources/data-representation/constants)
 
-Learn how to create subcollections in Firestore for your FlutterFlow app, including organizing documents within subcollections.
+Explore the importance of using Constants in FlutterFlow to define unchanging values throughout your application.
 
-[**Database Actions**](/integrations/database/supabase/database-actions)
+[**Custom Data Types**](/resources/data-representation/custom-data-types)
 
-Learn about Supabase Database actions in your FlutterFlow app, including how to perform various database operations.
+Learn how to create and utilize custom data types in FlutterFlow to handle complex data structures that predefined types can't cover.
 
-[**Deploy Firestore Rules**](/integrations/database/cloud-firestore/firestore-rules)
+[**Data Types**](/resources/data-representation/data-types)
 
-Learn how to deploy Firestore rules in your FlutterFlow app to manage data access and security.
+Dive into the diverse range of data types supported by FlutterFlow, from basic primitives like integers and strings to complex composite types and built-in functionalities tailored for app development.
 
-[**Firestore Actions**](/integrations/database/cloud-firestore/firestore-actions)
+[**Enums**](/resources/data-representation/enums)
 
-Learn about Firestore actions in your FlutterFlow app, including how to perform various database operations.
+Learn how Enums can enhance the management of application states, product types, and process statuses by providing a robust method to handle predefined sets of values.
 
-[**Firestore Content Manager**](/integrations/database/cloud-firestore/firestore-content-manager)
+[**Global Properties**](/resources/data-representation/global-properties)
 
-Learn how to use the Firestore Content Manager in your FlutterFlow app to manage Firestore data efficiently.
+Discover the role of Global Properties in FlutterFlow, which provide universal access across all pages of your app to facilitate common tasks and enhance functionality.
 
-[**Getting Started**](/integrations/database/cloud-firestore/getting-started)
+[**Overview**](/resources/data-representation)
 
-Learn how to get started with Cloud Firestore in your FlutterFlow app to manage your app's data.
-
-[**Refresh DB Request Action**](/integrations/database/refresh-db-request)
-
-Learn how to use the Refresh DB Request action in your FlutterFlow app to refresh your database content.
-
-[**SQLite Quickstart**](/integrations/database/sqlite)
-
-Learn how to quickly get started with SQLite in your FlutterFlow app for local data storage.
+Explore the essentials of data representation in app development, focusing on the use of variables in FlutterFlow.
 
 ----
 
