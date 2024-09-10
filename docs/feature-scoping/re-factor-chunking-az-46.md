@@ -86,6 +86,17 @@ methods:
       - First pass -> split into H1 an H2 sections
       - Second pass -> process each major section, splitting into chunks based on token count + content structure
       - Third pass -> adjust chunk boundaries to ensure code blocks are preserved and min/max token counts are respected
+  - Class structure:
+    - MarkdownChunker:
+      - attributes
+        - output_dir: str
+      - methods:
+        - load_date -> loads json
+        - save_chunks -> saves processed chunks in an async, multi-processed manner
+        - process_page -> loads a single page and does all the processing
+        - identify_sections -> identifies all sections within the doc
+        - create_chunks -> goes through each section and creates chunks
+        - code_blocks -> identifies code blocks
   - Target chunk structure:
 ```json
 {

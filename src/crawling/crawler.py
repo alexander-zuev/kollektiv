@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import List, Dict, Any, Optional, Union, Tuple
+from typing import List, Dict, Any, Optional, Tuple
 from uuid import uuid4
 
 from pydantic import HttpUrl
