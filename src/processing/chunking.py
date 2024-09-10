@@ -22,11 +22,17 @@ class MarkdownChunker:
         """Loads markdown from json and prepares for chunking"""
         input_filepath = os.path.join(NEW_RAW_DATA_DIR, self.input_filename)
 
-        with open(input_filepath, 'r', encoding='utf-8') as f:
-            doc = json.load(f)
-        self.logger.info(f"{self.input_filename} loaded")
-
-        return doc
+        try:
+            with open(input_filepath, 'r', encoding='utf-8') as f:
+                doc = json.load(f)
+            self.logger.info(f"{self.input_filename} loaded")
+            return doc
+        except FileNotFoundError:
+            self.logger.error(f"File not found: {input_filepath}")
+            raise
+        except json.JSONDecodeError:
+            self.logger.error(f"Invalid JSON in file: {input_filepath}")
+            raise
 
     @error_handler
     def save_chunks(self):
