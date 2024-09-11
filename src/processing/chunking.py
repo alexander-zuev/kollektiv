@@ -4,6 +4,7 @@ import json
 import os
 from typing import List, Dict, Any
 import tiktoken
+import re
 
 from src.utils.config import NEW_RAW_DATA_DIR, NEW_PROCESSED_DATA_DIR, LOG_DIR
 from src.utils.logger import setup_logger
@@ -46,22 +47,59 @@ class MarkdownChunker:
             raise
 
     @error_handler(logger)
-    def process_pages(self):
+    def process_pages(self, json_input: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Iterates through each page in the loaded data"""
         # calls identify_sections for each page
+        all_chunks = []
+        for index, page in enumerate(json_input['data']):
+            page_content = page['markdown']
+            page_metadata = page['metadata']
+            self.logger.info(f"Processing page {index + 1} of {len(json_input['data'])}")
+
+            sections = self.identify_sections(page_content)
+
+        print("Printing sections debuggins")
+        print(sections)
+            # page_chunks = self.create_chunks(sections, page_metadata)
+            # all_chunks.extend(page_chunks)
+
+
         # calls create chunks for each section
         # returns a list of chunks for all pages
 
     @error_handler(logger)
-    def identify_sections(self):
+    def identify_sections(self, page_content: str) -> List[Dict[str, Any]]:
         """Takes a singple page content and identifies headers"""
         # parses markdown to identify H1, H2 headers
         # returns a list of all sections with their headers and content
+        sections = []
+        h1_pattern = re.compile(r'^# (.+)$', re.MULTILINE)
+        h2_pattern = re.compile(r'^## (.+)$', re.MULTILINE)
+
+        h1_match = h1_pattern.search(page_content)
+        h1_title = h1_match.group(1) if h1_match else ""
+
+        h2_splits = h2_pattern.split(page_content)
+
+        if h1_title and h2_splits[0].strip():
+            sections.append({
+                "headers": {"h1": h1_title},
+                "content": h2_splits[0].strip()
+            })
+
+        for i in range(1, len(h2_splits), 2):
+            sections.append({
+                "headers": {"h1": h1_title, "h2": h2_splits[i]},
+                "content": h2_splits[i + 1].strip()
+            })
+
+        return sections
 
     @error_handler(logger)
-    def create_chunks(self):
+    def create_chunks(self, sections, page_metadata: Dict[str, Any]):
         """Takes a section (content between headers) and chunks it"""
         # splits the content based on token limits
+        # creates metadata
         # handles overlap
         # calls handle_code_blocks for each chunks
         # returns a list of chunk dictionaries
@@ -79,7 +117,6 @@ class MarkdownChunker:
         # saves them to the output director in the specified JSON format
 
 
-
     @error_handler(logger)
     def _generate_chunk_id(self) -> uuid.UUID:
         """Generates chunk's uuidv4"""
@@ -88,10 +125,18 @@ class MarkdownChunker:
     @error_handler(logger)
     def _calculate_tokens(self, text: str) -> int:
         """Calculates the number of tokens in a given text using tiktoken"""
+        token_count = len(self.tokenizer.encode(text))
+        return token_count
 
     @error_handler(logger)
-    def _create_metadata(self):
+    def _create_metadata(self, page_metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Creates metadata dictionary for a chunk"""
+        metadata = {
+            'token_count': 0,
+            'source_url' : page_metadata['sourceUrl'],
+            'page_title' : page_metadata['title'],
+        }
+        return metadata
 
     @error_handler(logger)
     def _create_overlap(self):
@@ -100,4 +145,5 @@ class MarkdownChunker:
 # Test usage
 markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_2024-09-11 07:16:11.json")
 result = markdown_chunker.load_data()
-print(result['data'][0]['markdown'])
+# print(result['data'][0]['markdown'])
+markdown_chunker.process_pages(result)
