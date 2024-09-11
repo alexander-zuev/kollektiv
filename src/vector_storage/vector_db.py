@@ -1,3 +1,4 @@
+from fileinput import filename
 from pprint import pprint
 
 import chromadb
@@ -8,7 +9,7 @@ import os
 from openai import OpenAI
 import cohere
 
-from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
+from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, NEW_PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
 from src.generation.claude_assistant import Claude
 
@@ -16,15 +17,15 @@ from src.generation.claude_assistant import Claude
 logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
 
 class DocumentProcessor:
-    def __init__(self, file_name: str = "processed_supabase_docs_20240901_193122.json"):
+    def __init__(self, file_name):
         self.file_name = file_name
-        self.file_path = os.path.join(PROCESSED_DATA_DIR, file_name)
+        self.file_path = os.path.join(NEW_PROCESSED_DATA_DIR, file_name)
 
     def load_json(self) -> List[Dict]:
         try:
             with open(self.file_path, 'r') as f:
                 data = json.load(f)
-            return data['chunks']
+            return data
         except FileNotFoundError:
             logger.error(f"File not found: {self.file_path}")
             raise
@@ -33,18 +34,22 @@ class DocumentProcessor:
             raise
 
     def prepare_documents(self, chunks: List[Dict]) -> Dict[str, List[str]]:
-        ids =[]
+        ids = []
         documents = []
         for chunk in chunks:
             # extract headers
-            headers = chunk['headers']
+            data = chunk['data']
+            headers = data['headers']
             header_text = " ".join(f"{key}: {value}" for key, value in headers.items() if value)
 
             # extract content
-            content = chunk['content']
+            content = data['text']
+
+            # Check if overlap_text exists, use an empty string if it doesn't
+            overlap_content = data.get('overlap_text', '')
 
             # combine
-            combined_text = f"Headers: {header_text}\n\n: Content{content}"
+            combined_text = f"Previous chunk: {overlap_content}\n\n Headers: {header_text}\n\n Content: {content}"
             ids.append(chunk['chunk_id'])
 
             documents.append(combined_text)
@@ -296,7 +301,7 @@ class Reranker:
         return relevant_results
 
 class ResultRetriever:
-    def __init__(self, file_name: str = "processed_supabase_docs_20240901_193122.json"):
+    def __init__(self, file_name: str):
         self.file_name = file_name
         self.doc_processor = None
         self.db = None
@@ -362,15 +367,18 @@ class ResultRetriever:
 
 
 def main():
-    # Test usage
+    file_name = "cra_supabase_docs_2024-09-11 07:16:11.json"
+
     # initialize the ranker
-    retriever = ResultRetriever()
+    retriever = ResultRetriever(file_name="cra_supabase_docs_2024-09-11 07:16:11.json")
     retriever.initialize_components()
 
-    # get user query
+    # Load the documents into the database
+    retriever.load_documents()
+
+    # Now proceed with the query process
     user_query = input("What do you want to know about: ")
     results = retriever.retrieve(user_query)
-    # pprint(results)
 
     # Send to the generation
     claude = Claude()
@@ -378,6 +386,7 @@ def main():
     response = claude.get_augmented_response(user_query, results)
     print("FINAL REPLY")
     print(response)
+
 
 if __name__ == "__main__":
     main()
