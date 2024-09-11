@@ -370,7 +370,7 @@ def main():
     file_name = "cra_supabase_docs_2024-09-11 07:16:11.json"
 
     # initialize the ranker
-    retriever = ResultRetriever(file_name="cra_supabase_docs_2024-09-11 07:16:11.json")
+    retriever = ResultRetriever(file_name="cra_supabase_docs_20240911_071307-chunked.json")
     retriever.initialize_components()
 
     # Load the documents into the database
