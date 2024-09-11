@@ -57,21 +57,18 @@ class MarkdownChunker:
             self.logger.info(f"Processing page {index + 1} of {len(json_input['data'])}")
 
             sections = self.identify_sections(page_content)
-
-        print("Printing sections debuggins")
-        print(sections)
-            # page_chunks = self.create_chunks(sections, page_metadata)
-            # all_chunks.extend(page_chunks)
+            chunks = self.create_chunks(sections, page_metadata)
+            all_chunks.extend(chunks)
 
 
-        # calls create chunks for each section
-        # returns a list of chunks for all pages
+        print("Debugging the results")
+        for item in all_chunks:
+            print(item)
+
 
     @error_handler(logger)
     def identify_sections(self, page_content: str) -> List[Dict[str, Any]]:
-        """Takes a singple page content and identifies headers"""
-        # parses markdown to identify H1, H2 headers
-        # returns a list of all sections with their headers and content
+        """Takes a single page content and identifies headers"""
         sections = []
         h1_pattern = re.compile(r'^# (.+)$', re.MULTILINE)
         h2_pattern = re.compile(r'^## (.+)$', re.MULTILINE)
@@ -79,30 +76,77 @@ class MarkdownChunker:
         h1_match = h1_pattern.search(page_content)
         h1_title = h1_match.group(1) if h1_match else ""
 
+        # Remove the H1 title from the content
+        if h1_match:
+            page_content = page_content[h1_match.end():].strip()
+
         h2_splits = h2_pattern.split(page_content)
 
-        if h1_title and h2_splits[0].strip():
+        # Handle content between H1 and first H2
+        if h2_splits[0].strip():
             sections.append({
                 "headers": {"h1": h1_title},
                 "content": h2_splits[0].strip()
             })
 
+        # Handle H2 sections
         for i in range(1, len(h2_splits), 2):
-            sections.append({
-                "headers": {"h1": h1_title, "h2": h2_splits[i]},
-                "content": h2_splits[i + 1].strip()
-            })
+            if i + 1 < len(h2_splits):
+                sections.append({
+                    "headers": {"h1": h1_title, "h2": h2_splits[i].strip()},
+                    "content": h2_splits[i + 1].strip()
+                })
 
         return sections
 
     @error_handler(logger)
-    def create_chunks(self, sections, page_metadata: Dict[str, Any]):
-        """Takes a section (content between headers) and chunks it"""
-        # splits the content based on token limits
-        # creates metadata
-        # handles overlap
-        # calls handle_code_blocks for each chunks
-        # returns a list of chunk dictionaries
+    def create_chunks(self, sections: List[Dict[str, Any]], page_metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        chunks = []
+        for section in sections:
+            section_chunks = self._split_section(section['content'], section['headers'])
+            for chunk in section_chunks:
+                chunk_id = self._generate_chunk_id()
+                chunk['chunk_id'] = chunk_id
+                chunk['metadata'] = self._create_metadata(page_metadata)
+                chunk['metadata']['token_count'] = self._calculate_tokens(chunk['content'])
+                chunks.append(chunk)
+
+        self._add_overlap(chunks)
+        return chunks
+
+    @error_handler(logger)
+    def _split_section(self, content: str, headers: Dict[str, str]) -> List[Dict[str, Any]]:
+        chunks = []
+        current_chunk = {'headers': headers, 'content': ''}
+        lines = content.split('\n')
+        in_code_block = False
+
+        for line in lines:
+            if line.strip().startswith('`') and line.strip().endswith('`') and len(line.strip()) > 1:
+                in_code_block = not in_code_block
+
+            if in_code_block or self._calculate_tokens(current_chunk['content'] + line) <= self.soft_token_limit:
+                current_chunk['content'] += line + '\n'
+            else:
+                if current_chunk['content'].strip():
+                    chunks.append(current_chunk)
+                current_chunk = {'headers': headers, 'content': line + '\n'}
+
+            if not in_code_block and self._is_break_point(line):
+                if self._calculate_tokens(current_chunk['content']) >= self.min_chunk_size:
+                    chunks.append(current_chunk)
+                    current_chunk = {'headers': headers, 'content': ''}
+
+        if current_chunk['content'].strip():
+            chunks.append(current_chunk)
+
+        return chunks
+
+    @error_handler(logger)
+    def _is_break_point(self, line: str) -> bool:
+        # Check if the line is the end of a paragraph, list item, or other logical break point
+        return line.strip() == '' or line.strip().endswith('.') or line.strip().endswith(':') or line.startswith(
+            '- ') or line.startswith('* ')
 
     @error_handler(logger)
     def handle_code_blocks(self):
@@ -133,14 +177,21 @@ class MarkdownChunker:
         """Creates metadata dictionary for a chunk"""
         metadata = {
             'token_count': 0,
-            'source_url' : page_metadata['sourceUrl'],
+            'source_url' : page_metadata['sourceURL'],
             'page_title' : page_metadata['title'],
         }
         return metadata
 
     @error_handler(logger)
-    def _create_overlap(self):
-        """Handles overlap between chunks"""
+    def _add_overlap(self, chunks: List[Dict[str, Any]]) -> None:
+        for i in range(1, len(chunks)):
+            prev_chunk = chunks[i - 1]
+            curr_chunk = chunks[i]
+            overlap_text = prev_chunk['content'][-int(len(prev_chunk['content']) * self.overlap_percentage):]
+            curr_chunk['metadata']['overlap'] = {
+                'previous_chunk_id': prev_chunk['chunk_id'],
+                'text': overlap_text
+            }
 
 # Test usage
 markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_2024-09-11 07:16:11.json")
