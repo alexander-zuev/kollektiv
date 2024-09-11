@@ -71,5 +71,45 @@
     "status": "completed",
     "timestamp": "2024-09-09 10:58:18",
     "method": "crawl"
+  },
+  "5a7b8523-23c9-403f-8d2a-ef982c1cd267": {
+    "internal_id": "5a7b8523-23c9-403f-8d2a-ef982c1cd267",
+    "job_id": "ea533fd2-64d8-49f2-b51a-b2286770239e",
+    "input_url": "https://supabase.com/docs/guides/ai",
+    "status": "completed",
+    "timestamp": "2024-09-11 07:03:36",
+    "method": "crawl"
+  },
+  "dfc55875-ce83-4614-869d-fe4c59829380": {
+    "internal_id": "dfc55875-ce83-4614-869d-fe4c59829380",
+    "job_id": "3db2905b-2daa-45c5-8cbe-9278beb3e42b",
+    "input_url": "https://supabase.com/docs/guides/ai",
+    "status": "completed",
+    "timestamp": "2024-09-11 07:09:13",
+    "method": "crawl"
+  },
+  "5a616935-5555-436f-b191-b6cb38a55a61": {
+    "internal_id": "5a616935-5555-436f-b191-b6cb38a55a61",
+    "job_id": "ec565e08-fd07-4d0a-8cbd-70c3412f6350",
+    "input_url": "https://supabase.com/docs/guides/ai",
+    "status": "completed",
+    "timestamp": "2024-09-11 07:10:53",
+    "method": "crawl"
+  },
+  "f8865079-6764-45d6-a291-382becc683cc": {
+    "internal_id": "f8865079-6764-45d6-a291-382becc683cc",
+    "job_id": "70718dd3-2ef1-4d19-8a9e-7de83b33aec8",
+    "input_url": "https://supabase.com/docs/guides/auth",
+    "status": "completed",
+    "timestamp": "2024-09-11 07:12:32",
+    "method": "crawl"
+  },
+  "b1e379c1-3a63-44aa-a6ed-86dad5e4759e": {
+    "internal_id": "b1e379c1-3a63-44aa-a6ed-86dad5e4759e",
+    "job_id": "343c20d4-7bf6-4d25-8a5c-2bd63ec7d06c",
+    "input_url": "https://supabase.com/docs/guides/ai",
+    "status": "completed",
+    "timestamp": "2024-09-11 07:15:37",
+    "method": "crawl"
   }
 }

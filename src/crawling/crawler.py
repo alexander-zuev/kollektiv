@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from pydoc import html
 from typing import List, Dict, Any, Optional, Tuple
 from uuid import uuid4
 
@@ -64,9 +65,10 @@ class FireCrawler:
     def async_crawl_url(self, url: HttpUrl, page_limit: int = 25, max_depth: int = 3) -> Dict[str, Any]:
         # setup params dict
         params = {
-            'maxDepth': max_depth,
+            # 'maxDepth': max_depth,
             'limit': page_limit,
-            'scrapeOptions': {'formats': ['markdown']}
+            'scrapeOptions':
+                {'formats': ['markdown', 'html']}
         }
 
         self.logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
@@ -173,7 +175,7 @@ class FireCrawler:
         with open(filepath, 'w') as f:
             json.dump(result, f, indent=2)
 
-        # build an md_example file
+        # build an example file
         self.build_example_file(filename)
 
         self.logger.info(f"Results saved to file: {filepath}")
@@ -279,29 +281,49 @@ class FireCrawler:
         return list(unique_links)
 
     @error_handler(logger)
-    def build_example_file(self, filename: str, pages: int = 3) -> None:
-        """Extracts n pages into md_example file to visualize its structure"""
+    def build_example_file(self, filename: str, pages: int = 1, include_html: bool = True) -> None:
+        """Extracts n pages into example file to visualize its structure"""
         input_filename = filename
         input_filepath = os.path.join(self.raw_data_dir, input_filename)
 
-        output_filename = "example.md"
-        output_filepath = os.path.join(SRC_ROOT, 'data', 'md_example', output_filename)
+        md_output_filename = "example.md"
+        html_output_filename = "example.html"
+        md_output_filepath = os.path.join(SRC_ROOT, 'data', 'example', md_output_filename)
+        html_output_filepath = os.path.join(SRC_ROOT, 'data', 'example', html_output_filename)
 
         # ensure directory exists
-        os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+        os.makedirs(os.path.dirname(md_output_filepath), exist_ok=True)
+        os.makedirs(os.path.dirname(html_output_filepath), exist_ok=True)
 
         with open(input_filepath, 'r') as f:
             json_data = json.load(f)
 
-        with open(output_filepath, 'w') as f:
-            for index, item in enumerate(json_data['data']):
-                if 'markdown' in item:
-                    f.write(f"Markdown content for item {index}\n\n {item['markdown']}\n\n----\n\n")
+        with (open(md_output_filepath, 'w', encoding='utf-8') as md_file,
+              open(html_output_filepath, 'w', encoding='utf-8') as html_file):
 
-                if index >= pages -1:
+            # Write HTML header
+            html_file.write("<html><body>\n")
+
+            for index, item in enumerate(json_data['data']):
+                if index >= pages:
                     break
 
-        logger.info(f"Example file created: {output_filepath}")
+                # Markdown file
+                if 'markdown' in item:
+                    md_file.write(f"# Content for item {index}\n\n")
+                    md_file.write(f"```markdown\n{item['markdown']}\n```\n\n")
+                    md_file.write("----\n\n")
+
+                # HTML file
+                if 'html' in item:
+                    html_file.write(item['html'])
+                    html_file.write("<hr>\n")
+
+            # Close HTML file
+            html_file.write("</body></html>")
+
+        logger.info(f"Example Markdown file created: {md_output_filepath}")
+        logger.info(f"Example HTML file created: {html_output_filepath}")
 
 
 # Test usage
@@ -315,17 +337,19 @@ def main():
     # print(supabase_ai_map['links'])
 
     # Testing crawl_url
-    url_to_crawl = "https://docs.flutterflow.io/"
-    results = crawler.async_crawl_url(url_to_crawl, page_limit=50, max_depth=3)
+    # url_to_crawl = "https://supabase.com/docs/guides/ai"
+    # results = crawler.async_crawl_url(url_to_crawl, page_limit=50)
+    #
+    # print(f"Crawl Results for {url_to_crawl}:")
+    # print(f"Input URL: {results['input_url']}")
+    # print(f"Total data points: {len(results['data'])}")
+    # if results['data']:
+    #     print(f"First data point:")
+    #     print(json.dumps(results['data'][0], indent=2))
+    # else:
+    #     print("No data points found.")
 
-    print(f"Crawl Results for {url_to_crawl}:")
-    print(f"Input URL: {results['input_url']}")
-    print(f"Total data points: {len(results['data'])}")
-    if results['data']:
-        print(f"First data point:")
-        print(json.dumps(results['data'][0], indent=2))
-    else:
-        print("No data points found.")
+    crawler.build_example_file("cra_supabase_docs_2024-09-11 07:16:11.json")
 
 if __name__ == "__main__":
     main()
