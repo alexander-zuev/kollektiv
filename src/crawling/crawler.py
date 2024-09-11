@@ -62,10 +62,9 @@ class FireCrawler:
         return result
 
     @error_handler(logger)
-    def async_crawl_url(self, url: HttpUrl, page_limit: int = 25, max_depth: int = 3) -> Dict[str, Any]:
+    def async_crawl_url(self, url: HttpUrl, page_limit: int = 25) -> Dict[str, Any]:
         # setup params dict
         params = {
-            # 'maxDepth': max_depth,
             'limit': page_limit,
             'scrapeOptions':
                 {'formats': ['markdown']}
@@ -199,7 +198,7 @@ class FireCrawler:
     @error_handler(logger)
     def _get_timestamp(self):
         """Returns the current timestamp to be used for saving the results"""
-        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return datetime.now().strftime("%Y%m%d_%H%M%S")
 
     @error_handler(logger)
     def create_job(self, job_id: str, method: str, input_url: HttpUrl) -> None:
@@ -281,29 +280,21 @@ class FireCrawler:
         return list(unique_links)
 
     @error_handler(logger)
-    def build_example_file(self, filename: str, pages: int = 1, include_html: bool = False) -> None:
+    def build_example_file(self, filename: str, pages: int = 1) -> None:
         """Extracts n pages into example file to visualize its structure"""
         input_filename = filename
         input_filepath = os.path.join(self.raw_data_dir, input_filename)
 
         md_output_filename = "example.md"
-        html_output_filename = "example.html"
         md_output_filepath = os.path.join(SRC_ROOT, 'data', 'example', md_output_filename)
-        html_output_filepath = os.path.join(SRC_ROOT, 'data', 'example', html_output_filename)
 
         # ensure directory exists
         os.makedirs(os.path.dirname(md_output_filepath), exist_ok=True)
-        os.makedirs(os.path.dirname(html_output_filepath), exist_ok=True)
 
         with open(input_filepath, 'r') as f:
             json_data = json.load(f)
 
-        with (open(md_output_filepath, 'w', encoding='utf-8') as md_file,
-              open(html_output_filepath, 'w', encoding='utf-8') as html_file):
-
-            # Write HTML header
-            html_file.write("<html><body>\n")
-
+        with (open(md_output_filepath, 'w', encoding='utf-8') as md_file):
             for index, item in enumerate(json_data['data']):
                 if index >= pages:
                     break
@@ -314,17 +305,7 @@ class FireCrawler:
                     md_file.write(f"```markdown\n{item['markdown']}\n```\n\n")
                     md_file.write("----\n\n")
 
-                # HTML file
-                if 'html' in item:
-                    html_file.write(item['html'])
-                    html_file.write("<hr>\n")
-
-            # Close HTML file
-            html_file.write("</body></html>")
-
         logger.info(f"Example Markdown file created: {md_output_filepath}")
-        logger.info(f"Example HTML file created: {html_output_filepath}")
-
 
 # Test usage
 def main():
