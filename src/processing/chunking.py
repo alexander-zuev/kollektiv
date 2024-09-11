@@ -54,16 +54,12 @@ class MarkdownChunker:
         for index, page in enumerate(json_input['data']):
             page_content = page['markdown']
             page_metadata = page['metadata']
-            self.logger.info(f"Processing page {index + 1} of {len(json_input['data'])}")
 
             sections = self.identify_sections(page_content)
             chunks = self.create_chunks(sections, page_metadata)
             all_chunks.extend(chunks)
 
-
-        print("Debugging the results")
-        for item in all_chunks:
-            print(item)
+        return all_chunks
 
 
     @error_handler(logger)
@@ -105,11 +101,16 @@ class MarkdownChunker:
         for section in sections:
             section_chunks = self._split_section(section['content'], section['headers'])
             for chunk in section_chunks:
-                chunk_id = self._generate_chunk_id()
-                chunk['chunk_id'] = chunk_id
-                chunk['metadata'] = self._create_metadata(page_metadata)
-                chunk['metadata']['token_count'] = self._calculate_tokens(chunk['content'])
-                chunks.append(chunk)
+                chunk_id = str(self._generate_chunk_id())
+                token_count = self._calculate_tokens(chunk['content'])
+                chunks.append({
+                    'chunk_id': chunk_id,
+                    'metadata': self._create_metadata(page_metadata, token_count),
+                    'data': {
+                        'headers': chunk['headers'],
+                        'text': chunk['content']
+                    }
+                })
 
         self._add_overlap(chunks)
         return chunks
@@ -155,10 +156,13 @@ class MarkdownChunker:
         # Adjusts chunk boundaries, if necessary
 
     @error_handler(logger)
-    def save_chunks(self):
+    def save_chunks(self, chunks: List[Dict[str, Any]]):
         """Saves chunks to output dir"""
-        # takes the final list of chunks
-        # saves them to the output director in the specified JSON format
+        output_filename = self.input_filename
+        output_filepath = os.path.join(self.output_dir, self.input_filename)
+        with open(output_filepath, 'w', encoding='utf-8') as f:
+            json.dump(chunks, f, indent=2)
+        self.logger.info(f"Chunks saved to {output_filepath}")
 
 
     @error_handler(logger)
@@ -173,28 +177,61 @@ class MarkdownChunker:
         return token_count
 
     @error_handler(logger)
-    def _create_metadata(self, page_metadata: Dict[str, Any]) -> Dict[str, Any]:
+    def _create_metadata(self, page_metadata: Dict[str, Any], token_count: int) -> Dict[str, Any]:
         """Creates metadata dictionary for a chunk"""
         metadata = {
-            'token_count': 0,
+            'token_count': token_count,
             'source_url' : page_metadata['sourceURL'],
             'page_title' : page_metadata['title'],
         }
         return metadata
 
     @error_handler(logger)
-    def _add_overlap(self, chunks: List[Dict[str, Any]]) -> None:
+    def _add_overlap(self,
+                     chunks: List[Dict[str, Any]],
+                     min_overlap_tokens: int = 50,
+                     max_overlap_tokens: int = 50) -> None:
+
         for i in range(1, len(chunks)):
             prev_chunk = chunks[i - 1]
             curr_chunk = chunks[i]
-            overlap_text = prev_chunk['content'][-int(len(prev_chunk['content']) * self.overlap_percentage):]
-            curr_chunk['metadata']['overlap'] = {
+            prev_chunk_text = prev_chunk['data']['text']
+            prev_chunk_headers = prev_chunk['data']['headers']
+
+            # Calculate 5% of the previous chunk's text
+            overlap_text_length = int(len(prev_chunk_text) * self.overlap_percentage)
+            overlap_text = prev_chunk_text[-overlap_text_length:]
+
+            # Check if the overlap is less than MIN_OVERLAP_TOKENS
+            if self._calculate_tokens(overlap_text) < min_overlap_tokens:
+                # If the entire previous chunk is less than MAX_FULL_CHUNK_TOKENS, use it all
+                if self._calculate_tokens(prev_chunk_text) <= max_overlap_tokens:
+                    overlap_text = prev_chunk_text
+                else:
+                    # Otherwise, take the last MAX_FULL_CHUNK_TOKENS worth of text
+                    overlap_text = self._get_last_n_tokens(prev_chunk_text, max_overlap_tokens)
+
+            # Construct the overlap text with headers
+            headers_text = " ".join(f"{k}: {v}" for k, v in prev_chunk_headers.items())
+            full_overlap_text = f"Content of the previous chunk for context: {headers_text}\n\n{overlap_text}"
+
+            curr_chunk['data']['overlap_text'] = {
                 'previous_chunk_id': prev_chunk['chunk_id'],
-                'text': overlap_text
+                'text': full_overlap_text
             }
+
+    def _get_last_n_tokens(self, text: str, n: int) -> str:
+        tokens = self.tokenizer.encode(text)
+        return self.tokenizer.decode(tokens[-n:])
+
 
 # Test usage
 markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_2024-09-11 07:16:11.json")
 result = markdown_chunker.load_data()
 # print(result['data'][0]['markdown'])
-markdown_chunker.process_pages(result)
+chunks = markdown_chunker.process_pages(result)
+markdown_chunker.save_chunks(chunks)
+
+for chunk in chunks:
+    for key, value in chunk.items():
+        print(key, value)
