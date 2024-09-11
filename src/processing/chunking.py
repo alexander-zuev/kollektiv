@@ -157,18 +157,12 @@ class MarkdownChunker:
     @error_handler(logger)
     def save_chunks(self, chunks: List[Dict[str, Any]]):
         """Saves chunks to output dir"""
-        output_filename = self.input_filename
-        output_filepath = os.path.join(self.output_dir, self.input_filename)
+        input_name = os.path.splitext(self.input_filename)[0]  # Remove the extension
+        output_filename = f"{input_name}-chunked.json"
+        output_filepath = os.path.join(self.output_dir, output_filename)
         with open(output_filepath, 'w', encoding='utf-8') as f:
             json.dump(chunks, f, indent=2)
         self.logger.info(f"Chunks saved to {output_filepath}")
-
-    def page_validation(self):
-        """Validate the before and after token count for each page."""
-
-    def chunk_validation(self):
-        """Validate """
-
 
     @error_handler(logger)
     def _generate_chunk_id(self) -> uuid.UUID:
@@ -231,15 +225,11 @@ class MarkdownChunker:
 
 # Test usage
 def main():
-    markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_2024-09-11 07:16:11.json")
+    markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_20240911_071611.json")
     result = markdown_chunker.load_data()
     # print(result['data'][0]['markdown'])
     chunks = markdown_chunker.process_pages(result)
     markdown_chunker.save_chunks(chunks)
-
-    for chunk in chunks:
-        for key, value in chunk.items():
-            print(key, value)
 
 if __name__ == "__main__":
     main()
