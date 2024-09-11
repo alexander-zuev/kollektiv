@@ -68,7 +68,7 @@ class FireCrawler:
             # 'maxDepth': max_depth,
             'limit': page_limit,
             'scrapeOptions':
-                {'formats': ['markdown', 'html']}
+                {'formats': ['markdown']}
         }
 
         self.logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
@@ -281,7 +281,7 @@ class FireCrawler:
         return list(unique_links)
 
     @error_handler(logger)
-    def build_example_file(self, filename: str, pages: int = 1, include_html: bool = True) -> None:
+    def build_example_file(self, filename: str, pages: int = 1, include_html: bool = False) -> None:
         """Extracts n pages into example file to visualize its structure"""
         input_filename = filename
         input_filepath = os.path.join(self.raw_data_dir, input_filename)
