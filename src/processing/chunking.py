@@ -1,5 +1,4 @@
 import uuid
-from pprint import pprint
 import json
 import os
 from typing import List, Dict, Any
@@ -164,6 +163,12 @@ class MarkdownChunker:
             json.dump(chunks, f, indent=2)
         self.logger.info(f"Chunks saved to {output_filepath}")
 
+    def page_validation(self):
+        """Validate the before and after token count for each page."""
+
+    def chunk_validation(self):
+        """Validate """
+
 
     @error_handler(logger)
     def _generate_chunk_id(self) -> uuid.UUID:
@@ -224,14 +229,17 @@ class MarkdownChunker:
         tokens = self.tokenizer.encode(text)
         return self.tokenizer.decode(tokens[-n:])
 
-
 # Test usage
-markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_2024-09-11 07:16:11.json")
-result = markdown_chunker.load_data()
-# print(result['data'][0]['markdown'])
-chunks = markdown_chunker.process_pages(result)
-markdown_chunker.save_chunks(chunks)
+def main():
+    markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_2024-09-11 07:16:11.json")
+    result = markdown_chunker.load_data()
+    # print(result['data'][0]['markdown'])
+    chunks = markdown_chunker.process_pages(result)
+    markdown_chunker.save_chunks(chunks)
 
-for chunk in chunks:
-    for key, value in chunk.items():
-        print(key, value)
+    for chunk in chunks:
+        for key, value in chunk.items():
+            print(key, value)
+
+if __name__ == "__main__":
+    main()
