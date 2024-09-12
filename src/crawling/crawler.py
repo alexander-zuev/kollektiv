@@ -62,49 +62,54 @@ class FireCrawler:
         return result
 
     @error_handler(logger)
-    def async_crawl_url(self, url: HttpUrl, page_limit: int = 25) -> Dict[str, Any]:
-        # setup params dict
-        params = {
-            'limit': page_limit,
-            'scrapeOptions':
-                {'formats': ['markdown']}
-        }
+    def async_crawl_url(self, urls: List[HttpUrl], page_limit: int = 25) -> Dict[str, Any]:
+        all_results = []
 
-        self.logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
-        response = self.app.async_crawl_url(url, params)
+        for url in urls:
+            params = {
+                'limit': page_limit,
+                'maxDepth': 5,
+                "includePaths": ["/docs/*",
+                                 '/api/*'],
+                'scrapeOptions':
+                    {'formats': ['markdown']}
+            }
 
-        crawl_job_id = response['id'] # return the id from FireCrawl
-        self.logger.info(f"Received job ID: {crawl_job_id}")
+            self.logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
+            response = self.app.async_crawl_url(url, params)
 
-        # create a job with this id
-        self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
+            crawl_job_id = response['id'] # return the id from FireCrawl
+            self.logger.info(f"Received job ID: {crawl_job_id}")
 
-        # check job status
-        self.logger.info("***Polling job status***")
-        job_status = self._poll_job_results(crawl_job_id)
-        if job_status == 'failed':
-            return {"status": "failed", "job_id": crawl_job_id}
+            # create a job with this id
+            self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
 
-        # get all the results
-        crawl_results = self._get_all_crawl_results(crawl_job_id)
-        unique_links = self._extract_unique_links(crawl_results)
-        self.logger.info(f"Job {crawl_job_id} results received.")
-        self.logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
+            # check job status
+            self.logger.info("***Polling job status***")
+            job_status = self._poll_job_results(crawl_job_id)
+            if job_status == 'failed':
+                return {"status": "failed", "job_id": crawl_job_id}
 
-        # save the results
-        crawl_results = {
-            'input_url': url,
-            'total_pages': len(crawl_results),
-            'unique_links': unique_links,
-            'data': crawl_results,
+            # get all the results
+            crawl_results = self._get_all_crawl_results(crawl_job_id)
+            unique_links = self._extract_unique_links(crawl_results)
+            self.logger.info(f"Job {crawl_job_id} results received.")
+            self.logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
 
-        }
+            # save the results
+            crawl_results = {
+                'input_url': url,
+                'total_pages': len(crawl_results),
+                'unique_links': unique_links,
+                'data': crawl_results,
+            }
 
-        self.save_results(crawl_results, method="crawl")
+            self.save_results(crawl_results, method="crawl")
 
-        # complete the job
-        self.complete_job(crawl_job_id)
-        return crawl_results
+            # complete the job
+            self.complete_job(crawl_job_id)
+            all_results.append(crawl_results)
+        return {'input_urls': urls, 'results': all_results}
 
     @error_handler(logger)
     def _poll_job_results(self, job_id: str, attempts=None) -> str:
@@ -318,19 +323,10 @@ def main():
     # print(supabase_ai_map['links'])
 
     # Testing crawl_url
-    # url_to_crawl = "https://supabase.com/docs/guides/ai"
-    # results = crawler.async_crawl_url(url_to_crawl, page_limit=50)
-    #
-    # print(f"Crawl Results for {url_to_crawl}:")
-    # print(f"Input URL: {results['input_url']}")
-    # print(f"Total data points: {len(results['data'])}")
-    # if results['data']:
-    #     print(f"First data point:")
-    #     print(json.dumps(results['data'][0], indent=2))
-    # else:
-    #     print("No data points found.")
-
-    crawler.build_example_file("cra_supabase_docs_2024-09-11 07:16:11.json")
+    urls_to_crawl = ["https://docs.anthropic.com/en",
+                    ]
+    results = crawler.async_crawl_url(urls_to_crawl, page_limit=75)
+    # crawler.build_example_file("cra_supabase_docs_2024-09-11 07:16:11.json")
 
 if __name__ == "__main__":
     main()
