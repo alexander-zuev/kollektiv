@@ -371,6 +371,7 @@ def main():
 
     # initialize the ranker
     retriever = ResultRetriever(filename=filename)
+
     retriever.initialize_components()
 
     # Load the documents into the database
