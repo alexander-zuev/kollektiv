@@ -301,8 +301,8 @@ class Reranker:
         return relevant_results
 
 class ResultRetriever:
-    def __init__(self, file_name: str):
-        self.file_name = file_name
+    def __init__(self, filename: str):
+        self.file_name = filename
         self.doc_processor = None
         self.db = None
         self.llm_client = None
@@ -367,10 +367,10 @@ class ResultRetriever:
 
 
 def main():
-    file_name = "cra_supabase_docs_2024-09-11 07:16:11.json"
+    filename = "cra_supabase_docs_20240911_071611-chunked.json"
 
     # initialize the ranker
-    retriever = ResultRetriever(file_name="cra_supabase_docs_20240911_071307-chunked.json")
+    retriever = ResultRetriever(filename=filename)
     retriever.initialize_components()
 
     # Load the documents into the database
