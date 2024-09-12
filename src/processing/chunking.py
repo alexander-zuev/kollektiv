@@ -225,7 +225,7 @@ class MarkdownChunker:
 
 # Test usage
 def main():
-    markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_20240911_071611.json")
+    markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_20240911_071307.json")
     result = markdown_chunker.load_data()
     # print(result['data'][0]['markdown'])
     chunks = markdown_chunker.process_pages(result)
