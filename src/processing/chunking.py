@@ -33,6 +33,7 @@ class MarkdownChunker:
         self.total_chunks = 0
         self.total_tokens = 0
         self.content_preserved = True
+        self.original_content_tokens = 0  # To store original content token count
 
     @error_handler(logger)
     def load_data(self) -> Dict[str, Any]:
@@ -65,6 +66,9 @@ class MarkdownChunker:
             chunks = self.create_chunks(sections, page_metadata)
             all_chunks.extend(chunks)
 
+        # Calculate tokens in original content
+        self.original_content_tokens = self._calculate_tokens(original_content)
+
         # After processing all pages, perform validation
         self.validate_all_chunks(all_chunks, original_content)
         return all_chunks
@@ -89,7 +93,6 @@ class MarkdownChunker:
                 },
                 "content": page_content.strip()
             })
-            self.logger.warning(f"No headers found in page. Using page title as h1.")
             return sections
 
         # Process headers and content
@@ -261,22 +264,38 @@ class MarkdownChunker:
         combined_chunk_content = ''.join(chunk['data']['text'] for chunk in chunks)
         if combined_chunk_content.strip() != original_content.strip():
             self.content_preserved = False
-            self.validation_errors.append("Content mismatch between original and chunks.")
-            self.logger.error("Content mismatch between original and chunks.")
+            # Find the difference in content lengths
+            original_length = len(original_content.strip())
+            combined_length = len(combined_chunk_content.strip())
+            length_difference = original_length - combined_length
+            percentage_difference = (abs(length_difference) / original_length) * 100
+
+            self.validation_errors.append(f"Content mismatch between original and chunks. Difference of {length_difference} characters ({percentage_difference:.2f}%).")
+            self.logger.error(f"Content mismatch between original and chunks. Difference of {length_difference} characters ({percentage_difference:.2f}%). Possible causes: duplicate content, missing content, or extra content.")
         else:
             self.content_preserved = True
 
-        # Check for duplicates
-        chunk_texts = set()
+        # Check for duplicates and remove them carefully
+        chunk_texts = {}
         duplicates_found = False
+        cleaned_chunks = []
         for chunk in chunks:
             text = chunk['data']['text']
             if text in chunk_texts:
                 duplicates_found = True
                 self.validation_errors.append(f"Duplicate chunk found with chunk_id {chunk['chunk_id']}")
-                self.logger.error(f"Duplicate chunk found with chunk_id {chunk['chunk_id']}")
+                self.logger.error(f"Duplicate chunk found with chunk_id {chunk['chunk_id']}. Removing duplicate.")
+                # Do not add the duplicate chunk to cleaned_chunks
+                continue
             else:
-                chunk_texts.add(text)
+                chunk_texts[text] = True
+                cleaned_chunks.append(chunk)
+
+        if duplicates_found:
+            # Update the chunks list to the cleaned_chunks without duplicates
+            chunks.clear()
+            chunks.extend(cleaned_chunks)
+            self.total_chunks = len(chunks)
 
         # Summarize validation
         if self.validation_errors:
@@ -321,6 +340,10 @@ class MarkdownChunker:
         """Logs a summary of the chunking process"""
         self.logger.info(f"Total chunks created: {self.total_chunks}")
         self.logger.info(f"Total tokens in chunks: {self.total_tokens}")
+        self.logger.info(f"Total tokens in original content: {self.original_content_tokens}")
+        token_difference = self.original_content_tokens - self.total_tokens
+        percentage_difference = (abs(token_difference) / self.original_content_tokens) * 100 if self.original_content_tokens > 0 else 0
+        self.logger.info(f"Token difference: {token_difference} tokens ({percentage_difference:.2f}%)")
         if self.content_preserved:
             self.logger.info("Content preservation check passed.")
         else:
