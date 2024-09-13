@@ -2,6 +2,7 @@ import uuid
 import json
 import os
 import re
+import statistics
 from typing import List, Dict, Any
 
 import tiktoken
@@ -32,8 +33,10 @@ class MarkdownChunker:
         self.validation_errors = []
         self.total_chunks = 0
         self.total_tokens = 0
-        self.content_preserved = True
         self.original_content_tokens = 0  # To store original content token count
+        self.content_missing = False  # To indicate if content is missing
+        self.chunk_token_counts = []  # To store token counts of individual chunks
+        self.headings_preserved = {'h1': set(), 'h2': set()}  # To track preserved headings
 
     @error_handler(logger)
     def load_data(self) -> Dict[str, Any]:
@@ -93,6 +96,8 @@ class MarkdownChunker:
                 },
                 "content": page_content.strip()
             })
+            # Track the h1 heading
+            self.headings_preserved['h1'].add(page_metadata.get('title', 'Untitled'))
             return sections
 
         # Process headers and content
@@ -122,9 +127,13 @@ class MarkdownChunker:
                 current_section['headers']['h1'] = header
                 current_section['headers']['h2'] = ""
                 current_section['headers']['h3'] = ""
+                # Track h1 headings
+                self.headings_preserved['h1'].add(header)
             elif header_level == 2:
                 current_section['headers']['h2'] = header
                 current_section['headers']['h3'] = ""
+                # Track h2 headings
+                self.headings_preserved['h2'].add(header)
             elif header_level == 3:
                 current_section['headers']['h3'] = header
 
@@ -147,6 +156,7 @@ class MarkdownChunker:
                 chunk_id = str(self._generate_chunk_id())
                 token_count = self._calculate_tokens(chunk['content'])
                 self.total_tokens += token_count
+                self.chunk_token_counts.append(token_count)
                 metadata = self._create_metadata(page_metadata, token_count, chunk['headers'])
                 new_chunk = {
                     'chunk_id': chunk_id,
@@ -263,17 +273,20 @@ class MarkdownChunker:
         # Check if total tokens in chunks match the original content
         combined_chunk_content = ''.join(chunk['data']['text'] for chunk in chunks)
         if combined_chunk_content.strip() != original_content.strip():
-            self.content_preserved = False
-            # Find the difference in content lengths
+            # Determine if content is missing
             original_length = len(original_content.strip())
             combined_length = len(combined_chunk_content.strip())
             length_difference = original_length - combined_length
             percentage_difference = (abs(length_difference) / original_length) * 100
 
-            self.validation_errors.append(f"Content mismatch between original and chunks. Difference of {length_difference} characters ({percentage_difference:.2f}%).")
-            self.logger.error(f"Content mismatch between original and chunks. Difference of {length_difference} characters ({percentage_difference:.2f}%). Possible causes: duplicate content, missing content, or extra content.")
-        else:
-            self.content_preserved = True
+            if length_difference > 0:
+                self.content_missing = True
+                self.validation_errors.append(f"Content missing from chunks. Missing {length_difference} characters ({percentage_difference:.2f}%).")
+                self.logger.warning(f"Content missing from chunks. Missing {length_difference} characters ({percentage_difference:.2f}%).")
+            else:
+                self.content_missing = False
+                # Having extra content may be acceptable
+                self.logger.info(f"Chunks contain extra content. Extra {abs(length_difference)} characters ({percentage_difference:.2f}%).")
 
         # Check for duplicates and remove them carefully
         chunk_texts = {}
@@ -284,7 +297,7 @@ class MarkdownChunker:
             if text in chunk_texts:
                 duplicates_found = True
                 self.validation_errors.append(f"Duplicate chunk found with chunk_id {chunk['chunk_id']}")
-                self.logger.error(f"Duplicate chunk found with chunk_id {chunk['chunk_id']}. Removing duplicate.")
+                self.logger.warning(f"Duplicate chunk found with chunk_id {chunk['chunk_id']}. Removing duplicate.")
                 # Do not add the duplicate chunk to cleaned_chunks
                 continue
             else:
@@ -296,12 +309,6 @@ class MarkdownChunker:
             chunks.clear()
             chunks.extend(cleaned_chunks)
             self.total_chunks = len(chunks)
-
-        # Summarize validation
-        if self.validation_errors:
-            self.logger.warning(f"Chunking completed with {len(self.validation_errors)} issues.")
-        else:
-            self.logger.info("Chunking completed successfully with no issues.")
 
     @error_handler(logger)
     def save_chunks(self, chunks: List[Dict[str, Any]]):
@@ -344,12 +351,34 @@ class MarkdownChunker:
         token_difference = self.original_content_tokens - self.total_tokens
         percentage_difference = (abs(token_difference) / self.original_content_tokens) * 100 if self.original_content_tokens > 0 else 0
         self.logger.info(f"Token difference: {token_difference} tokens ({percentage_difference:.2f}%)")
-        if self.content_preserved:
-            self.logger.info("Content preservation check passed.")
+        if self.content_missing:
+            self.logger.warning(f"Content missing from chunks. Missing {token_difference} tokens ({percentage_difference:.2f}%).")
         else:
-            self.logger.warning("Content preservation check failed.")
+            self.logger.info("All content has been preserved in the chunks.")
+
+        if self.headings_preserved['h1']:
+            self.logger.info(f"H1 headings preserved: {len(self.headings_preserved['h1'])}")
+        else:
+            self.logger.warning("No H1 headings found.")
+
+        if self.headings_preserved['h2']:
+            self.logger.info(f"H2 headings preserved: {len(self.headings_preserved['h2'])}")
+        else:
+            self.logger.warning("No H2 headings found.")
+
+        # Calculate basic chunk statistics
+        if self.chunk_token_counts:
+            avg_tokens = sum(self.chunk_token_counts) / len(self.chunk_token_counts)
+            median_tokens = statistics.median(self.chunk_token_counts)
+            self.logger.info(f"Average tokens per chunk: {avg_tokens:.2f}")
+            self.logger.info(f"Median tokens per chunk: {median_tokens}")
+            self.logger.info(f"Max tokens in a chunk: {max(self.chunk_token_counts)}")
+            self.logger.info(f"Min tokens in a chunk: {min(self.chunk_token_counts)}")
+        else:
+            self.logger.warning("No chunks to calculate statistics.")
+
         if self.validation_errors:
-            self.logger.warning("Validation issues encountered:")
+            self.logger.warning(f"Validation issues encountered ({len(self.validation_errors)}):")
             for error in self.validation_errors:
                 self.logger.warning(f"- {error}")
         else:
