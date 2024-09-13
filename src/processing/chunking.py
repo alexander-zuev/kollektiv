@@ -200,64 +200,106 @@ class MarkdownChunker:
         for line in lines:
             stripped_line = line.strip()
             if stripped_line.startswith('```'):
-                # Start or end of code block
                 in_code_block = not in_code_block
 
-            # Calculate token count if we add this line
             potential_chunk_content = current_chunk['content'] + line + '\n'
             token_count = self._calculate_tokens(potential_chunk_content)
 
             if token_count <= self.soft_token_limit or in_code_block:
                 current_chunk['content'] += line + '\n'
             else:
-                # If in code block, we need to handle this carefully
                 if in_code_block:
-                    # Code block exceeds soft limit, check against hard limit
                     if token_count <= self.max_tokens:
                         current_chunk['content'] += line + '\n'
                     else:
                         self.validation_errors.append(
                             f"Code block exceeds hard token limit in headers {headers}"
                         )
-                        # No need to log here; summary will handle it
                 else:
-                    # Save current chunk
                     if current_chunk['content'].strip():
                         chunks.append(current_chunk.copy())
                     current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
 
-        # Add any remaining content
         if current_chunk['content'].strip():
             chunks.append(current_chunk.copy())
 
-        # Ensure chunks meet minimum size and adjust if necessary
-        adjusted_chunks = self._adjust_chunks(chunks)
-        return adjusted_chunks
+        return self._adjust_chunks(chunks)
 
     @error_handler(logger)
     def _adjust_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Adjust chunks to ensure they meet min and max token requirements"""
         adjusted_chunks = []
-        i = 0
-        while i < len(chunks):
-            chunk = chunks[i]
-            token_count = self._calculate_tokens(chunk['content'])
+        current_chunk = None
 
-            if token_count < self.min_chunk_size and i > 0:
-                # Merge with previous chunk
-                prev_chunk = adjusted_chunks[-1]
-                prev_chunk['content'] += chunk['content']
-                prev_headers = prev_chunk['headers']
-                curr_headers = chunk['headers']
-                # Update headers if necessary
-                for key in ['h1', 'h2', 'h3']:
-                    if curr_headers.get(key) and curr_headers.get(key) != prev_headers.get(key):
-                        prev_headers[key] = curr_headers[key]
-                adjusted_chunks[-1] = prev_chunk
+        for chunk in chunks:
+            if current_chunk is None:
+                current_chunk = chunk
             else:
-                adjusted_chunks.append(chunk)
-            i += 1
-        return adjusted_chunks
+                combined_content = current_chunk['content'] + chunk['content']
+                combined_tokens = self._calculate_tokens(combined_content)
+
+                if combined_tokens <= self.soft_token_limit:
+                    # Merge chunks
+                    current_chunk['content'] = combined_content
+                    current_chunk['headers'].update(chunk['headers'])
+                elif self._calculate_tokens(current_chunk['content']) < self.min_chunk_size:
+                    # Current chunk is too small, force merge
+                    current_chunk['content'] = combined_content
+                    current_chunk['headers'].update(chunk['headers'])
+                else:
+                    # Can't merge, add current_chunk to adjusted_chunks and start a new one
+                    adjusted_chunks.append(current_chunk)
+                    current_chunk = chunk
+
+        if current_chunk:
+            adjusted_chunks.append(current_chunk)
+
+        # Handle remaining small chunks
+        final_chunks = []
+        for i, chunk in enumerate(adjusted_chunks):
+            token_count = self._calculate_tokens(chunk['content'])
+            if token_count < self.min_chunk_size:
+                if i < len(adjusted_chunks) - 1:
+                    # Merge with next chunk
+                    next_chunk = adjusted_chunks[i + 1]
+                    next_chunk['content'] = chunk['content'] + next_chunk['content']
+                    next_chunk['headers'].update(chunk['headers'])
+                elif i > 0 and final_chunks:
+                    # Merge with previous chunk
+                    prev_chunk = final_chunks[-1]
+                    prev_chunk['content'] += chunk['content']
+                    prev_chunk['headers'].update(chunk['headers'])
+                else:
+                    # This is the only chunk, keep it as is
+                    final_chunks.append(chunk)
+            elif token_count > self.max_tokens:
+                # Split large chunk
+                split_chunks = self._split_large_chunk(chunk)
+                final_chunks.extend(split_chunks)
+            else:
+                final_chunks.append(chunk)
+
+        return final_chunks
+
+    def _split_large_chunk(self, chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
+        content = chunk['content']
+        headers = chunk['headers']
+        lines = content.split('\n')
+        split_chunks = []
+        current_chunk = {'headers': headers.copy(), 'content': ''}
+
+        for line in lines:
+            potential_content = current_chunk['content'] + line + '\n'
+            if self._calculate_tokens(potential_content) <= self.soft_token_limit:
+                current_chunk['content'] = potential_content
+            else:
+                if current_chunk['content']:
+                    split_chunks.append(current_chunk)
+                current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
+
+        if current_chunk['content']:
+            split_chunks.append(current_chunk)
+
+        return split_chunks
 
     @error_handler(logger)
     def _add_overlap(self,
@@ -432,6 +474,39 @@ class MarkdownChunker:
         else:
             self.logger.info("No validation issues encountered.")
 
+    def find_incorrect_chunks(self, chunks: List[Dict[str, Any]]) -> None:
+        """Finds chunks below min_chunk_size or above max_tokens and saves to JSON."""
+        incorrect = {
+            "too_small": [
+                {"id": c["chunk_id"],
+                 "size": c["metadata"]["token_count"],
+                 'headers': c['data']['headers'],
+                 'text' :c['data']['text']}
+                for c in chunks if c["metadata"]["token_count"] < self.min_chunk_size
+            ],
+            "too_large": [
+                {"id": c["chunk_id"],
+                 "size": c["metadata"]["token_count"],
+                 'headers': c['data']['headers'],
+                 'text': c['data']['text']}
+                for c in chunks if c["metadata"]["token_count"] > self.max_tokens
+            ]
+        }
+
+        # Generate the filename based on the input filename
+        base_name = os.path.splitext(self.input_filename)[0]
+        output_filename = f"{base_name}-incorrect-chunks.json"
+        output_filepath = os.path.join(self.output_dir, output_filename)
+
+        with open(output_filepath, 'w', encoding='utf-8') as f:
+            json.dump(incorrect, f, indent=2, ensure_ascii=False)
+
+        self.logger.info(f"Incorrect chunks saved to {output_filepath}")
+
+        self.logger.info(f"Number of too small chunks: {len(incorrect['too_small'])}")
+        self.logger.info(f"Number of too big chunks: {len(incorrect['too_large'])}")
+
+
 # Test usage
 def main():
     markdown_chunker = MarkdownChunker(input_filename="cra_docs_en_20240912_082455.json")
@@ -439,6 +514,7 @@ def main():
     chunks = markdown_chunker.process_pages(result)
     markdown_chunker.save_chunks(chunks)
     markdown_chunker.log_summary()
+    markdown_chunker.find_incorrect_chunks(chunks)
 
 if __name__ == "__main__":
     main()
