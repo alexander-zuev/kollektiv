@@ -9,7 +9,7 @@ import os
 from openai import OpenAI
 import cohere
 
-from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, NEW_PROCESSED_DATA_DIR
+from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
 from src.generation.claude_assistant import Claude
 
@@ -19,7 +19,7 @@ logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
 class DocumentProcessor:
     def __init__(self, file_name):
         self.file_name = file_name
-        self.file_path = os.path.join(NEW_PROCESSED_DATA_DIR, file_name)
+        self.file_path = os.path.join(PROCESSED_DATA_DIR, file_name)
 
     def load_json(self) -> List[Dict]:
         try:

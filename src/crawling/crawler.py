@@ -14,14 +14,14 @@ from requests.exceptions import RequestException
 
 from firecrawl import FirecrawlApp
 
-from src.utils.config import FIRECRAWL_API_KEY, NEW_RAW_DATA_DIR, NEW_JOB_FILE_DIR, SRC_ROOT
+from src.utils.config import FIRECRAWL_API_KEY, RAW_DATA_DIR, JOB_FILE_DIR, SRC_ROOT
 from src.utils.logger import setup_logger
 from src.utils.decorators import error_handler
 
 logger = setup_logger("firecrawler", "firecrawler.log")
 
 class FireCrawler:
-    def __init__(self, api_key: str, data_dir: str = NEW_RAW_DATA_DIR, jobs_dir: str = NEW_JOB_FILE_DIR) -> None:
+    def __init__(self, api_key: str, data_dir: str = RAW_DATA_DIR, jobs_dir: str = JOB_FILE_DIR) -> None:
         self.api_key: str = api_key
         self.logger = logger
         self.current_job_id: str

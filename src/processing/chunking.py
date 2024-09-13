@@ -1,11 +1,12 @@
 import uuid
 import json
 import os
-from typing import List, Dict, Any
-import tiktoken
 import re
+from typing import List, Dict, Any
 
-from src.utils.config import NEW_RAW_DATA_DIR, NEW_PROCESSED_DATA_DIR, LOG_DIR
+import tiktoken
+
+from src.utils.config import RAW_DATA_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
 from src.utils.decorators import error_handler
 
@@ -13,8 +14,8 @@ logger = setup_logger('chunker', 'chunking.log')
 
 class MarkdownChunker:
     def __init__(self,
-                 input_filename:str,
-                 output_dir: str = NEW_PROCESSED_DATA_DIR,
+                 input_filename: str,
+                 output_dir: str = PROCESSED_DATA_DIR,
                  max_tokens: int = 1000,
                  soft_token_limit: int = 800,
                  min_chunk_size: int = 100,
@@ -27,11 +28,16 @@ class MarkdownChunker:
         self.soft_token_limit = soft_token_limit  # Soft limit
         self.min_chunk_size = min_chunk_size  # Minimum chunk size in tokens
         self.overlap_percentage = overlap_percentage  # 5% overlap
+        # For validation summary
+        self.validation_errors = []
+        self.total_chunks = 0
+        self.total_tokens = 0
+        self.content_preserved = True
 
     @error_handler(logger)
     def load_data(self) -> Dict[str, Any]:
-        """Loads markdown from json and prepares for chunking"""
-        input_filepath = os.path.join(NEW_RAW_DATA_DIR, self.input_filename)
+        """Loads markdown from JSON and prepares for chunking"""
+        input_filepath = os.path.join(RAW_DATA_DIR, self.input_filename)
 
         try:
             with open(input_filepath, 'r', encoding='utf-8') as f:
@@ -48,49 +54,84 @@ class MarkdownChunker:
     @error_handler(logger)
     def process_pages(self, json_input: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Iterates through each page in the loaded data"""
-        # calls identify_sections for each page
         all_chunks = []
+        original_content = ''
         for index, page in enumerate(json_input['data']):
             page_content = page['markdown']
+            original_content += page_content
             page_metadata = page['metadata']
 
-            sections = self.identify_sections(page_content)
+            sections = self.identify_sections(page_content, page_metadata)
             chunks = self.create_chunks(sections, page_metadata)
             all_chunks.extend(chunks)
 
+        # After processing all pages, perform validation
+        self.validate_all_chunks(all_chunks, original_content)
         return all_chunks
 
-
     @error_handler(logger)
-    def identify_sections(self, page_content: str) -> List[Dict[str, Any]]:
-        """Takes a single page content and identifies headers"""
+    def identify_sections(self, page_content: str, page_metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Identifies sections in the page content based on headers"""
         sections = []
-        h1_pattern = re.compile(r'^# (.+)$', re.MULTILINE)
-        h2_pattern = re.compile(r'^## (.+)$', re.MULTILINE)
 
-        h1_match = h1_pattern.search(page_content)
-        h1_title = h1_match.group(1) if h1_match else ""
+        # Patterns for headers
+        h_pattern = re.compile(r'^(#{1,6}) (.*)', re.MULTILINE)
 
-        # Remove the H1 title from the content
-        if h1_match:
-            page_content = page_content[h1_match.end():].strip()
+        # Find all headers
+        headers = [(m.start(), m.group(1), m.group(2).strip()) for m in h_pattern.finditer(page_content)]
+        headers.sort()
 
-        h2_splits = h2_pattern.split(page_content)
-
-        # Handle content between H1 and first H2
-        if h2_splits[0].strip():
+        # If no headers found, treat the entire content as one section
+        if not headers:
             sections.append({
-                "headers": {"h1": h1_title},
-                "content": h2_splits[0].strip()
+                "headers": {
+                    "h1": page_metadata.get('title', 'Untitled')
+                },
+                "content": page_content.strip()
             })
+            self.logger.warning(f"No headers found in page. Using page title as h1.")
+            return sections
 
-        # Handle H2 sections
-        for i in range(1, len(h2_splits), 2):
-            if i + 1 < len(h2_splits):
-                sections.append({
-                    "headers": {"h1": h1_title, "h2": h2_splits[i].strip()},
-                    "content": h2_splits[i + 1].strip()
-                })
+        # Process headers and content
+        last_index = 0
+        current_section = {
+            "headers": {
+                "h1": "",
+                "h2": "",
+                "h3": ""
+            },
+            "content": ""
+        }
+
+        for idx, (pos, header_marker, header_text) in enumerate(headers):
+            header_level = len(header_marker)
+            header = header_text
+
+            # Extract content before this header
+            content = page_content[last_index:pos].strip()
+            if content:
+                current_section['content'] = content
+                sections.append(current_section.copy())
+                current_section['content'] = ""
+
+            # Update headers based on header level
+            if header_level == 1:
+                current_section['headers']['h1'] = header
+                current_section['headers']['h2'] = ""
+                current_section['headers']['h3'] = ""
+            elif header_level == 2:
+                current_section['headers']['h2'] = header
+                current_section['headers']['h3'] = ""
+            elif header_level == 3:
+                current_section['headers']['h3'] = header
+
+            last_index = pos + len(header_marker) + 1 + len(header_text)  # +1 for space after #
+
+        # Add remaining content after the last header
+        content = page_content[last_index:].strip()
+        if content:
+            current_section['content'] = content
+            sections.append(current_section.copy())
 
         return sections
 
@@ -102,14 +143,18 @@ class MarkdownChunker:
             for chunk in section_chunks:
                 chunk_id = str(self._generate_chunk_id())
                 token_count = self._calculate_tokens(chunk['content'])
-                chunks.append({
+                self.total_tokens += token_count
+                metadata = self._create_metadata(page_metadata, token_count, chunk['headers'])
+                new_chunk = {
                     'chunk_id': chunk_id,
-                    'metadata': self._create_metadata(page_metadata, token_count),
+                    'metadata': metadata,
                     'data': {
                         'headers': chunk['headers'],
                         'text': chunk['content']
                     }
-                })
+                }
+                chunks.append(new_chunk)
+                self.total_chunks += 1
 
         self._add_overlap(chunks)
         return chunks
@@ -117,42 +162,127 @@ class MarkdownChunker:
     @error_handler(logger)
     def _split_section(self, content: str, headers: Dict[str, str]) -> List[Dict[str, Any]]:
         chunks = []
-        current_chunk = {'headers': headers, 'content': ''}
+        current_chunk = {'headers': headers.copy(), 'content': ''}
         lines = content.split('\n')
         in_code_block = False
 
         for line in lines:
-            if line.strip().startswith('`') and line.strip().endswith('`') and len(line.strip()) > 1:
+            stripped_line = line.strip()
+            if stripped_line.startswith('```'):
+                # Start or end of code block
                 in_code_block = not in_code_block
 
-            if in_code_block or self._calculate_tokens(current_chunk['content'] + line) <= self.soft_token_limit:
+            # Calculate token count if we add this line
+            potential_chunk_content = current_chunk['content'] + line + '\n'
+            token_count = self._calculate_tokens(potential_chunk_content)
+
+            if token_count <= self.soft_token_limit or in_code_block:
                 current_chunk['content'] += line + '\n'
             else:
-                if current_chunk['content'].strip():
-                    chunks.append(current_chunk)
-                current_chunk = {'headers': headers, 'content': line + '\n'}
+                # If in code block, we need to handle this carefully
+                if in_code_block:
+                    # Code block exceeds soft limit, check against hard limit
+                    if token_count <= self.max_tokens:
+                        current_chunk['content'] += line + '\n'
+                    else:
+                        self.validation_errors.append(f"Code block exceeds hard token limit in headers {headers}")
+                        self.logger.error(f"Code block exceeds hard token limit in headers {headers}")
+                        # You may choose to handle this differently
+                else:
+                    # Save current chunk
+                    if current_chunk['content'].strip():
+                        chunks.append(current_chunk.copy())
+                    current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
 
-            if not in_code_block and self._is_break_point(line):
-                if self._calculate_tokens(current_chunk['content']) >= self.min_chunk_size:
-                    chunks.append(current_chunk)
-                    current_chunk = {'headers': headers, 'content': ''}
-
+        # Add any remaining content
         if current_chunk['content'].strip():
-            chunks.append(current_chunk)
+            chunks.append(current_chunk.copy())
 
-        return chunks
-
-    @error_handler(logger)
-    def _is_break_point(self, line: str) -> bool:
-        # Check if the line is the end of a paragraph, list item, or other logical break point
-        return line.strip() == '' or line.strip().endswith('.') or line.strip().endswith(':') or line.startswith(
-            '- ') or line.startswith('* ')
+        # Ensure chunks meet minimum size and adjust if necessary
+        adjusted_chunks = self._adjust_chunks(chunks)
+        return adjusted_chunks
 
     @error_handler(logger)
-    def handle_code_blocks(self):
-        """Identified code blocks within a chunk"""
-        # Ensures code blocks are not split across chunks
-        # Adjusts chunk boundaries, if necessary
+    def _adjust_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Adjust chunks to ensure they meet min and max token requirements"""
+        adjusted_chunks = []
+        i = 0
+        while i < len(chunks):
+            chunk = chunks[i]
+            token_count = self._calculate_tokens(chunk['content'])
+
+            if token_count < self.min_chunk_size and i > 0:
+                # Merge with previous chunk
+                prev_chunk = adjusted_chunks[-1]
+                prev_chunk['content'] += chunk['content']
+                prev_headers = prev_chunk['headers']
+                curr_headers = chunk['headers']
+                # Update headers if necessary
+                for key in ['h1', 'h2', 'h3']:
+                    if curr_headers.get(key) and curr_headers.get(key) != prev_headers.get(key):
+                        prev_headers[key] = curr_headers[key]
+                adjusted_chunks[-1] = prev_chunk
+            else:
+                adjusted_chunks.append(chunk)
+            i += 1
+        return adjusted_chunks
+
+    @error_handler(logger)
+    def _add_overlap(self,
+                     chunks: List[Dict[str, Any]],
+                     min_overlap_tokens: int = 50,
+                     max_overlap_tokens: int = 100) -> None:
+
+        for i in range(1, len(chunks)):
+            prev_chunk = chunks[i - 1]
+            curr_chunk = chunks[i]
+            prev_chunk_text = prev_chunk['data']['text']
+
+            # Calculate overlap tokens
+            overlap_token_count = max(int(self._calculate_tokens(prev_chunk_text) * self.overlap_percentage), min_overlap_tokens)
+            overlap_token_count = min(overlap_token_count, max_overlap_tokens)
+
+            overlap_text = self._get_last_n_tokens(prev_chunk_text, overlap_token_count)
+
+            curr_chunk['data']['overlap_text'] = {
+                'previous_chunk_id': prev_chunk['chunk_id'],
+                'text': overlap_text
+            }
+
+    def _get_last_n_tokens(self, text: str, n: int) -> str:
+        tokens = self.tokenizer.encode(text)
+        last_n_tokens = tokens[-n:]
+        return self.tokenizer.decode(last_n_tokens)
+
+    @error_handler(logger)
+    def validate_all_chunks(self, chunks: List[Dict[str, Any]], original_content: str):
+        """Performs overall validation of chunks"""
+        # Check if total tokens in chunks match the original content
+        combined_chunk_content = ''.join(chunk['data']['text'] for chunk in chunks)
+        if combined_chunk_content.strip() != original_content.strip():
+            self.content_preserved = False
+            self.validation_errors.append("Content mismatch between original and chunks.")
+            self.logger.error("Content mismatch between original and chunks.")
+        else:
+            self.content_preserved = True
+
+        # Check for duplicates
+        chunk_texts = set()
+        duplicates_found = False
+        for chunk in chunks:
+            text = chunk['data']['text']
+            if text in chunk_texts:
+                duplicates_found = True
+                self.validation_errors.append(f"Duplicate chunk found with chunk_id {chunk['chunk_id']}")
+                self.logger.error(f"Duplicate chunk found with chunk_id {chunk['chunk_id']}")
+            else:
+                chunk_texts.add(text)
+
+        # Summarize validation
+        if self.validation_errors:
+            self.logger.warning(f"Chunking completed with {len(self.validation_errors)} issues.")
+        else:
+            self.logger.info("Chunking completed successfully with no issues.")
 
     @error_handler(logger)
     def save_chunks(self, chunks: List[Dict[str, Any]]):
@@ -176,60 +306,39 @@ class MarkdownChunker:
         return token_count
 
     @error_handler(logger)
-    def _create_metadata(self, page_metadata: Dict[str, Any], token_count: int) -> Dict[str, Any]:
+    def _create_metadata(self, page_metadata: Dict[str, Any], token_count: int, headers: Dict[str, str]) -> Dict[str, Any]:
         """Creates metadata dictionary for a chunk"""
+        position_in_doc_hierarchy = " > ".join([v for k, v in headers.items() if v])
         metadata = {
             'token_count': token_count,
-            'source_url' : page_metadata['sourceURL'],
-            'page_title' : page_metadata['title'],
+            'source_url': page_metadata.get('sourceURL', ''),
+            'page_title': page_metadata.get('title', ''),
+            'position_in_doc_hierarchy': position_in_doc_hierarchy
         }
         return metadata
 
-    @error_handler(logger)
-    def _add_overlap(self,
-                     chunks: List[Dict[str, Any]],
-                     min_overlap_tokens: int = 50,
-                     max_overlap_tokens: int = 50) -> None:
-
-        for i in range(1, len(chunks)):
-            prev_chunk = chunks[i - 1]
-            curr_chunk = chunks[i]
-            prev_chunk_text = prev_chunk['data']['text']
-            prev_chunk_headers = prev_chunk['data']['headers']
-
-            # Calculate 5% of the previous chunk's text
-            overlap_text_length = int(len(prev_chunk_text) * self.overlap_percentage)
-            overlap_text = prev_chunk_text[-overlap_text_length:]
-
-            # Check if the overlap is less than MIN_OVERLAP_TOKENS
-            if self._calculate_tokens(overlap_text) < min_overlap_tokens:
-                # If the entire previous chunk is less than MAX_FULL_CHUNK_TOKENS, use it all
-                if self._calculate_tokens(prev_chunk_text) <= max_overlap_tokens:
-                    overlap_text = prev_chunk_text
-                else:
-                    # Otherwise, take the last MAX_FULL_CHUNK_TOKENS worth of text
-                    overlap_text = self._get_last_n_tokens(prev_chunk_text, max_overlap_tokens)
-
-            # Construct the overlap text with headers
-            headers_text = " ".join(f"{k}: {v}" for k, v in prev_chunk_headers.items())
-            full_overlap_text = f"Content of the previous chunk for context: {headers_text}\n\n{overlap_text}"
-
-            curr_chunk['data']['overlap_text'] = {
-                'previous_chunk_id': prev_chunk['chunk_id'],
-                'text': full_overlap_text
-            }
-
-    def _get_last_n_tokens(self, text: str, n: int) -> str:
-        tokens = self.tokenizer.encode(text)
-        return self.tokenizer.decode(tokens[-n:])
+    def log_summary(self):
+        """Logs a summary of the chunking process"""
+        self.logger.info(f"Total chunks created: {self.total_chunks}")
+        self.logger.info(f"Total tokens in chunks: {self.total_tokens}")
+        if self.content_preserved:
+            self.logger.info("Content preservation check passed.")
+        else:
+            self.logger.warning("Content preservation check failed.")
+        if self.validation_errors:
+            self.logger.warning("Validation issues encountered:")
+            for error in self.validation_errors:
+                self.logger.warning(f"- {error}")
+        else:
+            self.logger.info("No validation issues encountered.")
 
 # Test usage
 def main():
     markdown_chunker = MarkdownChunker(input_filename="cra_docs_en_20240912_082455.json")
     result = markdown_chunker.load_data()
-    # print(result['data'][0]['markdown'])
     chunks = markdown_chunker.process_pages(result)
     markdown_chunker.save_chunks(chunks)
+    markdown_chunker.log_summary()
 
 if __name__ == "__main__":
     main()
