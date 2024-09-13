@@ -4,6 +4,7 @@ import os
 import re
 import statistics
 from typing import List, Dict, Any
+from functools import lru_cache
 
 import tiktoken
 
@@ -37,6 +38,23 @@ class MarkdownChunker:
             output_dir=self.output_dir,
             input_filename=self.input_filename
         )
+
+        # Precompile regex patterns for performance
+        self.boilerplate_patterns = [
+            r'\[Anthropic home page.*\]\(/.*\)',  # Matches the home page link with images
+            r'^English$',  # Matches the language selection
+            r'^Search\.\.\.$',
+            r'^Ctrl K$',
+            r'^Search$',
+            r'^Navigation$',
+            r'^\[.*\]\(/.*\)$',  # Matches navigation links
+            r'^On this page$',
+            r'^\* \* \*$'  # Matches horizontal rules used as separators
+        ]
+        self.boilerplate_regex = re.compile('|'.join(self.boilerplate_patterns), re.MULTILINE)
+        self.h_pattern = re.compile(r'^\s*(?![-*]{3,})(#{1,3})\s*(.*)$', re.MULTILINE)
+        self.code_block_start_pattern = re.compile(r'^(```|~~~)(.*)$')
+        self.inline_code_pattern = re.compile(r'`([^`\n]+)`')
 
     @error_handler(logger)
     def load_data(self) -> Dict[str, Any]:
@@ -88,28 +106,10 @@ class MarkdownChunker:
     @error_handler(logger)
     def remove_boilerplate(self, content: str) -> str:
         """Removes navigation and boilerplate content from markdown."""
-        # Define patterns to identify boilerplate content
-        boilerplate_patterns = [
-            r'\[Anthropic home page.*\]\(/.*\)',  # Matches the home page link with images
-            r'^English$',  # Matches the language selection
-            r'^Search\.\.\.$',
-            r'^Ctrl K$',
-            r'^Search$',
-            r'^Navigation$',
-            r'^\[.*\]\(/.*\)$',  # Matches navigation links
-            r'^On this page$',
-            r'^\* \* \*$'  # Matches horizontal rules used as separators
-        ]
-
-        # Combine patterns into a single regex
-        boilerplate_regex = re.compile('|'.join(boilerplate_patterns), re.MULTILINE)
-
-        # Remove boilerplate lines
-        cleaned_content = boilerplate_regex.sub('', content)
-
+        # Use precompiled regex
+        cleaned_content = self.boilerplate_regex.sub('', content)
         # Remove any extra newlines left after removing boilerplate
         cleaned_content = re.sub(r'\n{2,}', '\n\n', cleaned_content)
-
         return cleaned_content.strip()
 
     @error_handler(logger)
@@ -132,15 +132,8 @@ class MarkdownChunker:
         """Identifies sections in the page content based on headers and preserves markdown structures."""
         sections = []
 
-        # Ignore lines that are horizontal rules
-        h_pattern = re.compile(r'^\s*(?![-*]{3,})(#{1,3})\s*(.*)$', re.MULTILINE)
-
-        # Patterns for code blocks
-        code_block_pattern = re.compile(r'(```|~~~)(.*?)\1', re.DOTALL)
-        inline_code_pattern = re.compile(r'`([^`\n]+)`')
-
-        # Header positions for splitting
-        headers = [(m.start(), m.end(), m.group(1), m.group(2).strip()) for m in h_pattern.finditer(page_content)]
+        # Use precompiled header pattern
+        headers = [(m.start(), m.end(), m.group(1), m.group(2).strip()) for m in self.h_pattern.finditer(page_content)]
         headers.sort()
 
         last_index = 0
@@ -149,7 +142,7 @@ class MarkdownChunker:
         for idx, (start, end, header_marker, header_text) in enumerate(headers):
             header_level = len(header_marker)
             cleaned_header_text = self.clean_header_text(
-                re.sub(inline_code_pattern, r'<code>\1</code>', header_text.strip()))
+                self.inline_code_pattern.sub(r'<code>\1</code>', header_text.strip()))
 
             # Extract content before this header
             content = page_content[last_index:start].strip()
@@ -174,8 +167,7 @@ class MarkdownChunker:
                 current_section['headers']['h3'] = cleaned_header_text
 
             # Update validator counts
-            self.validator.increment_total_headings(f'h{header_level}')
-            self.validator.add_preserved_heading(f'h{header_level}', cleaned_header_text)
+            self.validator.increment_total_headings(f'h{header_level}', cleaned_header_text)
 
             last_index = end
 
@@ -213,6 +205,14 @@ class MarkdownChunker:
             }
             final_chunks.append(new_chunk)
 
+        # After chunks are created, update headings preserved
+        for chunk in final_chunks:
+            headers = chunk['data']['headers']
+            for level in ['h1', 'h2', 'h3']:
+                heading_text = headers.get(level)
+                if heading_text:
+                    self.validator.add_preserved_heading(level, heading_text)
+
         # Add overlap as the final step
         self._add_overlap(final_chunks)
         return final_chunks
@@ -230,7 +230,7 @@ class MarkdownChunker:
             stripped_line = line.strip()
 
             # Check for code block start/end
-            code_block_start_match = re.match(r'^(```|~~~)(.*)$', stripped_line)
+            code_block_start_match = self.code_block_start_pattern.match(stripped_line)
             if code_block_start_match:
                 if not in_code_block:
                     in_code_block = True
@@ -255,7 +255,7 @@ class MarkdownChunker:
                 continue
 
             # Handle inline code
-            line = re.sub(r'`([^`\n]+)`', r'<code>\1</code>', line)
+            line = self.inline_code_pattern.sub(r'<code>\1</code>', line)
 
             potential_chunk_content = current_chunk['content'] + line + '\n'
             token_count = self._calculate_tokens(potential_chunk_content)
@@ -317,10 +317,14 @@ class MarkdownChunker:
 
     @error_handler(logger)
     def _merge_headers(self, headers1: Dict[str, str], headers2: Dict[str, str]) -> Dict[str, str]:
-        merged = headers1.copy()
+        merged = {}
         for level in ['h1', 'h2', 'h3']:
-            if headers2.get(level) and headers2[level] != headers1.get(level):
+            if headers1.get(level):
+                merged[level] = headers1[level]
+            elif headers2.get(level):
                 merged[level] = headers2[level]
+            else:
+                merged[level] = ''
         return merged
 
     @error_handler(logger)
@@ -369,6 +373,7 @@ class MarkdownChunker:
         return uuid.uuid4()
 
     @error_handler(logger)
+    @lru_cache(maxsize=None)
     def _calculate_tokens(self, text: str) -> int:
         """Calculates the number of tokens in a given text using tiktoken"""
         token_count = len(self.tokenizer.encode(text))
@@ -381,13 +386,11 @@ class MarkdownChunker:
             'token_count': token_count,
             'source_url': page_metadata.get('sourceURL', ''),
             'page_title': page_metadata.get('title', '')
-            # 'position_in_doc_hierarchy' removed as per your request
         }
         return metadata
 
 class MarkdownChunkValidator:
     def __init__(self, logger, min_chunk_size, max_tokens, output_dir, input_filename):
-        self.incorrect_counts = None
         self.logger = logger
         self.min_chunk_size = min_chunk_size
         self.max_tokens = max_tokens
@@ -400,36 +403,15 @@ class MarkdownChunkValidator:
         self.original_content_tokens = 0
         self.content_missing = False
         self.chunk_token_counts = []
-        self.headings_preserved = {'h1': 0, 'h2': 0, 'h3': 0}
-        self.total_headings = {'h1': 0, 'h2': 0, 'h3': 0}
-        self.missing_headers = []
-        self.incorrect_counts = {'too_small': 0, 'too_large': 0, 'missing_headers': 0}  # Initialized here
+        self.headings_preserved = {'h1': set(), 'h2': set(), 'h3': set()}
+        self.total_headings = {'h1': set(), 'h2': set(), 'h3': set()}
+        self.incorrect_counts = {'too_small': 0, 'too_large': 0}  # Initialized here
 
-
-    def increment_total_headings(self, level):
-        if level in self.total_headings:
-            self.total_headings[level] += 1
-        else:
-            self.total_headings[level] = 1
-
-    def check_missing_headers(self, chunk):
-        headers = chunk['data']['headers']
-        for level in ['h1', 'h2', 'h3']:
-            header_text = headers.get(level, '')
-            if not header_text:
-                self.missing_headers.append({
-                    'chunk_id': chunk['chunk_id'],
-                    'missing_header_level': level,
-                    'source_url': chunk['metadata'].get('source_url', ''),
-                    'page_title': chunk['metadata'].get('page_title', ''),
-                    'headers': headers
-                })
+    def increment_total_headings(self, level, heading_text):
+        self.total_headings[level].add(heading_text)
 
     def add_preserved_heading(self, level, heading_text):
-        if level in self.headings_preserved:
-            self.headings_preserved[level] += 1
-        else:
-            self.headings_preserved[level] = 1
+        self.headings_preserved[level].add(heading_text)
 
     def add_chunk(self, token_count):
         self.total_chunks += 1
@@ -444,9 +426,7 @@ class MarkdownChunkValidator:
 
     def validate(self, chunks, original_content):
         self.validate_all_chunks(chunks, original_content)
-        for chunk in chunks:
-            self.check_missing_headers(chunk)
-        self.find_incorrect_chunks(chunks)  # Moved this line before log_summary()
+        self.find_incorrect_chunks(chunks)
         self.log_summary()
 
     def validate_all_chunks(self, chunks: List[Dict[str, Any]], original_content: str):
@@ -460,10 +440,7 @@ class MarkdownChunkValidator:
             length_difference = original_length - combined_length
             percentage_difference = (abs(length_difference) / original_length) * 100
 
-            if length_difference > 0:
-                self.content_missing = True
-            else:
-                self.content_missing = False
+            self.content_missing = length_difference > 0
 
         # Check for duplicates and remove them carefully
         chunk_texts = {}
@@ -520,8 +497,8 @@ class MarkdownChunkValidator:
         # Headers summary
         headers_info = []
         for level in ['h1', 'h2', 'h3']:
-            preserved = self.headings_preserved.get(level, 0)  # Fixed here
-            total = self.total_headings.get(level, 0)
+            total = len(self.total_headings.get(level, set()))
+            preserved = len(self.headings_preserved.get(level, set()))
             percentage = (preserved / total * 100) if total > 0 else 0
             headers_info.append(f"{level.upper()} preserved: {preserved}/{total} ({percentage:.2f}%)")
         self.logger.info("Headers summary - " + ", ".join(headers_info))
@@ -536,8 +513,7 @@ class MarkdownChunkValidator:
         # Incorrect chunks summary
         incorrect_chunks_info = (
             f"Incorrect chunks - Too small: {self.incorrect_counts.get('too_small', 0)}, "
-            f"Too large: {self.incorrect_counts.get('too_large', 0)}, "
-            f"Missing headers: {self.incorrect_counts.get('missing_headers', 0)}"
+            f"Too large: {self.incorrect_counts.get('too_large', 0)}"
         )
         self.logger.info(incorrect_chunks_info)
 
@@ -561,15 +537,13 @@ class MarkdownChunkValidator:
                     'text': c['data']['text']
                 }
                 for c in chunks if c["metadata"]["token_count"] > self.max_tokens
-            ],
-            "missing_headers": self.missing_headers
+            ]
         }
 
         # Store counts for logging summary
         self.incorrect_counts = {
             'too_small': len(incorrect['too_small']),
-            'too_large': len(incorrect['too_large']),
-            'missing_headers': len(incorrect['missing_headers'])
+            'too_large': len(incorrect['too_large'])
         }
 
         if any(incorrect.values()):
