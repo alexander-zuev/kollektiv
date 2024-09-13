@@ -29,15 +29,14 @@ class MarkdownChunker:
         self.soft_token_limit = soft_token_limit  # Soft limit
         self.min_chunk_size = min_chunk_size  # Minimum chunk size in tokens
         self.overlap_percentage = overlap_percentage  # 5% overlap
-        # For validation summary
-        self.validation_errors = []
-        self.total_chunks = 0
-        self.total_tokens = 0
-        self.original_content_tokens = 0  # To store original content token count
-        self.content_missing = False  # To indicate if content is missing
-        self.chunk_token_counts = []  # To store token counts of individual chunks
-        self.headings_preserved = {'h1': set(), 'h2': set()}  # To track preserved headings
-        self.total_headings = {'h1': 0, 'h2': 0}  # To track total number of headings in original content
+        # Initialize the validator
+        self.validator = MarkdownChunkValidator(
+            logger=self.logger,
+            min_chunk_size=self.min_chunk_size,
+            max_tokens=self.max_tokens,
+            output_dir=self.output_dir,
+            input_filename=self.input_filename
+        )
 
     @error_handler(logger)
     def load_data(self) -> Dict[str, Any]:
@@ -68,13 +67,21 @@ class MarkdownChunker:
 
             sections = self.identify_sections(page_content, page_metadata)
             chunks = self.create_chunks(sections, page_metadata)
+
+            # Post-processing: H1 fallback
+            page_title = page_metadata.get('title', 'Untitled')
+            for chunk in chunks:
+                if not chunk['data']['headers'].get('h1'):
+                    chunk['data']['headers']['h1'] = page_title
+
             all_chunks.extend(chunks)
 
         # Calculate tokens in original content
-        self.original_content_tokens = self._calculate_tokens(original_content)
+        original_content_tokens = self._calculate_tokens(original_content)
+        self.validator.set_original_content_tokens(original_content_tokens)
 
         # After processing all pages, perform validation
-        self.validate_all_chunks(all_chunks, original_content)
+        self.validator.validate(all_chunks, original_content)
         return all_chunks
 
     @error_handler(logger)
@@ -96,9 +103,9 @@ class MarkdownChunker:
         for _, _, header_marker, header_text in headers:
             header_level = len(header_marker)
             if header_level == 1:
-                self.total_headings['h1'] += 1
+                self.validator.increment_total_headings('h1')
             elif header_level == 2:
-                self.total_headings['h2'] += 1
+                self.validator.increment_total_headings('h2')
 
         # If no headers found, treat the entire content as one section
         if not headers:
@@ -109,8 +116,8 @@ class MarkdownChunker:
                 "content": page_content.strip()
             })
             # Track the h1 heading
-            self.headings_preserved['h1'].add(page_metadata.get('title', 'Untitled'))
-            self.total_headings['h1'] += 1  # Since we are using the page title as h1
+            self.validator.add_preserved_heading('h1', page_metadata.get('title', 'Untitled'))
+            self.validator.increment_total_headings('h1')  # Since we are using the page title as h1
             return sections
 
         # Process headers and content
@@ -146,12 +153,12 @@ class MarkdownChunker:
                 current_section['headers']['h2'] = ""
                 current_section['headers']['h3'] = ""
                 # Track h1 headings
-                self.headings_preserved['h1'].add(header)
+                self.validator.add_preserved_heading('h1', header)
             elif header_level == 2:
                 current_section['headers']['h2'] = header
                 current_section['headers']['h3'] = ""
                 # Track h2 headings
-                self.headings_preserved['h2'].add(header)
+                self.validator.add_preserved_heading('h2', header)
             elif header_level == 3:
                 current_section['headers']['h3'] = header
 
@@ -179,8 +186,7 @@ class MarkdownChunker:
         for chunk in adjusted_chunks:
             chunk_id = str(self._generate_chunk_id())
             token_count = self._calculate_tokens(chunk['content'])
-            self.total_tokens += token_count
-            self.chunk_token_counts.append(token_count)
+            self.validator.add_chunk(token_count)
             metadata = self._create_metadata(page_metadata, token_count)
             new_chunk = {
                 'chunk_id': chunk_id,
@@ -191,7 +197,6 @@ class MarkdownChunker:
                 }
             }
             final_chunks.append(new_chunk)
-            self.total_chunks += 1
 
         # Add overlap as the final step
         self._add_overlap(final_chunks)
@@ -203,11 +208,23 @@ class MarkdownChunker:
         current_chunk = {'headers': headers.copy(), 'content': ''}
         lines = content.split('\n')
         in_code_block = False
+        code_fence = ''
 
         for line in lines:
             stripped_line = line.strip()
-            if stripped_line.startswith('```'):
-                in_code_block = not in_code_block
+
+            # Check for code block start/end
+            if stripped_line.startswith('```') or stripped_line.startswith('~~~'):
+                if not in_code_block:
+                    in_code_block = True
+                    code_fence = stripped_line[:3]
+                elif stripped_line.startswith(code_fence):
+                    in_code_block = False
+                    code_fence = ''
+
+            # Handle inline code
+            if not in_code_block:
+                line = re.sub(r'`([^`\n]+)`', r'<code>\1</code>', line)
 
             potential_chunk_content = current_chunk['content'] + line + '\n'
             token_count = self._calculate_tokens(potential_chunk_content)
@@ -219,7 +236,7 @@ class MarkdownChunker:
                     if token_count <= self.max_tokens:
                         current_chunk['content'] += line + '\n'
                     else:
-                        self.validation_errors.append(
+                        self.validator.add_validation_error(
                             f"Code block exceeds hard token limit in headers {headers}"
                         )
                 else:
@@ -230,7 +247,7 @@ class MarkdownChunker:
         if current_chunk['content'].strip():
             chunks.append(current_chunk.copy())
 
-        return chunks  # Remove the _adjust_chunks call here
+        return chunks
 
     @error_handler(logger)
     def _adjust_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -410,6 +427,90 @@ class MarkdownChunker:
         }
         return metadata
 
+class MarkdownChunkValidator:
+    def __init__(self, logger, min_chunk_size, max_tokens, output_dir, input_filename):
+        self.logger = logger
+        self.min_chunk_size = min_chunk_size
+        self.max_tokens = max_tokens
+        self.output_dir = output_dir
+        self.input_filename = input_filename
+        # Validation-related attributes
+        self.validation_errors = []
+        self.total_chunks = 0
+        self.total_tokens = 0
+        self.original_content_tokens = 0
+        self.content_missing = False
+        self.chunk_token_counts = []
+        self.headings_preserved = {'h1': set(), 'h2': set()}
+        self.total_headings = {'h1': 0, 'h2': 0}
+
+    def increment_total_headings(self, level):
+        if level in self.total_headings:
+            self.total_headings[level] += 1
+        else:
+            self.total_headings[level] = 1
+
+    def add_preserved_heading(self, level, heading_text):
+        if level not in self.headings_preserved:
+            self.headings_preserved[level] = set()
+        self.headings_preserved[level].add(heading_text)
+
+    def add_chunk(self, token_count):
+        self.total_chunks += 1
+        self.total_tokens += token_count
+        self.chunk_token_counts.append(token_count)
+
+    def set_original_content_tokens(self, token_count):
+        self.original_content_tokens = token_count
+
+    def add_validation_error(self, error_message):
+        self.validation_errors.append(error_message)
+
+    def validate(self, chunks, original_content):
+        self.validate_all_chunks(chunks, original_content)
+        self.log_summary()
+        self.find_incorrect_chunks(chunks)
+
+    def validate_all_chunks(self, chunks: List[Dict[str, Any]], original_content: str):
+        """Performs overall validation of chunks"""
+        # Check if total tokens in chunks match the original content
+        combined_chunk_content = ''.join(chunk['data']['text'] for chunk in chunks)
+        if combined_chunk_content.strip() != original_content.strip():
+            # Determine if content is missing
+            original_length = len(original_content.strip())
+            combined_length = len(combined_chunk_content.strip())
+            length_difference = original_length - combined_length
+            percentage_difference = (abs(length_difference) / original_length) * 100
+
+            if length_difference > 0:
+                self.content_missing = True
+                self.validation_errors.append(
+                    f"Content missing from chunks. Missing {length_difference} "
+                    f"characters ({percentage_difference:.2f}%)."
+                )
+            else:
+                self.content_missing = False
+
+        # Check for duplicates and remove them carefully
+        chunk_texts = {}
+        duplicates_found = False
+        cleaned_chunks = []
+        for chunk in chunks:
+            text = chunk['data']['text']
+            if text in chunk_texts:
+                duplicates_found = True
+                # Duplicates are fixed here; no need to report them
+                continue
+            else:
+                chunk_texts[text] = True
+                cleaned_chunks.append(chunk)
+
+        if duplicates_found:
+            # Update the chunks list to the cleaned_chunks without duplicates
+            chunks.clear()
+            chunks.extend(cleaned_chunks)
+            self.total_chunks = len(chunks)
+
     def log_summary(self):
         """Logs a concise summary of the chunking process"""
         # Token counts
@@ -455,10 +556,10 @@ class MarkdownChunker:
             self.logger.warning("No chunks to calculate statistics.")
 
         # Headers summary
-        h1_preserved = len(self.headings_preserved['h1'])
-        h2_preserved = len(self.headings_preserved['h2'])
-        h1_total = self.total_headings['h1']
-        h2_total = self.total_headings['h2']
+        h1_preserved = len(self.headings_preserved.get('h1', set()))
+        h2_preserved = len(self.headings_preserved.get('h2', set()))
+        h1_total = self.total_headings.get('h1', 0)
+        h2_total = self.total_headings.get('h2', 0)
         h1_percentage = (h1_preserved / h1_total * 100) if h1_total > 0 else 0
         h2_percentage = (h2_preserved / h2_total * 100) if h2_total > 0 else 0
         self.logger.info(
@@ -481,33 +582,40 @@ class MarkdownChunker:
         """Finds chunks below min_chunk_size or above max_tokens and saves to JSON."""
         incorrect = {
             "too_small": [
-                {"id": c["chunk_id"],
-                 "size": c["metadata"]["token_count"],
-                 'headers': c['data']['headers'],
-                 'text' :c['data']['text']}
+                {
+                    "id": c["chunk_id"],
+                    "size": c["metadata"]["token_count"],
+                    'headers': c['data']['headers'],
+                    'text': c['data']['text']
+                }
                 for c in chunks if c["metadata"]["token_count"] < self.min_chunk_size
             ],
             "too_large": [
-                {"id": c["chunk_id"],
-                 "size": c["metadata"]["token_count"],
-                 'headers': c['data']['headers'],
-                 'text': c['data']['text']}
+                {
+                    "id": c["chunk_id"],
+                    "size": c["metadata"]["token_count"],
+                    'headers': c['data']['headers'],
+                    'text': c['data']['text']
+                }
                 for c in chunks if c["metadata"]["token_count"] > self.max_tokens
             ]
         }
 
-        # Generate the filename based on the input filename
-        base_name = os.path.splitext(self.input_filename)[0]
-        output_filename = f"{base_name}-incorrect-chunks.json"
-        output_filepath = os.path.join(self.output_dir, output_filename)
+        if incorrect["too_small"] or incorrect["too_large"]:
+            base_name = os.path.splitext(self.input_filename)[0]
+            output_filename = f"{base_name}-incorrect-chunks.json"
+            output_filepath = os.path.join(self.output_dir, output_filename)
 
-        with open(output_filepath, 'w', encoding='utf-8') as f:
-            json.dump(incorrect, f, indent=2, ensure_ascii=False)
+            with open(output_filepath, 'w', encoding='utf-8') as f:
+                json.dump(incorrect, f, indent=2, ensure_ascii=False)
 
-        self.logger.info(f"Incorrect chunks saved to {output_filepath}")
+            self.logger.info(f"Incorrect chunks saved to {output_filepath}")
+            self.logger.info(f"Number of too small chunks: {len(incorrect['too_small'])}")
+            self.logger.info(f"Number of too big chunks: {len(incorrect['too_large'])}")
+        else:
+            self.logger.info("No incorrect chunks found.")
 
-        self.logger.info(f"Number of too small chunks: {len(incorrect['too_small'])}")
-        self.logger.info(f"Number of too big chunks: {len(incorrect['too_large'])}")
+
 
 
 # Test usage
@@ -516,8 +624,6 @@ def main():
     result = markdown_chunker.load_data()
     chunks = markdown_chunker.process_pages(result)
     markdown_chunker.save_chunks(chunks)
-    markdown_chunker.log_summary()
-    markdown_chunker.find_incorrect_chunks(chunks)
 
 if __name__ == "__main__":
     main()
