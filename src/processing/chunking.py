@@ -62,6 +62,7 @@ class MarkdownChunker:
         original_content = ''
         for index, page in enumerate(json_input['data']):
             page_content = page['markdown']
+            page_content = self.remove_boilerplate(page_content)
             original_content += page_content
             page_metadata = page['metadata']
 
@@ -85,6 +86,34 @@ class MarkdownChunker:
         return all_chunks
 
     @error_handler(logger)
+    def remove_boilerplate(self, content: str) -> str:
+        """Removes navigation and boilerplate content from markdown."""
+        # Define patterns to identify boilerplate content
+        boilerplate_patterns = [
+            r'\[Anthropic home page.*\]\(/.*\)',  # Matches the home page link with images
+            r'^English$',  # Matches the language selection
+            r'^Search\.\.\.$',
+            r'^Ctrl K$',
+            r'^Search$',
+            r'^Navigation$',
+            r'^\[.*\]\(/.*\)$',  # Matches navigation links
+            r'^On this page$',
+            r'^Next steps$',  # Matches common headings used in boilerplate
+            r'^\* \* \*$'  # Matches horizontal rules used as separators
+        ]
+
+        # Combine patterns into a single regex
+        boilerplate_regex = re.compile('|'.join(boilerplate_patterns), re.MULTILINE)
+
+        # Remove boilerplate lines
+        cleaned_content = boilerplate_regex.sub('', content)
+
+        # Remove any extra newlines left after removing boilerplate
+        cleaned_content = re.sub(r'\n{2,}', '\n\n', cleaned_content)
+
+        return cleaned_content.strip()
+
+    @error_handler(logger)
     def clean_header_text(self, header_text: str) -> str:
         """Cleans unwanted markdown elements and artifacts from header text."""
         # Remove zero-width spaces
@@ -105,15 +134,11 @@ class MarkdownChunker:
         sections = []
 
         # Ignore lines that are horizontal rules
-        h_pattern = re.compile(r'^\s*(?![-*]{3,})(#{1,6})\s*(.*)$', re.MULTILINE)
+        h_pattern = re.compile(r'^\s*(?![-*]{3,})(#{1,3})\s*(.*)$', re.MULTILINE)
 
-        # Patterns for lists, code blocks, and tables
-        code_block_pattern = re.compile(r'(```|~~~)[\s\S]+?\1', re.MULTILINE)
+        # Patterns for code blocks
+        code_block_pattern = re.compile(r'(```|~~~)(.*?)\1', re.DOTALL)
         inline_code_pattern = re.compile(r'`([^`\n]+)`')
-        list_pattern = re.compile(r'^(\*|\-|\+|\d+\.)\s', re.MULTILINE)
-        table_pattern = re.compile(r'(\|[^\n]+\|)\s*\n(\|[:\- ]+\|)', re.MULTILINE)
-
-
 
         # Header positions for splitting
         headers = [(m.start(), m.end(), m.group(1), m.group(2).strip()) for m in h_pattern.finditer(page_content)]
@@ -130,9 +155,6 @@ class MarkdownChunker:
             # Extract content before this header
             content = page_content[last_index:start].strip()
             if content:
-                # Check for lists, code blocks, and tables
-                if code_block_pattern.search(content):
-                    content = code_block_pattern.sub(lambda m: f'<pre><code>{m.group(0)}</code></pre>', content)
                 current_section['content'] = content
                 sections.append(current_section.copy())
                 # Reset current_section for the next section
@@ -165,8 +187,6 @@ class MarkdownChunker:
             sections.append(current_section.copy())
 
         return sections
-
-
 
     @error_handler(logger)
     def create_chunks(self, sections: List[Dict[str, Any]], page_metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -205,40 +225,48 @@ class MarkdownChunker:
         lines = content.split('\n')
         in_code_block = False
         code_fence = ''
+        code_block_content = ''
 
-        for line in lines:
+        for i, line in enumerate(lines):
             stripped_line = line.strip()
 
             # Check for code block start/end
-            if stripped_line.startswith('```') or stripped_line.startswith('~~~'):
+            code_block_start_match = re.match(r'^(```|~~~)(.*)$', stripped_line)
+            if code_block_start_match:
                 if not in_code_block:
                     in_code_block = True
-                    code_fence = stripped_line[:3]
-                elif stripped_line.startswith(code_fence):
+                    code_fence = code_block_start_match.group(1)
+                    code_block_content = line + '\n'
+                    continue
+                elif stripped_line == code_fence:
                     in_code_block = False
-                    code_fence = ''
+                    code_block_content += line + '\n'
+                    # Handle large code blocks
+                    code_block_tokens = self._calculate_tokens(code_block_content)
+                    if code_block_tokens > self.max_tokens:
+                        self.validator.add_validation_error(
+                            f"Code block exceeds max token limit in headers {headers}"
+                        )
+                    # Add code block to current chunk
+                    current_chunk['content'] += code_block_content
+                    code_block_content = ''
+                    continue
+            elif in_code_block:
+                code_block_content += line + '\n'
+                continue
 
             # Handle inline code
-            if not in_code_block:
-                line = re.sub(r'`([^`\n]+)`', r'<code>\1</code>', line)
+            line = re.sub(r'`([^`\n]+)`', r'<code>\1</code>', line)
 
             potential_chunk_content = current_chunk['content'] + line + '\n'
             token_count = self._calculate_tokens(potential_chunk_content)
 
-            if token_count <= self.soft_token_limit or in_code_block:
-                current_chunk['content'] += line + '\n'
+            if token_count <= self.soft_token_limit:
+                current_chunk['content'] = potential_chunk_content
             else:
-                if in_code_block:
-                    if token_count <= self.max_tokens:
-                        current_chunk['content'] += line + '\n'
-                    else:
-                        self.validator.add_validation_error(
-                            f"Code block exceeds hard token limit in headers {headers}"
-                        )
-                else:
-                    if current_chunk['content'].strip():
-                        chunks.append(current_chunk.copy())
-                    current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
+                if current_chunk['content'].strip():
+                    chunks.append(current_chunk.copy())
+                current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
 
         if current_chunk['content'].strip():
             chunks.append(current_chunk.copy())
@@ -271,20 +299,20 @@ class MarkdownChunker:
                 else:
                     # Can't merge, add current_chunk to adjusted_chunks and start a new one
                     if self._calculate_tokens(current_chunk['content']) > self.max_tokens:
-                        # Split large chunk
-                        split_chunks = self._split_large_chunk(current_chunk)
-                        adjusted_chunks.extend(split_chunks)
-                    else:
-                        adjusted_chunks.append(current_chunk)
+                        # Log a warning
+                        self.validator.add_validation_error(
+                            f"Chunk exceeds max token limit in headers {current_chunk['headers']}"
+                        )
+                    adjusted_chunks.append(current_chunk)
                     current_chunk = chunk
 
         if current_chunk:
             if self._calculate_tokens(current_chunk['content']) > self.max_tokens:
-                # Split last large chunk if necessary
-                split_chunks = self._split_large_chunk(current_chunk)
-                adjusted_chunks.extend(split_chunks)
-            else:
-                adjusted_chunks.append(current_chunk)
+                # Log a warning
+                self.validator.add_validation_error(
+                    f"Chunk exceeds max token limit in headers {current_chunk['headers']}"
+                )
+            adjusted_chunks.append(current_chunk)
 
         return adjusted_chunks
 
@@ -295,27 +323,6 @@ class MarkdownChunker:
             if headers2.get(level) and headers2[level] != headers1.get(level):
                 merged[level] = headers2[level]
         return merged
-
-    def _split_large_chunk(self, chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
-        content = chunk['content']
-        headers = chunk['headers']
-        lines = content.split('\n')
-        split_chunks = []
-        current_chunk = {'headers': headers.copy(), 'content': ''}
-
-        for line in lines:
-            potential_content = current_chunk['content'] + line + '\n'
-            if self._calculate_tokens(potential_content) <= self.soft_token_limit:
-                current_chunk['content'] = potential_content
-            else:
-                if current_chunk['content']:
-                    split_chunks.append(current_chunk)
-                current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
-
-        if current_chunk['content']:
-            split_chunks.append(current_chunk)
-
-        return split_chunks
 
     @error_handler(logger)
     def _add_overlap(self,
@@ -346,50 +353,6 @@ class MarkdownChunker:
         tokens = self.tokenizer.encode(text)
         last_n_tokens = tokens[-n:]
         return self.tokenizer.decode(last_n_tokens)
-
-    @error_handler(logger)
-    def validate_all_chunks(self, chunks: List[Dict[str, Any]], original_content: str):
-        """Performs overall validation of chunks"""
-        # Check if total tokens in chunks match the original content
-        combined_chunk_content = ''.join(chunk['data']['text'] for chunk in chunks)
-        if combined_chunk_content.strip() != original_content.strip():
-            # Determine if content is missing
-            original_length = len(original_content.strip())
-            combined_length = len(combined_chunk_content.strip())
-            length_difference = original_length - combined_length
-            percentage_difference = (abs(length_difference) / original_length) * 100
-
-            if length_difference > 0:
-                self.content_missing = True
-                self.validation_errors.append(
-                    f"Content missing from chunks. Missing {length_difference} "
-                    f"characters ({percentage_difference:.2f}%)."
-                )
-                # No need to log here; summary will handle it
-            else:
-                self.content_missing = False
-                # Having extra content may be acceptable
-                # No need to log here; summary will handle it
-
-        # Check for duplicates and remove them carefully
-        chunk_texts = {}
-        duplicates_found = False
-        cleaned_chunks = []
-        for chunk in chunks:
-            text = chunk['data']['text']
-            if text in chunk_texts:
-                duplicates_found = True
-                # Duplicates are fixed here; no need to report them
-                continue
-            else:
-                chunk_texts[text] = True
-                cleaned_chunks.append(chunk)
-
-        if duplicates_found:
-            # Update the chunks list to the cleaned_chunks without duplicates
-            chunks.clear()
-            chunks.extend(cleaned_chunks)
-            self.total_chunks = len(chunks)
 
     @error_handler(logger)
     def save_chunks(self, chunks: List[Dict[str, Any]]):
@@ -437,8 +400,8 @@ class MarkdownChunkValidator:
         self.original_content_tokens = 0
         self.content_missing = False
         self.chunk_token_counts = []
-        self.headings_preserved = {'h1': set(), 'h2': set()}
-        self.total_headings = {'h1': 0, 'h2': 0}
+        self.headings_preserved = {'h1': set(), 'h2': set(), 'h3': set()}
+        self.total_headings = {'h1': 0, 'h2': 0, 'h3': 0}
 
     def increment_total_headings(self, level):
         if level in self.total_headings:
@@ -552,18 +515,13 @@ class MarkdownChunkValidator:
             self.logger.warning("No chunks to calculate statistics.")
 
         # Headers summary
-        h1_preserved = len(self.headings_preserved.get('h1', set()))
-        h2_preserved = len(self.headings_preserved.get('h2', set()))
-        h1_total = self.total_headings.get('h1', 0)
-        h2_total = self.total_headings.get('h2', 0)
-        h1_percentage = (h1_preserved / h1_total * 100) if h1_total > 0 else 0
-        h2_percentage = (h2_preserved / h2_total * 100) if h2_total > 0 else 0
-        self.logger.info(
-            f"H1 headings preserved: {h1_preserved}/{h1_total} ({h1_percentage:.2f}%)"
-        )
-        self.logger.info(
-            f"H2 headings preserved: {h2_preserved}/{h2_total} ({h2_percentage:.2f}%)"
-        )
+        for level in ['h1', 'h2', 'h3']:
+            preserved = len(self.headings_preserved.get(level, set()))
+            total = self.total_headings.get(level, 0)
+            percentage = (preserved / total * 100) if total > 0 else 0
+            self.logger.info(
+                f"{level.upper()} headings preserved: {preserved}/{total} ({percentage:.2f}%)"
+            )
 
         # Validation errors
         unique_errors = set(self.validation_errors)
@@ -610,9 +568,6 @@ class MarkdownChunkValidator:
             self.logger.info(f"Number of too big chunks: {len(incorrect['too_large'])}")
         else:
             self.logger.info("No incorrect chunks found.")
-
-
-
 
 # Test usage
 def main():
