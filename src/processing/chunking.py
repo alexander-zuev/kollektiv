@@ -167,28 +167,35 @@ class MarkdownChunker:
 
     @error_handler(logger)
     def create_chunks(self, sections: List[Dict[str, Any]], page_metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
-        chunks = []
+        page_chunks = []
         for section in sections:
             section_chunks = self._split_section(section['content'], section['headers'])
-            for chunk in section_chunks:
-                chunk_id = str(self._generate_chunk_id())
-                token_count = self._calculate_tokens(chunk['content'])
-                self.total_tokens += token_count
-                self.chunk_token_counts.append(token_count)
-                metadata = self._create_metadata(page_metadata, token_count)
-                new_chunk = {
-                    'chunk_id': chunk_id,
-                    'metadata': metadata,
-                    'data': {
-                        'headers': chunk['headers'],
-                        'text': chunk['content']
-                    }
-                }
-                chunks.append(new_chunk)
-                self.total_chunks += 1
+            page_chunks.extend(section_chunks)
 
-        self._add_overlap(chunks)
-        return chunks
+        # Adjust chunks for the entire page
+        adjusted_chunks = self._adjust_chunks(page_chunks)
+
+        final_chunks = []
+        for chunk in adjusted_chunks:
+            chunk_id = str(self._generate_chunk_id())
+            token_count = self._calculate_tokens(chunk['content'])
+            self.total_tokens += token_count
+            self.chunk_token_counts.append(token_count)
+            metadata = self._create_metadata(page_metadata, token_count)
+            new_chunk = {
+                'chunk_id': chunk_id,
+                'metadata': metadata,
+                'data': {
+                    'headers': chunk['headers'],
+                    'text': chunk['content']
+                }
+            }
+            final_chunks.append(new_chunk)
+            self.total_chunks += 1
+
+        # Add overlap as the final step
+        self._add_overlap(final_chunks)
+        return final_chunks
 
     @error_handler(logger)
     def _split_section(self, content: str, headers: Dict[str, str]) -> List[Dict[str, Any]]:
@@ -223,7 +230,7 @@ class MarkdownChunker:
         if current_chunk['content'].strip():
             chunks.append(current_chunk.copy())
 
-        return self._adjust_chunks(chunks)
+        return chunks  # Remove the _adjust_chunks call here
 
     @error_handler(logger)
     def _adjust_chunks(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -240,45 +247,41 @@ class MarkdownChunker:
                 if combined_tokens <= self.soft_token_limit:
                     # Merge chunks
                     current_chunk['content'] = combined_content
-                    current_chunk['headers'].update(chunk['headers'])
-                elif self._calculate_tokens(current_chunk['content']) < self.min_chunk_size:
-                    # Current chunk is too small, force merge
+                    current_chunk['headers'] = self._merge_headers(current_chunk['headers'], chunk['headers'])
+                elif combined_tokens <= self.max_tokens and (
+                        self._calculate_tokens(current_chunk['content']) < self.min_chunk_size or
+                        self._calculate_tokens(chunk['content']) < self.min_chunk_size
+                ):
+                    # Force merge if one of the chunks is too small, even if it exceeds soft limit
                     current_chunk['content'] = combined_content
-                    current_chunk['headers'].update(chunk['headers'])
+                    current_chunk['headers'] = self._merge_headers(current_chunk['headers'], chunk['headers'])
                 else:
                     # Can't merge, add current_chunk to adjusted_chunks and start a new one
-                    adjusted_chunks.append(current_chunk)
+                    if self._calculate_tokens(current_chunk['content']) > self.max_tokens:
+                        # Split large chunk
+                        split_chunks = self._split_large_chunk(current_chunk)
+                        adjusted_chunks.extend(split_chunks)
+                    else:
+                        adjusted_chunks.append(current_chunk)
                     current_chunk = chunk
 
         if current_chunk:
-            adjusted_chunks.append(current_chunk)
-
-        # Handle remaining small chunks
-        final_chunks = []
-        for i, chunk in enumerate(adjusted_chunks):
-            token_count = self._calculate_tokens(chunk['content'])
-            if token_count < self.min_chunk_size:
-                if i < len(adjusted_chunks) - 1:
-                    # Merge with next chunk
-                    next_chunk = adjusted_chunks[i + 1]
-                    next_chunk['content'] = chunk['content'] + next_chunk['content']
-                    next_chunk['headers'].update(chunk['headers'])
-                elif i > 0 and final_chunks:
-                    # Merge with previous chunk
-                    prev_chunk = final_chunks[-1]
-                    prev_chunk['content'] += chunk['content']
-                    prev_chunk['headers'].update(chunk['headers'])
-                else:
-                    # This is the only chunk, keep it as is
-                    final_chunks.append(chunk)
-            elif token_count > self.max_tokens:
-                # Split large chunk
-                split_chunks = self._split_large_chunk(chunk)
-                final_chunks.extend(split_chunks)
+            if self._calculate_tokens(current_chunk['content']) > self.max_tokens:
+                # Split last large chunk if necessary
+                split_chunks = self._split_large_chunk(current_chunk)
+                adjusted_chunks.extend(split_chunks)
             else:
-                final_chunks.append(chunk)
+                adjusted_chunks.append(current_chunk)
 
-        return final_chunks
+        return adjusted_chunks
+
+    @error_handler(logger)
+    def _merge_headers(self, headers1: Dict[str, str], headers2: Dict[str, str]) -> Dict[str, str]:
+        merged = headers1.copy()
+        for level in ['h1', 'h2', 'h3']:
+            if headers2.get(level) and headers2[level] != headers1.get(level):
+                merged[level] = headers2[level]
+        return merged
 
     def _split_large_chunk(self, chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
         content = chunk['content']
