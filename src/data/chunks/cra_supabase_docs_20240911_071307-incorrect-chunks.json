@@ -1,0 +1,45 @@
+{
+  "too_small": [
+    {
+      "id": "77552a91-f57d-44e7-89c9-d64a4fef21d7",
+      "size": 95,
+      "headers": {
+        "h1": "Supabase Auth with SvelteKit",
+        "h2": "",
+        "h3": ""
+      },
+      "text": "Auth\nWe generally recommend using the new <code>@supabase/ssr</code> package instead of <code>auth-helpers</code>. <code>@supabase/ssr</code> takes the core concepts of the Auth Helpers package and makes them available to any server framework. Check out the [migration doc](/docs/guides/auth/server-side/migrating-to-ssr-from-auth-helpers) to learn more.\n\nSee legacy docs\n"
+    },
+    {
+      "id": "ad1988ce-d65c-4f56-895c-eea84d1a37e5",
+      "size": 86,
+      "headers": {
+        "h1": "Supabase Auth with the Next.js App Router",
+        "h2": "",
+        "h3": ""
+      },
+      "text": "Auth\nThe <code>auth-helpers</code> package has been replaced with the <code>@supabase/ssr</code> package. We recommend setting up Auth for your Next.js app with <code>@supabase/ssr</code> instead. See the [Next.js Server-Side Auth guide](/docs/guides/auth/server-side/nextjs) to learn how.\n\nSee legacy docs\n"
+    },
+    {
+      "id": "29532168-e6ae-4f22-bf78-bda98784aa4d",
+      "size": 90,
+      "headers": {
+        "h1": "Supabase Auth with Next.js Pages Directory",
+        "h2": "",
+        "h3": ""
+      },
+      "text": "Auth\nThe <code>auth-helpers</code> package has been replaced with the <code>@supabase/ssr</code> package. We recommend setting up Auth for your Next.js app with <code>@supabase/ssr</code> instead. See the [Next.js Server-Side Auth guide](/docs/guides/auth/server-side/nextjs?router=pages) to learn how.\n\nSee legacy docs\n"
+    },
+    {
+      "id": "b01ed308-c628-4c23-ae2f-8da6d3630942",
+      "size": 43,
+      "headers": {
+        "h1": "Enterprise Single Sign-On",
+        "h2": "",
+        "h3": ""
+      },
+      "text": "Auth\nSupabase Auth supports building enterprise applications that require Single Sign-On (SSO) authentication [with SAML 2.0](/docs/guides/auth/sso/auth-sso-saml).\n"
+    }
+  ],
+  "too_large": []
+}

@@ -1,7 +1,7 @@
 {
   "too_small": [
     {
-      "id": "b6cbebd1-c877-438f-a336-10a0a09e4840",
+      "id": "a190facb-7a05-45a3-9474-0596b1b5c8bf",
       "size": 55,
       "headers": {
         "h1": "IP addresses - Anthropic",
@@ -13,7 +13,7 @@
   ],
   "too_large": [
     {
-      "id": "baff1af8-9c91-42fe-ac17-9c9034a39109",
+      "id": "7e152825-8db3-4912-851a-fa0fbfe71542",
       "size": 1058,
       "headers": {
         "h1": "Tool use (function calling) - Anthropic",
@@ -23,7 +23,7 @@
       "text": "Here are a few code examples demonstrating various tool use patterns and techniques. For brevity’s sake, the tools are simple tools, and the tool descriptions are shorter than would be ideal to ensure best performance.\n\nSingle tool example\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [{\\\n        \"name\": \"get_weather\",\\\n        \"description\": \"Get the current weather in a given location\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"location\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                },\\\n                \"unit\": {\\\n                    \"type\": \"string\",\\\n                    \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                    \"description\": \"The unit of temperature, either \\\"celsius\\\" or \\\"fahrenheit\\\"\"\\\n                }\\\n            },\\\n            \"required\": [\"location\"]\\\n        }\\\n    }],\n    \"messages\": [{\"role\": \"user\", \"content\": \"What is the weather like in San Francisco?\"}]\n}'\n\n```\n\nClaude will return a response similar to:\n\nJSON\n\nCopy\n\n```JSON\n{\n  \"id\": \"msg_01Aq9w938a90dw8q\",\n  \"model\": \"claude-3-5-sonnet-20240620\",\n  \"stop_reason\": \"tool_use\",\n  \"role\": \"assistant\",\n  \"content\": [\\\n    {\\\n      \"type\": \"text\",\\\n      \"text\": \"<thinking>I need to call the get_weather function, and the user wants SF, which is likely San Francisco, CA.</thinking>\"\\\n    },\\\n    {\\\n      \"type\": \"tool_use\",\\\n      \"id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n      \"name\": \"get_weather\",\\\n      \"input\": {\"location\": \"San Francisco, CA\", \"unit\": \"celsius\"}\\\n    }\\\n  ]\n}\n\n```\n\nYou would then need to execute the <code>get_weather</code> function with the provided input, and return the result in a new <code>user</code> message:\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [\\\n        {\\\n            \"name\": \"get_weather\",\\\n            \"description\": \"Get the current weather in a given location\",\\\n            \"input_schema\": {\\\n                \"type\": \"object\",\\\n                \"properties\": {\\\n                    \"location\": {\\\n                        \"type\": \"string\",\\\n                        \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                    },\\\n                    \"unit\": {\\\n                        \"type\": \"string\",\\\n                        \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                        \"description\": \"The unit of temperature, either \\\"celsius\\\" or \\\"fahrenheit\\\"\"\\\n                    }\\\n                },\\\n                \"required\": [\"location\"]\\\n            }\\\n        }\\\n    ],\n    \"messages\": [\\\n        {\\\n            \"role\": \"user\",\\\n            \"content\": \"What is the weather like in San Francisco?\"\\\n        },\\\n        {\\\n            \"role\": \"assistant\",\\\n            \"content\": [\\\n                {\\\n                    \"type\": \"text\",\\\n                    \"text\": \"<thinking>I need to use get_weather, and the user wants SF, which is likely San Francisco, CA.</thinking>\"\\\n                },\\\n                {\\\n                    \"type\": \"tool_use\",\\\n                    \"id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n                    \"name\": \"get_weather\",\\\n                    \"input\": {\\\n                        \"location\": \"San Francisco, CA\",\\\n                        \"unit\": \"celsius\"\\\n                    }\\\n                }\\\n            ]\\\n        },\\\n        {\\\n            \"role\": \"user\",\\\n            \"content\": [\\\n                {\\\n                    \"type\": \"tool_result\",\\\n                    \"tool_use_id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n                    \"content\": \"15 degrees\"\\\n                }\\\n            ]\\\n        }\\\n    ]\n}'\n\n```\n"
     },
     {
-      "id": "e7aa3093-be07-4b9d-85b6-98cff5e790e5",
+      "id": "45525ba6-d42a-471f-869c-43a441d25028",
       "size": 1265,
       "headers": {
         "h1": "Streaming Messages - Anthropic",
@@ -31,6 +31,998 @@
         "h3": "Streaming request with tool use"
       },
       "text": "In this request, we ask Claude to use a tool to tell us the weather.\n\nRequest\n\nCopy\n\n```bash\n  curl https://api.anthropic.com/v1/messages \\\n    -H \"content-type: application/json\" \\\n    -H \"x-api-key: $ANTHROPIC_API_KEY\" \\\n    -H \"anthropic-version: 2023-06-01\" \\\n    -d '{\n      \"model\": \"claude-3-5-sonnet-20240620\",\n      \"max_tokens\": 1024,\n      \"tools\": [\\\n        {\\\n          \"name\": \"get_weather\",\\\n          \"description\": \"Get the current weather in a given location\",\\\n          \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n              \"location\": {\\\n                \"type\": \"string\",\\\n                \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n              }\\\n            },\\\n            \"required\": [\"location\"]\\\n          }\\\n        }\\\n      ],\n      \"tool_choice\": {\"type\": \"any\"},\n      \"messages\": [\\\n        {\\\n          \"role\": \"user\",\\\n          \"content\": \"What is the weather like in San Francisco?\"\\\n        }\\\n      ],\n      \"stream\": true\n    }'\n\n```\n\nResponse\n\nCopy\n\n```json\nevent: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_014p7gG3wDgGV9EUtLvnow3U\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-3-haiku-20240307\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":472,\"output_tokens\":2},\"content\":[],\"stop_reason\":null}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Okay\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\",\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" let\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"'s\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" check\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" the\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" weather\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" for\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" San\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" Francisco\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\",\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" CA\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\":\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_01T1x1fJ34qAmk2tNTrN7Up6\",\"name\":\"get_weather\",\"input\":{}}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"location\\\":\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" \\\"San\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" Francisc\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"o,\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" CA\\\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\", \"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\"unit\\\": \\\"fah\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"renheit\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":89}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n```\n"
+    }
+  ],
+  "missing_headers": [
+    {
+      "chunk_id": "ca407e80-972f-41d2-8a60-962022091f86",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/versioning",
+      "page_title": "Versions - Anthropic",
+      "headers": {
+        "h1": "Versions - Anthropic",
+        "h2": "Version history",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "3e3faec5-0e8d-4869-89e9-27dc39b889a5",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-generator",
+      "page_title": "Automatically generate first draft prompt templates - Anthropic",
+      "headers": {
+        "h1": "Automatically generate first draft prompt templates - Anthropic",
+        "h2": "Next steps",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "7e152825-8db3-4912-851a-fa0fbfe71542",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic",
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "Tool use examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "22772ac2-de1d-4455-9557-83de731fc4cf",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic",
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "Tool use examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "4cf33d42-d673-4708-9a9e-e11674bb463e",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic",
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "Tool use examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "a7132220-deae-48c9-932e-6667f032b04b",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic",
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "Tool use examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "04319e5f-2f7d-4348-b7f7-616c36c5b5bc",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic",
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "04319e5f-2f7d-4348-b7f7-616c36c5b5bc",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic",
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "2f3bc18d-51c5-4e22-84f7-7eb3f7497144",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic",
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "Pricing",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "ca60b76e-4f8e-422f-9e10-1f21a4b216d5",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic",
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "Next Steps",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "92357a89-d62d-4be0-8d1f-e3229ac16d32",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts",
+      "page_title": "Giving Claude a role with a system prompt - Anthropic",
+      "headers": {
+        "h1": "Giving Claude a role with a system prompt - Anthropic",
+        "h2": "How to give Claude a role",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "98d673b3-8d72-48b8-aeef-6d715fa49af0",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
+      "page_title": "Glossary - Anthropic",
+      "headers": {
+        "h1": "Glossary - Anthropic",
+        "h2": "Pretraining",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "ccef3b5d-ebfd-4dda-a9f8-eaba2b63c9b7",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
+      "page_title": "Glossary - Anthropic",
+      "headers": {
+        "h1": "Glossary - Anthropic",
+        "h2": "TTFT (Time to first token)",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "d9a25891-3eb5-45bc-aed0-1d4a1c271357",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
+      "page_title": "Glossary - Anthropic",
+      "headers": {
+        "h1": "Glossary - Anthropic",
+        "h2": "Tokens",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "59932831-edda-434e-b6dc-6c05417fddfa",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool",
+      "page_title": "Using the Evaluation Tool - Anthropic",
+      "headers": {
+        "h1": "Using the Evaluation Tool - Anthropic",
+        "h2": "Creating Test Cases",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "531ae453-e991-455d-a8c3-a30d68eb076c",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool",
+      "page_title": "Using the Evaluation Tool - Anthropic",
+      "headers": {
+        "h1": "Using the Evaluation Tool - Anthropic",
+        "h2": "Understanding and comparing results",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "1c425a1c-4334-4802-8e63-e8d3a561b406",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-hallucinations",
+      "page_title": "Reduce hallucinations - Anthropic",
+      "headers": {
+        "h1": "Reduce hallucinations - Anthropic",
+        "h2": "Advanced techniques",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "dad676ee-de2e-4a55-91f2-21eee441e0b4",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
+      "page_title": "Embeddings - Anthropic",
+      "headers": {
+        "h1": "Alternatively, you can use vo = voyageai.Client(api_key=\"<your secret key>\")",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "dad676ee-de2e-4a55-91f2-21eee441e0b4",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
+      "page_title": "Embeddings - Anthropic",
+      "headers": {
+        "h1": "Alternatively, you can use vo = voyageai.Client(api_key=\"<your secret key>\")",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "d1b1e4b5-742d-4b2f-8d30-231a0cd83db7",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
+      "page_title": "Embeddings - Anthropic",
+      "headers": {
+        "h1": "Alternatively, you can use vo = voyageai.Client(api_key=\"<your secret key>\")",
+        "h2": "",
+        "h3": "Voyage HTTP API"
+      }
+    },
+    {
+      "chunk_id": "a88b06f5-1f51-4970-ada6-568b3af0f5f7",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
+      "page_title": "Embeddings - Anthropic",
+      "headers": {
+        "h1": "and cosine similarity are the same.",
+        "h2": "Voyage embedding example",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "b2e3a36a-1d12-4ae7-a899-eb251cad5022",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
+      "page_title": "Embeddings - Anthropic",
+      "headers": {
+        "h1": "is the same as dot-product.",
+        "h2": "FAQ",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "7d3c1b2a-02a8-42ee-a11b-075c6d85e5f1",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
+      "page_title": "Embeddings - Anthropic",
+      "headers": {
+        "h1": "is the same as dot-product.",
+        "h2": "Pricing",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "957d0652-f619-4fa5-ab70-4586de943b28",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
+      "page_title": "Increase output consistency (JSON mode) - Anthropic",
+      "headers": {
+        "h1": "Increase output consistency (JSON mode) - Anthropic",
+        "h2": "Specify the desired output format",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "665bb689-1983-4e90-a36b-c0fac83c77f3",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
+      "page_title": "Increase output consistency (JSON mode) - Anthropic",
+      "headers": {
+        "h1": "Increase output consistency (JSON mode) - Anthropic",
+        "h2": "Prefill Claude’s response",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "6287ab07-6c09-456e-941e-4955f9cec55c",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
+      "page_title": "Increase output consistency (JSON mode) - Anthropic",
+      "headers": {
+        "h1": "Increase output consistency (JSON mode) - Anthropic",
+        "h2": "Constrain with examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "fd0014d9-e986-4068-a604-f1e4702928c8",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
+      "page_title": "Increase output consistency (JSON mode) - Anthropic",
+      "headers": {
+        "h1": "Increase output consistency (JSON mode) - Anthropic",
+        "h2": "Use retrieval for contextual consistency",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "6376116d-b9e4-4720-865f-7d182f574f45",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
+      "page_title": "Increase output consistency (JSON mode) - Anthropic",
+      "headers": {
+        "h1": "Increase output consistency (JSON mode) - Anthropic",
+        "h2": "Chain prompts for complex tasks",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "5efb669d-af54-424f-801a-56baaa87763c",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/migrating-from-text-completions-to-messages",
+      "page_title": "Migrating from Text Completions - Anthropic",
+      "headers": {
+        "h1": "Migrating from Text Completions - Anthropic",
+        "h2": "",
+        "h3": "Putting words in Claude’s mouth"
+      }
+    },
+    {
+      "chunk_id": "38017453-c64c-49b8-a3ff-3f4a703da3af",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/migrating-from-text-completions-to-messages",
+      "page_title": "Migrating from Text Completions - Anthropic",
+      "headers": {
+        "h1": "Migrating from Text Completions - Anthropic",
+        "h2": "",
+        "h3": "Streaming format"
+      }
+    },
+    {
+      "chunk_id": "e5ff9c58-9f36-4358-a5b5-4aa334a279cd",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/initial-setup",
+      "page_title": "Initial setup - Anthropic",
+      "headers": {
+        "h1": "Initial setup - Anthropic",
+        "h2": "Start with the Workbench",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "d41f598e-8c58-441c-882f-f40a828b2ac1",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/initial-setup",
+      "page_title": "Initial setup - Anthropic",
+      "headers": {
+        "h1": "Initial setup - Anthropic",
+        "h2": "Next steps",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "ec0d202c-2391-4a46-916c-b4977add83f5",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prefill-claudes-response",
+      "page_title": "Prefill Claude's response for greater output control - Anthropic",
+      "headers": {
+        "h1": "Prefill Claude's response for greater output control - Anthropic",
+        "h2": "How to prefill Claude’s response",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "5a672ca2-b5c2-4f7f-b2aa-802a227c3e2e",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
+      "page_title": "Google Sheets add-on - Anthropic",
+      "headers": {
+        "h1": "Google Sheets add-on - Anthropic",
+        "h2": "Advanced use",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "51188bdc-b5dd-40fa-bbd7-e2b9ddd81525",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
+      "page_title": "Google Sheets add-on - Anthropic",
+      "headers": {
+        "h1": "ERROR!, ⚠ DEFERRED ⚠ or ⚠ THROTTLED ⚠",
+        "h2": "Further information",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "aceca4da-6e06-4f67-881c-277c2e8b0ce7",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/intro-to-claude",
+      "page_title": "Intro to Claude - Anthropic",
+      "headers": {
+        "h1": "Intro to Claude - Anthropic",
+        "h2": "Start building with Claude",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "cca10388-c8a5-4ff0-879a-62bc376b7e8e",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      "page_title": "Prompt Caching (beta) - Anthropic",
+      "headers": {
+        "h1": "Prompt Caching (beta) - Anthropic",
+        "h2": "How Prompt Caching works",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "0043d6e1-f58f-45d3-858e-62055bddb33f",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      "page_title": "Prompt Caching (beta) - Anthropic",
+      "headers": {
+        "h1": "Prompt Caching (beta) - Anthropic",
+        "h2": "Prompt Caching examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "e023962d-8f79-46f3-96ba-e86547569a0d",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      "page_title": "Prompt Caching (beta) - Anthropic",
+      "headers": {
+        "h1": "many more tools\\",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "e023962d-8f79-46f3-96ba-e86547569a0d",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      "page_title": "Prompt Caching (beta) - Anthropic",
+      "headers": {
+        "h1": "many more tools\\",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "e3b382c0-a373-4259-9a5b-57c638c0407d",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      "page_title": "Prompt Caching (beta) - Anthropic",
+      "headers": {
+        "h1": "many more tools\\",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "e3b382c0-a373-4259-9a5b-57c638c0407d",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      "page_title": "Prompt Caching (beta) - Anthropic",
+      "headers": {
+        "h1": "many more tools\\",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "213567ff-be1e-4ed6-b480-8b316110fd5c",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
+      "page_title": "Prompt Caching (beta) - Anthropic",
+      "headers": {
+        "h1": "many more tools\\",
+        "h2": "FAQ",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "1b8364e2-961d-4e62-97fe-9db9df7b02c9",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/supported-regions",
+      "page_title": "Supported regions - Anthropic",
+      "headers": {
+        "h1": "Supported regions - Anthropic",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "1b8364e2-961d-4e62-97fe-9db9df7b02c9",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/supported-regions",
+      "page_title": "Supported regions - Anthropic",
+      "headers": {
+        "h1": "Supported regions - Anthropic",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "e0217da4-f072-499f-9779-328871236219",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
+      "page_title": "Content moderation - Anthropic",
+      "headers": {
+        "h1": "Format messages string, with each message wrapped in XML-like tags and given an ID",
+        "h2": "",
+        "h3": "Consider batch processing"
+      }
+    },
+    {
+      "chunk_id": "daedf7e2-2363-43de-a19a-ec777ac1bc03",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
+      "page_title": "Content moderation - Anthropic",
+      "headers": {
+        "h1": "Print the results for each detected violation",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "daedf7e2-2363-43de-a19a-ec777ac1bc03",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
+      "page_title": "Content moderation - Anthropic",
+      "headers": {
+        "h1": "Print the results for each detected violation",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "00ab7d54-1f5a-4930-8dd6-04b69bc32fdf",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/keep-claude-in-character",
+      "page_title": "Keep Claude in character with role prompting and prefilling - Anthropic",
+      "headers": {
+        "h1": "Keep Claude in character with role prompting and prefilling - Anthropic",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "00ab7d54-1f5a-4930-8dd6-04b69bc32fdf",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/keep-claude-in-character",
+      "page_title": "Keep Claude in character with role prompting and prefilling - Anthropic",
+      "headers": {
+        "h1": "Keep Claude in character with role prompting and prefilling - Anthropic",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "9817fec5-8ab4-4cda-9915-9f1dcf7a0e73",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/rate-limits",
+      "page_title": "Rate limits - Anthropic",
+      "headers": {
+        "h1": "Rate limits - Anthropic",
+        "h2": "Response headers",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "cdeb0631-6ece-4412-b535-cb9b50810b3c",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
+      "page_title": "Create strong empirical evaluations - Anthropic",
+      "headers": {
+        "h1": "... 496 more queries\\",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "cdeb0631-6ece-4412-b535-cb9b50810b3c",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
+      "page_title": "Create strong empirical evaluations - Anthropic",
+      "headers": {
+        "h1": "... 496 more queries\\",
+        "h2": "",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "ec015491-f63b-48b9-8881-2b31ed720cc0",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
+      "page_title": "Create strong empirical evaluations - Anthropic",
+      "headers": {
+        "h1": "Example usage",
+        "h2": "Next steps",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "9929e3a2-90fe-4ff9-8778-7be385925ee4",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/welcome",
+      "page_title": "Welcome to Claude - Anthropic",
+      "headers": {
+        "h1": "Welcome to Claude - Anthropic",
+        "h2": "Support",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "f8c4885c-de69-45ae-b762-0a9810c8d5d1",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/getting-started",
+      "page_title": "Getting started - Anthropic",
+      "headers": {
+        "h1": "Getting started - Anthropic",
+        "h2": "Examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "e51518bd-3afe-4042-bed9-5c69307a0ca9",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/release-notes/api",
+      "page_title": "API - Anthropic",
+      "headers": {
+        "h1": "API - Anthropic",
+        "h2": "",
+        "h3": "#   May 30th, 2024"
+      }
+    },
+    {
+      "chunk_id": "fb848a1b-6463-4381-933e-4853ae1b76ae",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/release-notes/api",
+      "page_title": "API - Anthropic",
+      "headers": {
+        "h1": "API - Anthropic",
+        "h2": "",
+        "h3": "#   May 10th, 2024"
+      }
+    },
+    {
+      "chunk_id": "af3a6bc8-9e99-41ba-bcc6-e679c88283ad",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-prompt-leak",
+      "page_title": "Reduce prompt leak - Anthropic",
+      "headers": {
+        "h1": "Reduce prompt leak - Anthropic",
+        "h2": "Strategies to reduce prompt leak",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "91636dd9-607b-4f24-8232-1bb66669724d",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/errors",
+      "page_title": "Errors - Anthropic",
+      "headers": {
+        "h1": "Errors - Anthropic",
+        "h2": "Request id",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "36267f42-9860-4b1c-ac34-01af596f8892",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/messages",
+      "page_title": "Create a Message - Anthropic",
+      "headers": {
+        "h1": "Create a Message - Anthropic",
+        "h2": "",
+        "h3": "# Headers"
+      }
+    },
+    {
+      "chunk_id": "c5a50e4f-5400-40a0-8c02-669db9745f53",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/messages",
+      "page_title": "Create a Message - Anthropic",
+      "headers": {
+        "h1": "Create a Message - Anthropic",
+        "h2": "",
+        "h3": "# Body"
+      }
+    },
+    {
+      "chunk_id": "dc60661c-3a61-44c4-a159-968a19b8ae39",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/messages",
+      "page_title": "Create a Message - Anthropic",
+      "headers": {
+        "h1": "Create a Message - Anthropic",
+        "h2": "",
+        "h3": "# Body"
+      }
+    },
+    {
+      "chunk_id": "0f61582d-56f0-44ab-b690-3116a237be4e",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/messages",
+      "page_title": "Create a Message - Anthropic",
+      "headers": {
+        "h1": "Create a Message - Anthropic",
+        "h2": "",
+        "h3": "# Body"
+      }
+    },
+    {
+      "chunk_id": "638c6b9b-fdd3-409f-b509-2eb1ac21e6b7",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/messages",
+      "page_title": "Create a Message - Anthropic",
+      "headers": {
+        "h1": "Create a Message - Anthropic",
+        "h2": "",
+        "h3": "# Response"
+      }
+    },
+    {
+      "chunk_id": "3c73e90a-300c-4c2c-819a-e0bdeb76516c",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/messages",
+      "page_title": "Create a Message - Anthropic",
+      "headers": {
+        "h1": "Create a Message - Anthropic",
+        "h2": "",
+        "h3": "# Response"
+      }
+    },
+    {
+      "chunk_id": "7830c5da-b2da-4da1-b353-e1afeb137ad2",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
+      "page_title": "Customer support agent - Anthropic",
+      "headers": {
+        "h1": "ignore tool use blocks",
+        "h2": "",
+        "h3": "#   Integrate real-time data with tool use"
+      }
+    },
+    {
+      "chunk_id": "f65bb8ee-109a-49f9-93f5-3aa64a8d2e86",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
+      "page_title": "Customer support agent - Anthropic",
+      "headers": {
+        "h1": "ignore tool use blocks",
+        "h2": "",
+        "h3": "#   Scale your Chatbot"
+      }
+    },
+    {
+      "chunk_id": "b48a1c65-37b7-457b-81d1-22a39182f646",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
+      "page_title": "Customer support agent - Anthropic",
+      "headers": {
+        "h1": "ignore tool use blocks",
+        "h2": "",
+        "h3": "Integrate Claude into your support workflow"
+      }
+    },
+    {
+      "chunk_id": "77e3d3ea-a3b9-423d-bf8c-81ffcba7bd29",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/messages-examples",
+      "page_title": "Messages examples - Anthropic",
+      "headers": {
+        "h1": "Messages examples - Anthropic",
+        "h2": "Multiple conversational turns",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "0dfd2f1e-a273-490b-89b2-aaa93aa49dc6",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/messages-examples",
+      "page_title": "Messages examples - Anthropic",
+      "headers": {
+        "h1": "Messages examples - Anthropic",
+        "h2": "Putting words in Claude’s mouth",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "9c290831-b31a-4f78-aae7-91c9a22856d8",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/messages-examples",
+      "page_title": "Messages examples - Anthropic",
+      "headers": {
+        "h1": "Messages examples - Anthropic",
+        "h2": "Vision",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "b991b101-ef9f-43c2-8f37-1e0fcd44fc1d",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/messages-examples",
+      "page_title": "Messages examples - Anthropic",
+      "headers": {
+        "h1": "Messages examples - Anthropic",
+        "h2": "Tool use and JSON mode",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "2c036a7f-3b9e-453e-935e-d6a32f45ce85",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/resources/model-deprecations",
+      "page_title": "Model Deprecations - Anthropic",
+      "headers": {
+        "h1": "Model Deprecations - Anthropic",
+        "h2": "Deprecation History",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "fe33294f-dc37-426d-992c-f9267de36b18",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview",
+      "page_title": "Prompt engineering overview - Anthropic",
+      "headers": {
+        "h1": "Prompt engineering overview - Anthropic",
+        "h2": "When to prompt engineer",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "ba8d0125-0de6-4f50-ad9c-ee29b80eee89",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview",
+      "page_title": "Prompt engineering overview - Anthropic",
+      "headers": {
+        "h1": "Prompt engineering overview - Anthropic",
+        "h2": "Prompt engineering tutorial",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "441baa30-6ad9-4ed1-9135-744a3da8c978",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips",
+      "page_title": "Long context prompting tips - Anthropic",
+      "headers": {
+        "h1": "Long context prompting tips - Anthropic",
+        "h2": "Essential tips for long context prompts",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "dc391d42-c718-4206-9d44-393ba2300aad",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
+      "page_title": "Legal summarization - Anthropic",
+      "headers": {
+        "h1": "Prompt the model to summarize the sublease agreement",
+        "h2": "",
+        "h3": "Evaluate your prompt"
+      }
+    },
+    {
+      "chunk_id": "f649b16c-2adb-4c59-a080-dfc0fe9584fd",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
+      "page_title": "Legal summarization - Anthropic",
+      "headers": {
+        "h1": "Iterate over chunks and summarize each one",
+        "h2": "",
+        "h3": "Use summary indexed documents to explore a large collection of documents"
+      }
+    },
+    {
+      "chunk_id": "6e038553-12e2-45eb-9de9-e6b26edfd71a",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
+      "page_title": "Legal summarization - Anthropic",
+      "headers": {
+        "h1": "Iterate over chunks and summarize each one",
+        "h2": "",
+        "h3": "Fine-tune Claude to learn from your dataset"
+      }
+    },
+    {
+      "chunk_id": "3954dd3e-856f-49e9-a6da-89f3c717c1c8",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/text-generation",
+      "page_title": "Text generation - Anthropic",
+      "headers": {
+        "h1": "Text generation - Anthropic",
+        "h2": "More Resources",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "9402954c-8aeb-4110-ae86-05704e5964fd",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct",
+      "page_title": "Be clear, direct, and detailed - Anthropic",
+      "headers": {
+        "h1": "Be clear, direct, and detailed - Anthropic",
+        "h2": "How to be clear, contextual, and specific",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "077e69bf-6b31-4207-b1e6-ff4bae8ddfd7",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/api/client-sdks",
+      "page_title": "Client SDKs - Anthropic",
+      "headers": {
+        "h1": "defaults to os.environ.get(\"ANTHROPIC_API_KEY\")",
+        "h2": "TypeScript",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "af298527-8cfd-4c42-bf2f-775dfc774ecf",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/multishot-prompting",
+      "page_title": "Use examples (multishot prompting) to guide Claude's behavior - Anthropic",
+      "headers": {
+        "h1": "Use examples (multishot prompting) to guide Claude's behavior - Anthropic",
+        "h2": "Crafting effective examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "7a01efda-c9f5-4bdf-ab8b-019a624aa795",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/multishot-prompting",
+      "page_title": "Use examples (multishot prompting) to guide Claude's behavior - Anthropic",
+      "headers": {
+        "h1": "Use examples (multishot prompting) to guide Claude's behavior - Anthropic",
+        "h2": "Crafting effective examples",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "a190facb-7a05-45a3-9474-0596b1b5c8bf",
+      "missing_header_level": "h2",
+      "source_url": "https://docs.anthropic.com/en/api/ip-addresses",
+      "page_title": "IP addresses - Anthropic",
+      "headers": {
+        "h1": "IP addresses - Anthropic",
+        "h2": "",
+        "h3": "#   IPv6"
+      }
+    },
+    {
+      "chunk_id": "f4fd21a7-e460-4512-bdf6-1e66a6761123",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
+      "page_title": "Models - Anthropic",
+      "headers": {
+        "h1": "Models - Anthropic",
+        "h2": "Model comparison",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "7d34e1cb-89d6-4539-977a-c826fb157af7",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
+      "page_title": "Models - Anthropic",
+      "headers": {
+        "h1": "Models - Anthropic",
+        "h2": "Get started with Claude",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "4cc2f48a-2873-449a-80ba-c8ac1cbcea22",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/define-success",
+      "page_title": "Define your success criteria - Anthropic",
+      "headers": {
+        "h1": "Define your success criteria - Anthropic",
+        "h2": "Building strong criteria",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "51bfa9e7-1c11-4052-b043-2ca3fed5112c",
+      "missing_header_level": "h3",
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/define-success",
+      "page_title": "Define your success criteria - Anthropic",
+      "headers": {
+        "h1": "Define your success criteria - Anthropic",
+        "h2": "Next steps",
+        "h3": ""
+      }
     }
   ]
 }

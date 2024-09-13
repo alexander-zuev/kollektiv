@@ -1,0 +1,754 @@
+[
+  {
+    "chunk_id": "be9a716d-e1ac-4fe9-9bdb-c80f6a3bf8e9",
+    "metadata": {
+      "token_count": 644,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Python Client Library",
+        "h2": "Fetch data",
+        "h3": "Parameters"
+      },
+      "text": "Python Reference v2.0\nsupabase-py [View on GitHub](https://github.com/supabase/supabase-py)\n\nThis reference documents every object and method available in Supabase's Python library, [supabase-py](https://github.com/supabase/supabase-py). You can use supabase-py to interact with your Postgres database, listen to database changes, invoke Deno Edge Functions, build login and user management functionality, and manage large files.\nYou can install supabase-py via the terminal. (for Python > 3.8)\n\nPIPConda\n\nTerminal\n\n`\n1\npip install supabase\n`\nYou can initialize a new Supabase client using the <code>create_client()</code> method.\n\nThe Supabase client is your entrypoint to the rest of the Supabase functionality and is the easiest way to interact with everything we offer within the Supabase ecosystem.\n- supabase\\_urlRequiredstring\n\nThe unique Supabase URL which is supplied when you create a new project in your project dashboard.\n\n- supabase\\_keyRequiredstring\n\nThe unique Supabase Key which is supplied when you create a new project in your project dashboard.\n\n- optionsOptionalClientOptions\n\nOptions to change the Auth behaviors.\n\nDetails\n\ncreate\\_client()With timeout option\n\n`\n1\nimport os\n2\nfrom supabase import create_client, Client\n3\n4\nurl: str = os.environ.get(\"SUPABASE_URL\")\n5\nkey: str = os.environ.get(\"SUPABASE_KEY\")\n6\nsupabase: Client = create_client(url, key)\n`\n- By default, Supabase projects return a maximum of 1,000 rows. This setting can be changed in your project's [API settings](/dashboard/project/_/settings/api). It's recommended that you keep it low to limit the payload size of accidental or malicious requests. You can use <code>range()</code> queries to paginate through your data.\n- <code>select()</code> can be combined with [Filters](/docs/reference/python/using-filters)\n- <code>select()</code> can be combined with [Modifiers](/docs/reference/python/using-modifiers)\n- <code>apikey</code> is a reserved keyword if you're using the [Supabase Platform](/docs/guides/platform) and [should be avoided as a column name](https://github.com/supabase/supabase/issues/5465).\n- columnsOptionalstring\n\nThe columns to retrieve, defaults to <code>*</code>.\n\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\nGetting your dataSelecting specific columnsQuery referenced tablesQuery referenced tables through a join tableQuery the same referenced table multiple timesFiltering through referenced tablesQuerying referenced table with countQuerying with count optionQuerying JSON dataQuerying referenced table with inner joinSwitching schemas per query\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").execute()\n`\n\nData source\n\nResponse\n"
+    }
+  },
+  {
+    "chunk_id": "410a323b-8bf7-4146-af0f-003be7ec78c1",
+    "metadata": {
+      "token_count": 855,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Python Client Library",
+        "h2": "Call a Postgres function",
+        "h3": "Parameters"
+      },
+      "text": "- jsonRequireddict, list\n\nThe values to insert. Pass an dict to insert a single row or an list to insert multiple rows.\n\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\n- returningOptionalReturnMethod\n\nEither 'minimal' or 'representation'. Defaults to 'representation'.\n\n- default\\_to\\_nullOptionalbool\n\nMake missing fields default to <code>null</code>. Otherwise, use the default value for the column. Only applies for bulk inserts.\n\nCreate a recordBulk create\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .insert({\"id\": 1, \"name\": \"Denmark\"})\n4\n    .execute()\n5\n)\n`\n\nData source\n\nResponse\n- <code>update()</code> should always be combined with [Filters](/docs/reference/python/using-filters) to target the item(s) you wish to update.\n- jsonRequireddict, list\n\nThe values to insert. Pass an dict to insert a single row or an list to insert multiple rows.\n\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\nUpdating your dataUpdating JSON data\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .update({\"name\": \"Australia\"})\n4\n    .eq(\"id\", 1)\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\n- Primary keys must be included in the <code>values</code> dict to use upsert.\n- jsonRequireddict, list\n\nThe values to insert. Pass an dict to insert a single row or an list to insert multiple rows.\n\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\n- returningOptionalReturnMethod\n\nEither 'minimal' or 'representation'. Defaults to 'representation'.\n\n- ignore\\_duplicatesOptionalbool\n\nWhether duplicate rows should be ignored.\n\n- on\\_conflictOptionalstring\n\nSpecified columns to be made to work with UNIQUE constraint.\n\n- default\\_to\\_nullOptionalbool\n\nMake missing fields default to <code>null</code>. Otherwise, use the default value for the column. Only applies for bulk inserts.\n\nUpsert your dataBulk Upsert your dataUpserting into tables with constraints\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .upsert({\"id\": 1, \"name\": \"Australia\"})\n4\n    .execute()\n5\n)\n`\n\nData source\n\nResponse\n- <code>delete()</code> should always be combined with [filters](/docs/reference/python/using-filters) to target the item(s) you wish to delete.\n- If you use <code>delete()</code> with filters and you have [RLS](/docs/learn/auth-deep-dive/auth-row-level-security) enabled, only rows visible through <code>SELECT</code> policies are deleted. Note that by default no rows are visible, so you need at least one <code>SELECT</code>/ <code>ALL</code> policy that makes the rows visible.\n- When using <code>delete().in_()</code>, specify an array of values to target multiple rows with a single query. This is particularly useful for batch deleting entries that share common criteria, such as deleting users by their IDs. Ensure that the array you provide accurately represents all records you intend to delete to avoid unintended data removal.\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\n- returningOptionalReturnMethod\n\nEither 'minimal' or 'representation'. Defaults to 'representation'.\n\nDelete recordsDelete multiple records\n\n`\n1\nresponse = supabase.table('countries').delete().eq('id', 1).execute()\n`\n\nData source\n\nResponse\nYou can call Postgres functions as _Remote Procedure Calls_, logic in your database that you can execute from anywhere. Functions are useful when the logic rarely changes\u2014like for password resets and updates.\n\n`\n1\ncreate or replace function hello_world() returns text as $$\n2\nselect 'Hello world';\n3\n$$ language sql;\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "be9a716d-e1ac-4fe9-9bdb-c80f6a3bf8e9",
+        "text": "ing referenced table with countQuerying with count optionQuerying JSON dataQuerying referenced table with inner joinSwitching schemas per query\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").execute()\n`\n\nData source\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "71546fc1-8b3d-4095-b842-340a0184335b",
+    "metadata": {
+      "token_count": 978,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Column matches a pattern",
+        "h3": "Parameters"
+      },
+      "text": "- fnRequiredcallable\n\nThe stored procedure call to be executed.\n\n- paramsOptionaldict of any\n\nParameters passed into the stored procedure call.\n\n- getOptionaldict of any\n\nWhen set to <code>true</code>, <code>data</code> will not be returned. Useful if you only need the count.\n\n- headOptionaldict of any\n\nWhen set to <code>true</code>, the function will be called with read-only access mode.\n\n- countOptionalCountMethod\n\nCount algorithm to use to count rows returned by the function. Only applicable for [set-returning functions](https://www.postgresql.org/docs/current/functions-srf.html). <code>\"exact\"</code>: Exact but slow count algorithm. Performs a <code>COUNT(*)</code> under the hood. <code>\"planned\"</code>: Approximated but fast count algorithm. Uses the Postgres statistics under the hood. <code>\"estimated\"</code>: Uses exact count for low numbers and planned count for high numbers.\n\nCall a Postgres function without argumentsCall a Postgres function with argumentsBulk processingCall a Postgres function with filtersCall a read-only Postgres function\n\n`\n1\nresponse = supabase.rpc(\"hello_world\").execute()\n`\n\nData source\n\nResponse\nFilters allow you to only return rows that match certain conditions.\n\nFilters can be used on <code>select()</code>, <code>update()</code>, <code>upsert()</code>, and <code>delete()</code> queries.\n\nIf a Postgres function returns a table response, you can also apply filters.\n\nApplying FiltersChainingConditional chainingFilter by values within JSON columnFilter Foreign Tables\n\n`\n1\n2\nresponse = (\n3\n    supabase.table(\"cities\")\n4\n    .select(\"name, country_id\")\n5\n    .eq(\"name\", \"Bali\")\n6\n    .execute()\n7\n)\n8\n9\n10\nresponse = (\n11\n    supabase.table(\"cities\")\n12\n    .eq(\"name\", \"Bali\")\n13\n    .select(\"name, country_id\")\n14\n    .execute()\n15\n)\n`\n\nData source\n\nNotes\nMatch only rows where <code>column</code> is equal to <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").eq(\"name\", \"Albania\").execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> is not equal to <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").neq(\"name\", \"Albania\").execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> is greather than <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").gt(\"id\", 2).execute()\n`\n\nData source\n\nResponse\n\nNotes\nMatch only rows where <code>column</code> is greater than or equal to <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").gte(\"id\", 2).execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> is less than <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").lt(\"id\", 2).execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> is less than or equal to <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").lte(\"id\", 2).execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> matches <code>pattern</code> case-sensitively.\n",
+      "overlap_text": {
+        "previous_chunk_id": "410a323b-8bf7-4146-af0f-003be7ec78c1",
+        "text": " can execute from anywhere. Functions are useful when the logic rarely changes\u2014like for password resets and updates.\n\n`\n1\ncreate or replace function hello_world() returns text as $$\n2\nselect 'Hello world';\n3\n$$ language sql;\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "18b98455-c87c-492f-a8f0-c252a2f1f6c7",
+    "metadata": {
+      "token_count": 838,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Greater than or equal to a range",
+        "h3": "Parameters"
+      },
+      "text": "- columnRequiredstring\n\nThe name of the column to apply a filter on\n\n- patternRequiredstring\n\nThe pattern to match by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").like(\"name\", \"%Alba%\").execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> matches <code>pattern</code> case-insensitively.\n- columnRequiredstring\n\nThe name of the column to apply a filter on\n\n- patternRequiredstring\n\nThe pattern to match by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").ilike(\"name\", \"%alba%\").execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> IS <code>value</code>.\n- columnRequiredstring\n\nThe name of the column to apply a filter on\n\n- valueRequirednull \\| boolean\n\nThe value to match by\n\nChecking for nullness, True or False\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").is_(\"name\", \"null\").execute()\n`\n\nData source\n\nResponse\n\nNotes\nMatch only rows where <code>column</code> is included in the <code>values</code> array.\n- columnRequiredstring\n\nThe column to filter on\n\n- valuesRequiredarray\n\nThe values to filter by\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .select(\"*\")\n4\n    .in_(\"name\", [\"Albania\", \"Algeria\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nOnly relevant for jsonb, array, and range columns. Match only rows where <code>column</code> contains every element appearing in <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valuesRequiredobject\n\nThe jsonb, array, or range value to filter with\n\nOn array columnsOn range columnsOn \\<code>jsonb\\</code> columns\n\n`\n1\nresponse = (\n2\n    supabase.table(\"issues\")\n3\n    .select(\"*\")\n4\n    .contains(\"tags\", [\"is:open\", \"priority:low\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nOnly relevant for jsonb, array, and range columns. Match only rows where every element appearing in <code>column</code> is contained by <code>value</code>.\n- columnRequiredstring\n\nThe jsonb, array, or range column to filter on\n\n- valueRequiredobject\n\nThe jsonb, array, or range value to filter with\n\nOn array columnsOn range columnsOn \\<code>jsonb\\</code> columns\n\n`\n1\nresponse = (\n2\n    supabase.table(\"classes\")\n3\n    .select(\"name\")\n4\n    .contained_by(\"days\", [\"monday\", \"tuesday\", \"wednesday\", \"friday\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is greater than any element in <code>range</code>.\n- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredarray\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"reservations\")\n3\n    .select(\"*\")\n4\n    .range_gt(\"during\", [\"2000-01-02 08:00\", \"2000-01-02 09:00\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is either contained in <code>range</code> or greater than any element in <code>range</code>.\n",
+      "overlap_text": {
+        "previous_chunk_id": "71546fc1-8b3d-4095-b842-340a0184335b",
+        "text": " supabase.table(\"countries\").select(\"*\").lte(\"id\", 2).execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> matches <code>pattern</code> case-sensitively.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "d1548392-6eda-42ee-ae9b-58a5876ff698",
+    "metadata": {
+      "token_count": 716,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Match a string",
+        "h3": "Parameters"
+      },
+      "text": "- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredstring\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"reservations\")\n3\n    .select(\"*\")\n4\n    .range_gte(\"during\", [\"2000-01-02 08:30\", \"2000-01-02 09:30\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is less than any element in <code>range</code>.\n- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredarray\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"reservations\")\n3\n    .select(\"*\")\n4\n    .range_lt(\"during\", [\"2000-01-01 15:00\", \"2000-01-01 16:00\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is less than any element in <code>range</code>.\n- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredarray\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"reservations\")\n3\n    .select(\"*\")\n4\n    .range_lte(\"during\", [\"2000-01-01 14:00\", \"2000-01-01 16:00\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where <code>column</code> is mutually exclusive to <code>range</code> and there can be no element between the two ranges.\n- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredarray\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"reservations\")\n3\n    .select(\"*\")\n4\n    .range_adjacent(\"during\", [\"2000-01-01 12:00\", \"2000-01-01 13:00\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for array and range columns. Match only rows where <code>column</code> and <code>value</code> have an element in common.\n- columnRequiredstring\n\nThe array or range column to filter on\n\n- valueRequiredIterable\\[Any\\]\n\nThe array or range value to filter with\n\nOn array columnsOn range columns\n\n`\n1\nresponse = (\n2\n    supabase.table(\"issues\")\n3\n    .select(\"title\")\n4\n    .overlaps(\"tags\", [\"is:closed\", \"severity:high\"])\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nOnly relevant for text and tsvector columns. Match only rows where <code>column</code> matches the query string in <code>query</code>.\n\n- For more information, see [Postgres full text search](/docs/guides/database/full-text-search).\n",
+      "overlap_text": {
+        "previous_chunk_id": "18b98455-c87c-492f-a8f0-c252a2f1f6c7",
+        "text": " source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is either contained in <code>range</code> or greater than any element in <code>range</code>.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "7375ca2a-7920-4c14-8f9c-9d3b2ccd25ec",
+    "metadata": {
+      "token_count": 758,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Match the filter",
+        "h3": "Parameters"
+      },
+      "text": "- columnRequiredstring\n\nThe text or tsvector column to filter on\n\n- queryRequiredstring\n\nThe query text to match with\n\n- optionsOptionalobject\n\nNamed parameters\n\nDetails\n\nText searchBasic normalizationFull normalizationWebsearch\n\n`\n1\nresponse = (\n2\n    supabase.table(\"texts\")\n3\n    .select(\"content\")\n4\n    .text_search(\"content\", \"'eggs' & 'ham'\", options={\"config\": \"english\"})\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nMatch only rows where each column in <code>query</code> keys is equal to its associated value. Shorthand for multiple <code>.eq()</code> s.\n- queryRequireddict\n\nThe object to filter with, with column names as keys mapped to their filter values\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .select(\"*\")\n4\n    .match({\"id\": 2, \"name\": \"Albania\"})\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nMatch only rows which doesn't satisfy the filter. <code>not_</code> expects you to use the raw PostgREST syntax for the filter values.\n\n``\n1\n.not_.in_('id', '(5,6,7)')  # Use <code>()</code> for <code>in</code> filter\n2\n.not_.contains('arraycol', '\\{\"a\",\"b\"\\}')  # Use <code>\\{\\}</code> for array values\n``\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .select(\"*\")\n4\n    .not_.is_(\"name\", \"null\")\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nor\\_() expects you to use the raw PostgREST syntax for the filter names and values.\n\n``\n1\n.or_('id.in.(5,6,7), arraycol.cs.\\{\"a\",\"b\"\\}')  # Use <code>()</code> for <code>in</code> filter, <code>\\{\\}</code> for array values and <code>cs</code> for <code>contains()</code>.\n2\n.or_('id.in.(5,6,7), arraycol.cd.\\{\"a\",\"b\"\\}')  # Use <code>cd</code> for <code>containedBy()</code>\n``\n- filtersRequiredstring\n\nThe filters to use, following PostgREST syntax\n\n- reference\\_tableOptionalstring\n\nSet this to filter on referenced tables instead of the parent table\n\nWith \\<code>select()\\</code>Use \\<code>or\\</code> with \\<code>and\\</code>Use \\<code>or\\</code> on referenced tables\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .select(\"name\")\n4\n    .or_(\"id.eq.2,name.eq.Algeria\")\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nfilter() expects you to use the raw PostgREST syntax for the filter values.\n\n``\n1\n.filter('id', 'in', '(5,6,7)')  # Use <code>()</code> for <code>in</code> filter\n2\n.filter('arraycol', 'cs', '\\{\"a\",\"b\"\\}')  # Use <code>cs</code> for <code>contains()</code>, <code>\\{\\}</code> for array values\n``\n",
+      "overlap_text": {
+        "previous_chunk_id": "d1548392-6eda-42ee-ae9b-58a5876ff698",
+        "text": " tsvector columns. Match only rows where <code>column</code> matches the query string in <code>query</code>.\n\n- For more information, see [Postgres full text search](/docs/guides/database/full-text-search).\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "65767e7d-761c-40b1-94ee-72e16d6c2885",
+    "metadata": {
+      "token_count": 820,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Retrieve as a CSV",
+        "h3": "Parameters"
+      },
+      "text": "- columnRequiredstring\n\nThe column to filter on\n\n- operatorOptionalstring\n\nThe operator to filter with, following PostgREST syntax\n\n- valueOptionalany\n\nThe value to filter with, following PostgREST syntax\n\nWith \\<code>select()\\</code>On a foreign table\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .select(\"*\")\n4\n    .filter(\"name\", \"in\", '(\"Algeria\",\"Japan\")')\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\nFilters work on the row level\u2014they allow you to return rows that only match certain conditions without changing the shape of the rows. Modifiers are everything that don't fit that definition\u2014allowing you to change the format of the response (e.g., returning a CSV string).\n\nModifiers must be specified after filters. Some modifiers only apply for queries that return rows (e.g., <code>select()</code> or <code>rpc()</code> on a function that returns a table response).\nOrder the query result by <code>column</code>.\n- columnRequiredstring\n\nThe column to order by\n\n- descOptionalbool\n\nWhether the rows should be ordered in descending order or not.\n\n- foreign\\_tableOptionalstring\n\nForeign table name whose results are to be ordered.\n\n- nullsfirstOptionalbool\n\nOrder by showing nulls first\n\nWith \\<code>select()\\</code>On a foreign table\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .select(\"*\")\n4\n    .order(\"name\", desc=True)\n5\n    .execute()\n6\n)\n`\n\nData source\n\nResponse\n- sizeRequirednumber\n\nThe maximum number of rows to return\n\n- foreign\\_tableOptionalstring\n\nSet this to limit rows of foreign tables instead of the parent table.\n\nWith \\<code>select()\\</code>On a foreign table\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"name\").limit(1).execute()\n`\n\nData source\n\nResponse\nLimit the query result by starting at an offset ( <code>from</code>) and ending at the offset ( <code>from + to</code>). Only records within this range are returned. This respects the query order and if there is no order clause the range could behave unexpectedly.\n\nThe <code>from</code> and <code>to</code> values are 0-based and inclusive: <code>range(1, 3)</code> will include the second, third and fourth rows of the query.\n- startRequirednumber\n\nThe starting index from which to limit the result.\n\n- endRequirednumber\n\nThe last index to which to limit the result.\n\n- foreign\\_tableOptionalstring\n\nSet this to limit rows of foreign tables instead of the parent table.\n\nWith \\<code>select()\\</code>On a foreign table\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"name\").range(0, 1).execute()\n`\n\nData source\n\nResponse\nReturn <code>data</code> as a single object instead of an array of objects.\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"name\").limit(1).single().execute()\n`\n\nData source\n\nResponse\nReturn <code>data</code> as a single object instead of an array of objects.\n\nWith \\<code>select()\\</code>\n\n`\n1\nresponse = (\n2\n    supabase.table(\"countries\")\n3\n    .select(\"*\")\n4\n    .eq(\"name\", \"Albania\")\n5\n    .maybe_single()\n6\n    .execute()\n7\n)\n`\n\nData source\n\nResponse\nReturn <code>data</code> as a string in CSV format.\n\nReturn data as CSV\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").csv().execute()\n`\n\nData source\n\nResponse\n\nNotes\n",
+      "overlap_text": {
+        "previous_chunk_id": "7375ca2a-7920-4c14-8f9c-9d3b2ccd25ec",
+        "text": "> filter\n2\n.filter('arraycol', 'cs', '\\{\"a\",\"b\"\\}')  # Use <code>cs</code> for <code>contains()</code>, <code>\\{\\}</code> for array values\n``\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "19f59cce-99ce-489d-bfd6-606eed72f5da",
+    "metadata": {
+      "token_count": 527,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Overview",
+        "h3": "Parameters"
+      },
+      "text": "For debugging slow queries, you can get the [Postgres <code>EXPLAIN</code> execution plan](https://www.postgresql.org/docs/current/sql-explain.html) of a query using the <code>explain()</code> method. This works on any query, even for <code>rpc()</code> or writes.\n\nExplain is not enabled by default as it can reveal sensitive information about your database. It's best to only enable this for testing environments but if you wish to enable it for production you can provide additional protection by using a <code>pre-request</code> function.\n\nFollow the [Performance Debugging Guide](/docs/guides/database/debugging-performance) to enable the functionality on your project.\n- walOptionalboolean\n\nIf <code>true</code>, include information on WAL record generation.\n\n- verboseOptionalboolean\n\nIf <code>true</code>, the query identifier will be returned and <code>data</code> will include the output columns of the query.\n\n- settingsOptionalboolean\n\nIf <code>true</code>, include information on configuration parameters that affect query planning.\n\n- formatOptionalboolean\n\nThe format of the output, can be <code>\"text\"</code> (default) or <code>\"json\"</code>.\n\n- formatOptional\"text\" \\| \"json\"\n\nThe format of the output, can be <code>\"text\"</code> (default) or <code>\"json\"</code>.\n\n- buffersOptionalboolean\n\nIf <code>true</code>, include information on buffer usage.\n\n- analyzeOptionalboolean\n\nIf <code>true</code>, the query will be executed and the actual run time will be returned.\n\nGet the execution planGet the execution plan with analyze and verbose\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").explain().execute()\n`\n\nData source\n\nResponse\n\nNotes\n- The auth methods can be accessed via the <code>supabase.auth</code> namespace.\n- By default, the supabase client sets <code>persist_session</code> to true and attempts to store the session in memory.\n- Any email links and one-time passwords (OTPs) sent have a default expiry of 24 hours. We have the following [rate limits](/docs/guides/platform/going-into-prod#auth-rate-limits) in place to guard against brute force attacks.\n- The expiry of an access token can be set in the \"JWT expiry limit\" field in [your project's auth settings](/dashboard/project/_/settings/auth). A refresh token never expires and can only be used once.\n",
+      "overlap_text": {
+        "previous_chunk_id": "65767e7d-761c-40b1-94ee-72e16d6c2885",
+        "text": "\n\nResponse\nReturn <code>data</code> as a string in CSV format.\n\nReturn data as CSV\n\n`\n1\nresponse = supabase.table(\"countries\").select(\"*\").csv().execute()\n`\n\nData source\n\nResponse\n\nNotes\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "b68adfe1-7751-4fc0-b5a3-54b88491dfee",
+    "metadata": {
+      "token_count": 679,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Sign in with ID Token",
+        "h3": "Parameters"
+      },
+      "text": "- By default, the user needs to verify their email address before logging in. To turn this off, disable **Confirm email** in [your project](https://supabase.com/dashboard/project/_/auth/providers).\n- **Confirm email** determines if users need to confirm their email address after signing up.\n\n  - If **Confirm email** is enabled, a <code>user</code> is returned but <code>session</code> is null.\n  - If **Confirm email** is disabled, both a <code>user</code> and a <code>session</code> are returned.\n- By default, when the user confirms their email address, they are redirected to the [<code>SITE_URL</code>](https://supabase.com/docs/guides/auth/redirect-urls). You can modify your <code>SITE_URL</code> or add additional redirect URLs in [your project](https://supabase.com/dashboard/project/_/auth/url-configuration).\n- If sign\\_up() is called for an existing confirmed user:\n  - When both **Confirm email** and **Confirm phone** (even when phone provider is disabled) are enabled in [your project](/dashboard/project/_/auth/providers), an obfuscated/fake user object is returned.\n  - When either **Confirm email** or **Confirm phone** (even when phone provider is disabled) is disabled, the error message, <code>User already registered</code> is returned.\n- To fetch the currently logged-in user, refer to [<code>get_user()</code>](/docs/reference/python/auth-getuser).\n- credentialsRequiredSignUpWithPasswordCredentials\n\nDetails\n\nSign up with an email and passwordSign up with a phone number and password (SMS)Sign up with a phone number and password (whatsapp)Sign up with additional user metadataSign up with a redirect URL\n\n`\n1\nresponse = supabase.auth.sign_up(\n2\n    {\"email\": \"email@example.com\", \"password\": \"password\"}\n3\n)\n`\n\nResponse\n- Returns an anonymous user\n- It is recommended to set up captcha for anonymous sign-ins to prevent abuse. You can pass in the captcha token in the <code>options</code> param.\n- credentialsRequiredSignInAnonymouslyCredentials\n\nDetails\n\nCreate an anonymous userCreate an anonymous user with custom user metadata\n\n`\n1\nresponse = supabase.auth.sign_in_anonymously(\n2\n    {\"options\": {\"captcha_token\": \"\"}}\n3\n)\n`\n\nResponse\nLog in an existing user with an email and password or phone and password.\n\n- Requires either an email and password or a phone number and password.\n- credentialsRequiredSignInWithPasswordCredentials\n\nDetails\n\nSign in with email and passwordSign in with phone and password\n\n`\n1\nresponse = supabase.auth.sign_in_with_password(\n2\n    {\"email\": \"email@example.com\", \"password\": \"example-password\"}\n3\n)\n`\n\nResponse\nAllows signing in with an OIDC ID token. The authentication provider used should be enabled and configured.\n- credentialsRequiredSignInWithIdTokenCredentials\n\nDetails\n\nSign In using ID Token\n\n`\n1\nresponse = supabase.auth.sign_in_with_id_token(\n2\n{\"provider\": \"google\", \"token\": \"your-id-token\"}\n3\n)\n`\n\nResponse\n",
+      "overlap_text": {
+        "previous_chunk_id": "19f59cce-99ce-489d-bfd6-606eed72f5da",
+        "text": " brute force attacks.\n- The expiry of an access token can be set in the \"JWT expiry limit\" field in [your project's auth settings](/dashboard/project/_/settings/auth). A refresh token never expires and can only be used once.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "d7fe99c6-09fb-418d-b545-adf400b5383b",
+    "metadata": {
+      "token_count": 684,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Sign in a user through SSO",
+        "h3": "Parameters"
+      },
+      "text": "- Requires either an email or phone number.\n- This method is used for passwordless sign-ins where a OTP is sent to the user's email or phone number.\n- If the user doesn't exist, <code>sign_in_with_otp()</code> will signup the user instead. To restrict this behavior, you can set <code>should_create_user</code> in <code>SignInWithPasswordlessCredentials.options</code> to <code>false</code>.\n- If you're using an email, you can configure whether you want the user to receive a magiclink or a OTP.\n- If you're using phone, you can configure whether you want the user to receive a OTP.\n- The magic link's destination URL is determined by the [<code>SITE_URL</code>](/docs/guides/auth/redirect-urls).\n- See [redirect URLs and wildcards](/docs/guides/auth/overview#redirect-urls-and-wildcards) to add additional redirect URLs to your project.\n- Magic links and OTPs share the same implementation. To send users a one-time code instead of a magic link, [modify the magic link email template](https://supabase.com/dashboard/project/_/auth/templates) to include <code>\\{\\{ .Token \\}\\}</code> instead of <code>\\{\\{ .ConfirmationURL \\}\\}</code>.\n- credentialsRequiredSignInWithPasswordCredentials\n\nDetails\n\nSign in with emailSign in with SMS OTPSign in with WhatsApp OTP\n\n`\n1\nresponse = supabase.auth.sign_in_with_otp(\n2\n    {\n3\n        \"email\": \"email@example.com\",\n4\n        \"options\": {\"email_redirect_to\": \"https://example.com/welcome\"},\n5\n    }\n6\n)\n`\n\nResponse\n\nNotes\n- This method is used for signing in using a third-party provider.\n- Supabase supports many different [third-party providers](/docs/guides/auth#configure-third-party-providers).\n- credentialsRequiredSignInWithOAuthCredentials\n\nDetails\n\nSign in using a third-party providerSign in using a third-party provider with redirectSign in with scopes\n\n`\n1\nresponse = supabase.auth.sign_in_with_oauth({\n2\n\"provider\": 'github'\n3\n})\n`\n- Before you can call this method you need to [establish a connection](/docs/guides/auth/sso/auth-sso-saml#managing-saml-20-connections) to an identity provider. Use the [CLI commands](/docs/reference/cli/supabase-sso) to do this.\n- If you've associated an email domain to the identity provider, you can use the <code>domain</code> property to start a sign-in flow.\n- In case you need to use a different way to start the authentication flow with an identity provider, you can use the <code>provider_id</code> property. For example:\n\n  - Mapping specific user email addresses with an identity provider.\n  - Using different hints to identity the identity provider to be used by the user, like a company-specific page, IP address or other tracking information.\n- paramsRequiredSignInWithSSOCredentials\n\nDetails\n\nSign in with email domainSign in with provider UUID\n\n`\n1\nresponse = supabase.auth.sign_in_with_sso({\"domain\": \"company.com\"})\n`\n\nResponse\n\nNotes\n",
+      "overlap_text": {
+        "previous_chunk_id": "b68adfe1-7751-4fc0-b5a3-54b88491dfee",
+        "text": "WithIdTokenCredentials\n\nDetails\n\nSign In using ID Token\n\n`\n1\nresponse = supabase.auth.sign_in_with_id_token(\n2\n{\"provider\": \"google\", \"token\": \"your-id-token\"}\n3\n)\n`\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "fb609d26-fa70-49b0-b3c6-ad5ecaa898c0",
+    "metadata": {
+      "token_count": 718,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Verify and log in through OTP",
+        "h3": "Parameters"
+      },
+      "text": "- In order to use the <code>sign_out()</code> method, the user needs to be signed in first.\n- By default, <code>sign_out()</code> uses the global scope, which signs out all other sessions that the user is logged into as well.\n- Since Supabase Auth uses JWTs for authentication, the access token JWT will be valid until it's expired. When the user signs out, Supabase revokes the refresh token and deletes the JWT from the client-side. This does not revoke the JWT and it will still be valid until it expires.\n- optionsOptionalSignOutOptions\n\nDetails\n\nSign out\n\n`\n1\nresponse = supabase.auth.sign_out()\n`\n- The password reset flow consist of 2 broad steps: (i) Allow the user to login via the password reset link; (ii) Update the user's password.\n- The <code>reset_password_for_email()</code> only sends a password reset link to the user's email. To update the user's password, see [<code>update_user()</code>](/docs/reference/python/auth-updateuser).\n- When the user clicks the reset link in the email they are redirected back to your application. You can configure the URL that the user is redirected to with the <code>redirectTo</code> parameter. See [redirect URLs and wildcards](/docs/guides/auth#redirect-urls-and-wildcards) to add additional redirect URLs to your project.\n- After the user has been redirected successfully, prompt them for a new password and call <code>update_user()</code>:\n\n`\n1\nresponse = supabase.auth.update_user(\\{\n2\n\"password\": new_password\n3\n\\})\n`\n- emailRequiredstring\n\nThe email address of the user.\n\n- optionsOptionalobject\n\nDetails\n\nReset password\n\n`\n1\nsupabase.auth.reset_password_for_email(email, {\n2\n\"redirect_to\": \"https://example.com/update-password\",\n3\n})\n`\n- The <code>verify_otp</code> method takes in different verification types. If a phone number is used, the type can either be <code>sms</code> or <code>phone_change</code>. If an email address is used, the type can be one of the following: <code>email</code>, <code>recovery</code>, <code>invite</code> or <code>email_change</code> ( <code>signup</code> and <code>magiclink</code> types are deprecated).\n- The verification type used should be determined based on the corresponding auth method called before <code>verify_otp</code> to sign up / sign-in a user.\n- The <code>TokenHash</code> is contained in the [email templates](/docs/guides/auth/auth-email-templates) and can be used to sign in. You may wish to use the hash with Magic Links for the PKCE flow for Server Side Auth. See [this guide](/docs/guides/auth/server-side/email-based-auth-with-pkce-flow-for-ssr) for more details.\n- paramsRequiredVerifyOtpParams\n\nDetails\n\nVerify Signup One-Time Password (OTP)Verify SMS One-Time Password (OTP)Verify Email Auth (Token Hash)\n\n`\n1\nresponse = supabase.auth.verify_otp(\n2\n{\"email\": \"email@example.com\", \"token\": \"123456\", \"type\": \"email\"}\n3\n)\n`\n\nResponse\n",
+      "overlap_text": {
+        "previous_chunk_id": "d7fe99c6-09fb-418d-b545-adf400b5383b",
+        "text": " information.\n- paramsRequiredSignInWithSSOCredentials\n\nDetails\n\nSign in with email domainSign in with provider UUID\n\n`\n1\nresponse = supabase.auth.sign_in_with_sso({\"domain\": \"company.com\"})\n`\n\nResponse\n\nNotes\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "fd3c1b8e-ba55-4bc3-8f30-2db9bffbcef6",
+    "metadata": {
+      "token_count": 843,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "unlink the google identity",
+        "h2": "Unlink an identity from a user",
+        "h3": "Parameters"
+      },
+      "text": "- This method retrieves the current local session (i.e in memory).\n- The session contains a signed JWT and unencoded session data.\n- Since the unencoded session data is retrieved from the local storage medium, **do not** rely on it as a source of trusted data on the server. It could be tampered with by the sender. If you need verified, trustworthy user data, call [<code>get_user</code>](/docs/reference/python/auth-getuser) instead.\n- If the session has an expired access token, this method will use the refresh token to get a new session.\n\nGet the session data\n\n`\n1\nresponse = supabase.auth.get_session()\n`\n\nResponse\nReturns a new session, regardless of expiry status. Takes in an optional refresh token. If not passed in, then refresh\\_session() will attempt to retrieve it from get\\_session(). If the current session's refresh token is invalid, an error will be thrown.\n\n- This method will refresh the session whether the current one is expired or not.\n- refresh\\_tokenOptionalstring\n\nRefresh session using the current session\n\n`\n1\nresponse = supabase.auth.refresh_session()\n`\n\nResponse\n- This method fetches the user object from the database instead of local session.\n- This method is useful for checking if the user is authorized because it validates the user's access token JWT on the server.\n- jwtOptionalstring\n\nTakes in an optional access token JWT. If no JWT is provided, the JWT from the current session is used.\n\nGet the logged in user with the current existing sessionGet the logged in user with a custom access token jwt\n\n`\n1\nresponse = supabase.auth.get_user()\n`\n\nResponse\n- In order to use the <code>update_user()</code> method, the user needs to be signed in first.\n- By default, email updates sends a confirmation link to both the user's current and new email. To only send a confirmation link to the user's new email, disable **Secure email change** in your project's [email auth provider settings](/dashboard/project/_/auth/providers).\n\nUpdate the email for an authenticated userUpdate the phone number for an authenticated userUpdate the password for an authenticated userUpdate the user's metadataUpdate the user's password with a nonce\n\n`\n1\nresponse = supabase.auth.update_user({\n2\n\"email\": \"new@email.com\"\n3\n})\n`\n\nResponse\n\nNotes\nGets all the identities linked to a user.\n\n- The user needs to be signed in to call <code>get_user_identities()</code>.\n\nReturns a list of identities linked to the user\n\n`\n1\nresponse = supabase.auth.get_user_identities()\n`\n\nResponse\n- The **Enable Manual Linking** option must be enabled from your [project's authentication settings](/dashboard/project/_/settings/auth).\n- The user needs to be signed in to call <code>link_identity()</code>.\n- If the candidate identity is already linked to the existing user or another user, <code>link_identity()</code> will fail.\n- If <code>link_identity</code> is run on the server, you should handle the redirect.\n- credentialsRequiredSignInWithOAuthCredentials\n\nDetails\n\nLink an identity to a user\n\n`\n1\nresponse = supabase.auth.link_identity({\n2\nprovider: 'github'\n3\n})\n`\n\nResponse\n- The **Enable Manual Linking** option must be enabled from your [project's authentication settings](/dashboard/project/_/settings/auth).\n- The user needs to be signed in to call <code>unlink_identity()</code>.\n- The user must have at least 2 identities in order to unlink an identity.\n- The identity to be unlinked must belong to the user.\n- identityRequiredUserIdentity\n\nDetails\n\nUnlink an identity\n\n`\n1\n2\nres = supabase.auth.get_user_identities()\n3\n4\n5\ngoogle_identity = list(\n6\nfilter(lambda identity: identity.provider == \"google\", res.identities)\n7\n).pop()\n8\n9\n10\nresponse = supabase.auth.unlink_identity(google_identity)\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "fb609d26-fa70-49b0-b3c6-ad5ecaa898c0",
+        "text": ")Verify Email Auth (Token Hash)\n\n`\n1\nresponse = supabase.auth.verify_otp(\n2\n{\"email\": \"email@example.com\", \"token\": \"123456\", \"type\": \"email\"}\n3\n)\n`\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "dc8570d7-3fb0-4b88-86c1-6add3bf16a12",
+    "metadata": {
+      "token_count": 752,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "unlink the google identity",
+        "h2": "Auth MFA",
+        "h3": "Parameters"
+      },
+      "text": "- This method is used together with <code>updateUser()</code> when a user's password needs to be updated.\n- If you require your user to reauthenticate before updating their password, you need to enable the **Secure password change** option in your [project's email provider settings](/dashboard/project/_/auth/providers).\n- A user is only require to reauthenticate before updating their password if **Secure password change** is enabled and the user **hasn't recently signed in**. A user is deemed recently signed in if the session was created in the last 24 hours.\n- This method will send a nonce to the user's email. If the user doesn't have a confirmed email address, the method will send the nonce to the user's confirmed phone number instead.\n\nSend reauthentication nonce\n\n`\n1\nresponse = supabase.auth.reauthenticate()\n`\n\nNotes\n- Resends a signup confirmation, email change or phone change email to the user.\n- Passwordless sign-ins can be resent by calling the <code>sign_in_with_otp()</code> method again.\n- Password recovery emails can be resent by calling the <code>reset_password_for_email()</code> method again.\n- This method will only resend an email or phone OTP to the user if there was an initial signup, email change or phone change request being made.\n- You can specify a redirect url when you resend an email link using the <code>email_redirect_to</code> option.\n- credentialsRequiredResendCredentials\n\nDetails\n\nResend an email signup confirmationResend a phone signup confirmationResend email change emailResend phone change OTP\n\n`\n1\nresponse = supabase.auth.resend({\n2\n\"type\": \"signup\",\n3\n\"email\": \"email@example.com\",\n4\n\"options\": {\n5\n    \"email_redirect_to\": \"https://example.com/welcome\"\n6\n}\n7\n})\n`\n\nNotes\nSets the session data from the current session. If the current session is expired, setSession will take care of refreshing it to obtain a new session. If the refresh token or access token in the current session is invalid, an error will be thrown.\n\n- This method sets the session using an <code>access_token</code> and <code>refresh_token</code>.\n- If successful, a <code>SIGNED_IN</code> event is emitted.\n- access\\_tokenRequiredstring\n\n- refresh\\_tokenRequiredstring\n\nRefresh the session\n\n`\n1\nresponse = supabase.auth.set_session(access_token, refresh_token)\n`\n\nResponse\n\nNotes\nLog in an existing user by exchanging an Auth Code issued during the PKCE flow.\n\n- Used when <code>flow_type</code> is set to <code>pkce</code> in client options.\n- auth\\_codeRequiredstring\n\nExchange Auth Code\n\n`\n1\nresponse = supabase.auth.exchange_code_for_session(\"auth_code\": \"34e770dd-9ff9-416c-87fa-43b31d7ef225\")\n`\n\nResponse\nThis section contains methods commonly used for Multi-Factor Authentication (MFA) and are invoked behind the <code>supabase.auth.mfa</code> namespace.\n\nCurrently, we only support time-based one-time password (TOTP) as the 2nd factor. We don't support recovery codes but we allow users to enroll more than 1 TOTP factor, with an upper limit of 10.\n\nHaving a 2nd TOTP factor for recovery frees the user of the burden of having to store their recovery codes somewhere. It also reduces the attack surface since multiple recovery codes are usually generated compared to just having 1 backup TOTP factor.\n",
+      "overlap_text": {
+        "previous_chunk_id": "fd3c1b8e-ba55-4bc3-8f30-2db9bffbcef6",
+        "text": "\n4\n5\ngoogle_identity = list(\n6\nfilter(lambda identity: identity.provider == \"google\", res.identities)\n7\n).pop()\n8\n9\n10\nresponse = supabase.auth.unlink_identity(google_identity)\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "d82fb98e-341a-4ec4-8248-3b5b6ba637b7",
+    "metadata": {
+      "token_count": 770,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "unlink the google identity",
+        "h2": "Get Authenticator Assurance Level",
+        "h3": ""
+      },
+      "text": "- Currently, <code>totp</code> is the only supported <code>factor_type</code>. The returned <code>id</code> should be used to create a challenge.\n- To create a challenge, see [<code>mfa.challenge()</code>](/docs/reference/python/auth-mfa-challenge).\n- To verify a challenge, see [<code>mfa.verify()</code>](/docs/reference/python/auth-mfa-verify).\n- To create and verify a challenge in a single step, see [<code>mfa.challenge_and_verify()</code>](/docs/reference/python/auth-mfa-challengeandverify).\n\nEnroll a time-based, one-time password (TOTP) factor\n\n`\n1\nres = supabase.auth.mfa.enroll({\n2\n\"factor_type\": \"totp\",\n3\n\"friendly_name\": \"your_friendly_name\"\n4\n})\n`\n- An [enrolled factor](/docs/reference/python/auth-mfa-enroll) is required before creating a challenge.\n- To verify a challenge, see [<code>mfa.verify()</code>](/docs/reference/python/auth-mfa-verify).\n\nCreate a challenge for a factor\n\n`\n1\nres = supabase.auth.mfa.challenge({\n2\n\"factor_id\": '34e770dd-9ff9-416c-87fa-43b31d7ef225'\n3\n})\n`\n- To verify a challenge, please [create a challenge](/docs/reference/python/auth-mfa-challenge) first.\n\nVerify a challenge for a factor\n\n`\n1\nres = supabase.auth.mfa.verify({\n2\n\"factor_id\": '34e770dd-9ff9-416c-87fa-43b31d7ef225',\n3\n\"challenge_id\": '4034ae6f-a8ce-4fb5-8ee5-69a5863a7c15',\n4\n\"code\": '123456'\n5\n})\n`\n- An [enrolled factor](/docs/reference/python/auth-mfa-enroll) is required before invoking <code>challengeAndVerify()</code>.\n- Executes [<code>mfa.challenge()</code>](/docs/reference/python/auth-mfa-challenge) and [<code>mfa.verify()</code>](/docs/reference/python/auth-mfa-verify) in a single step.\n\nCreate and verify a challenge for a factor\n\n`\n1\nres = supabase.auth.mfa.challenge_and_verify({\n2\n\"factor_id\": '34e770dd-9ff9-416c-87fa-43b31d7ef225',\n3\n\"code\": '123456'\n4\n})\n`\nUnenroll a factor\n\n`\n1\nres = supabase.auth.mfa.unenroll({\n2\n\"factor_id\": '34e770dd-9ff9-416c-87fa-43b31d7ef225',\n3\n})\n`\n- Authenticator Assurance Level (AAL) is the measure of the strength of an authentication mechanism.\n- In Supabase, having an AAL of <code>aal1</code> refers to having the 1st factor of authentication such as an email and password or OAuth sign-in while <code>aal2</code> refers to the 2nd factor of authentication such as a time-based, one-time-password (TOTP).\n- If the user has a verified factor, the <code>next_level</code> field will return <code>aal2</code>, else, it will return <code>aal1</code>.\n\nGet the AAL details of a session\n\n`\n1\nres = supabase.auth.mfa.get_authenticator_assurance_level()\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "dc8570d7-3fb0-4b88-86c1-6add3bf16a12",
+        "text": ".\n\nHaving a 2nd TOTP factor for recovery frees the user of the burden of having to store their recovery codes somewhere. It also reduces the attack surface since multiple recovery codes are usually generated compared to just having 1 backup TOTP factor.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "b285ed68-4ef3-45a1-aa2e-e27a6841817b",
+    "metadata": {
+      "token_count": 745,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Delete a user",
+        "h3": "Parameters"
+      },
+      "text": "- Any method under the <code>supabase.auth.admin</code> namespace requires a <code>service_role</code> key.\n- These methods are considered admin methods and should be called on a trusted server. Never expose your <code>service_role</code> key in the browser.\n\nCreate server-side auth client\n\n`\n1\nfrom supabase import create_client\n2\nfrom supabase.lib.client_options import ClientOptions\n3\n4\nsupabase = create_client(\n5\nsupabase_url,\n6\nservice_role_key,\n7\noptions=ClientOptions(\n8\n    auto_refresh_token=False,\n9\n    persist_session=False,\n10\n)\n11\n)\n12\n13\n14\nadmin_auth_client = supabase.auth.admin\n`\n- Fetches the user object from the database based on the user's id.\n- The <code>get_user_by_id()</code> method requires the user's id which maps to the <code>auth.users.id</code> column.\n- uidRequiredstring\n\nThe user's unique identifier\n\nThis function should only be called on a server. Never expose your <code>service_role</code> key in the browser.\n\nFetch the user object using the access\\_token jwt\n\n`\n1\nresponse = supabase.auth.admin.get_user_by_id(1)\n`\n\nResponse\n- Defaults to return 50 users per page.\n- paramsOptionalPageParams\n\nAn object which supports page and perPage as numbers, to alter the paginated results.\n\nDetails\n\nGet a page of usersPaginated list of users\n\n`\n1\nresponse = supabase.auth.admin.list_users()\n`\n- To confirm the user's email address or phone number, set <code>email_confirm</code> or <code>phone_confirm</code> to true. Both arguments default to false.\n- <code>create_user()</code> will not send a confirmation email to the user. You can use [<code>invite_user_by_email()</code>](/docs/reference/python/auth-admin-inviteuserbyemail) if you want to send them an email invite instead.\n- If you are sure that the created user's email or phone number is legitimate and verified, you can set the <code>email_confirm</code> or <code>phone_confirm</code> param to <code>true</code>.\n- attributesRequiredAdminUserAttributes\n\nDetails\n\nWith custom user metadataAuto-confirm the user's emailAuto-confirm the user's phone number\n\n`\n1\nresponse = supabase.auth.admin.create_user({\n2\n\"email\": \"user@email.com\",\n3\n\"password\": \"password\",\n4\n\"user_metadata\": { \"name\": \"Yoda\" }\n5\n})\n`\n\nResponse\nDelete a user. Requires a <code>service_role</code> key.\n\n- The <code>delete_user()</code> method requires the user's ID, which maps to the <code>auth.users.id</code> column.\n- idRequiredstring\n\nThe user id you want to remove.\n\n- should\\_soft\\_deleteOptionalboolean\n\nIf true, then the user will be soft-deleted (setting <code>deleted_at</code> to the current timestamp and disabling their account while preserving their data) from the auth schema. Defaults to false for backward compatibility.\n\nThis function should only be called on a server. Never expose your <code>service_role</code> key in the browser.\n\nRemoves a user\n\n`\n1\nsupabase.auth.admin.delete_user(\n2\n\"715ed5db-f090-4b8c-a067-640ecee36aa0\"\n3\n)\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "d82fb98e-341a-4ec4-8248-3b5b6ba637b7",
+        "text": " return <code>aal2</code>, else, it will return <code>aal1</code>.\n\nGet the AAL details of a session\n\n`\n1\nres = supabase.auth.mfa.get_authenticator_assurance_level()\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "8832a226-19cd-4afe-a579-8f489ce18b29",
+    "metadata": {
+      "token_count": 649,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Delete a factor for a user",
+        "h3": "Parameters"
+      },
+      "text": "Sends an invite link to an email address.\n\n- Sends an invite link to the user's email address.\n- The <code>invite_user_by_email()</code> method is typically used by administrators to invite users to join the application.\n- Note that PKCE is not supported when using <code>invite_user_by_email</code>. This is because the browser initiating the invite is often different from the browser accepting the invite which makes it difficult to provide the security guarantees required of the PKCE flow.\n- emailRequiredstring\n\nThe email address of the user.\n\n- optionsOptionalInviteUserByEmailOptions\n\nDetails\n\nInvite a user\n\n`\n1\nresponse = supabase.auth.admin.invite_user_by_email(\"email@example.com\")\n`\n\nResponse\n- The following types can be passed into <code>generate_link()</code>: <code>signup</code>, <code>magiclink</code>, <code>invite</code>, <code>recovery</code>, <code>email_change_current</code>, <code>email_change_new</code>, <code>phone_change</code>.\n- <code>generate_link()</code> only generates the email link for <code>email_change_email</code> if the **Secure email change** is enabled in your project's [email auth provider settings](/dashboard/project/_/auth/providers).\n- <code>generate_link()</code> handles the creation of the user for <code>signup</code>, <code>invite</code> and <code>magiclink</code>.\n- paramsRequiredGenerateLinkParams\n\nDetails\n\nGenerate a signup linkGenerate an invite linkGenerate a magic linkGenerate a recovery linkGenerate links to change current email address\n\n`\n1\nresponse = supabase.auth.admin.generate_link({\n2\n\"type\": \"signup\",\n3\n\"email\": \"email@example.com\",\n4\n\"password\": \"secret\"\n5\n})\n`\n\nResponse\n- uidRequiredstring\n\n- attributesRequiredAdminUserAttributes\n\nThe data you want to update.\n\nThis function should only be called on a server. Never expose your <code>service_role</code> key in the browser.\n\nDetails\n\nUpdates a user's emailUpdates a user's passwordUpdates a user's metadataUpdates a user's app\\_metadataConfirms a user's email addressConfirms a user's phone number\n\n`\n1\nresponse = supabase.auth.admin.update_user_by_id(\n2\n\"11111111-1111-1111-1111-111111111111\",\n3\n{ \"email\": \"new@email.com\" }\n4\n)\n`\n\nResponse\nDeletes a factor on a user. This will log the user out of all active sessions if the deleted factor was verified.\n- paramsRequiredAuthMFAAdminDeleteFactorParams\n\nDetails\n\nDelete a factor for a user\n\n`\n1\nresponse = supabase.auth.admin.mfa.delete_factor({\n2\n\"id\": \"34e770dd-9ff9-416c-87fa-43b31d7ef225\",\n3\n\"user_id\": \"a89baba7-b1b7-440f-b4bb-91026967f66b\",\n4\n})\n`\n\nResponse\n",
+      "overlap_text": {
+        "previous_chunk_id": "b285ed68-4ef3-45a1-aa2e-e27a6841817b",
+        "text": "> key in the browser.\n\nRemoves a user\n\n`\n1\nsupabase.auth.admin.delete_user(\n2\n\"715ed5db-f090-4b8c-a067-640ecee36aa0\"\n3\n)\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "53a91b7e-2da1-440f-82b0-4b995a22c34a",
+    "metadata": {
+      "token_count": 981,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "List all buckets",
+        "h3": ""
+      },
+      "text": "Invoke a Supabase Function.\n\n- Requires an Authorization header.\n- When you pass in a body to your function, we automatically attach the Content-Type header for <code>Blob</code>, <code>ArrayBuffer</code>, <code>File</code>, <code>FormData</code> and <code>String</code>. If it doesn't match any of these types we assume the payload is <code>json</code>, serialise it and attach the <code>Content-Type</code> header as <code>application/json</code>. You can override this behaviour by passing in a <code>Content-Type</code> header of your own.\n\nBasic invocationError handlingPassing custom headers\n\n`\n1\nresponse = supabase.functions.invoke(\n2\n    \"hello-world\", invoke_options={\"body\": {\"name\": \"Functions\"}}\n3\n)\n`\n- By default, Broadcast and Presence are enabled for all projects.\n- By default, listening to database changes is disabled for new projects due to database performance and security concerns. You can turn it on by managing Realtime's [replication](/docs/guides/api#realtime-api-overview).\n- You can receive the \"previous\" data for updates and deletes by setting the table's <code>REPLICA IDENTITY</code> to <code>FULL</code> (e.g., <code>ALTER TABLE your_table REPLICA IDENTITY FULL;</code>).\n- Row level security is not applied to delete statements. When RLS is enabled and replica identity is set to full, only the primary key is sent to clients.\n\nListen to broadcast messagesListen to presence syncListen to presence joinListen to presence leaveListen to all database changesListen to a specific tableListen to insertsListen to updatesListen to deletesListen to multiple eventsListen to row level changes\n\n`\n1\nchannel = supabase.channel(\"room1\")\n2\n3\ndef on_subscribe(status, err):\n4\nif status == RealtimeSubscribeStates.SUBSCRIBED:\n5\n    channel.send_broadcast('cursor-pos', { \"x\": random.random(), \"y\": random.random() })\n6\n7\ndef handle_broadcast(payload):\n8\nprint(\"Cursor position received!\", payload)\n9\n10\nchannel.on_broadcast(event=\"cursor-pos\", callback=handle_broadcast).subscribe(on_subscribe)\n`\n- Removing a channel is a great way to maintain the performance of your project's Realtime service as well as your database if you're listening to Postgres changes. Supabase will automatically handle cleanup 30 seconds after a client is disconnected, but unused channels may cause degradation as more clients are simultaneously subscribed.\n\nRemoves a channel\n\n`\n1\nsupabase.remove_channel(myChannel)\n`\n- Removing channels is a great way to maintain the performance of your project's Realtime service as well as your database if you're listening to Postgres changes. Supabase will automatically handle cleanup 30 seconds after a client is disconnected, but unused channels may cause degradation as more clients are simultaneously subscribed.\n\nRemove all channels\n\n`\n1\nsupabase.remove_all_channels()\n`\nGet all channels\n\n`\n1\nchannels = supabase.get_channels()\n`\nBroadcast a message to all connected clients to a channel.\n\nSend a message via websocket\n\n`\n1\nchannel = supabase.channel('room1')\n2\n3\ndef on_subscribe(status, err):\n4\nif status == RealtimeSubscribeStates.SUBSCRIBED:\n5\n    channel.send_broadcast('cursor-pos', { \"x\": random.random(), \"y\": random.random() })\n6\n7\nchannel.subscribe(on_subscribe)\n`\n\nResponse\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>insert</code>\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nCreate bucket\n\n`\n1\nres = supabase.storage.create_bucket(name)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>select</code>\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nGet bucket\n\n`\n1\nres = supabase.storage.get_bucket(name)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>select</code>\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nList buckets\n\n`\n1\nres = supabase.storage.list_buckets()\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "8832a226-19cd-4afe-a579-8f489ce18b29",
+        "text": "-416c-87fa-43b31d7ef225\",\n3\n\"user_id\": \"a89baba7-b1b7-440f-b4bb-91026967f66b\",\n4\n})\n`\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "dffd8beb-840c-406c-80c4-b45a152675f6",
+    "metadata": {
+      "token_count": 970,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Create a signed URL",
+        "h3": ""
+      },
+      "text": "- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>select</code> and <code>delete</code>\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nDelete bucket\n\n`\n1\nres = supabase.storage.delete_bucket(name)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>select</code>\n  - <code>objects</code> table permissions: <code>select</code> and <code>delete</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nEmpty bucket\n\n`\n1\nres = supabase.storage.empty_bucket(name)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>insert</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n- Please specify the appropriate content [MIME type](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types) if you are uploading images or audio. If no <code>file_options</code> are specified, the MIME type defaults to <code>text/html</code>.\n\nUpload file using filepath\n\n`\n1\nwith open(filepath, 'rb') as f:\n2\n    supabase.storage.from_(\"testbucket\").upload(file=f,path=path_on_supastorage, file_options={\"content-type\": \"audio/mpeg\"})\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nDownload file\n\n`\n1\nwith open(destination, 'wb+') as f:\n2\nres = supabase.storage.from_('bucket_name').download(source)\n3\nf.write(res)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nList files in a bucket\n\n`\n1\nres = supabase.storage.from_('bucket_name').list()\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>update</code> and <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nUpdate file\n\n`\n1\nwith open(filepath, 'rb') as f:\n2\nsupabase.storage.from_(\"bucket_name\").update(file=f, path=path_on_supastorage, file_options={\"cache-control\": \"3600\", \"upsert\": \"true\"})\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>update</code> and <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nMove file\n\n`\n1\nres = supabase.storage.from_('bucket_name').move('public/avatar1.png', 'private/avatar2.png')\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>delete</code> and <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nDelete file\n\n`\n1\nres = supabase.storage.from_('bucket_name').remove('test.jpg')\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nCreate Signed URL\n\n`\n1\nres = supabase.storage.from_('bucket_name').create_signed_url(filepath, expiry_duration)\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "53a91b7e-2da1-440f-82b0-4b995a22c34a",
+        "text": ">objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nList buckets\n\n`\n1\nres = supabase.storage.list_buckets()\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "718b4f39-ff72-40a0-96dd-084fffeeea43",
+    "metadata": {
+      "token_count": 153,
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Retrieve public URL",
+        "h3": ""
+      },
+      "text": "- The bucket needs to be set to public, either via [updateBucket()](/docs/reference/python/storage-updatebucket) or by going to Storage on [supabase.com/dashboard](https://supabase.com/dashboard), clicking the overflow menu on a bucket and choosing \"Make public\"\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nReturns the URL for an asset in a public bucket\n\n`\n1\nres = supabase.storage.from_('bucket_name').get_public_url('test/avatar1.jpg')\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "dffd8beb-840c-406c-80c4-b45a152675f6",
+        "text": " Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nCreate Signed URL\n\n`\n1\nres = supabase.storage.from_('bucket_name').create_signed_url(filepath, expiry_duration)\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "e59babbd-abeb-4b70-ba8a-c2839ab7fff9",
+    "metadata": {
+      "token_count": 652,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Python Client Library",
+        "h2": "Fetch data",
+        "h3": "Parameters"
+      },
+      "text": "Python Reference v2.0\nsupabase-py [View on GitHub](https://github.com/supabase/supabase-py)\n\nThis reference documents every object and method available in Supabase's Python library, [supabase-py](https://github.com/supabase/supabase-py). You can use supabase-py to interact with your Postgres database, listen to database changes, invoke Deno Edge Functions, build login and user management functionality, and manage large files.\nYou can install supabase-py via the terminal. (for Python > 3.8)\n\nPIPConda\n\nTerminal\n\n`\n_10\npip install supabase\n`\nYou can initialize a new Supabase client using the <code>create_client()</code> method.\n\nThe Supabase client is your entrypoint to the rest of the Supabase functionality and is the easiest way to interact with everything we offer within the Supabase ecosystem.\n- supabase\\_urlRequiredstring\n\nThe unique Supabase URL which is supplied when you create a new project in your project dashboard.\n\n- supabase\\_keyRequiredstring\n\nThe unique Supabase Key which is supplied when you create a new project in your project dashboard.\n\n- optionsOptionalClientOptions\n\nOptions to change the Auth behaviors.\n\nDetails\n\ncreate\\_client()With timeout option\n\n`\n_10\nimport os\n_10\nfrom supabase import create_client, Client\n_10\n_10\nurl: str = os.environ.get(\"SUPABASE_URL\")\n_10\nkey: str = os.environ.get(\"SUPABASE_KEY\")\n_10\nsupabase: Client = create_client(url, key)\n`\n- By default, Supabase projects return a maximum of 1,000 rows. This setting can be changed in your project's [API settings](/dashboard/project/_/settings/api). It's recommended that you keep it low to limit the payload size of accidental or malicious requests. You can use <code>range()</code> queries to paginate through your data.\n- <code>select()</code> can be combined with [Filters](/docs/reference/python/using-filters)\n- <code>select()</code> can be combined with [Modifiers](/docs/reference/python/using-modifiers)\n- <code>apikey</code> is a reserved keyword if you're using the [Supabase Platform](/docs/guides/platform) and [should be avoided as a column name](https://github.com/supabase/supabase/issues/5465).\n- columnsOptionalstring\n\nThe columns to retrieve, defaults to <code>*</code>.\n\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\nGetting your dataSelecting specific columnsQuery referenced tablesQuery referenced tables through a join tableQuery the same referenced table multiple timesFiltering through referenced tablesQuerying referenced table with countQuerying with count optionQuerying JSON dataQuerying referenced table with inner joinSwitching schemas per query\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").execute()\n`\n\nData source\n\nResponse\n"
+    }
+  },
+  {
+    "chunk_id": "61bd9414-9e7d-4fa3-a7c0-3dece539b3c8",
+    "metadata": {
+      "token_count": 875,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Python Client Library",
+        "h2": "Call a Postgres function",
+        "h3": "Parameters"
+      },
+      "text": "- jsonRequireddict, list\n\nThe values to insert. Pass an dict to insert a single row or an list to insert multiple rows.\n\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\n- returningOptionalReturnMethod\n\nEither 'minimal' or 'representation'. Defaults to 'representation'.\n\n- default\\_to\\_nullOptionalbool\n\nMake missing fields default to <code>null</code>. Otherwise, use the default value for the column. Only applies for bulk inserts.\n\nCreate a recordBulk create\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .insert({\"id\": 1, \"name\": \"Denmark\"})\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n- <code>update()</code> should always be combined with [Filters](/docs/reference/python/using-filters) to target the item(s) you wish to update.\n- jsonRequireddict, list\n\nThe values to insert. Pass an dict to insert a single row or an list to insert multiple rows.\n\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\nUpdating your dataUpdating JSON data\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .update({\"name\": \"Australia\"})\n_10\n    .eq(\"id\", 1)\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n- Primary keys must be included in the <code>values</code> dict to use upsert.\n- jsonRequireddict, list\n\nThe values to insert. Pass an dict to insert a single row or an list to insert multiple rows.\n\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\n- returningOptionalReturnMethod\n\nEither 'minimal' or 'representation'. Defaults to 'representation'.\n\n- ignore\\_duplicatesOptionalbool\n\nWhether duplicate rows should be ignored.\n\n- on\\_conflictOptionalstring\n\nSpecified columns to be made to work with UNIQUE constraint.\n\n- default\\_to\\_nullOptionalbool\n\nMake missing fields default to <code>null</code>. Otherwise, use the default value for the column. Only applies for bulk inserts.\n\nUpsert your dataBulk Upsert your dataUpserting into tables with constraints\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .upsert({\"id\": 1, \"name\": \"Australia\"})\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n- <code>delete()</code> should always be combined with [filters](/docs/reference/python/using-filters) to target the item(s) you wish to delete.\n- If you use <code>delete()</code> with filters and you have [RLS](/docs/learn/auth-deep-dive/auth-row-level-security) enabled, only rows visible through <code>SELECT</code> policies are deleted. Note that by default no rows are visible, so you need at least one <code>SELECT</code>/ <code>ALL</code> policy that makes the rows visible.\n- When using <code>delete().in_()</code>, specify an array of values to target multiple rows with a single query. This is particularly useful for batch deleting entries that share common criteria, such as deleting users by their IDs. Ensure that the array you provide accurately represents all records you intend to delete to avoid unintended data removal.\n- countOptionalCountMethod\n\nThe property to use to get the count of rows returned.\n\n- returningOptionalReturnMethod\n\nEither 'minimal' or 'representation'. Defaults to 'representation'.\n\nDelete recordsDelete multiple records\n\n`\n_10\nresponse = supabase.table('countries').delete().eq('id', 1).execute()\n`\n\nData source\n\nResponse\nYou can call Postgres functions as _Remote Procedure Calls_, logic in your database that you can execute from anywhere. Functions are useful when the logic rarely changes\u2014like for password resets and updates.\n\n`\n_10\ncreate or replace function hello_world() returns text as $$\n_10\nselect 'Hello world';\n_10\n$$ language sql;\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "e59babbd-abeb-4b70-ba8a-c2839ab7fff9",
+        "text": " referenced table with countQuerying with count optionQuerying JSON dataQuerying referenced table with inner joinSwitching schemas per query\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").execute()\n`\n\nData source\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "b9c97665-ca95-48dd-9f53-ffa483b6e4f5",
+    "metadata": {
+      "token_count": 1000,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Column matches a pattern",
+        "h3": "Parameters"
+      },
+      "text": "- fnRequiredcallable\n\nThe stored procedure call to be executed.\n\n- paramsOptionaldict of any\n\nParameters passed into the stored procedure call.\n\n- getOptionaldict of any\n\nWhen set to <code>true</code>, <code>data</code> will not be returned. Useful if you only need the count.\n\n- headOptionaldict of any\n\nWhen set to <code>true</code>, the function will be called with read-only access mode.\n\n- countOptionalCountMethod\n\nCount algorithm to use to count rows returned by the function. Only applicable for [set-returning functions](https://www.postgresql.org/docs/current/functions-srf.html). <code>\"exact\"</code>: Exact but slow count algorithm. Performs a <code>COUNT(*)</code> under the hood. <code>\"planned\"</code>: Approximated but fast count algorithm. Uses the Postgres statistics under the hood. <code>\"estimated\"</code>: Uses exact count for low numbers and planned count for high numbers.\n\nCall a Postgres function without argumentsCall a Postgres function with argumentsBulk processingCall a Postgres function with filtersCall a read-only Postgres function\n\n`\n_10\nresponse = supabase.rpc(\"hello_world\").execute()\n`\n\nData source\n\nResponse\nFilters allow you to only return rows that match certain conditions.\n\nFilters can be used on <code>select()</code>, <code>update()</code>, <code>upsert()</code>, and <code>delete()</code> queries.\n\nIf a Postgres function returns a table response, you can also apply filters.\n\nApplying FiltersChainingConditional chainingFilter by values within JSON columnFilter Foreign Tables\n\n`\n_15\n_15\nresponse = (\n_15\n    supabase.table(\"cities\")\n_15\n    .select(\"name, country_id\")\n_15\n    .eq(\"name\", \"Bali\")\n_15\n    .execute()\n_15\n)\n_15\n_15\n_15\nresponse = (\n_15\n    supabase.table(\"cities\")\n_15\n    .eq(\"name\", \"Bali\")\n_15\n    .select(\"name, country_id\")\n_15\n    .execute()\n_15\n)\n`\n\nData source\n\nNotes\nMatch only rows where <code>column</code> is equal to <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").eq(\"name\", \"Albania\").execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> is not equal to <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").neq(\"name\", \"Albania\").execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> is greather than <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").gt(\"id\", 2).execute()\n`\n\nData source\n\nResponse\n\nNotes\nMatch only rows where <code>column</code> is greater than or equal to <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").gte(\"id\", 2).execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> is less than <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").lt(\"id\", 2).execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> is less than or equal to <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valueRequiredany\n\nThe value to filter by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").lte(\"id\", 2).execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> matches <code>pattern</code> case-sensitively.\n",
+      "overlap_text": {
+        "previous_chunk_id": "61bd9414-9e7d-4fa3-a7c0-3dece539b3c8",
+        "text": " anywhere. Functions are useful when the logic rarely changes\u2014like for password resets and updates.\n\n`\n_10\ncreate or replace function hello_world() returns text as $$\n_10\nselect 'Hello world';\n_10\n$$ language sql;\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "53171edd-e78e-44ff-8607-5cd5b1db8f95",
+    "metadata": {
+      "token_count": 709,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Greater than a range",
+        "h3": "Parameters"
+      },
+      "text": "- columnRequiredstring\n\nThe name of the column to apply a filter on\n\n- patternRequiredstring\n\nThe pattern to match by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").like(\"name\", \"%Alba%\").execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> matches <code>pattern</code> case-insensitively.\n- columnRequiredstring\n\nThe name of the column to apply a filter on\n\n- patternRequiredstring\n\nThe pattern to match by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").ilike(\"name\", \"%alba%\").execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> IS <code>value</code>.\n- columnRequiredstring\n\nThe name of the column to apply a filter on\n\n- valueRequirednull \\| boolean\n\nThe value to match by\n\nChecking for nullness, True or False\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").is_(\"name\", \"null\").execute()\n`\n\nData source\n\nResponse\n\nNotes\nMatch only rows where <code>column</code> is included in the <code>values</code> array.\n- columnRequiredstring\n\nThe column to filter on\n\n- valuesRequiredarray\n\nThe values to filter by\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .select(\"*\")\n_10\n    .in_(\"name\", [\"Albania\", \"Algeria\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nOnly relevant for jsonb, array, and range columns. Match only rows where <code>column</code> contains every element appearing in <code>value</code>.\n- columnRequiredstring\n\nThe column to filter on\n\n- valuesRequiredobject\n\nThe jsonb, array, or range value to filter with\n\nOn array columnsOn range columnsOn \\<code>jsonb\\</code> columns\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"issues\")\n_10\n    .select(\"*\")\n_10\n    .contains(\"tags\", [\"is:open\", \"priority:low\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nOnly relevant for jsonb, array, and range columns. Match only rows where every element appearing in <code>column</code> is contained by <code>value</code>.\n- columnRequiredstring\n\nThe jsonb, array, or range column to filter on\n\n- valueRequiredobject\n\nThe jsonb, array, or range value to filter with\n\nOn array columnsOn range columnsOn \\<code>jsonb\\</code> columns\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"classes\")\n_10\n    .select(\"name\")\n_10\n    .contained_by(\"days\", [\"monday\", \"tuesday\", \"wednesday\", \"friday\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is greater than any element in <code>range</code>.\n",
+      "overlap_text": {
+        "previous_chunk_id": "b9c97665-ca95-48dd-9f53-ffa483b6e4f5",
+        "text": " supabase.table(\"countries\").select(\"*\").lte(\"id\", 2).execute()\n`\n\nData source\n\nResponse\nMatch only rows where <code>column</code> matches <code>pattern</code> case-sensitively.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "bf1c8ff9-ec64-4994-b4f5-11c34e257d74",
+    "metadata": {
+      "token_count": 745,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "With a common element",
+        "h3": "Parameters"
+      },
+      "text": "- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredarray\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"reservations\")\n_10\n    .select(\"*\")\n_10\n    .range_gt(\"during\", [\"2000-01-02 08:00\", \"2000-01-02 09:00\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is either contained in <code>range</code> or greater than any element in <code>range</code>.\n- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredstring\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"reservations\")\n_10\n    .select(\"*\")\n_10\n    .range_gte(\"during\", [\"2000-01-02 08:30\", \"2000-01-02 09:30\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is less than any element in <code>range</code>.\n- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredarray\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"reservations\")\n_10\n    .select(\"*\")\n_10\n    .range_lt(\"during\", [\"2000-01-01 15:00\", \"2000-01-01 16:00\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is less than any element in <code>range</code>.\n- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredarray\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"reservations\")\n_10\n    .select(\"*\")\n_10\n    .range_lte(\"during\", [\"2000-01-01 14:00\", \"2000-01-01 16:00\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for range columns. Match only rows where <code>column</code> is mutually exclusive to <code>range</code> and there can be no element between the two ranges.\n- columnRequiredstring\n\nThe range column to filter on\n\n- rangeRequiredarray\n\nThe range to filter with\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"reservations\")\n_10\n    .select(\"*\")\n_10\n    .range_adjacent(\"during\", [\"2000-01-01 12:00\", \"2000-01-01 13:00\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for array and range columns. Match only rows where <code>column</code> and <code>value</code> have an element in common.\n",
+      "overlap_text": {
+        "previous_chunk_id": "53171edd-e78e-44ff-8607-5cd5b1db8f95",
+        "text": "_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nOnly relevant for range columns. Match only rows where every element in <code>column</code> is greater than any element in <code>range</code>.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "5d785638-7512-4f05-a948-0ef17d71c64c",
+    "metadata": {
+      "token_count": 705,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Match at least one filter",
+        "h3": "Parameters"
+      },
+      "text": "- columnRequiredstring\n\nThe array or range column to filter on\n\n- valueRequiredIterable\\[Any\\]\n\nThe array or range value to filter with\n\nOn array columnsOn range columns\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"issues\")\n_10\n    .select(\"title\")\n_10\n    .overlaps(\"tags\", [\"is:closed\", \"severity:high\"])\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nOnly relevant for text and tsvector columns. Match only rows where <code>column</code> matches the query string in <code>query</code>.\n\n- For more information, see [Postgres full text search](/docs/guides/database/full-text-search).\n- columnRequiredstring\n\nThe text or tsvector column to filter on\n\n- queryRequiredstring\n\nThe query text to match with\n\n- optionsOptionalobject\n\nNamed parameters\n\nDetails\n\nText searchBasic normalizationFull normalizationWebsearch\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"texts\")\n_10\n    .select(\"content\")\n_10\n    .text_search(\"content\", \"'eggs' & 'ham'\", options={\"config\": \"english\"})\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nMatch only rows where each column in <code>query</code> keys is equal to its associated value. Shorthand for multiple <code>.eq()</code> s.\n- queryRequireddict\n\nThe object to filter with, with column names as keys mapped to their filter values\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .select(\"*\")\n_10\n    .match({\"id\": 2, \"name\": \"Albania\"})\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nMatch only rows which doesn't satisfy the filter. <code>not_</code> expects you to use the raw PostgREST syntax for the filter values.\n\n``\n_10\n.not_.in_('id', '(5,6,7)')  # Use <code>()</code> for <code>in</code> filter\n_10\n.not_.contains('arraycol', '\\{\"a\",\"b\"\\}')  # Use <code>\\{\\}</code> for array values\n``\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .select(\"*\")\n_10\n    .not_.is_(\"name\", \"null\")\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nor\\_() expects you to use the raw PostgREST syntax for the filter names and values.\n\n``\n_10\n.or_('id.in.(5,6,7), arraycol.cs.\\{\"a\",\"b\"\\}')  # Use <code>()</code> for <code>in</code> filter, <code>\\{\\}</code> for array values and <code>cs</code> for <code>contains()</code>.\n_10\n.or_('id.in.(5,6,7), arraycol.cd.\\{\"a\",\"b\"\\}')  # Use <code>cd</code> for <code>containedBy()</code>\n``\n",
+      "overlap_text": {
+        "previous_chunk_id": "bf1c8ff9-ec64-4994-b4f5-11c34e257d74",
+        "text": "\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n\nNotes\nOnly relevant for array and range columns. Match only rows where <code>column</code> and <code>value</code> have an element in common.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "08610801-f206-4d32-a6c5-d18295b628c3",
+    "metadata": {
+      "token_count": 942,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Retrieve one row of data",
+        "h3": "Parameters"
+      },
+      "text": "- filtersRequiredstring\n\nThe filters to use, following PostgREST syntax\n\n- reference\\_tableOptionalstring\n\nSet this to filter on referenced tables instead of the parent table\n\nWith \\<code>select()\\</code>Use \\<code>or\\</code> with \\<code>and\\</code>Use \\<code>or\\</code> on referenced tables\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .select(\"name\")\n_10\n    .or_(\"id.eq.2,name.eq.Algeria\")\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nfilter() expects you to use the raw PostgREST syntax for the filter values.\n\n``\n_10\n.filter('id', 'in', '(5,6,7)')  # Use <code>()</code> for <code>in</code> filter\n_10\n.filter('arraycol', 'cs', '\\{\"a\",\"b\"\\}')  # Use <code>cs</code> for <code>contains()</code>, <code>\\{\\}</code> for array values\n``\n- columnRequiredstring\n\nThe column to filter on\n\n- operatorOptionalstring\n\nThe operator to filter with, following PostgREST syntax\n\n- valueOptionalany\n\nThe value to filter with, following PostgREST syntax\n\nWith \\<code>select()\\</code>On a foreign table\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .select(\"*\")\n_10\n    .filter(\"name\", \"in\", '(\"Algeria\",\"Japan\")')\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nFilters work on the row level\u2014they allow you to return rows that only match certain conditions without changing the shape of the rows. Modifiers are everything that don't fit that definition\u2014allowing you to change the format of the response (e.g., returning a CSV string).\n\nModifiers must be specified after filters. Some modifiers only apply for queries that return rows (e.g., <code>select()</code> or <code>rpc()</code> on a function that returns a table response).\nOrder the query result by <code>column</code>.\n- columnRequiredstring\n\nThe column to order by\n\n- descOptionalbool\n\nWhether the rows should be ordered in descending order or not.\n\n- foreign\\_tableOptionalstring\n\nForeign table name whose results are to be ordered.\n\n- nullsfirstOptionalbool\n\nOrder by showing nulls first\n\nWith \\<code>select()\\</code>On a foreign table\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .select(\"*\")\n_10\n    .order(\"name\", desc=True)\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\n- sizeRequirednumber\n\nThe maximum number of rows to return\n\n- foreign\\_tableOptionalstring\n\nSet this to limit rows of foreign tables instead of the parent table.\n\nWith \\<code>select()\\</code>On a foreign table\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"name\").limit(1).execute()\n`\n\nData source\n\nResponse\nLimit the query result by starting at an offset ( <code>from</code>) and ending at the offset ( <code>from + to</code>). Only records within this range are returned. This respects the query order and if there is no order clause the range could behave unexpectedly.\n\nThe <code>from</code> and <code>to</code> values are 0-based and inclusive: <code>range(1, 3)</code> will include the second, third and fourth rows of the query.\n- startRequirednumber\n\nThe starting index from which to limit the result.\n\n- endRequirednumber\n\nThe last index to which to limit the result.\n\n- foreign\\_tableOptionalstring\n\nSet this to limit rows of foreign tables instead of the parent table.\n\nWith \\<code>select()\\</code>On a foreign table\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"name\").range(0, 1).execute()\n`\n\nData source\n\nResponse\nReturn <code>data</code> as a single object instead of an array of objects.\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"name\").limit(1).single().execute()\n`\n\nData source\n\nResponse\n",
+      "overlap_text": {
+        "previous_chunk_id": "5d785638-7512-4f05-a948-0ef17d71c64c",
+        "text": "code>contains()</code>.\n_10\n.or_('id.in.(5,6,7), arraycol.cd.\\{\"a\",\"b\"\\}')  # Use <code>cd</code> for <code>containedBy()</code>\n``\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "c05e9277-3729-4a32-9708-865eb7cb22f2",
+    "metadata": {
+      "token_count": 669,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Overview",
+        "h3": "Parameters"
+      },
+      "text": "Return <code>data</code> as a single object instead of an array of objects.\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = (\n_10\n    supabase.table(\"countries\")\n_10\n    .select(\"*\")\n_10\n    .eq(\"name\", \"Albania\")\n_10\n    .maybe_single()\n_10\n    .execute()\n_10\n)\n`\n\nData source\n\nResponse\nReturn <code>data</code> as a string in CSV format.\n\nReturn data as CSV\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").csv().execute()\n`\n\nData source\n\nResponse\n\nNotes\nFor debugging slow queries, you can get the [Postgres <code>EXPLAIN</code> execution plan](https://www.postgresql.org/docs/current/sql-explain.html) of a query using the <code>explain()</code> method. This works on any query, even for <code>rpc()</code> or writes.\n\nExplain is not enabled by default as it can reveal sensitive information about your database. It's best to only enable this for testing environments but if you wish to enable it for production you can provide additional protection by using a <code>pre-request</code> function.\n\nFollow the [Performance Debugging Guide](/docs/guides/database/debugging-performance) to enable the functionality on your project.\n- walOptionalboolean\n\nIf <code>true</code>, include information on WAL record generation.\n\n- verboseOptionalboolean\n\nIf <code>true</code>, the query identifier will be returned and <code>data</code> will include the output columns of the query.\n\n- settingsOptionalboolean\n\nIf <code>true</code>, include information on configuration parameters that affect query planning.\n\n- formatOptionalboolean\n\nThe format of the output, can be <code>\"text\"</code> (default) or <code>\"json\"</code>.\n\n- formatOptional\"text\" \\| \"json\"\n\nThe format of the output, can be <code>\"text\"</code> (default) or <code>\"json\"</code>.\n\n- buffersOptionalboolean\n\nIf <code>true</code>, include information on buffer usage.\n\n- analyzeOptionalboolean\n\nIf <code>true</code>, the query will be executed and the actual run time will be returned.\n\nGet the execution planGet the execution plan with analyze and verbose\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"*\").explain().execute()\n`\n\nData source\n\nResponse\n\nNotes\n- The auth methods can be accessed via the <code>supabase.auth</code> namespace.\n- By default, the supabase client sets <code>persist_session</code> to true and attempts to store the session in memory.\n- Any email links and one-time passwords (OTPs) sent have a default expiry of 24 hours. We have the following [rate limits](/docs/guides/platform/going-into-prod#auth-rate-limits) in place to guard against brute force attacks.\n- The expiry of an access token can be set in the \"JWT expiry limit\" field in [your project's auth settings](/dashboard/project/_/settings/auth). A refresh token never expires and can only be used once.\n",
+      "overlap_text": {
+        "previous_chunk_id": "08610801-f206-4d32-a6c5-d18295b628c3",
+        "text": " a single object instead of an array of objects.\n\nWith \\<code>select()\\</code>\n\n`\n_10\nresponse = supabase.table(\"countries\").select(\"name\").limit(1).single().execute()\n`\n\nData source\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "d92bf6f9-d371-4358-880f-a17ce6ababcc",
+    "metadata": {
+      "token_count": 691,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Sign in with ID Token",
+        "h3": "Parameters"
+      },
+      "text": "- By default, the user needs to verify their email address before logging in. To turn this off, disable **Confirm email** in [your project](https://supabase.com/dashboard/project/_/auth/providers).\n- **Confirm email** determines if users need to confirm their email address after signing up.\n  - If **Confirm email** is enabled, a <code>user</code> is returned but <code>session</code> is null.\n  - If **Confirm email** is disabled, both a <code>user</code> and a <code>session</code> are returned.\n- By default, when the user confirms their email address, they are redirected to the [<code>SITE_URL</code>](https://supabase.com/docs/guides/auth/redirect-urls). You can modify your <code>SITE_URL</code> or add additional redirect URLs in [your project](https://supabase.com/dashboard/project/_/auth/url-configuration).\n- If sign\\_up() is called for an existing confirmed user:\n  - When both **Confirm email** and **Confirm phone** (even when phone provider is disabled) are enabled in [your project](/dashboard/project/_/auth/providers), an obfuscated/fake user object is returned.\n  - When either **Confirm email** or **Confirm phone** (even when phone provider is disabled) is disabled, the error message, <code>User already registered</code> is returned.\n- To fetch the currently logged-in user, refer to [<code>get_user()</code>](/docs/reference/python/auth-getuser).\n- credentialsRequiredSignUpWithPasswordCredentials\n\nDetails\n\nSign up with an email and passwordSign up with a phone number and password (SMS)Sign up with a phone number and password (whatsapp)Sign up with additional user metadataSign up with a redirect URL\n\n`\n_10\nresponse = supabase.auth.sign_up(\n_10\n    {\"email\": \"email@example.com\", \"password\": \"password\"}\n_10\n)\n`\n\nResponse\n- Returns an anonymous user\n- It is recommended to set up captcha for anonymous sign-ins to prevent abuse. You can pass in the captcha token in the <code>options</code> param.\n- credentialsRequiredSignInAnonymouslyCredentials\n\nDetails\n\nCreate an anonymous userCreate an anonymous user with custom user metadata\n\n`\n_10\nresponse = supabase.auth.sign_in_anonymously(\n_10\n    {\"options\": {\"captcha_token\": \"\"}}\n_10\n)\n`\n\nResponse\nLog in an existing user with an email and password or phone and password.\n\n- Requires either an email and password or a phone number and password.\n- credentialsRequiredSignInWithPasswordCredentials\n\nDetails\n\nSign in with email and passwordSign in with phone and password\n\n`\n_10\nresponse = supabase.auth.sign_in_with_password(\n_10\n    {\"email\": \"email@example.com\", \"password\": \"example-password\"}\n_10\n)\n`\n\nResponse\nAllows signing in with an OIDC ID token. The authentication provider used should be enabled and configured.\n- credentialsRequiredSignInWithIdTokenCredentials\n\nDetails\n\nSign In using ID Token\n\n`\n_10\nresponse = supabase.auth.sign_in_with_id_token(\n_10\n{\"provider\": \"google\", \"token\": \"your-id-token\"}\n_10\n)\n`\n\nResponse\n",
+      "overlap_text": {
+        "previous_chunk_id": "c05e9277-3729-4a32-9708-865eb7cb22f2",
+        "text": " brute force attacks.\n- The expiry of an access token can be set in the \"JWT expiry limit\" field in [your project's auth settings](/dashboard/project/_/settings/auth). A refresh token never expires and can only be used once.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "c782782f-915f-4bae-949b-3422021467d1",
+    "metadata": {
+      "token_count": 694,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Sign in a user through SSO",
+        "h3": "Parameters"
+      },
+      "text": "- Requires either an email or phone number.\n- This method is used for passwordless sign-ins where a OTP is sent to the user's email or phone number.\n- If the user doesn't exist, <code>sign_in_with_otp()</code> will signup the user instead. To restrict this behavior, you can set <code>should_create_user</code> in <code>SignInWithPasswordlessCredentials.options</code> to <code>false</code>.\n- If you're using an email, you can configure whether you want the user to receive a magiclink or a OTP.\n- If you're using phone, you can configure whether you want the user to receive a OTP.\n- The magic link's destination URL is determined by the [<code>SITE_URL</code>](/docs/guides/auth/redirect-urls).\n- See [redirect URLs and wildcards](/docs/guides/auth/overview#redirect-urls-and-wildcards) to add additional redirect URLs to your project.\n- Magic links and OTPs share the same implementation. To send users a one-time code instead of a magic link, [modify the magic link email template](https://supabase.com/dashboard/project/_/auth/templates) to include <code>\\{\\{ .Token \\}\\}</code> instead of <code>\\{\\{ .ConfirmationURL \\}\\}</code>.\n- credentialsRequiredSignInWithPasswordCredentials\n\nDetails\n\nSign in with emailSign in with SMS OTPSign in with WhatsApp OTP\n\n`\n_10\nresponse = supabase.auth.sign_in_with_otp(\n_10\n    {\n_10\n        \"email\": \"email@example.com\",\n_10\n        \"options\": {\"email_redirect_to\": \"https://example.com/welcome\"},\n_10\n    }\n_10\n)\n`\n\nResponse\n\nNotes\n- This method is used for signing in using a third-party provider.\n- Supabase supports many different [third-party providers](/docs/guides/auth#configure-third-party-providers).\n- credentialsRequiredSignInWithOAuthCredentials\n\nDetails\n\nSign in using a third-party providerSign in using a third-party provider with redirectSign in with scopes\n\n`\n_10\nresponse = supabase.auth.sign_in_with_oauth({\n_10\n\"provider\": 'github'\n_10\n})\n`\n- Before you can call this method you need to [establish a connection](/docs/guides/auth/sso/auth-sso-saml#managing-saml-20-connections) to an identity provider. Use the [CLI commands](/docs/reference/cli/supabase-sso) to do this.\n- If you've associated an email domain to the identity provider, you can use the <code>domain</code> property to start a sign-in flow.\n- In case you need to use a different way to start the authentication flow with an identity provider, you can use the <code>provider_id</code> property. For example:\n  - Mapping specific user email addresses with an identity provider.\n  - Using different hints to identity the identity provider to be used by the user, like a company-specific page, IP address or other tracking information.\n- paramsRequiredSignInWithSSOCredentials\n\nDetails\n\nSign in with email domainSign in with provider UUID\n\n`\n_10\nresponse = supabase.auth.sign_in_with_sso({\"domain\": \"company.com\"})\n`\n\nResponse\n\nNotes\n",
+      "overlap_text": {
+        "previous_chunk_id": "d92bf6f9-d371-4358-880f-a17ce6ababcc",
+        "text": "Credentials\n\nDetails\n\nSign In using ID Token\n\n`\n_10\nresponse = supabase.auth.sign_in_with_id_token(\n_10\n{\"provider\": \"google\", \"token\": \"your-id-token\"}\n_10\n)\n`\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "8b99c248-23fc-41bd-a237-572cafe069ef",
+    "metadata": {
+      "token_count": 728,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Incorrect",
+        "h2": "Verify and log in through OTP",
+        "h3": "Parameters"
+      },
+      "text": "- In order to use the <code>sign_out()</code> method, the user needs to be signed in first.\n- By default, <code>sign_out()</code> uses the global scope, which signs out all other sessions that the user is logged into as well.\n- Since Supabase Auth uses JWTs for authentication, the access token JWT will be valid until it's expired. When the user signs out, Supabase revokes the refresh token and deletes the JWT from the client-side. This does not revoke the JWT and it will still be valid until it expires.\n- optionsOptionalSignOutOptions\n\nDetails\n\nSign out\n\n`\n_10\nresponse = supabase.auth.sign_out()\n`\n- The password reset flow consist of 2 broad steps: (i) Allow the user to login via the password reset link; (ii) Update the user's password.\n- The <code>reset_password_for_email()</code> only sends a password reset link to the user's email. To update the user's password, see [<code>update_user()</code>](/docs/reference/python/auth-updateuser).\n- When the user clicks the reset link in the email they are redirected back to your application. You can configure the URL that the user is redirected to with the <code>redirectTo</code> parameter. See [redirect URLs and wildcards](/docs/guides/auth#redirect-urls-and-wildcards) to add additional redirect URLs to your project.\n- After the user has been redirected successfully, prompt them for a new password and call <code>update_user()</code>:\n\n`\n_10\nresponse = supabase.auth.update_user(\\{\n_10\n\"password\": new_password\n_10\n\\})\n`\n- emailRequiredstring\n\nThe email address of the user.\n\n- optionsOptionalobject\n\nDetails\n\nReset password\n\n`\n_10\nsupabase.auth.reset_password_for_email(email, {\n_10\n\"redirect_to\": \"https://example.com/update-password\",\n_10\n})\n`\n- The <code>verify_otp</code> method takes in different verification types. If a phone number is used, the type can either be <code>sms</code> or <code>phone_change</code>. If an email address is used, the type can be one of the following: <code>email</code>, <code>recovery</code>, <code>invite</code> or <code>email_change</code> ( <code>signup</code> and <code>magiclink</code> types are deprecated).\n- The verification type used should be determined based on the corresponding auth method called before <code>verify_otp</code> to sign up / sign-in a user.\n- The <code>TokenHash</code> is contained in the [email templates](/docs/guides/auth/auth-email-templates) and can be used to sign in. You may wish to use the hash with Magic Links for the PKCE flow for Server Side Auth. See [this guide](/docs/guides/auth/server-side/email-based-auth-with-pkce-flow-for-ssr) for more details.\n- paramsRequiredVerifyOtpParams\n\nDetails\n\nVerify Signup One-Time Password (OTP)Verify SMS One-Time Password (OTP)Verify Email Auth (Token Hash)\n\n`\n_10\nresponse = supabase.auth.verify_otp(\n_10\n{\"email\": \"email@example.com\", \"token\": \"123456\", \"type\": \"email\"}\n_10\n)\n`\n\nResponse\n",
+      "overlap_text": {
+        "previous_chunk_id": "c782782f-915f-4bae-949b-3422021467d1",
+        "text": ".\n- paramsRequiredSignInWithSSOCredentials\n\nDetails\n\nSign in with email domainSign in with provider UUID\n\n`\n_10\nresponse = supabase.auth.sign_in_with_sso({\"domain\": \"company.com\"})\n`\n\nResponse\n\nNotes\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "2f19f5fc-8c9a-4bae-958b-dafd5e89dc19",
+    "metadata": {
+      "token_count": 863,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "unlink the google identity",
+        "h2": "Unlink an identity from a user",
+        "h3": "Parameters"
+      },
+      "text": "- This method retrieves the current local session (i.e in memory).\n- The session contains a signed JWT and unencoded session data.\n- Since the unencoded session data is retrieved from the local storage medium, **do not** rely on it as a source of trusted data on the server. It could be tampered with by the sender. If you need verified, trustworthy user data, call [<code>get_user</code>](/docs/reference/python/auth-getuser) instead.\n- If the session has an expired access token, this method will use the refresh token to get a new session.\n\nGet the session data\n\n`\n_10\nresponse = supabase.auth.get_session()\n`\n\nResponse\nReturns a new session, regardless of expiry status. Takes in an optional refresh token. If not passed in, then refresh\\_session() will attempt to retrieve it from get\\_session(). If the current session's refresh token is invalid, an error will be thrown.\n\n- This method will refresh the session whether the current one is expired or not.\n- refresh\\_tokenOptionalstring\n\nRefresh session using the current session\n\n`\n_10\nresponse = supabase.auth.refresh_session()\n`\n\nResponse\n- This method fetches the user object from the database instead of local session.\n- This method is useful for checking if the user is authorized because it validates the user's access token JWT on the server.\n- jwtOptionalstring\n\nTakes in an optional access token JWT. If no JWT is provided, the JWT from the current session is used.\n\nGet the logged in user with the current existing sessionGet the logged in user with a custom access token jwt\n\n`\n_10\nresponse = supabase.auth.get_user()\n`\n\nResponse\n- In order to use the <code>update_user()</code> method, the user needs to be signed in first.\n- By default, email updates sends a confirmation link to both the user's current and new email. To only send a confirmation link to the user's new email, disable **Secure email change** in your project's [email auth provider settings](/dashboard/project/_/auth/providers).\n\nUpdate the email for an authenticated userUpdate the phone number for an authenticated userUpdate the password for an authenticated userUpdate the user's metadataUpdate the user's password with a nonce\n\n`\n_10\nresponse = supabase.auth.update_user({\n_10\n\"email\": \"new@email.com\"\n_10\n})\n`\n\nResponse\n\nNotes\nGets all the identities linked to a user.\n\n- The user needs to be signed in to call <code>get_user_identities()</code>.\n\nReturns a list of identities linked to the user\n\n`\n_10\nresponse = supabase.auth.get_user_identities()\n`\n\nResponse\n- The **Enable Manual Linking** option must be enabled from your [project's authentication settings](/dashboard/project/_/settings/auth).\n- The user needs to be signed in to call <code>link_identity()</code>.\n- If the candidate identity is already linked to the existing user or another user, <code>link_identity()</code> will fail.\n- If <code>link_identity</code> is run on the server, you should handle the redirect.\n- credentialsRequiredSignInWithOAuthCredentials\n\nDetails\n\nLink an identity to a user\n\n`\n_10\nresponse = supabase.auth.link_identity({\n_10\nprovider: 'github'\n_10\n})\n`\n\nResponse\n- The **Enable Manual Linking** option must be enabled from your [project's authentication settings](/dashboard/project/_/settings/auth).\n- The user needs to be signed in to call <code>unlink_identity()</code>.\n- The user must have at least 2 identities in order to unlink an identity.\n- The identity to be unlinked must belong to the user.\n- identityRequiredUserIdentity\n\nDetails\n\nUnlink an identity\n\n`\n_10\n_10\nres = supabase.auth.get_user_identities()\n_10\n_10\n_10\ngoogle_identity = list(\n_10\nfilter(lambda identity: identity.provider == \"google\", res.identities)\n_10\n).pop()\n_10\n_10\n_10\nresponse = supabase.auth.unlink_identity(google_identity)\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "8b99c248-23fc-41bd-a237-572cafe069ef",
+        "text": " Auth (Token Hash)\n\n`\n_10\nresponse = supabase.auth.verify_otp(\n_10\n{\"email\": \"email@example.com\", \"token\": \"123456\", \"type\": \"email\"}\n_10\n)\n`\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "45dccdee-888b-47ef-9fad-5cd1a8ef6150",
+    "metadata": {
+      "token_count": 762,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "unlink the google identity",
+        "h2": "Auth MFA",
+        "h3": "Parameters"
+      },
+      "text": "- This method is used together with <code>updateUser()</code> when a user's password needs to be updated.\n- If you require your user to reauthenticate before updating their password, you need to enable the **Secure password change** option in your [project's email provider settings](/dashboard/project/_/auth/providers).\n- A user is only require to reauthenticate before updating their password if **Secure password change** is enabled and the user **hasn't recently signed in**. A user is deemed recently signed in if the session was created in the last 24 hours.\n- This method will send a nonce to the user's email. If the user doesn't have a confirmed email address, the method will send the nonce to the user's confirmed phone number instead.\n\nSend reauthentication nonce\n\n`\n_10\nresponse = supabase.auth.reauthenticate()\n`\n\nNotes\n- Resends a signup confirmation, email change or phone change email to the user.\n- Passwordless sign-ins can be resent by calling the <code>sign_in_with_otp()</code> method again.\n- Password recovery emails can be resent by calling the <code>reset_password_for_email()</code> method again.\n- This method will only resend an email or phone OTP to the user if there was an initial signup, email change or phone change request being made.\n- You can specify a redirect url when you resend an email link using the <code>email_redirect_to</code> option.\n- credentialsRequiredResendCredentials\n\nDetails\n\nResend an email signup confirmationResend a phone signup confirmationResend email change emailResend phone change OTP\n\n`\n_10\nresponse = supabase.auth.resend({\n_10\n\"type\": \"signup\",\n_10\n\"email\": \"email@example.com\",\n_10\n\"options\": {\n_10\n    \"email_redirect_to\": \"https://example.com/welcome\"\n_10\n}\n_10\n})\n`\n\nNotes\nSets the session data from the current session. If the current session is expired, setSession will take care of refreshing it to obtain a new session. If the refresh token or access token in the current session is invalid, an error will be thrown.\n\n- This method sets the session using an <code>access_token</code> and <code>refresh_token</code>.\n- If successful, a <code>SIGNED_IN</code> event is emitted.\n- access\\_tokenRequiredstring\n\n- refresh\\_tokenRequiredstring\n\nRefresh the session\n\n`\n_10\nresponse = supabase.auth.set_session(access_token, refresh_token)\n`\n\nResponse\n\nNotes\nLog in an existing user by exchanging an Auth Code issued during the PKCE flow.\n\n- Used when <code>flow_type</code> is set to <code>pkce</code> in client options.\n- auth\\_codeRequiredstring\n\nExchange Auth Code\n\n`\n_10\nresponse = supabase.auth.exchange_code_for_session(\"auth_code\": \"34e770dd-9ff9-416c-87fa-43b31d7ef225\")\n`\n\nResponse\nThis section contains methods commonly used for Multi-Factor Authentication (MFA) and are invoked behind the <code>supabase.auth.mfa</code> namespace.\n\nCurrently, we only support time-based one-time password (TOTP) as the 2nd factor. We don't support recovery codes but we allow users to enroll more than 1 TOTP factor, with an upper limit of 10.\n\nHaving a 2nd TOTP factor for recovery frees the user of the burden of having to store their recovery codes somewhere. It also reduces the attack surface since multiple recovery codes are usually generated compared to just having 1 backup TOTP factor.\n",
+      "overlap_text": {
+        "previous_chunk_id": "2f19f5fc-8c9a-4bae-958b-dafd5e89dc19",
+        "text": "google_identity = list(\n_10\nfilter(lambda identity: identity.provider == \"google\", res.identities)\n_10\n).pop()\n_10\n_10\n_10\nresponse = supabase.auth.unlink_identity(google_identity)\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "2d8f561a-878f-49c8-a73a-8ef2d6166c3f",
+    "metadata": {
+      "token_count": 790,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "unlink the google identity",
+        "h2": "Get Authenticator Assurance Level",
+        "h3": ""
+      },
+      "text": "- Currently, <code>totp</code> is the only supported <code>factor_type</code>. The returned <code>id</code> should be used to create a challenge.\n- To create a challenge, see [<code>mfa.challenge()</code>](/docs/reference/python/auth-mfa-challenge).\n- To verify a challenge, see [<code>mfa.verify()</code>](/docs/reference/python/auth-mfa-verify).\n- To create and verify a challenge in a single step, see [<code>mfa.challenge_and_verify()</code>](/docs/reference/python/auth-mfa-challengeandverify).\n\nEnroll a time-based, one-time password (TOTP) factor\n\n`\n_10\nres = supabase.auth.mfa.enroll({\n_10\n\"factor_type\": \"totp\",\n_10\n\"friendly_name\": \"your_friendly_name\"\n_10\n})\n`\n- An [enrolled factor](/docs/reference/python/auth-mfa-enroll) is required before creating a challenge.\n- To verify a challenge, see [<code>mfa.verify()</code>](/docs/reference/python/auth-mfa-verify).\n\nCreate a challenge for a factor\n\n`\n_10\nres = supabase.auth.mfa.challenge({\n_10\n\"factor_id\": '34e770dd-9ff9-416c-87fa-43b31d7ef225'\n_10\n})\n`\n- To verify a challenge, please [create a challenge](/docs/reference/python/auth-mfa-challenge) first.\n\nVerify a challenge for a factor\n\n`\n_10\nres = supabase.auth.mfa.verify({\n_10\n\"factor_id\": '34e770dd-9ff9-416c-87fa-43b31d7ef225',\n_10\n\"challenge_id\": '4034ae6f-a8ce-4fb5-8ee5-69a5863a7c15',\n_10\n\"code\": '123456'\n_10\n})\n`\n- An [enrolled factor](/docs/reference/python/auth-mfa-enroll) is required before invoking <code>challengeAndVerify()</code>.\n- Executes [<code>mfa.challenge()</code>](/docs/reference/python/auth-mfa-challenge) and [<code>mfa.verify()</code>](/docs/reference/python/auth-mfa-verify) in a single step.\n\nCreate and verify a challenge for a factor\n\n`\n_10\nres = supabase.auth.mfa.challenge_and_verify({\n_10\n\"factor_id\": '34e770dd-9ff9-416c-87fa-43b31d7ef225',\n_10\n\"code\": '123456'\n_10\n})\n`\nUnenroll a factor\n\n`\n_10\nres = supabase.auth.mfa.unenroll({\n_10\n\"factor_id\": '34e770dd-9ff9-416c-87fa-43b31d7ef225',\n_10\n})\n`\n- Authenticator Assurance Level (AAL) is the measure of the strength of an authentication mechanism.\n- In Supabase, having an AAL of <code>aal1</code> refers to having the 1st factor of authentication such as an email and password or OAuth sign-in while <code>aal2</code> refers to the 2nd factor of authentication such as a time-based, one-time-password (TOTP).\n- If the user has a verified factor, the <code>next_level</code> field will return <code>aal2</code>, else, it will return <code>aal1</code>.\n\nGet the AAL details of a session\n\n`\n_10\nres = supabase.auth.mfa.get_authenticator_assurance_level()\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "45dccdee-888b-47ef-9fad-5cd1a8ef6150",
+        "text": ".\n\nHaving a 2nd TOTP factor for recovery frees the user of the burden of having to store their recovery codes somewhere. It also reduces the attack surface since multiple recovery codes are usually generated compared to just having 1 backup TOTP factor.\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "d7490696-7a67-4dff-91c0-a403744ea629",
+    "metadata": {
+      "token_count": 769,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Delete a user",
+        "h3": "Parameters"
+      },
+      "text": "- Any method under the <code>supabase.auth.admin</code> namespace requires a <code>service_role</code> key.\n- These methods are considered admin methods and should be called on a trusted server. Never expose your <code>service_role</code> key in the browser.\n\nCreate server-side auth client\n\n`\n_14\nfrom supabase import create_client\n_14\nfrom supabase.lib.client_options import ClientOptions\n_14\n_14\nsupabase = create_client(\n_14\nsupabase_url,\n_14\nservice_role_key,\n_14\noptions=ClientOptions(\n_14\n    auto_refresh_token=False,\n_14\n    persist_session=False,\n_14\n)\n_14\n)\n_14\n_14\n_14\nadmin_auth_client = supabase.auth.admin\n`\n- Fetches the user object from the database based on the user's id.\n- The <code>get_user_by_id()</code> method requires the user's id which maps to the <code>auth.users.id</code> column.\n- uidRequiredstring\n\nThe user's unique identifier\n\nThis function should only be called on a server. Never expose your <code>service_role</code> key in the browser.\n\nFetch the user object using the access\\_token jwt\n\n`\n_10\nresponse = supabase.auth.admin.get_user_by_id(1)\n`\n\nResponse\n- Defaults to return 50 users per page.\n- paramsOptionalPageParams\n\nAn object which supports page and perPage as numbers, to alter the paginated results.\n\nDetails\n\nGet a page of usersPaginated list of users\n\n`\n_10\nresponse = supabase.auth.admin.list_users()\n`\n- To confirm the user's email address or phone number, set <code>email_confirm</code> or <code>phone_confirm</code> to true. Both arguments default to false.\n- <code>create_user()</code> will not send a confirmation email to the user. You can use [<code>invite_user_by_email()</code>](/docs/reference/python/auth-admin-inviteuserbyemail) if you want to send them an email invite instead.\n- If you are sure that the created user's email or phone number is legitimate and verified, you can set the <code>email_confirm</code> or <code>phone_confirm</code> param to <code>true</code>.\n- attributesRequiredAdminUserAttributes\n\nDetails\n\nWith custom user metadataAuto-confirm the user's emailAuto-confirm the user's phone number\n\n`\n_10\nresponse = supabase.auth.admin.create_user({\n_10\n\"email\": \"user@email.com\",\n_10\n\"password\": \"password\",\n_10\n\"user_metadata\": { \"name\": \"Yoda\" }\n_10\n})\n`\n\nResponse\nDelete a user. Requires a <code>service_role</code> key.\n\n- The <code>delete_user()</code> method requires the user's ID, which maps to the <code>auth.users.id</code> column.\n- idRequiredstring\n\nThe user id you want to remove.\n\n- should\\_soft\\_deleteOptionalboolean\n\nIf true, then the user will be soft-deleted (setting <code>deleted_at</code> to the current timestamp and disabling their account while preserving their data) from the auth schema. Defaults to false for backward compatibility.\n\nThis function should only be called on a server. Never expose your <code>service_role</code> key in the browser.\n\nRemoves a user\n\n`\n_10\nsupabase.auth.admin.delete_user(\n_10\n\"715ed5db-f090-4b8c-a067-640ecee36aa0\"\n_10\n)\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "2d8f561a-878f-49c8-a73a-8ef2d6166c3f",
+        "text": " <code>aal2</code>, else, it will return <code>aal1</code>.\n\nGet the AAL details of a session\n\n`\n_10\nres = supabase.auth.mfa.get_authenticator_assurance_level()\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "43a5eb70-3bdf-462a-be99-c759e12e7b7b",
+    "metadata": {
+      "token_count": 663,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Delete a factor for a user",
+        "h3": "Parameters"
+      },
+      "text": "Sends an invite link to an email address.\n\n- Sends an invite link to the user's email address.\n- The <code>invite_user_by_email()</code> method is typically used by administrators to invite users to join the application.\n- Note that PKCE is not supported when using <code>invite_user_by_email</code>. This is because the browser initiating the invite is often different from the browser accepting the invite which makes it difficult to provide the security guarantees required of the PKCE flow.\n- emailRequiredstring\n\nThe email address of the user.\n\n- optionsOptionalInviteUserByEmailOptions\n\nDetails\n\nInvite a user\n\n`\n_10\nresponse = supabase.auth.admin.invite_user_by_email(\"email@example.com\")\n`\n\nResponse\n- The following types can be passed into <code>generate_link()</code>: <code>signup</code>, <code>magiclink</code>, <code>invite</code>, <code>recovery</code>, <code>email_change_current</code>, <code>email_change_new</code>, <code>phone_change</code>.\n- <code>generate_link()</code> only generates the email link for <code>email_change_email</code> if the **Secure email change** is enabled in your project's [email auth provider settings](/dashboard/project/_/auth/providers).\n- <code>generate_link()</code> handles the creation of the user for <code>signup</code>, <code>invite</code> and <code>magiclink</code>.\n- paramsRequiredGenerateLinkParams\n\nDetails\n\nGenerate a signup linkGenerate an invite linkGenerate a magic linkGenerate a recovery linkGenerate links to change current email address\n\n`\n_10\nresponse = supabase.auth.admin.generate_link({\n_10\n\"type\": \"signup\",\n_10\n\"email\": \"email@example.com\",\n_10\n\"password\": \"secret\"\n_10\n})\n`\n\nResponse\n- uidRequiredstring\n\n- attributesRequiredAdminUserAttributes\n\nThe data you want to update.\n\nThis function should only be called on a server. Never expose your <code>service_role</code> key in the browser.\n\nDetails\n\nUpdates a user's emailUpdates a user's passwordUpdates a user's metadataUpdates a user's app\\_metadataConfirms a user's email addressConfirms a user's phone number\n\n`\n_10\nresponse = supabase.auth.admin.update_user_by_id(\n_10\n\"11111111-1111-1111-1111-111111111111\",\n_10\n{ \"email\": \"new@email.com\" }\n_10\n)\n`\n\nResponse\nDeletes a factor on a user. This will log the user out of all active sessions if the deleted factor was verified.\n- paramsRequiredAuthMFAAdminDeleteFactorParams\n\nDetails\n\nDelete a factor for a user\n\n`\n_10\nresponse = supabase.auth.admin.mfa.delete_factor({\n_10\n\"id\": \"34e770dd-9ff9-416c-87fa-43b31d7ef225\",\n_10\n\"user_id\": \"a89baba7-b1b7-440f-b4bb-91026967f66b\",\n_10\n})\n`\n\nResponse\n",
+      "overlap_text": {
+        "previous_chunk_id": "d7490696-7a67-4dff-91c0-a403744ea629",
+        "text": " the browser.\n\nRemoves a user\n\n`\n_10\nsupabase.auth.admin.delete_user(\n_10\n\"715ed5db-f090-4b8c-a067-640ecee36aa0\"\n_10\n)\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "67734010-3cf4-4c1d-844a-8f6e0908b62a",
+    "metadata": {
+      "token_count": 926,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Retrieve a bucket",
+        "h3": ""
+      },
+      "text": "Invoke a Supabase Function.\n\n- Requires an Authorization header.\n- When you pass in a body to your function, we automatically attach the Content-Type header for <code>Blob</code>, <code>ArrayBuffer</code>, <code>File</code>, <code>FormData</code> and <code>String</code>. If it doesn't match any of these types we assume the payload is <code>json</code>, serialise it and attach the <code>Content-Type</code> header as <code>application/json</code>. You can override this behaviour by passing in a <code>Content-Type</code> header of your own.\n\nBasic invocationError handlingPassing custom headers\n\n`\n_10\nresponse = supabase.functions.invoke(\n_10\n    \"hello-world\", invoke_options={\"body\": {\"name\": \"Functions\"}}\n_10\n)\n`\n- By default, Broadcast and Presence are enabled for all projects.\n- By default, listening to database changes is disabled for new projects due to database performance and security concerns. You can turn it on by managing Realtime's [replication](/docs/guides/api#realtime-api-overview).\n- You can receive the \"previous\" data for updates and deletes by setting the table's <code>REPLICA IDENTITY</code> to <code>FULL</code> (e.g., <code>ALTER TABLE your_table REPLICA IDENTITY FULL;</code>).\n- Row level security is not applied to delete statements. When RLS is enabled and replica identity is set to full, only the primary key is sent to clients.\n\nListen to broadcast messagesListen to presence syncListen to presence joinListen to presence leaveListen to all database changesListen to a specific tableListen to insertsListen to updatesListen to deletesListen to multiple eventsListen to row level changes\n\n`\n_10\nchannel = supabase.channel(\"room1\")\n_10\n_10\ndef on_subscribe(status, err):\n_10\nif status == RealtimeSubscribeStates.SUBSCRIBED:\n_10\n    channel.send_broadcast('cursor-pos', { \"x\": random.random(), \"y\": random.random() })\n_10\n_10\ndef handle_broadcast(payload):\n_10\nprint(\"Cursor position received!\", payload)\n_10\n_10\nchannel.on_broadcast(event=\"cursor-pos\", callback=handle_broadcast).subscribe(on_subscribe)\n`\n- Removing a channel is a great way to maintain the performance of your project's Realtime service as well as your database if you're listening to Postgres changes. Supabase will automatically handle cleanup 30 seconds after a client is disconnected, but unused channels may cause degradation as more clients are simultaneously subscribed.\n\nRemoves a channel\n\n`\n_10\nsupabase.remove_channel(myChannel)\n`\n- Removing channels is a great way to maintain the performance of your project's Realtime service as well as your database if you're listening to Postgres changes. Supabase will automatically handle cleanup 30 seconds after a client is disconnected, but unused channels may cause degradation as more clients are simultaneously subscribed.\n\nRemove all channels\n\n`\n_10\nsupabase.remove_all_channels()\n`\nGet all channels\n\n`\n_10\nchannels = supabase.get_channels()\n`\nBroadcast a message to all connected clients to a channel.\n\nSend a message via websocket\n\n`\n_10\nchannel = supabase.channel('room1')\n_10\n_10\ndef on_subscribe(status, err):\n_10\nif status == RealtimeSubscribeStates.SUBSCRIBED:\n_10\n    channel.send_broadcast('cursor-pos', { \"x\": random.random(), \"y\": random.random() })\n_10\n_10\nchannel.subscribe(on_subscribe)\n`\n\nResponse\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>insert</code>\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nCreate bucket\n\n`\n_10\nres = supabase.storage.create_bucket(name)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>select</code>\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nGet bucket\n\n`\n_10\nres = supabase.storage.get_bucket(name)\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "43a5eb70-3bdf-462a-be99-c759e12e7b7b",
+        "text": "c-87fa-43b31d7ef225\",\n_10\n\"user_id\": \"a89baba7-b1b7-440f-b4bb-91026967f66b\",\n_10\n})\n`\n\nResponse\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "8c89beba-2764-4763-b1e2-540a1a40dd19",
+    "metadata": {
+      "token_count": 772,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Replace an existing file",
+        "h3": ""
+      },
+      "text": "- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>select</code>\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nList buckets\n\n`\n_10\nres = supabase.storage.list_buckets()\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>select</code> and <code>delete</code>\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nDelete bucket\n\n`\n_10\nres = supabase.storage.delete_bucket(name)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: <code>select</code>\n  - <code>objects</code> table permissions: <code>select</code> and <code>delete</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nEmpty bucket\n\n`\n_10\nres = supabase.storage.empty_bucket(name)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>insert</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n- Please specify the appropriate content [MIME type](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types) if you are uploading images or audio. If no <code>file_options</code> are specified, the MIME type defaults to <code>text/html</code>.\n\nUpload file using filepath\n\n`\n_10\nwith open(filepath, 'rb') as f:\n_10\n    supabase.storage.from_(\"testbucket\").upload(file=f,path=path_on_supastorage, file_options={\"content-type\": \"audio/mpeg\"})\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nDownload file\n\n`\n_10\nwith open(destination, 'wb+') as f:\n_10\nres = supabase.storage.from_('bucket_name').download(source)\n_10\nf.write(res)\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nList files in a bucket\n\n`\n_10\nres = supabase.storage.from_('bucket_name').list()\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>update</code> and <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nUpdate file\n\n`\n_10\nwith open(filepath, 'rb') as f:\n_10\nsupabase.storage.from_(\"bucket_name\").update(file=f, path=path_on_supastorage, file_options={\"cache-control\": \"3600\", \"upsert\": \"true\"})\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "67734010-3cf4-4c1d-844a-8f6e0908b62a",
+        "text": "</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nGet bucket\n\n`\n_10\nres = supabase.storage.get_bucket(name)\n`\n"
+      }
+    }
+  },
+  {
+    "chunk_id": "5ab3c67e-5529-4d6a-a34d-29b1ec5b2b22",
+    "metadata": {
+      "token_count": 446,
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs"
+    },
+    "data": {
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Retrieve public URL",
+        "h3": ""
+      },
+      "text": "- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>update</code> and <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nMove file\n\n`\n_10\nres = supabase.storage.from_('bucket_name').move('public/avatar1.png', 'private/avatar2.png')\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>delete</code> and <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nDelete file\n\n`\n_10\nres = supabase.storage.from_('bucket_name').remove('test.jpg')\n`\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: <code>select</code>\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nCreate Signed URL\n\n`\n_10\nres = supabase.storage.from_('bucket_name').create_signed_url(filepath, expiry_duration)\n`\n- The bucket needs to be set to public, either via [updateBucket()](/docs/reference/python/storage-updatebucket) or by going to Storage on [supabase.com/dashboard](https://supabase.com/dashboard), clicking the overflow menu on a bucket and choosing \"Make public\"\n- RLS policy permissions required:\n  - <code>buckets</code> table permissions: none\n  - <code>objects</code> table permissions: none\n- Refer to the [Storage guide](/docs/guides/storage/security/access-control) on how access control works\n\nReturns the URL for an asset in a public bucket\n\n`\n_10\nres = supabase.storage.from_('bucket_name').get_public_url('test/avatar1.jpg')\n`\n",
+      "overlap_text": {
+        "previous_chunk_id": "8c89beba-2764-4763-b1e2-540a1a40dd19",
+        "text": " open(filepath, 'rb') as f:\n_10\nsupabase.storage.from_(\"bucket_name\").update(file=f, path=path_on_supastorage, file_options={\"cache-control\": \"3600\", \"upsert\": \"true\"})\n`\n"
+      }
+    }
+  }
+]

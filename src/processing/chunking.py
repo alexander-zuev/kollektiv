@@ -98,7 +98,6 @@ class MarkdownChunker:
             r'^Navigation$',
             r'^\[.*\]\(/.*\)$',  # Matches navigation links
             r'^On this page$',
-            r'^Next steps$',  # Matches common headings used in boilerplate
             r'^\* \* \*$'  # Matches horizontal rules used as separators
         ]
 
@@ -388,6 +387,7 @@ class MarkdownChunker:
 
 class MarkdownChunkValidator:
     def __init__(self, logger, min_chunk_size, max_tokens, output_dir, input_filename):
+        self.incorrect_counts = None
         self.logger = logger
         self.min_chunk_size = min_chunk_size
         self.max_tokens = max_tokens
@@ -400,8 +400,11 @@ class MarkdownChunkValidator:
         self.original_content_tokens = 0
         self.content_missing = False
         self.chunk_token_counts = []
-        self.headings_preserved = {'h1': set(), 'h2': set(), 'h3': set()}
+        self.headings_preserved = {'h1': 0, 'h2': 0, 'h3': 0}
         self.total_headings = {'h1': 0, 'h2': 0, 'h3': 0}
+        self.missing_headers = []
+        self.incorrect_counts = {'too_small': 0, 'too_large': 0, 'missing_headers': 0}  # Initialized here
+
 
     def increment_total_headings(self, level):
         if level in self.total_headings:
@@ -409,10 +412,24 @@ class MarkdownChunkValidator:
         else:
             self.total_headings[level] = 1
 
+    def check_missing_headers(self, chunk):
+        headers = chunk['data']['headers']
+        for level in ['h1', 'h2', 'h3']:
+            header_text = headers.get(level, '')
+            if not header_text:
+                self.missing_headers.append({
+                    'chunk_id': chunk['chunk_id'],
+                    'missing_header_level': level,
+                    'source_url': chunk['metadata'].get('source_url', ''),
+                    'page_title': chunk['metadata'].get('page_title', ''),
+                    'headers': headers
+                })
+
     def add_preserved_heading(self, level, heading_text):
-        if level not in self.headings_preserved:
-            self.headings_preserved[level] = set()
-        self.headings_preserved[level].add(heading_text)
+        if level in self.headings_preserved:
+            self.headings_preserved[level] += 1
+        else:
+            self.headings_preserved[level] = 1
 
     def add_chunk(self, token_count):
         self.total_chunks += 1
@@ -427,8 +444,10 @@ class MarkdownChunkValidator:
 
     def validate(self, chunks, original_content):
         self.validate_all_chunks(chunks, original_content)
+        for chunk in chunks:
+            self.check_missing_headers(chunk)
+        self.find_incorrect_chunks(chunks)  # Moved this line before log_summary()
         self.log_summary()
-        self.find_incorrect_chunks(chunks)
 
     def validate_all_chunks(self, chunks: List[Dict[str, Any]], original_content: str):
         """Performs overall validation of chunks"""
@@ -443,10 +462,6 @@ class MarkdownChunkValidator:
 
             if length_difference > 0:
                 self.content_missing = True
-                self.validation_errors.append(
-                    f"Content missing from chunks. Missing {length_difference} "
-                    f"characters ({percentage_difference:.2f}%)."
-                )
             else:
                 self.content_missing = False
 
@@ -473,25 +488,16 @@ class MarkdownChunkValidator:
     def log_summary(self):
         """Logs a concise summary of the chunking process"""
         # Token counts
-        self.logger.info(f"Total tokens in original content: {self.original_content_tokens}")
-        self.logger.info(f"Total tokens in chunks: {self.total_tokens}")
         token_difference = self.original_content_tokens - self.total_tokens
         percentage_difference = (
             (abs(token_difference) / self.original_content_tokens) * 100
             if self.original_content_tokens > 0 else 0
         )
         self.logger.info(
-            f"Token difference: {token_difference} tokens ({percentage_difference:.2f}%)"
+            f"Tokens - Original: {self.original_content_tokens}, "
+            f"Chunks: {self.total_tokens}, "
+            f"Difference: {token_difference} tokens ({percentage_difference:.2f}%)"
         )
-
-        # Content alignment
-        if self.content_missing:
-            self.logger.warning(
-                f"Content missing from chunks. Missing {token_difference} tokens "
-                f"({percentage_difference:.2f}%)."
-            )
-        else:
-            self.logger.info("All content has been preserved in the chunks.")
 
         # Total chunks
         self.logger.info(f"Total chunks created: {self.total_chunks}")
@@ -504,33 +510,36 @@ class MarkdownChunkValidator:
             max_tokens = max(self.chunk_token_counts)
             p25 = statistics.quantiles(self.chunk_token_counts, n=4)[0]
             p75 = statistics.quantiles(self.chunk_token_counts, n=4)[2]
-            self.logger.info("Chunk token statistics:")
-            self.logger.info(f" - Average tokens per chunk: {avg_tokens:.2f}")
-            self.logger.info(f" - Median tokens per chunk: {median_tokens}")
-            self.logger.info(f" - Min tokens in a chunk: {min_tokens}")
-            self.logger.info(f" - Max tokens in a chunk: {max_tokens}")
-            self.logger.info(f" - 25th percentile tokens: {p25}")
-            self.logger.info(f" - 75th percentile tokens: {p75}")
+            self.logger.info(
+                f"Chunk token statistics - Median: {median_tokens}, Min: {min_tokens}, "
+                f"Max: {max_tokens}, 25th percentile: {p25}, 75th percentile: {p75}"
+            )
         else:
             self.logger.warning("No chunks to calculate statistics.")
 
         # Headers summary
+        headers_info = []
         for level in ['h1', 'h2', 'h3']:
-            preserved = len(self.headings_preserved.get(level, set()))
+            preserved = self.headings_preserved.get(level, 0)  # Fixed here
             total = self.total_headings.get(level, 0)
             percentage = (preserved / total * 100) if total > 0 else 0
-            self.logger.info(
-                f"{level.upper()} headings preserved: {preserved}/{total} ({percentage:.2f}%)"
-            )
+            headers_info.append(f"{level.upper()} preserved: {preserved}/{total} ({percentage:.2f}%)")
+        self.logger.info("Headers summary - " + ", ".join(headers_info))
 
-        # Validation errors
-        unique_errors = set(self.validation_errors)
-        if unique_errors:
-            self.logger.warning(f"Validation issues encountered ({len(unique_errors)}):")
-            for error in unique_errors:
-                self.logger.warning(f"- {error}")
+        # Validation errors summary
+        total_errors = len(set(self.validation_errors))
+        if total_errors:
+            self.logger.warning(f"Validation issues encountered: {total_errors} issues found.")
         else:
             self.logger.info("No validation issues encountered.")
+
+        # Incorrect chunks summary
+        incorrect_chunks_info = (
+            f"Incorrect chunks - Too small: {self.incorrect_counts.get('too_small', 0)}, "
+            f"Too large: {self.incorrect_counts.get('too_large', 0)}, "
+            f"Missing headers: {self.incorrect_counts.get('missing_headers', 0)}"
+        )
+        self.logger.info(incorrect_chunks_info)
 
     def find_incorrect_chunks(self, chunks: List[Dict[str, Any]]) -> None:
         """Finds chunks below min_chunk_size or above max_tokens and saves to JSON."""
@@ -552,10 +561,18 @@ class MarkdownChunkValidator:
                     'text': c['data']['text']
                 }
                 for c in chunks if c["metadata"]["token_count"] > self.max_tokens
-            ]
+            ],
+            "missing_headers": self.missing_headers
         }
 
-        if incorrect["too_small"] or incorrect["too_large"]:
+        # Store counts for logging summary
+        self.incorrect_counts = {
+            'too_small': len(incorrect['too_small']),
+            'too_large': len(incorrect['too_large']),
+            'missing_headers': len(incorrect['missing_headers'])
+        }
+
+        if any(incorrect.values()):
             base_name = os.path.splitext(self.input_filename)[0]
             output_filename = f"{base_name}-incorrect-chunks.json"
             output_filepath = os.path.join(self.output_dir, output_filename)
@@ -564,14 +581,12 @@ class MarkdownChunkValidator:
                 json.dump(incorrect, f, indent=2, ensure_ascii=False)
 
             self.logger.info(f"Incorrect chunks saved to {output_filepath}")
-            self.logger.info(f"Number of too small chunks: {len(incorrect['too_small'])}")
-            self.logger.info(f"Number of too big chunks: {len(incorrect['too_large'])}")
         else:
             self.logger.info("No incorrect chunks found.")
 
 # Test usage
 def main():
-    markdown_chunker = MarkdownChunker(input_filename="cra_docs_en_20240912_082455.json")
+    markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_20240908_223343.json")
     result = markdown_chunker.load_data()
     chunks = markdown_chunker.process_pages(result)
     markdown_chunker.save_chunks(chunks)

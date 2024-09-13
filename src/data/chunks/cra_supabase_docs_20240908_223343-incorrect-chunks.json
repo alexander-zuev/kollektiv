@@ -1,0 +1,94 @@
+{
+  "too_small": [],
+  "too_large": [],
+  "missing_headers": [
+    {
+      "chunk_id": "d82fb98e-341a-4ec4-8248-3b5b6ba637b7",
+      "missing_header_level": "h3",
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs",
+      "headers": {
+        "h1": "unlink the google identity",
+        "h2": "Get Authenticator Assurance Level",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "53a91b7e-2da1-440f-82b0-4b995a22c34a",
+      "missing_header_level": "h3",
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs",
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "List all buckets",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "dffd8beb-840c-406c-80c4-b45a152675f6",
+      "missing_header_level": "h3",
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs",
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Create a signed URL",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "718b4f39-ff72-40a0-96dd-084fffeeea43",
+      "missing_header_level": "h3",
+      "source_url": "https://supabase.com/docs/reference/python/order",
+      "page_title": "Python API Reference | Supabase Docs",
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Retrieve public URL",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "2d8f561a-878f-49c8-a73a-8ef2d6166c3f",
+      "missing_header_level": "h3",
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs",
+      "headers": {
+        "h1": "unlink the google identity",
+        "h2": "Get Authenticator Assurance Level",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "67734010-3cf4-4c1d-844a-8f6e0908b62a",
+      "missing_header_level": "h3",
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs",
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Retrieve a bucket",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "8c89beba-2764-4763-b1e2-540a1a40dd19",
+      "missing_header_level": "h3",
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs",
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Replace an existing file",
+        "h3": ""
+      }
+    },
+    {
+      "chunk_id": "5ab3c67e-5529-4d6a-a34d-29b1ec5b2b22",
+      "missing_header_level": "h3",
+      "source_url": "https://supabase.com/docs/reference/python/or",
+      "page_title": "Python API Reference | Supabase Docs",
+      "headers": {
+        "h1": "Access auth admin api",
+        "h2": "Retrieve public URL",
+        "h3": ""
+      }
+    }
+  ]
+}
