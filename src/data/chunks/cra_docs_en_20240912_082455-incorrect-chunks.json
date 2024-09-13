@@ -1,0 +1,15 @@
+{
+  "too_small": [
+    {
+      "id": "08543878-6a16-4581-bd21-69c4a2a961b3",
+      "size": 20,
+      "headers": {
+        "h1": "Create strong empirical evaluations - Anthropic",
+        "h2": "Building evals and test cases",
+        "h3": "Example evals"
+      },
+      "text": "print(f\"Average Context Utilization Score: {sum(context_scores) / len(context_scores)}\")\n\n\n"
+    }
+  ],
+  "too_large": []
+}

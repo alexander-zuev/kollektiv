@@ -68,7 +68,7 @@ class MarkdownChunker:
             sections = self.identify_sections(page_content, page_metadata)
             chunks = self.create_chunks(sections, page_metadata)
 
-            # Post-processing: H1 fallback
+            # Post-processing: Ensure headers fallback to page title if missing
             page_title = page_metadata.get('title', 'Untitled')
             for chunk in chunks:
                 if not chunk['data']['headers'].get('h1'):
@@ -85,92 +85,88 @@ class MarkdownChunker:
         return all_chunks
 
     @error_handler(logger)
+    def clean_header_text(self, header_text: str) -> str:
+        """Cleans unwanted markdown elements and artifacts from header text."""
+        # Remove zero-width spaces
+        cleaned_text = header_text.replace('\u200b', '')
+        # Remove markdown links but keep the link text
+        cleaned_text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', cleaned_text)
+        # Remove images in headers
+        cleaned_text = re.sub(r'!\[.*?\]\(.*?\)', '', cleaned_text)
+        cleaned_text = cleaned_text.strip()
+        # Ensure shell commands are not mistaken as headers
+        if cleaned_text.startswith('!/') or cleaned_text.startswith('#!'):
+            cleaned_text = ''  # Empty out any shell commands mistaken as headers
+        return cleaned_text
+
+    @error_handler(logger)
     def identify_sections(self, page_content: str, page_metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Identifies sections in the page content based on headers"""
+        """Identifies sections in the page content based on headers and preserves markdown structures."""
         sections = []
 
-        # Patterns for headers
-        h_pattern = re.compile(r'^(#{1,6})\s*(.*)$', re.MULTILINE)
+        # Ignore lines that are horizontal rules
+        h_pattern = re.compile(r'^\s*(?![-*]{3,})(#{1,6})\s*(.*)$', re.MULTILINE)
 
-        # Find all headers
-        headers = [
-            (m.start(), m.end(), m.group(1), m.group(2).strip())
-            for m in h_pattern.finditer(page_content)
-        ]
+        # Patterns for lists, code blocks, and tables
+        code_block_pattern = re.compile(r'(```|~~~)[\s\S]+?\1', re.MULTILINE)
+        inline_code_pattern = re.compile(r'`([^`\n]+)`')
+        list_pattern = re.compile(r'^(\*|\-|\+|\d+\.)\s', re.MULTILINE)
+        table_pattern = re.compile(r'(\|[^\n]+\|)\s*\n(\|[:\- ]+\|)', re.MULTILINE)
+
+
+
+        # Header positions for splitting
+        headers = [(m.start(), m.end(), m.group(1), m.group(2).strip()) for m in h_pattern.finditer(page_content)]
         headers.sort()
 
-        # Count total headings in original content
-        for _, _, header_marker, header_text in headers:
-            header_level = len(header_marker)
-            if header_level == 1:
-                self.validator.increment_total_headings('h1')
-            elif header_level == 2:
-                self.validator.increment_total_headings('h2')
-
-        # If no headers found, treat the entire content as one section
-        if not headers:
-            sections.append({
-                "headers": {
-                    "h1": page_metadata.get('title', 'Untitled')
-                },
-                "content": page_content.strip()
-            })
-            # Track the h1 heading
-            self.validator.add_preserved_heading('h1', page_metadata.get('title', 'Untitled'))
-            self.validator.increment_total_headings('h1')  # Since we are using the page title as h1
-            return sections
-
-        # Process headers and content
         last_index = 0
-        current_section = {
-            "headers": {
-                "h1": "",
-                "h2": "",
-                "h3": ""
-            },
-            "content": ""
-        }
+        current_section = {"headers": {"h1": "", "h2": "", "h3": ""}, "content": ""}
 
         for idx, (start, end, header_marker, header_text) in enumerate(headers):
-            # Clean header text to remove markdown artifacts
-            header_text = re.sub(r'!\[.*?\]\(.*?\)', '', header_text)  # Remove images
-            header_text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', header_text)  # Remove links but keep text
-            header_text = header_text.strip()
-
             header_level = len(header_marker)
-            header = header_text
+            cleaned_header_text = self.clean_header_text(
+                re.sub(inline_code_pattern, r'<code>\1</code>', header_text.strip()))
 
             # Extract content before this header
             content = page_content[last_index:start].strip()
             if content:
+                # Check for lists, code blocks, and tables
+                if code_block_pattern.search(content):
+                    content = code_block_pattern.sub(lambda m: f'<pre><code>{m.group(0)}</code></pre>', content)
                 current_section['content'] = content
                 sections.append(current_section.copy())
-                current_section['content'] = ""
+                # Reset current_section for the next section
+                current_section = {
+                    "headers": current_section['headers'].copy(),
+                    "content": ""
+                }
 
-            # Update headers based on header level
+            # Update headers after cleaning
             if header_level == 1:
-                current_section['headers']['h1'] = header
-                current_section['headers']['h2'] = ""
-                current_section['headers']['h3'] = ""
-                # Track h1 headings
-                self.validator.add_preserved_heading('h1', header)
+                current_section['headers']['h1'] = cleaned_header_text
+                current_section['headers']['h2'] = ''
+                current_section['headers']['h3'] = ''
             elif header_level == 2:
-                current_section['headers']['h2'] = header
-                current_section['headers']['h3'] = ""
-                # Track h2 headings
-                self.validator.add_preserved_heading('h2', header)
+                current_section['headers']['h2'] = cleaned_header_text
+                current_section['headers']['h3'] = ''
             elif header_level == 3:
-                current_section['headers']['h3'] = header
+                current_section['headers']['h3'] = cleaned_header_text
+
+            # Update validator counts
+            self.validator.increment_total_headings(f'h{header_level}')
+            self.validator.add_preserved_heading(f'h{header_level}', cleaned_header_text)
 
             last_index = end
 
-        # Add remaining content after the last header
+        # Process final content
         content = page_content[last_index:].strip()
         if content:
             current_section['content'] = content
             sections.append(current_section.copy())
 
         return sections
+
+
 
     @error_handler(logger)
     def create_chunks(self, sections: List[Dict[str, Any]], page_metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
