@@ -32,9 +32,11 @@ class ClaudeAssistant:
         self.retriever = None
         self.query_generator = QueryGenerator()
 
+        self._init()
+
 
     @error_handler(logger)
-    def init(self):
+    def _init(self):
         self.client = anthropic.Anthropic(api_key=self.api_key)
         self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
         self.logger.info("Successfully initialized Anthropic client")
@@ -209,7 +211,6 @@ class ClaudeAssistant:
 
 def main():
     ca = ClaudeAssistant()
-    ca.init()
 
     user_input = input("What do you want to chat about? ")
     while user_input != "exit":

@@ -1,5 +1,5 @@
 from src.generation.claude_assistant import ClaudeAssistant
-from src.vector_storage.vector_db import VectorDB, Reranker, ResultRetriever
+from src.vector_storage.vector_db import VectorDB, Reranker, ResultRetriever, DocumentProcessor
 from src.utils.logger import setup_logger
 
 def main():
@@ -8,15 +8,20 @@ def main():
 
     # Initialize components
     vector_db = VectorDB()
-    vector_db.init()
+
+    # let's load some docs
+    filename = "cra_docs_en_20240912_082455-chunked.json"
+    doc_processor = DocumentProcessor(filename)
+    data = doc_processor.load_json()
+    chunks = doc_processor.prepare_documents(data)
+    vector_db.add_documents(chunks)
+
 
     reranker = Reranker()
-    reranker.init()
 
     retriever = ResultRetriever(vector_db=vector_db, reranker=reranker)
 
     claude_assistant = ClaudeAssistant()
-    claude_assistant.init()
 
     # Set retriever in the assistant
     claude_assistant.retriever = retriever

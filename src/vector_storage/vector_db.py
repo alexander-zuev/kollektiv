@@ -58,17 +58,18 @@ class DocumentProcessor:
 
 class VectorDB:
     def __init__(self,
-                 collection_name: str = "supabase_collection",
                  embedding_function: str = "text-embedding-3-small",
                  openai_api_key: str = OPENAI_API_KEY):
         self.embedding_function = None
-        self.collection_name = collection_name
         self.client = None
         self.collection = None
         self.embedding_function_name = embedding_function
         self.openai_api_key = openai_api_key
+        self.collection_name = "local-collection"
 
-    def init(self):
+        self._init()
+
+    def _init(self):
         try:
             self.client = chromadb.PersistentClient() # using default path for Chroma
             self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
@@ -76,10 +77,13 @@ class VectorDB:
                 model_name=self.embedding_function_name
             )
             self.collection = self.client.get_or_create_collection(
-                "supabase-collection", embedding_function=self.embedding_function
+                self.collection_name, embedding_function=self.embedding_function
             )
             logger.info(f"Successfully initialized ChromaDb with collection: {self.collection_name}")
-            logger.info(f"A total number of documents in the database: {self.collection.count()}")
+            if self.collection.count() == 0:
+                logger.warning("No documents in the database")
+            else:
+                logger.info(f"A total number of documents in the database: {self.collection.count()}")
         except Exception as e:
             logger.error(f"Error initializing ChromaDB: {e}")
             raise
@@ -103,7 +107,7 @@ class VectorDB:
             all_exist = len(missing_ids) == 0
 
             if not all_exist:
-                logger.warning("Some ids do not exist in the database")
+                logger.warning("Found missing chunks by chunk ID, reloading the full documents list.")
             return all_exist, missing_ids
 
         except Exception as e:
@@ -119,7 +123,7 @@ class VectorDB:
             all_exist, missing_ids = self.check_documents_exist(ids)
 
             if all_exist:
-                logger.info("All documents already exist in the db. skipping addition.")
+                logger.info("Documents with the same chunk ids exist in the database, skipping insertion")
                 return
 
             else: # try to add all documents (handling only simplified case
@@ -180,7 +184,10 @@ class Reranker:
         self.model_name = model_name
         self.client = None
 
-    def init(self):
+        self._init()
+
+
+    def _init(self):
         try:
             self.client = cohere.Client(os.getenv("COHERE_API_KEY"))
             logger.info("Successfully initialized Cohere client")
@@ -279,16 +286,14 @@ def main():
 
     document_processor = DocumentProcessor(filename)
     db = VectorDB()
-    db.init()
 
     llm_client = QueryGenerator()
 
     reranker = Reranker()
-    reranker.init()
     logger.info("All components initialized successfully")
 
     # initialize
-    retriever = ResultRetriever(vector_db=db, reranker=reranker, llm_client=llm_client)
+    retriever = ResultRetriever(vector_db=db, reranker=reranker)
 
     # Now proceed with the query process
     user_query = input("What do you want to know about: ")
