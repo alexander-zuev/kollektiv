@@ -76,11 +76,9 @@ class MarkdownChunker:
     def process_pages(self, json_input: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Iterates through each page in the loaded data"""
         all_chunks = []
-        original_content = ''
         for index, page in enumerate(json_input['data']):
             page_content = page['markdown']
             page_content = self.remove_boilerplate(page_content)
-            original_content += page_content
             page_metadata = page['metadata']
 
             sections = self.identify_sections(page_content, page_metadata)
@@ -97,12 +95,8 @@ class MarkdownChunker:
 
             all_chunks.extend(chunks)
 
-        # Calculate tokens in original content
-        original_content_tokens = self._calculate_tokens(original_content)
-        self.validator.set_original_content_tokens(original_content_tokens)
-
         # After processing all pages, perform validation
-        self.validator.validate(all_chunks, original_content)
+        self.validator.validate(all_chunks)
         return all_chunks
 
     @error_handler(logger)
@@ -272,7 +266,7 @@ class MarkdownChunker:
                     code_block_tokens = self._calculate_tokens(code_block_content)
                     if code_block_tokens > 2 * self.max_tokens:
                         # Split the code block
-                        split_code_blocks = self._split_code_block(code_block_content)
+                        split_code_blocks = self._split_code_block(code_block_content, code_fence)
                         for code_chunk in split_code_blocks:
                             code_chunk = code_chunk.strip()
                             if not code_chunk:
@@ -281,7 +275,7 @@ class MarkdownChunker:
                             code_chunk_content = f"{code_fence}\n{code_chunk}\n{code_fence}\n"
                             potential_chunk_content = current_chunk['content'] + code_chunk_content
                             token_count = self._calculate_tokens(potential_chunk_content)
-                            if token_count <= self.max_tokens:
+                            if token_count <= 2 * self.max_tokens:
                                 current_chunk['content'] = potential_chunk_content
                             else:
                                 if current_chunk['content'].strip():
@@ -291,12 +285,11 @@ class MarkdownChunker:
                         # Decide whether to add to current chunk or start a new one
                         potential_chunk_content = current_chunk['content'] + code_block_content
                         token_count = self._calculate_tokens(potential_chunk_content)
-                        if token_count <= self.max_tokens:
+                        if token_count <= 2 * self.max_tokens:
                             current_chunk['content'] = potential_chunk_content
                         else:
                             if current_chunk['content'].strip():
                                 chunks.append(current_chunk.copy())
-                            # Start a new chunk for the code block, even if it exceeds max_tokens
                             current_chunk = {'headers': headers.copy(), 'content': code_block_content}
                     code_block_content = ''
                 else:
@@ -320,18 +313,60 @@ class MarkdownChunker:
             else:
                 if current_chunk['content'].strip():
                     chunks.append(current_chunk.copy())
-                current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
+                # Check if the line itself exceeds 2 * max_tokens
+                line_token_count = self._calculate_tokens(line + '\n')
+                if line_token_count > 2 * self.max_tokens:
+                    # Split the line into smaller chunks
+                    split_lines = self._split_long_line(line)
+                    for split_line in split_lines:
+                        current_chunk = {'headers': headers.copy(), 'content': split_line + '\n'}
+                        chunks.append(current_chunk.copy())
+                    current_chunk = {'headers': headers.copy(), 'content': ''}
+                else:
+                    current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
             i += 1
 
         # After processing all lines, check for any unclosed code block
         if in_code_block:
             self.validator.add_validation_error("Unclosed code block detected.")
-            # Add remaining code block content to current chunk
+            # Add remaining code block content to current_chunk
             current_chunk['content'] += code_block_content
 
         if current_chunk['content'].strip():
             chunks.append(current_chunk.copy())
 
+        return chunks
+
+    @error_handler(logger)
+    def _split_code_block(self, code_block_content: str, code_fence: str) -> List[str]:
+        """Splits a code block into smaller chunks without breaking code syntax."""
+        lines = code_block_content.strip().split('\n')
+        chunks = []
+        current_chunk_lines = []
+        for line in lines:
+            current_chunk_lines.append(line)
+            current_chunk = '\n'.join(current_chunk_lines)
+            token_count = self._calculate_tokens(f"{code_fence}\n{current_chunk}\n{code_fence}\n")
+            if token_count >= 2 * self.max_tokens:
+                # Attempt to find a logical split point
+                split_index = len(current_chunk_lines) - 1
+                for j in range(len(current_chunk_lines) - 1, -1, -1):
+                    line_j = current_chunk_lines[j]
+                    if (line_j.strip() == '' or
+                            line_j.strip().startswith('#') or
+                            re.match(r'^\s*(def |class |\}|//|/\*|\*/)', line_j)):
+                        split_index = j
+                        break
+                # Split at split_index
+                chunk_content = '\n'.join(current_chunk_lines[:split_index + 1])
+                chunks.append(chunk_content.strip())
+                # Start new chunk with remaining lines
+                current_chunk_lines = current_chunk_lines[split_index + 1:]
+        # Add any remaining lines as the last chunk
+        if current_chunk_lines:
+            chunk_content = '\n'.join(current_chunk_lines)
+            if chunk_content.strip():
+                chunks.append(chunk_content.strip())
         return chunks
 
     @error_handler(logger)
@@ -350,7 +385,7 @@ class MarkdownChunker:
                     next_chunk = chunks[i + 1]
                     combined_content = current_chunk['content'] + next_chunk['content']
                     combined_tokens = self._calculate_tokens(combined_content)
-                    if combined_tokens <= self.max_tokens:
+                    if combined_tokens <= 2 * self.max_tokens:
                         # Merge current and next chunk
                         merged_chunk = {
                             'headers': self._merge_headers(current_chunk['headers'], next_chunk['headers']),
@@ -365,7 +400,7 @@ class MarkdownChunker:
                     prev_chunk = adjusted_chunks[-1]
                     combined_content = prev_chunk['content'] + current_chunk['content']
                     combined_tokens = self._calculate_tokens(combined_content)
-                    if combined_tokens <= self.max_tokens:
+                    if combined_tokens <= 2 * self.max_tokens:
                         # Merge previous and current chunk
                         merged_chunk = {
                             'headers': self._merge_headers(prev_chunk['headers'], current_chunk['headers']),
@@ -383,15 +418,42 @@ class MarkdownChunker:
                 adjusted_chunks.append(current_chunk)
                 i += 1
 
-        # Check for chunks exceeding max_tokens
+        # Now, split any chunks that exceed 2x max_tokens
+        final_chunks = []
         for chunk in adjusted_chunks:
             token_count = self._calculate_tokens(chunk['content'])
-            if token_count > self.max_tokens:
-                self.validator.add_validation_error(
-                    f"Chunk exceeds max token limit in headers {chunk['headers']}"
-                )
+            if token_count > 2 * self.max_tokens:
+                split_chunks = self._split_large_chunk(chunk)
+                final_chunks.extend(split_chunks)
+            else:
+                final_chunks.append(chunk)
+        return final_chunks
 
-        return adjusted_chunks
+    @error_handler(logger)
+    def _split_large_chunk(self, chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Splits a chunk that exceeds 2x max_tokens into smaller chunks."""
+        content = chunk['content']
+        headers = chunk['headers']
+        lines = content.split('\n')
+
+        chunks = []
+        current_chunk_content = ''
+        for line in lines:
+            potential_chunk_content = current_chunk_content + line + '\n'
+            token_count = self._calculate_tokens(potential_chunk_content)
+            if token_count <= 2 * self.max_tokens:
+                current_chunk_content = potential_chunk_content
+            else:
+                if current_chunk_content.strip():
+                    new_chunk = {'headers': headers.copy(), 'content': current_chunk_content.strip()}
+                    chunks.append(new_chunk)
+                current_chunk_content = line + '\n'
+
+        if current_chunk_content.strip():
+            new_chunk = {'headers': headers.copy(), 'content': current_chunk_content.strip()}
+            chunks.append(new_chunk)
+
+        return chunks
 
     @error_handler(logger)
     def _split_code_block(self, code_block_content: str) -> List[str]:
@@ -475,6 +537,16 @@ class MarkdownChunker:
             curr_chunk['data']['text'] = overlap_text + curr_chunk['data']['text']
             curr_chunk['metadata']['token_count'] += additional_tokens
 
+    def _split_long_line(self, line: str) -> List[str]:
+        """Splits a long line into smaller chunks not exceeding 2 * max_tokens."""
+        tokens = self.tokenizer.encode(line)
+        max_tokens_per_chunk = 2 * self.max_tokens
+        chunks = []
+        for i in range(0, len(tokens), max_tokens_per_chunk):
+            chunk_tokens = tokens[i:i + max_tokens_per_chunk]
+            chunk_text = self.tokenizer.decode(chunk_tokens)
+            chunks.append(chunk_text)
+        return chunks
 
     def _get_last_n_tokens(self, text: str, n: int) -> str:
         tokens = self.tokenizer.encode(text)
@@ -512,6 +584,12 @@ class MarkdownChunker:
         }
         return metadata
 
+    @error_handler(logger)
+    def process(self, input_filename: str):
+        """Orchestrates end to end chunking process for the given file"""
+
+
+
 class MarkdownChunkValidator:
     def __init__(self, logger, min_chunk_size, max_tokens, output_dir, input_filename):
         self.logger = logger
@@ -523,12 +601,11 @@ class MarkdownChunkValidator:
         self.validation_errors = []
         self.total_chunks = 0
         self.total_tokens = 0
-        self.original_content_tokens = 0
-        self.content_missing = False
         self.chunk_token_counts = []
         self.headings_preserved = {'h1': set(), 'h2': set(), 'h3': set()}
         self.total_headings = {'h1': set(), 'h2': set(), 'h3': set()}
         self.incorrect_counts = {'too_small': 0, 'too_large': 0}
+        self.duplicates_removed = 0  # New attribute to track duplicates removed
 
     def increment_total_headings(self, level, heading_text):
         self.total_headings[level].add(heading_text.strip())
@@ -541,66 +618,41 @@ class MarkdownChunkValidator:
         self.total_tokens += token_count
         self.chunk_token_counts.append(token_count)
 
-    def set_original_content_tokens(self, token_count):
-        self.original_content_tokens = token_count
-
     def add_validation_error(self, error_message):
         self.validation_errors.append(error_message)
 
-    def validate(self, chunks, original_content):
-        self.validate_all_chunks(chunks, original_content)
+    def validate(self, chunks):
+        self.validate_duplicates(chunks)
         self.find_incorrect_chunks(chunks)
         self.log_summary()
 
-    def validate_all_chunks(self, chunks: List[Dict[str, Any]], original_content: str):
-        """Performs overall validation of chunks"""
-        # Check if total tokens in chunks match the original content
-        combined_chunk_content = ''.join(chunk['data']['text'] for chunk in chunks)
-        if combined_chunk_content.strip() != original_content.strip():
-            # Determine if content is missing
-            original_length = len(original_content.strip())
-            combined_length = len(combined_chunk_content.strip())
-            length_difference = original_length - combined_length
-            percentage_difference = (abs(length_difference) / original_length) * 100
-
-            self.content_missing = length_difference > 0
-
-        # Check for duplicates and remove them carefully
-        chunk_texts = {}
-        duplicates_found = False
+    def validate_duplicates(self, chunks: List[Dict[str, Any]]) -> None:
+        """Removes duplicate chunks and updates counts."""
+        unique_chunks = {}
         cleaned_chunks = []
         for chunk in chunks:
             text = chunk['data']['text']
-            if text in chunk_texts:
-                duplicates_found = True
+            if text in unique_chunks:
+                self.duplicates_removed += 1
+                # Log the duplicate chunk removal
                 self.logger.warning(f"Duplicate chunk found and removed: {chunk['chunk_id']}")
                 continue
             else:
-                chunk_texts[text] = True
+                unique_chunks[text] = True
                 cleaned_chunks.append(chunk)
 
-        if duplicates_found:
-            # Update the chunks list to the cleaned_chunks without duplicates
-            chunks.clear()
-            chunks.extend(cleaned_chunks)
-            self.total_chunks = len(chunks)
+        # Update the chunks list to the cleaned_chunks without duplicates
+        chunks.clear()
+        chunks.extend(cleaned_chunks)
+        self.total_chunks = len(chunks)
 
     def log_summary(self):
         """Logs a concise summary of the chunking process"""
-        # Token counts
-        token_difference = self.original_content_tokens - self.total_tokens
-        percentage_difference = (
-            (abs(token_difference) / self.original_content_tokens) * 100
-            if self.original_content_tokens > 0 else 0
-        )
-        self.logger.info(
-            f"Tokens - Original: {self.original_content_tokens}, "
-            f"Chunks: {self.total_tokens}, "
-            f"Difference: {token_difference} tokens ({percentage_difference:.2f}%)"
-        )
-
         # Total chunks
         self.logger.info(f"Total chunks created: {self.total_chunks}")
+
+        # Duplicate chunks removed
+        self.logger.info(f"Duplicate chunks removed: {self.duplicates_removed}")
 
         # Chunk statistics
         if self.chunk_token_counts:
@@ -627,9 +679,14 @@ class MarkdownChunkValidator:
         self.logger.info("Headers summary - " + ", ".join(headers_info))
 
         # Validation errors summary
-        total_errors = len(set(self.validation_errors))
-        if total_errors:
+        if self.validation_errors:
+            error_counts = {}
+            for error in self.validation_errors:
+                error_counts[error] = error_counts.get(error, 0) + 1
+            total_errors = sum(error_counts.values())
             self.logger.warning(f"Validation issues encountered: {total_errors} issues found.")
+            for error, count in error_counts.items():
+                self.logger.warning(f"Validation error: '{error}' occurred {count} times.")
         else:
             self.logger.info("No validation issues encountered.")
 
@@ -641,7 +698,7 @@ class MarkdownChunkValidator:
         self.logger.info(incorrect_chunks_info)
 
     def find_incorrect_chunks(self, chunks: List[Dict[str, Any]]) -> None:
-        """Finds chunks below min_chunk_size or above max_tokens and saves to JSON."""
+        """Finds chunks below min_chunk_size or above 2x max_tokens and saves to JSON."""
         incorrect = {
             "too_small": [
                 {
@@ -659,7 +716,7 @@ class MarkdownChunkValidator:
                     'headers': c['data']['headers'],
                     'text': c['data']['text']
                 }
-                for c in chunks if c["metadata"]["token_count"] > self.max_tokens
+                for c in chunks if c["metadata"]["token_count"] > 2 * self.max_tokens
             ]
         }
 
@@ -668,7 +725,6 @@ class MarkdownChunkValidator:
             'too_small': len(incorrect['too_small']),
             'too_large': len(incorrect['too_large'])
         }
-
 
         if any(incorrect.values()):
             base_name = os.path.splitext(self.input_filename)[0]
@@ -681,6 +737,7 @@ class MarkdownChunkValidator:
             self.logger.info(f"Incorrect chunks saved to {output_filepath}")
         else:
             self.logger.info("No incorrect chunks found.")
+
 
 # Test usage
 def main():

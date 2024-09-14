@@ -367,7 +367,7 @@ class ResultRetriever:
 
 
 def main():
-    filename = "cra_docs_en_20240912_082455-chunked.json"
+    filename = "cra_supabase_docs_20240911_071307-chunked.json"
 
     # initialize the ranker
     retriever = ResultRetriever(filename=filename)
@@ -389,5 +389,5 @@ def main():
     print(response)
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
