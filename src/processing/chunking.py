@@ -93,7 +93,8 @@ class MarkdownChunker:
                 if not chunk['data']['headers'].get('h1'):
                     chunk['data']['headers']['h1'] = page_title
                     # Increment total headings for H1 when setting from page title
-                    self.validator.increment_total_headings('h1', page_title)
+                    if page_title.strip() not in self.validator.total_headings['h1']:
+                        self.validator.increment_total_headings('h1', page_title)
 
             all_chunks.extend(chunks)
 
@@ -267,7 +268,7 @@ class MarkdownChunker:
                     code_block_content += line + '\n'
                     # Handle large code blocks
                     code_block_tokens = self._calculate_tokens(code_block_content)
-                    if code_block_tokens > self.max_tokens:
+                    if code_block_tokens > 2 * self.max_tokens:
                         # Split code block into smaller chunks
                         split_code_blocks = self._split_code_block(code_block_content)
                         for code_chunk in split_code_blocks:
@@ -286,7 +287,7 @@ class MarkdownChunker:
                         continue
                     else:
                         current_chunk['content'] += code_block_content
-                    code_block_content = ''
+                        code_block_content = ''
                     continue
             elif in_code_block:
                 code_block_content += line + '\n'
@@ -372,28 +373,48 @@ class MarkdownChunker:
     @error_handler(logger)
     def _split_code_block(self, code_block_content: str) -> List[str]:
         """Splits a code block into smaller chunks without breaking code syntax."""
-        # For simplicity, split the code block at empty lines
         lines = code_block_content.split('\n')
         chunks = []
-        current_chunk = ''
-        for line in lines:
-            current_chunk += line + '\n'
+        current_chunk_lines = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            current_chunk_lines.append(line)
+            current_chunk = '\n'.join(current_chunk_lines) + '\n'
             token_count = self._calculate_tokens(current_chunk)
             if token_count >= self.soft_token_limit:
+                # Attempt to find a logical split point
+                split_index = i
+                for j in range(i, 0, -1):
+                    if (lines[j].strip() == '' or
+                            lines[j].strip().startswith('#') or
+                            re.match(r'^\s*(def |class |\}|//|/\*|\*/)', lines[j])):
+                        split_index = j
+                        break
+                # Split the chunk at the split_index
+                chunk_content = '\n'.join(lines[:split_index + 1])
+                chunks.append(chunk_content.strip())
+                # Reset current_chunk_lines with remaining lines
+                lines = lines[split_index + 1:]
+                current_chunk_lines = []
+                i = -1  # Reset index for the new lines list
+            i += 1
+        if current_chunk_lines:
+            current_chunk = '\n'.join(current_chunk_lines)
+            if current_chunk.strip():
                 chunks.append(current_chunk.strip())
-                current_chunk = ''
-        if current_chunk.strip():
-            chunks.append(current_chunk.strip())
         return chunks
 
     @error_handler(logger)
     def _merge_headers(self, headers1: Dict[str, str], headers2: Dict[str, str]) -> Dict[str, str]:
         merged = {}
         for level in ['h1', 'h2', 'h3']:
-            if headers1.get(level):
-                merged[level] = headers1[level]
-            elif headers2.get(level):
-                merged[level] = headers2[level]
+            header1 = headers1.get(level, '').strip()
+            header2 = headers2.get(level, '').strip()
+            if header1:
+                merged[level] = header1
+            elif header2:
+                merged[level] = header2
             else:
                 merged[level] = ''
         return merged
@@ -487,10 +508,10 @@ class MarkdownChunkValidator:
         self.incorrect_counts = {'too_small': 0, 'too_large': 0}
 
     def increment_total_headings(self, level, heading_text):
-        self.total_headings[level].add(heading_text)
+        self.total_headings[level].add(heading_text.strip())
 
     def add_preserved_heading(self, level, heading_text):
-        self.headings_preserved[level].add(heading_text)
+        self.headings_preserved[level].add(heading_text.strip())
 
     def add_chunk(self, token_count):
         self.total_chunks += 1
@@ -624,6 +645,7 @@ class MarkdownChunkValidator:
             'too_small': len(incorrect['too_small']),
             'too_large': len(incorrect['too_large'])
         }
+
 
         if any(incorrect.values()):
             base_name = os.path.splitext(self.input_filename)[0]
