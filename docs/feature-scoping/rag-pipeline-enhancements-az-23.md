@@ -49,9 +49,10 @@ implementation that I'd want to address before calling it a v0.1 release.
 
 ## Simplified flow
 - User starts the application (Chainlit interface)
-  - Orchestrator initializes all components (VectorDB, RAGTool, ClaudeAssistant)
+  - Claude Assistant initializes all components (VectorDB, RAGTool, ClaudeAssistant)
   - User inputs a query
-  - Orchestrator processes the query and decides whether to use RAG
+  - Orchestrator passes the query to ClaudeAssistant
+  - ClaudeAssistant processes the query and decides whether to use RAG
     - If using RAG, retrieves and ranks relevant documents 
   - ClaudeAssistant generates a response, incorporating RAG results if applicable 
   - Response is displayed to the user

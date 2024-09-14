@@ -11,7 +11,8 @@ import cohere
 
 from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
-from src.generation.claude_assistant import Claude
+from src.generation.claude_assistant import ClaudeAssistant
+from src.utils.config import ANTHROPIC_API_KEY
 
 # Set up logger
 logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
@@ -173,58 +174,6 @@ class VectorDB:
                 }
         return unique_documents
 
-class OpenAIClient:
-    def __init__(self, api_key: str = OPENAI_API_KEY, model_name: str = 'gpt-4o-mini'):
-        self.api_key = api_key
-        self.model_name = model_name
-        self.client = None
-
-    def init(self):
-        try:
-            self.client = OpenAI(api_key=self.api_key)
-            logger.info("Successfully initialized OpenAI client")
-        except Exception as e:
-            logger.error(f"Error initializing OpenAI client: {e}")
-            raise
-
-    def generate_multi_query(self, user_query: str, model: str = None) -> List[str]:
-        prompt = """
-        You are a meticoulous, accurate, and knowledgeable AI assistant.
-        You are helping users retrieve relevan information from a vector database.
-        For the given user question, formulate up to 3 related, relevant questions to assist in finding the 
-        information.
-        
-        Requirements to follow:
-        - Provide concise, single-topic questions (without compounding sentences) that cover various aspects of 
-        the topic.
-        - Ensure each question is complete and directly related to the original inquiry.
-        - List each question on a separate line without numbering.
-        """
-        if model is None:
-            model = self.model_name
-
-        try:
-            messages = [
-                {'role': 'system', 'content': prompt},
-                {'role': 'user', 'content': user_query},
-            ]
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
-            content = response.choices[0].message.content
-            content = content.split('\n')
-            return content
-        except Exception as e:
-            logger.error(f"Error generating OpenAI completion: {e}")
-            raise
-
-    def combine_queries(self, user_query: str, generated_queries: List[str]) -> List[str]:
-        """
-        Combines user query and generated queries into a list, removing any empty queries.
-        """
-        combined_queries = [query for query in [user_query] + generated_queries if query.strip()]
-        return combined_queries
 
 class Reranker:
     def __init__(self, cohere_api_key: str = COHERE_API_KEY, model_name: str = 'rerank-english-v3.0'):
@@ -319,7 +268,7 @@ class ResultRetriever:
             self.db.init()
 
             # llm client
-            self.llm_client = OpenAIClient()
+            self.llm_client = ClaudeAssistant()
             self.llm_client.init()
 
             # reranker
@@ -347,6 +296,7 @@ class ResultRetriever:
         try:
             # expand the queries
             multiple_queries = self.llm_client.generate_multi_query(user_query)
+            logger.info(f"Debugging generated {multiple_queries}")
             combined_queries = self.llm_client.combine_queries(user_query, multiple_queries)
             logger.debug(f"Debugging ranked documents {combined_queries}")
 
@@ -367,7 +317,7 @@ class ResultRetriever:
 
 
 def main():
-    filename = "cra_supabase_docs_20240911_071307-chunked.json"
+    filename = "cra_docs_en_20240912_082455-chunked.json"
 
     # initialize the ranker
     retriever = ResultRetriever(filename=filename)
@@ -382,12 +332,12 @@ def main():
     results = retriever.retrieve(user_query)
 
     # Send to the generation
-    claude = Claude()
+    claude = ClaudeAssistant()
     claude.init()
     response = claude.get_augmented_response(user_query, results)
     print("FINAL REPLY")
     print(response)
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
