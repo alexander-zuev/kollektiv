@@ -6,13 +6,12 @@ import chromadb.utils.embedding_functions as embedding_functions
 from typing import List, Dict, Any, Tuple, Union
 import json
 import os
-from openai import OpenAI
 import cohere
 
 from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
-from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.config import ANTHROPIC_API_KEY
+from src.generation.claude_assistant import QueryGenerator
+
 
 # Set up logger
 logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
@@ -220,7 +219,6 @@ class Reranker:
         return relevant_results
 
 
-
     def rerank(self, query: str, documents: Dict[str, Any], relevance_threshold: float = 0.01, return_documents=True):
         """
         Use Cohere rerank API to score and rank documents based on the query.
@@ -250,55 +248,15 @@ class Reranker:
         return relevant_results
 
 class ResultRetriever:
-    def __init__(self, filename: str):
+    def __init__(self, vector_db: VectorDB, reranker: Reranker):
         self.file_name = filename
-        self.doc_processor = None
-        self.db = None
-        self.llm_client = None
-        self.reranker = None
+        self.db = vector_db
+        self.reranker = reranker
 
-    def initialize_components(self):
-        """Initialize all necessary components."""
-        try:
-            #
-            self.doc_processor = DocumentProcessor(self.file_name)
 
-            # db
-            self.db = VectorDB()
-            self.db.init()
-
-            # llm client
-            self.llm_client = ClaudeAssistant()
-            self.llm_client.init()
-
-            # reranker
-            self.reranker = Reranker()
-            self.reranker.init()
-
-            logger.info("All components initialized successfully")
-
-        except Exception as e:
-            logger.error(f"Error initializing components: {e}")
-            raise
-
-    def load_documents(self) -> None:
-        """Load docs in the database if they are not already present"""
-        try:
-            chunks = self.doc_processor.load_json()
-            processed_chunks = self.doc_processor.prepare_documents(chunks)
-            self.db.add_documents(processed_chunks)
-        except Exception as e:
-            logger.error(f"Error loading documents: {e}")
-            raise
-
-    def retrieve(self, user_query: str):
+    def retrieve(self, user_query: str, combined_queries: List[str]):
         """Given the user query run the full end to end flow"""
         try:
-            # expand the queries
-            multiple_queries = self.llm_client.generate_multi_query(user_query)
-            logger.info(f"Debugging generated {multiple_queries}")
-            combined_queries = self.llm_client.combine_queries(user_query, multiple_queries)
-            logger.debug(f"Debugging ranked documents {combined_queries}")
 
             # get expanded search results
             search_results = self.db.query(combined_queries)
@@ -319,24 +277,29 @@ class ResultRetriever:
 def main():
     filename = "cra_docs_en_20240912_082455-chunked.json"
 
-    # initialize the ranker
-    retriever = ResultRetriever(filename=filename)
+    document_processor = DocumentProcessor(filename)
+    db = VectorDB()
+    db.init()
 
-    retriever.initialize_components()
+    llm_client = QueryGenerator()
 
-    # Load the documents into the database
-    retriever.load_documents()
+    reranker = Reranker()
+    reranker.init()
+    logger.info("All components initialized successfully")
+
+    # initialize
+    retriever = ResultRetriever(vector_db=db, reranker=reranker, llm_client=llm_client)
 
     # Now proceed with the query process
     user_query = input("What do you want to know about: ")
     results = retriever.retrieve(user_query)
 
-    # Send to the generation
-    claude = ClaudeAssistant()
-    claude.init()
-    response = claude.get_augmented_response(user_query, results)
-    print("FINAL REPLY")
-    print(response)
+    # # Send to the generation
+    # claude = ClaudeAssistant()
+    # claude.init()
+    # response = claude.get_augmented_response(user_query, results)
+    # print("FINAL REPLY")
+    # print(response)
 
 
 if __name__ == "__main__":
