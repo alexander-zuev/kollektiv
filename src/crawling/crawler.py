@@ -69,8 +69,11 @@ class FireCrawler:
             params = {
                 'limit': page_limit,
                 'maxDepth': 5,
-                "includePaths": ["/docs/*",
-                                 '/api/*'],
+                "includePaths": ["/api_reference/*",
+                                 '/module_guides/*',
+                                 '/examples/*',
+                                 '/understanding/*,'
+                                 '/optimizing/*'],
                 'scrapeOptions':
                     {'formats': ['markdown']}
             }
@@ -323,9 +326,9 @@ def main():
     # print(supabase_ai_map['links'])
 
     # Testing crawl_url
-    urls_to_crawl = ["https://docs.anthropic.com/en",
+    urls_to_crawl = ["https://docs.llamaindex.ai/en/stable",
                     ]
-    results = crawler.async_crawl_url(urls_to_crawl, page_limit=75)
+    results = crawler.async_crawl_url(urls_to_crawl, page_limit=100)
     # crawler.build_example_file("cra_supabase_docs_2024-09-11 07:16:11.json")
 
 if __name__ == "__main__":

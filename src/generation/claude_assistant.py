@@ -1,11 +1,12 @@
-from csv import excel_tab
-
 from src.utils.logger import setup_logger
 from src.utils.config import ANTHROPIC_API_KEY, LOG_DIR
+from src.utils.decorators import error_handler
 from typing import Dict, Any, List
 
 import anthropic
 import os
+
+logger = setup_logger('claude_assistant', "claude_assistant.log")
 
 # Client Class
 class Claude:
@@ -13,23 +14,19 @@ class Claude:
         self.client = None
         self.api_key = api_key
         self.model_name = model_name
-        self.logger = setup_logger('claude_assistant', os.path.join(LOG_DIR,
-                                                                    "claude_assistant.log"))
+        self.logger = logger
 
+    @error_handler(logger)
     def init(self, ):
-        try:
-            self.client = anthropic.Anthropic(
-                api_key=self.api_key,
-            )
-            self.logger.info("Successfully initialized Anthropic client")
-        except Exception as e:
-            self.logger.error(f"Exception while initializing Anthropic client: {e}")
-            raise
+        self.client = anthropic.Anthropic(api_key=self.api_key)
+        self.logger.info("Successfully initialized Anthropic client")
 
 
+    @error_handler(logger)
     def get_response(self, user_query: str, streaming: bool = False):
         pass
 
+    @error_handler(logger)
     def preprocess_ranked_documents(self, ranked_documents: Dict[str, Any]) -> List[str]:
         """
         Converts ranked documents into a structured string for passing to the Claude API.
@@ -52,6 +49,7 @@ class Claude:
 
         return preprocessed_context
 
+    @error_handler(logger)
     def get_augmented_response(self, user_query: str, context: Dict[str, Any], model_name: str =
     "claude-3-5-sonnet-20240620"):
 
