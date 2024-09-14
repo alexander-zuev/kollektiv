@@ -4,7 +4,6 @@ import os
 import re
 import statistics
 from typing import List, Dict, Any
-from functools import lru_cache
 
 import tiktoken
 
@@ -252,50 +251,67 @@ class MarkdownChunker:
         code_fence = ''
         code_block_content = ''
 
-        for i, line in enumerate(lines):
+        i = 0
+        while i < len(lines):
+            line = lines[i]
             stripped_line = line.rstrip()
 
             # Check for code block start/end
             code_block_start_match = self.code_block_start_pattern.match(stripped_line)
             if code_block_start_match:
+                fence = code_block_start_match.group(1)
                 if not in_code_block:
                     in_code_block = True
-                    code_fence = code_block_start_match.group(1)
+                    code_fence = fence
                     code_block_content = line + '\n'
-                    continue
                 elif stripped_line == code_fence:
-                    in_code_block = False
                     code_block_content += line + '\n'
-                    # Handle large code blocks
+                    in_code_block = False
+
+                    # Code block has ended; decide where to place it
                     code_block_tokens = self._calculate_tokens(code_block_content)
                     if code_block_tokens > 2 * self.max_tokens:
-                        # Split code block into smaller chunks
+                        # Split the code block
                         split_code_blocks = self._split_code_block(code_block_content)
                         for code_chunk in split_code_blocks:
-                            if code_chunk.strip():
-                                # Wrap code chunk with code fence
-                                code_chunk_content = f"{code_fence}\n{code_chunk}\n{code_fence}\n"
-                                potential_chunk_content = current_chunk['content'] + code_chunk_content
-                                token_count = self._calculate_tokens(potential_chunk_content)
-                                if token_count <= self.max_tokens:
-                                    current_chunk['content'] = potential_chunk_content
-                                else:
-                                    if current_chunk['content'].strip():
-                                        chunks.append(current_chunk.copy())
-                                    current_chunk = {'headers': headers.copy(), 'content': code_chunk_content}
-                        code_block_content = ''
-                        continue
+                            code_chunk = code_chunk.strip()
+                            if not code_chunk:
+                                continue
+                            # Wrap code chunk with code fence
+                            code_chunk_content = f"{code_fence}\n{code_chunk}\n{code_fence}\n"
+                            potential_chunk_content = current_chunk['content'] + code_chunk_content
+                            token_count = self._calculate_tokens(potential_chunk_content)
+                            if token_count <= self.max_tokens:
+                                current_chunk['content'] = potential_chunk_content
+                            else:
+                                if current_chunk['content'].strip():
+                                    chunks.append(current_chunk.copy())
+                                current_chunk = {'headers': headers.copy(), 'content': code_chunk_content}
                     else:
-                        current_chunk['content'] += code_block_content
-                        code_block_content = ''
-                    continue
-            elif in_code_block:
-                code_block_content += line + '\n'
+                        # Decide whether to add to current chunk or start a new one
+                        potential_chunk_content = current_chunk['content'] + code_block_content
+                        token_count = self._calculate_tokens(potential_chunk_content)
+                        if token_count <= self.max_tokens:
+                            current_chunk['content'] = potential_chunk_content
+                        else:
+                            if current_chunk['content'].strip():
+                                chunks.append(current_chunk.copy())
+                            # Start a new chunk for the code block, even if it exceeds max_tokens
+                            current_chunk = {'headers': headers.copy(), 'content': code_block_content}
+                    code_block_content = ''
+                else:
+                    # Inside code block
+                    code_block_content += line + '\n'
+                i += 1
                 continue
 
-            # Handle inline code
-            line = self.inline_code_pattern.sub(r'<code>\1</code>', line)
+            elif in_code_block:
+                code_block_content += line + '\n'
+                i += 1
+                continue
 
+            # Handle regular lines
+            line = self.inline_code_pattern.sub(r'<code>\1</code>', line)
             potential_chunk_content = current_chunk['content'] + line + '\n'
             token_count = self._calculate_tokens(potential_chunk_content)
 
@@ -305,6 +321,13 @@ class MarkdownChunker:
                 if current_chunk['content'].strip():
                     chunks.append(current_chunk.copy())
                 current_chunk = {'headers': headers.copy(), 'content': line + '\n'}
+            i += 1
+
+        # After processing all lines, check for any unclosed code block
+        if in_code_block:
+            self.validator.add_validation_error("Unclosed code block detected.")
+            # Add remaining code block content to current chunk
+            current_chunk['content'] += code_block_content
 
         if current_chunk['content'].strip():
             chunks.append(current_chunk.copy())

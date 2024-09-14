@@ -1,6 +1,6 @@
 [
   {
-    "chunk_id": "8eb1ae80-aa07-49be-885c-0a42b2f76a96",
+    "chunk_id": "7990094c-b6e4-4923-83b6-e4255259480e",
     "metadata": {
       "token_count": 404,
       "source_url": "https://docs.anthropic.com/en/api/versioning",
@@ -16,7 +16,7 @@
     }
   },
   {
-    "chunk_id": "bfc7cb43-0cf9-420a-893f-a7f8f0f41330",
+    "chunk_id": "39dfdfe6-7d7c-461f-8fea-55144fc8c78d",
     "metadata": {
       "token_count": 198,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-generator",
@@ -32,7 +32,7 @@
     }
   },
   {
-    "chunk_id": "1a70a744-8359-4291-a1b6-e1b63d8f8482",
+    "chunk_id": "0657e711-6240-45ee-a64a-ad3be443d485",
     "metadata": {
       "token_count": 246,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prompt-generator",
@@ -48,7 +48,7 @@
     }
   },
   {
-    "chunk_id": "3760a0e8-ec68-44bc-b4f9-5c5231b0d3d2",
+    "chunk_id": "e569a70e-8d7e-4e50-96e3-bdd4755084a4",
     "metadata": {
       "token_count": 371,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -64,7 +64,7 @@
     }
   },
   {
-    "chunk_id": "6128d0b6-f067-4cb4-b7ac-697396a610cc",
+    "chunk_id": "70991b4e-e7b3-4ae1-a39c-7cc7545ce46d",
     "metadata": {
       "token_count": 367,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -80,7 +80,7 @@
     }
   },
   {
-    "chunk_id": "1214329b-490d-43eb-b92b-c98481f52f21",
+    "chunk_id": "084d52a4-e979-4b25-816c-d57d089af486",
     "metadata": {
       "token_count": 426,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -96,7 +96,7 @@
     }
   },
   {
-    "chunk_id": "e99d33e5-807e-4d48-a422-c767df3d2f8a",
+    "chunk_id": "b91dc3e9-f6e0-408d-afbb-2bcffade9597",
     "metadata": {
       "token_count": 577,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -112,7 +112,7 @@
     }
   },
   {
-    "chunk_id": "f24553fe-cb9b-4ae7-a380-f43a7e01e4f6",
+    "chunk_id": "303ff391-0aae-4aff-9ebe-fee5b6521091",
     "metadata": {
       "token_count": 439,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -128,7 +128,7 @@
     }
   },
   {
-    "chunk_id": "7805bfd5-af80-4209-a250-bb404832f341",
+    "chunk_id": "2af5dd2f-12c2-4f6c-b5a2-690599002e98",
     "metadata": {
       "token_count": 586,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -144,7 +144,7 @@
     }
   },
   {
-    "chunk_id": "8c96dfa5-afb6-48e8-b9d4-327f0625dff3",
+    "chunk_id": "2c4840ec-6ad3-45d2-b883-dc390f6ef38a",
     "metadata": {
       "token_count": 905,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -160,7 +160,7 @@
     }
   },
   {
-    "chunk_id": "6a1b304e-650d-4652-baaf-49b5d68f5bf0",
+    "chunk_id": "00c47ccc-cd25-4d13-b214-2508dec428fe",
     "metadata": {
       "token_count": 285,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -176,7 +176,7 @@
     }
   },
   {
-    "chunk_id": "6aaeef36-8b43-4c95-94fe-d8fd96593e27",
+    "chunk_id": "f93ee213-a499-4780-8375-0590002a15cd",
     "metadata": {
       "token_count": 591,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -192,9 +192,9 @@
     }
   },
   {
-    "chunk_id": "f713825d-5c68-4714-abbe-087ad7965a78",
+    "chunk_id": "27bdaf13-0e8d-4130-9ac6-15353ef32633",
     "metadata": {
-      "token_count": 1058,
+      "token_count": 611,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
       "page_title": "Tool use (function calling) - Anthropic"
     },
@@ -204,13 +204,13 @@
         "h2": "Tool use examples",
         "h3": ""
       },
-      "text": "Here are a few code examples demonstrating various tool use patterns and techniques. For brevity\u2019s sake, the tools are simple tools, and the tool descriptions are shorter than would be ideal to ensure best performance.\n\nSingle tool example\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [{\\\n        \"name\": \"get_weather\",\\\n        \"description\": \"Get the current weather in a given location\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"location\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                },\\\n                \"unit\": {\\\n                    \"type\": \"string\",\\\n                    \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                    \"description\": \"The unit of temperature, either \\\"celsius\\\" or \\\"fahrenheit\\\"\"\\\n                }\\\n            },\\\n            \"required\": [\"location\"]\\\n        }\\\n    }],\n    \"messages\": [{\"role\": \"user\", \"content\": \"What is the weather like in San Francisco?\"}]\n}'\n\n```\n\nClaude will return a response similar to:\n\nJSON\n\nCopy\n\n```JSON\n{\n  \"id\": \"msg_01Aq9w938a90dw8q\",\n  \"model\": \"claude-3-5-sonnet-20240620\",\n  \"stop_reason\": \"tool_use\",\n  \"role\": \"assistant\",\n  \"content\": [\\\n    {\\\n      \"type\": \"text\",\\\n      \"text\": \"<thinking>I need to call the get_weather function, and the user wants SF, which is likely San Francisco, CA.</thinking>\"\\\n    },\\\n    {\\\n      \"type\": \"tool_use\",\\\n      \"id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n      \"name\": \"get_weather\",\\\n      \"input\": {\"location\": \"San Francisco, CA\", \"unit\": \"celsius\"}\\\n    }\\\n  ]\n}\n\n```\n\nYou would then need to execute the <code>get_weather</code> function with the provided input, and return the result in a new <code>user</code> message:\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [\\\n        {\\\n            \"name\": \"get_weather\",\\\n            \"description\": \"Get the current weather in a given location\",\\\n            \"input_schema\": {\\\n                \"type\": \"object\",\\\n                \"properties\": {\\\n                    \"location\": {\\\n                        \"type\": \"string\",\\\n                        \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                    },\\\n                    \"unit\": {\\\n                        \"type\": \"string\",\\\n                        \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                        \"description\": \"The unit of temperature, either \\\"celsius\\\" or \\\"fahrenheit\\\"\"\\\n                    }\\\n                },\\\n                \"required\": [\"location\"]\\\n            }\\\n        }\\\n    ],\n    \"messages\": [\\\n        {\\\n            \"role\": \"user\",\\\n            \"content\": \"What is the weather like in San Francisco?\"\\\n        },\\\n        {\\\n            \"role\": \"assistant\",\\\n            \"content\": [\\\n                {\\\n                    \"type\": \"text\",\\\n                    \"text\": \"<thinking>I need to use get_weather, and the user wants SF, which is likely San Francisco, CA.</thinking>\"\\\n                },\\\n                {\\\n                    \"type\": \"tool_use\",\\\n                    \"id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n                    \"name\": \"get_weather\",\\\n                    \"input\": {\\\n                        \"location\": \"San Francisco, CA\",\\\n                        \"unit\": \"celsius\"\\\n                    }\\\n                }\\\n            ]\\\n        },\\\n        {\\\n            \"role\": \"user\",\\\n            \"content\": [\\\n                {\\\n                    \"type\": \"tool_result\",\\\n                    \"tool_use_id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n                    \"content\": \"15 degrees\"\\\n                }\\\n            ]\\\n        }\\\n    ]\n}'\n\n```\n"
+      "text": " user.\n\n<search\\_quality\\_reflection> tags\n\nTo prevent Claude from reflecting on search quality with <search\\_quality\\_reflection> tags, add \u201cDo not reflect on the quality of the returned search results in your response\u201d to your prompt.\nHere are a few code examples demonstrating various tool use patterns and techniques. For brevity\u2019s sake, the tools are simple tools, and the tool descriptions are shorter than would be ideal to ensure best performance.\n\nSingle tool example\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [{\\\n        \"name\": \"get_weather\",\\\n        \"description\": \"Get the current weather in a given location\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"location\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                },\\\n                \"unit\": {\\\n                    \"type\": \"string\",\\\n                    \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                    \"description\": \"The unit of temperature, either \\\"celsius\\\" or \\\"fahrenheit\\\"\"\\\n                }\\\n            },\\\n            \"required\": [\"location\"]\\\n        }\\\n    }],\n    \"messages\": [{\"role\": \"user\", \"content\": \"What is the weather like in San Francisco?\"}]\n}'\n\n```\n\nClaude will return a response similar to:\n\nJSON\n\nCopy\n\n```JSON\n{\n  \"id\": \"msg_01Aq9w938a90dw8q\",\n  \"model\": \"claude-3-5-sonnet-20240620\",\n  \"stop_reason\": \"tool_use\",\n  \"role\": \"assistant\",\n  \"content\": [\\\n    {\\\n      \"type\": \"text\",\\\n      \"text\": \"<thinking>I need to call the get_weather function, and the user wants SF, which is likely San Francisco, CA.</thinking>\"\\\n    },\\\n    {\\\n      \"type\": \"tool_use\",\\\n      \"id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n      \"name\": \"get_weather\",\\\n      \"input\": {\"location\": \"San Francisco, CA\", \"unit\": \"celsius\"}\\\n    }\\\n  ]\n}\n\n```\n\nYou would then need to execute the <code>get_weather</code> function with the provided input, and return the result in a new <code>user</code> message:\n\nShell\n\nPython\n\nCopy\n\n"
     }
   },
   {
-    "chunk_id": "9dbeb565-cbfa-4964-8edd-e576d15f7a3a",
+    "chunk_id": "72178178-6d9f-484b-97ab-9b7f7cc29b02",
     "metadata": {
-      "token_count": 826,
+      "token_count": 742,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
       "page_title": "Tool use (function calling) - Anthropic"
     },
@@ -220,13 +220,13 @@
         "h2": "Tool use examples",
         "h3": ""
       },
-      "text": "_result\",\\\n                    \"tool_use_id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n                    \"content\": \"15 degrees\"\\\n                }\\\n            ]\\\n        }\\\n    ]\n}'\n\n```\n\nThis will print Claude\u2019s final response, incorporating the weather data:\n\nJSON\n\nCopy\n\n```JSON\n{\n  \"id\": \"msg_01Aq9w938a90dw8q\",\n  \"model\": \"claude-3-5-sonnet-20240620\",\n  \"stop_reason\": \"stop_sequence\",\n  \"role\": \"assistant\",\n  \"content\": [\\\n    {\\\n      \"type\": \"text\",\\\n      \"text\": \"The current weather in San Francisco is 15 degrees Celsius (59 degrees Fahrenheit). It's a cool day in the city by the bay!\"\\\n    }\\\n  ]\n}\n\n```\n\nMultiple tool example\n\nYou can provide Claude with multiple tools to choose from in a single request. Here\u2019s an example with both a <code>get_weather</code> and a <code>get_time</code> tool, along with a user query that asks for both.\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [{\\\n        \"name\": \"get_weather\",\\\n        \"description\": \"Get the current weather in a given location\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"location\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                },\\\n                \"unit\": {\\\n                    \"type\": \"string\",\\\n                    \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                    \"description\": \"The unit of temperature, either 'celsius' or 'fahrenheit'\"\\\n                }\\\n            },\\\n            \"required\": [\"location\"]\\\n        }\\\n    },\\\n    {\\\n        \"name\": \"get_time\",\\\n        \"description\": \"Get the current time in a given time zone\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"timezone\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"The IANA time zone name, e.g. America/Los_Angeles\"\\\n                }\\\n            },\\\n            \"required\": [\"timezone\"]\\\n        }\\\n    }],\n    \"messages\": [{\\\n        \"role\": \"user\",\\\n        \"content\": \"What is the weather like right now in New York? Also what time is it there?\"\\\n    }]\n}'\n\n```\n\nIn this case, Claude will most likely try to use two separate tools, one at a time \u2014 <code>get_weather</code> and then <code>get_time</code> \u2014 in order to fully answer the user\u2019s question. However, it will also occasionally output two <code>tool_use</code> blocks at once, particularly if they are not dependent on each other. You would need to execute each tool and return their results in separate <code>tool_result</code> blocks within a single <code>user</code> message.\n\nMissing information\n\nIf the user\u2019s prompt doesn\u2019t include enough information to fill all the required parameters for a tool, Claude 3 Opus is much more likely to recognize that a parameter is missing and ask for it. Claude 3 Sonnet may ask, especially when prompted to think before outputting a tool request. But it may also do its best to infer a reasonable value.\n\n"
+      "text": " }\\\n  ]\n}\n\n```\n\nYou would then need to execute the <code>get_weather</code> function with the provided input, and return the result in a new <code>user</code> message:\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [\\\n        {\\\n            \"name\": \"get_weather\",\\\n            \"description\": \"Get the current weather in a given location\",\\\n            \"input_schema\": {\\\n                \"type\": \"object\",\\\n                \"properties\": {\\\n                    \"location\": {\\\n                        \"type\": \"string\",\\\n                        \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                    },\\\n                    \"unit\": {\\\n                        \"type\": \"string\",\\\n                        \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                        \"description\": \"The unit of temperature, either \\\"celsius\\\" or \\\"fahrenheit\\\"\"\\\n                    }\\\n                },\\\n                \"required\": [\"location\"]\\\n            }\\\n        }\\\n    ],\n    \"messages\": [\\\n        {\\\n            \"role\": \"user\",\\\n            \"content\": \"What is the weather like in San Francisco?\"\\\n        },\\\n        {\\\n            \"role\": \"assistant\",\\\n            \"content\": [\\\n                {\\\n                    \"type\": \"text\",\\\n                    \"text\": \"<thinking>I need to use get_weather, and the user wants SF, which is likely San Francisco, CA.</thinking>\"\\\n                },\\\n                {\\\n                    \"type\": \"tool_use\",\\\n                    \"id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n                    \"name\": \"get_weather\",\\\n                    \"input\": {\\\n                        \"location\": \"San Francisco, CA\",\\\n                        \"unit\": \"celsius\"\\\n                    }\\\n                }\\\n            ]\\\n        },\\\n        {\\\n            \"role\": \"user\",\\\n            \"content\": [\\\n                {\\\n                    \"type\": \"tool_result\",\\\n                    \"tool_use_id\": \"toolu_01A09q90qw90lq917835lq9\",\\\n                    \"content\": \"15 degrees\"\\\n                }\\\n            ]\\\n        }\\\n    ]\n}'\n\n```\n\nThis will print Claude\u2019s final response, incorporating the weather data:\n\nJSON\n\nCopy\n\n```JSON\n{\n  \"id\": \"msg_01Aq9w938a90dw8q\",\n  \"model\": \"claude-3-5-sonnet-20240620\",\n  \"stop_reason\": \"stop_sequence\",\n  \"role\": \"assistant\",\n  \"content\": [\\\n    {\\\n      \"type\": \"text\",\\\n      \"text\": \"The current weather in San Francisco is 15 degrees Celsius (59 degrees Fahrenheit). It's a cool day in the city by the bay!\"\\\n    }\\\n  ]\n}\n\n```\n\nMultiple tool example\n\nYou can provide Claude with multiple tools to choose from in a single request. Here\u2019s an example with both a <code>get_weather</code> and a <code>get_time</code> tool, along with a user query that asks for both.\n\nShell\n\nPython\n\nCopy\n\n"
     }
   },
   {
-    "chunk_id": "56652eb5-cbe8-4ecf-a5f3-905e80035375",
+    "chunk_id": "742a614d-6457-49a9-9959-f6aada69ef5b",
     "metadata": {
-      "token_count": 835,
+      "token_count": 808,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
       "page_title": "Tool use (function calling) - Anthropic"
     },
@@ -236,13 +236,13 @@
         "h2": "Tool use examples",
         "h3": ""
       },
-      "text": "us is much more likely to recognize that a parameter is missing and ask for it. Claude 3 Sonnet may ask, especially when prompted to think before outputting a tool request. But it may also do its best to infer a reasonable value.\n\nFor example, using the <code>get_weather</code> tool above, if you ask Claude \u201cWhat\u2019s the weather?\u201d without specifying a location, Claude, particularly Claude 3 Sonnet, may make a guess about tools inputs:\n\nJSON\n\nCopy\n\n```JSON\n{\n  \"type\": \"tool_use\",\n  \"id\": \"toolu_01A09q90qw90lq917835lq9\",\n  \"name\": \"get_weather\",\n  \"input\": {\"location\": \"New York, NY\", \"unit\": \"fahrenheit\"}\n}\n\n```\n\nThis behavior is not guaranteed, especially for more ambiguous prompts and for models less intelligent than Claude 3 Opus. If Claude 3 Opus doesn\u2019t have enough context to fill in the required parameters, it is far more likely respond with a clarifying question instead of making a tool call.\n\nSequential tools\n\nSome tasks may require calling multiple tools in sequence, using the output of one tool as the input to another. In such a case, Claude will call one tool at a time. If prompted to call the tools all at once, Claude is likely to guess parameters for tools further downstream if they are dependent on tool results for tools further upstream.\n\nHere\u2019s an example of using a <code>get_location</code> tool to get the user\u2019s location, then passing that location to the <code>get_weather</code> tool:\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [\\\n        {\\\n            \"name\": \"get_location\",\\\n            \"description\": \"Get the current user location based on their IP address. This tool has no parameters or arguments.\",\\\n            \"input_schema\": {\\\n                \"type\": \"object\",\\\n                \"properties\": {}\\\n            }\\\n        },\\\n        {\\\n            \"name\": \"get_weather\",\\\n            \"description\": \"Get the current weather in a given location\",\\\n            \"input_schema\": {\\\n                \"type\": \"object\",\\\n                \"properties\": {\\\n                    \"location\": {\\\n                        \"type\": \"string\",\\\n                        \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                    },\\\n                    \"unit\": {\\\n                        \"type\": \"string\",\\\n                        \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                        \"description\": \"The unit of temperature, either 'celsius' or 'fahrenheit'\"\\\n                    }\\\n                },\\\n                \"required\": [\"location\"]\\\n            }\\\n        }\\\n    ],\n    \"messages\": [{\\\n        \"role\": \"user\",\\\n        \"content\": \"What is the weather like where I am?\"\\\n    }]\n}'\n\n```\n\nIn this case, Claude would first call the <code>get_location</code> tool to get the user\u2019s location. After you return the location in a <code>tool_result</code>, Claude would then call <code>get_weather</code> with that location to get the final answer.\n\nThe full conversation might look like:\n\n| Role | Content |\n| --- | --- |\n| User | What\u2019s the weather like where I am? |\n| Assistant | <thinking>To answer this, I first need to determine the user\u2019s location using the get\\_location tool. Then I can pass that location to the get\\_weather tool to find the current weather there.</thinking>\\[Tool use for get\\_location\\] |\n"
+      "text": " choose from in a single request. Here\u2019s an example with both a <code>get_weather</code> and a <code>get_time</code> tool, along with a user query that asks for both.\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [{\\\n        \"name\": \"get_weather\",\\\n        \"description\": \"Get the current weather in a given location\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"location\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                },\\\n                \"unit\": {\\\n                    \"type\": \"string\",\\\n                    \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                    \"description\": \"The unit of temperature, either 'celsius' or 'fahrenheit'\"\\\n                }\\\n            },\\\n            \"required\": [\"location\"]\\\n        }\\\n    },\\\n    {\\\n        \"name\": \"get_time\",\\\n        \"description\": \"Get the current time in a given time zone\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"timezone\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"The IANA time zone name, e.g. America/Los_Angeles\"\\\n                }\\\n            },\\\n            \"required\": [\"timezone\"]\\\n        }\\\n    }],\n    \"messages\": [{\\\n        \"role\": \"user\",\\\n        \"content\": \"What is the weather like right now in New York? Also what time is it there?\"\\\n    }]\n}'\n\n```\n\nIn this case, Claude will most likely try to use two separate tools, one at a time \u2014 <code>get_weather</code> and then <code>get_time</code> \u2014 in order to fully answer the user\u2019s question. However, it will also occasionally output two <code>tool_use</code> blocks at once, particularly if they are not dependent on each other. You would need to execute each tool and return their results in separate <code>tool_result</code> blocks within a single <code>user</code> message.\n\nMissing information\n\nIf the user\u2019s prompt doesn\u2019t include enough information to fill all the required parameters for a tool, Claude 3 Opus is much more likely to recognize that a parameter is missing and ask for it. Claude 3 Sonnet may ask, especially when prompted to think before outputting a tool request. But it may also do its best to infer a reasonable value.\n\nFor example, using the <code>get_weather</code> tool above, if you ask Claude \u201cWhat\u2019s the weather?\u201d without specifying a location, Claude, particularly Claude 3 Sonnet, may make a guess about tools inputs:\n\nJSON\n\nCopy\n\n```JSON\n{\n  \"type\": \"tool_use\",\n  \"id\": \"toolu_01A09q90qw90lq917835lq9\",\n  \"name\": \"get_weather\",\n  \"input\": {\"location\": \"New York, NY\", \"unit\": \"fahrenheit\"}\n}\n\n```\n\nThis behavior is not guaranteed, especially for more ambiguous prompts and for models less intelligent than Claude 3 Opus. If Claude 3 Opus doesn\u2019t have enough context to fill in the required parameters, it is far more likely respond with a clarifying question instead of making a tool call.\n\nSequential tools\n\n"
     }
   },
   {
-    "chunk_id": "f5e604ee-6b82-4f9a-9fa4-a4f4980bedf2",
+    "chunk_id": "e8b6a54a-0955-445e-8502-e9933c3513c4",
     "metadata": {
-      "token_count": 827,
+      "token_count": 830,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
       "page_title": "Tool use (function calling) - Anthropic"
     },
@@ -252,13 +252,13 @@
         "h2": "Tool use examples",
         "h3": ""
       },
-      "text": " answer this, I first need to determine the user\u2019s location using the get\\_location tool. Then I can pass that location to the get\\_weather tool to find the current weather there.</thinking>\\[Tool use for get\\_location\\] |\n| User | \\[Tool result for get\\_location with matching id and result of San Francisco, CA\\] |\n| Assistant | \\[Tool use for get\\_weather with the following input\\]{ \u201clocation\u201d: \u201cSan Francisco, CA\u201d, \u201cunit\u201d: \u201cfahrenheit\u201d } |\n| User | \\[Tool result for get\\_weather with matching id and result of \u201c59\u00b0F (15\u00b0C), mostly cloudy\u201d\\] |\n| Assistant | Based on your current location in San Francisco, CA, the weather right now is 59\u00b0F (15\u00b0C) and mostly cloudy. It\u2019s a fairly cool and overcast day in the city. You may want to bring a light jacket if you\u2019re heading outside. |\n\nThis example demonstrates how Claude can chain together multiple tool calls to answer a question that requires gathering data from different sources. The key steps are:\n\n1. Claude first realizes it needs the user\u2019s location to answer the weather question, so it calls the <code>get_location</code> tool.\n2. The user (i.e. the client code) executes the actual <code>get_location</code> function and returns the result \u201cSan Francisco, CA\u201d in a <code>tool_result</code> block.\n3. With the location now known, Claude proceeds to call the <code>get_weather</code> tool, passing in \u201cSan Francisco, CA\u201d as the <code>location</code> parameter (as well as a guessed <code>unit</code> parameter, as <code>unit</code> is not a required parameter).\n4. The user again executes the actual <code>get_weather</code> function with the provided arguments and returns the weather data in another <code>tool_result</code> block.\n5. Finally, Claude incorporates the weather data into a natural language response to the original question.\n\nChain of thought tool use\n\nBy default, Claude 3 Opus is prompted to think before it answers a tool use query to best determine whether a tool is necessary, which tool to use, and the appropriate parameters. Claude 3 Sonnet and Claude 3 Haiku are prompted to try to use tools as much as possible and are more likely to call an unnecessary tool or infer missing parameters. To prompt Sonnet or Haiku to better assess the user query before making tool calls, the following prompt can be used:\n\nChain of thought prompt\n\n<code>Answer the user's request using relevant tools (if they are available). Before calling a tool, do some analysis within \\<thinking>\\</thinking> tags. First, think about which of the provided tools is the relevant tool to answer the user's request. Second, go through each of the required parameters of the relevant tool and determine if the user has directly provided or given enough information to infer a value. When deciding if the parameter can be inferred, carefully consider all the context to see if it supports a specific value. If all of the required parameters are present or can be reasonably inferred, close the thinking tag and proceed with the tool call. BUT, if one of the values for a required parameter is missing, DO NOT invoke the function (not even with fillers for the missing params) and instead, ask the user to provide the missing parameters. DO NOT ask for more information on optional parameters if it is not provided.     </code>\n\nJSON mode\n\nYou can use tools to get Claude produce JSON output that follows a schema, even if you don\u2019t have any intention of running that output through a tool or function.\n\nWhen using tools in this way:\n\n- You usually want to provide a **single** tool\n- You should set <code>tool_choice</code> (see [Forcing tool use](/en/docs/tool-use#forcing-tool-use)) to instruct the model to explicitly use that tool\n"
+      "text": " for models less intelligent than Claude 3 Opus. If Claude 3 Opus doesn\u2019t have enough context to fill in the required parameters, it is far more likely respond with a clarifying question instead of making a tool call.\n\nSequential tools\n\nSome tasks may require calling multiple tools in sequence, using the output of one tool as the input to another. In such a case, Claude will call one tool at a time. If prompted to call the tools all at once, Claude is likely to guess parameters for tools further downstream if they are dependent on tool results for tools further upstream.\n\nHere\u2019s an example of using a <code>get_location</code> tool to get the user\u2019s location, then passing that location to the <code>get_weather</code> tool:\n\nShell\n\nPython\n\nCopy\n\n```bash\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --header \"content-type: application/json\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-5-sonnet-20240620\",\n    \"max_tokens\": 1024,\n    \"tools\": [\\\n        {\\\n            \"name\": \"get_location\",\\\n            \"description\": \"Get the current user location based on their IP address. This tool has no parameters or arguments.\",\\\n            \"input_schema\": {\\\n                \"type\": \"object\",\\\n                \"properties\": {}\\\n            }\\\n        },\\\n        {\\\n            \"name\": \"get_weather\",\\\n            \"description\": \"Get the current weather in a given location\",\\\n            \"input_schema\": {\\\n                \"type\": \"object\",\\\n                \"properties\": {\\\n                    \"location\": {\\\n                        \"type\": \"string\",\\\n                        \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n                    },\\\n                    \"unit\": {\\\n                        \"type\": \"string\",\\\n                        \"enum\": [\"celsius\", \"fahrenheit\"],\\\n                        \"description\": \"The unit of temperature, either 'celsius' or 'fahrenheit'\"\\\n                    }\\\n                },\\\n                \"required\": [\"location\"]\\\n            }\\\n        }\\\n    ],\n    \"messages\": [{\\\n        \"role\": \"user\",\\\n        \"content\": \"What is the weather like where I am?\"\\\n    }]\n}'\n\n```\n\nIn this case, Claude would first call the <code>get_location</code> tool to get the user\u2019s location. After you return the location in a <code>tool_result</code>, Claude would then call <code>get_weather</code> with that location to get the final answer.\n\nThe full conversation might look like:\n\n| Role | Content |\n| --- | --- |\n| User | What\u2019s the weather like where I am? |\n| Assistant | <thinking>To answer this, I first need to determine the user\u2019s location using the get\\_location tool. Then I can pass that location to the get\\_weather tool to find the current weather there.</thinking>\\[Tool use for get\\_location\\] |\n| User | \\[Tool result for get\\_location with matching id and result of San Francisco, CA\\] |\n| Assistant | \\[Tool use for get\\_weather with the following input\\]{ \u201clocation\u201d: \u201cSan Francisco, CA\u201d, \u201cunit\u201d: \u201cfahrenheit\u201d } |\n| User | \\[Tool result for get\\_weather with matching id and result of \u201c59\u00b0F (15\u00b0C), mostly cloudy\u201d\\] |\n| Assistant | Based on your current location in San Francisco, CA, the weather right now is 59\u00b0F (15\u00b0C) and mostly cloudy. It\u2019s a fairly cool and overcast day in the city. You may want to bring a light jacket if you\u2019re heading outside. |\n\nThis example demonstrates how Claude can chain together multiple tool calls to answer a question that requires gathering data from different sources. The key steps are:\n\n"
     }
   },
   {
-    "chunk_id": "016c9b62-2f99-490d-a8fe-9b2c581c3e8f",
+    "chunk_id": "9410a09f-c78d-478d-a14e-a085bd495d65",
     "metadata": {
-      "token_count": 729,
+      "token_count": 715,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
       "page_title": "Tool use (function calling) - Anthropic"
     },
@@ -268,11 +268,27 @@
         "h2": "Tool use examples",
         "h3": ""
       },
-      "text": " usually want to provide a **single** tool\n- You should set <code>tool_choice</code> (see [Forcing tool use](/en/docs/tool-use#forcing-tool-use)) to instruct the model to explicitly use that tool\n- Remember that the model will pass the <code>input</code> to the tool, so the name of the tool and description should be from the model\u2019s perspective.\n\nThe following uses a <code>record_summary</code> tool to describe an image following a particular format.\n\nShell\n\nPython\n\nCopy\n\n```bash\n#!/bin/bash\nIMAGE_URL=\"https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg\"\nIMAGE_MEDIA_TYPE=\"image/jpeg\"\nIMAGE_BASE64=$(curl \"$IMAGE_URL\" | base64)\n\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"content-type: application/json\" \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-sonnet-20240229\",\n    \"max_tokens\": 1024,\n    \"tools\": [{\\\n        \"name\": \"record_summary\",\\\n        \"description\": \"Record summary of an image using well-structured JSON.\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"key_colors\": {\\\n                    \"type\": \"array\",\\\n                    \"items\": {\\\n                        \"type\": \"object\",\\\n                        \"properties\": {\\\n                            \"r\": { \"type\": \"number\", \"description\": \"red value [0.0, 1.0]\" },\\\n                            \"g\": { \"type\": \"number\", \"description\": \"green value [0.0, 1.0]\" },\\\n                            \"b\": { \"type\": \"number\", \"description\": \"blue value [0.0, 1.0]\" },\\\n                            \"name\": { \"type\": \"string\", \"description\": \"Human-readable color name in snake_case, e.g. \\\"olive_green\\\" or \\\"turquoise\\\"\" }\\\n                        },\\\n                        \"required\": [ \"r\", \"g\", \"b\", \"name\" ]\\\n                    },\\\n                    \"description\": \"Key colors in the image. Limit to less then four.\"\\\n                },\\\n                \"description\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"Image description. One to two sentences max.\"\\\n                },\\\n                \"estimated_year\": {\\\n                    \"type\": \"integer\",\\\n                    \"description\": \"Estimated year that the images was taken, if is it a photo. Only set this if the image appears to be non-fictional. Rough estimates are okay!\"\\\n                }\\\n            },\\\n            \"required\": [ \"key_colors\", \"description\" ]\\\n        }\\\n    }],\n    \"tool_choice\": {\"type\": \"tool\", \"name\": \"record_summary\"},\n    \"messages\": [\\\n        {\"role\": \"user\", \"content\": [\\\n            {\"type\": \"image\", \"source\": {\\\n                \"type\": \"base64\",\\\n                \"media_type\": \"'$IMAGE_MEDIA_TYPE'\",\\\n                \"data\": \"'$IMAGE_BASE64'\"\\\n            }},\\\n            {\"type\": \"text\", \"text\": \"Describe this image.\"}\\\n        ]}\\\n    ]\n}'\n\n```\n"
+      "text": " overcast day in the city. You may want to bring a light jacket if you\u2019re heading outside. |\n\nThis example demonstrates how Claude can chain together multiple tool calls to answer a question that requires gathering data from different sources. The key steps are:\n\n1. Claude first realizes it needs the user\u2019s location to answer the weather question, so it calls the <code>get_location</code> tool.\n2. The user (i.e. the client code) executes the actual <code>get_location</code> function and returns the result \u201cSan Francisco, CA\u201d in a <code>tool_result</code> block.\n3. With the location now known, Claude proceeds to call the <code>get_weather</code> tool, passing in \u201cSan Francisco, CA\u201d as the <code>location</code> parameter (as well as a guessed <code>unit</code> parameter, as <code>unit</code> is not a required parameter).\n4. The user again executes the actual <code>get_weather</code> function with the provided arguments and returns the weather data in another <code>tool_result</code> block.\n5. Finally, Claude incorporates the weather data into a natural language response to the original question.\n\nChain of thought tool use\n\nBy default, Claude 3 Opus is prompted to think before it answers a tool use query to best determine whether a tool is necessary, which tool to use, and the appropriate parameters. Claude 3 Sonnet and Claude 3 Haiku are prompted to try to use tools as much as possible and are more likely to call an unnecessary tool or infer missing parameters. To prompt Sonnet or Haiku to better assess the user query before making tool calls, the following prompt can be used:\n\nChain of thought prompt\n\n<code>Answer the user's request using relevant tools (if they are available). Before calling a tool, do some analysis within \\<thinking>\\</thinking> tags. First, think about which of the provided tools is the relevant tool to answer the user's request. Second, go through each of the required parameters of the relevant tool and determine if the user has directly provided or given enough information to infer a value. When deciding if the parameter can be inferred, carefully consider all the context to see if it supports a specific value. If all of the required parameters are present or can be reasonably inferred, close the thinking tag and proceed with the tool call. BUT, if one of the values for a required parameter is missing, DO NOT invoke the function (not even with fillers for the missing params) and instead, ask the user to provide the missing parameters. DO NOT ask for more information on optional parameters if it is not provided.     </code>\n\nJSON mode\n\nYou can use tools to get Claude produce JSON output that follows a schema, even if you don\u2019t have any intention of running that output through a tool or function.\n\nWhen using tools in this way:\n\n- You usually want to provide a **single** tool\n- You should set <code>tool_choice</code> (see [Forcing tool use](/en/docs/tool-use#forcing-tool-use)) to instruct the model to explicitly use that tool\n- Remember that the model will pass the <code>input</code> to the tool, so the name of the tool and description should be from the model\u2019s perspective.\n\nThe following uses a <code>record_summary</code> tool to describe an image following a particular format.\n\nShell\n\nPython\n\nCopy\n\n"
     }
   },
   {
-    "chunk_id": "e02701d8-b680-46b5-9d7a-92249fe623f3",
+    "chunk_id": "c9543673-ac49-42be-89d2-0095cdaf1085",
+    "metadata": {
+      "token_count": 666,
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
+      "page_title": "Tool use (function calling) - Anthropic"
+    },
+    "data": {
+      "headers": {
+        "h1": "Tool use (function calling) - Anthropic",
+        "h2": "Tool use examples",
+        "h3": ""
+      },
+      "text": "code> to the tool, so the name of the tool and description should be from the model\u2019s perspective.\n\nThe following uses a <code>record_summary</code> tool to describe an image following a particular format.\n\nShell\n\nPython\n\nCopy\n\n```bash\n#!/bin/bash\nIMAGE_URL=\"https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg\"\nIMAGE_MEDIA_TYPE=\"image/jpeg\"\nIMAGE_BASE64=$(curl \"$IMAGE_URL\" | base64)\n\ncurl https://api.anthropic.com/v1/messages \\\n     --header \"content-type: application/json\" \\\n     --header \"x-api-key: $ANTHROPIC_API_KEY\" \\\n     --header \"anthropic-version: 2023-06-01\" \\\n     --data \\\n'{\n    \"model\": \"claude-3-sonnet-20240229\",\n    \"max_tokens\": 1024,\n    \"tools\": [{\\\n        \"name\": \"record_summary\",\\\n        \"description\": \"Record summary of an image using well-structured JSON.\",\\\n        \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n                \"key_colors\": {\\\n                    \"type\": \"array\",\\\n                    \"items\": {\\\n                        \"type\": \"object\",\\\n                        \"properties\": {\\\n                            \"r\": { \"type\": \"number\", \"description\": \"red value [0.0, 1.0]\" },\\\n                            \"g\": { \"type\": \"number\", \"description\": \"green value [0.0, 1.0]\" },\\\n                            \"b\": { \"type\": \"number\", \"description\": \"blue value [0.0, 1.0]\" },\\\n                            \"name\": { \"type\": \"string\", \"description\": \"Human-readable color name in snake_case, e.g. \\\"olive_green\\\" or \\\"turquoise\\\"\" }\\\n                        },\\\n                        \"required\": [ \"r\", \"g\", \"b\", \"name\" ]\\\n                    },\\\n                    \"description\": \"Key colors in the image. Limit to less then four.\"\\\n                },\\\n                \"description\": {\\\n                    \"type\": \"string\",\\\n                    \"description\": \"Image description. One to two sentences max.\"\\\n                },\\\n                \"estimated_year\": {\\\n                    \"type\": \"integer\",\\\n                    \"description\": \"Estimated year that the images was taken, if is it a photo. Only set this if the image appears to be non-fictional. Rough estimates are okay!\"\\\n                }\\\n            },\\\n            \"required\": [ \"key_colors\", \"description\" ]\\\n        }\\\n    }],\n    \"tool_choice\": {\"type\": \"tool\", \"name\": \"record_summary\"},\n    \"messages\": [\\\n        {\"role\": \"user\", \"content\": [\\\n            {\"type\": \"image\", \"source\": {\\\n                \"type\": \"base64\",\\\n                \"media_type\": \"'$IMAGE_MEDIA_TYPE'\",\\\n                \"data\": \"'$IMAGE_BASE64'\"\\\n            }},\\\n            {\"type\": \"text\", \"text\": \"Describe this image.\"}\\\n        ]}\\\n    ]\n}'\n\n```\n"
+    }
+  },
+  {
+    "chunk_id": "721d7786-00e9-4ad0-8ec9-adba397a56f4",
     "metadata": {
       "token_count": 510,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -288,7 +304,7 @@
     }
   },
   {
-    "chunk_id": "127981d4-b4df-4253-b60b-404edb3875aa",
+    "chunk_id": "185d4932-6804-499b-a225-8a34297719fe",
     "metadata": {
       "token_count": 404,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/tool-use",
@@ -304,7 +320,7 @@
     }
   },
   {
-    "chunk_id": "4ba30dce-b16c-4338-8d8a-79d5fcb4807e",
+    "chunk_id": "bfebefd7-c0ec-4218-aa6b-fe7b55e99c69",
     "metadata": {
       "token_count": 117,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts",
@@ -320,7 +336,7 @@
     }
   },
   {
-    "chunk_id": "5c47f93d-bd77-4895-bc92-d34af7ad1865",
+    "chunk_id": "5b985e71-4f94-425d-92f9-556b80383a18",
     "metadata": {
       "token_count": 327,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts",
@@ -336,7 +352,7 @@
     }
   },
   {
-    "chunk_id": "44b2f08e-339e-4362-8201-5de4ba823842",
+    "chunk_id": "72a00aa4-b0db-4bb4-9a08-042ff4dc04ae",
     "metadata": {
       "token_count": 664,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts",
@@ -352,7 +368,7 @@
     }
   },
   {
-    "chunk_id": "7ae55a5c-82d7-4e09-9dfa-88af7f4d5ae4",
+    "chunk_id": "46f89477-330a-438f-942e-46350608b515",
     "metadata": {
       "token_count": 921,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/system-prompts",
@@ -368,7 +384,7 @@
     }
   },
   {
-    "chunk_id": "de8cdee0-a8c2-4282-97c0-f8ff91c96d22",
+    "chunk_id": "af875870-ef02-4252-9db9-45d39176995f",
     "metadata": {
       "token_count": 128,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -384,7 +400,7 @@
     }
   },
   {
-    "chunk_id": "d402f064-414b-47ff-a23d-3b2ddc2037e1",
+    "chunk_id": "4ab7b7d3-9de9-4b0c-b452-f38576480d3c",
     "metadata": {
       "token_count": 180,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -400,7 +416,7 @@
     }
   },
   {
-    "chunk_id": "c8fb3084-5b4e-4d21-afa2-b1dfe359b373",
+    "chunk_id": "5b0560f4-e242-42f6-85cf-1052d2e908d8",
     "metadata": {
       "token_count": 169,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -416,7 +432,7 @@
     }
   },
   {
-    "chunk_id": "2b31380d-0e28-4c78-bf62-ff213b5e4fd6",
+    "chunk_id": "825dd77c-5522-4826-b835-7375e32a239e",
     "metadata": {
       "token_count": 228,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -432,7 +448,7 @@
     }
   },
   {
-    "chunk_id": "85f296be-456c-4112-9478-b4c176406858",
+    "chunk_id": "e11e43ba-89ff-4511-8c3c-f63743284b91",
     "metadata": {
       "token_count": 157,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -448,7 +464,7 @@
     }
   },
   {
-    "chunk_id": "0176d890-e6d7-4f60-a78b-fa8ee7ba3c85",
+    "chunk_id": "768c004f-5d33-4d41-b244-681cbde3100d",
     "metadata": {
       "token_count": 290,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -464,7 +480,7 @@
     }
   },
   {
-    "chunk_id": "b2af09ea-32f8-4b55-8fe6-b96c6f6d318c",
+    "chunk_id": "4573e68c-582c-4961-a3a5-ed411c5692b7",
     "metadata": {
       "token_count": 178,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -480,7 +496,7 @@
     }
   },
   {
-    "chunk_id": "1edb12c7-f9d9-4429-a769-be07556369d7",
+    "chunk_id": "bb8177bb-cc80-4a21-9e67-a0ee5216260d",
     "metadata": {
       "token_count": 151,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -496,7 +512,7 @@
     }
   },
   {
-    "chunk_id": "d64ff4e9-e893-40c3-a365-3ae83977fce2",
+    "chunk_id": "832dd71e-ab21-4091-9cf7-e2b435c27a71",
     "metadata": {
       "token_count": 164,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -512,7 +528,7 @@
     }
   },
   {
-    "chunk_id": "e89f192a-a4a2-4c4b-ba18-3dac2fe95e92",
+    "chunk_id": "ac164e44-0078-474c-8677-682c1c8d4c18",
     "metadata": {
       "token_count": 347,
       "source_url": "https://docs.anthropic.com/en/docs/resources/glossary",
@@ -528,7 +544,7 @@
     }
   },
   {
-    "chunk_id": "aac71a5b-e5d7-4c13-8e28-01ddcea63b5d",
+    "chunk_id": "dfc98928-496a-4c19-9baf-c96e63ce59c1",
     "metadata": {
       "token_count": 110,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool",
@@ -544,7 +560,7 @@
     }
   },
   {
-    "chunk_id": "bc15cc54-d0f6-491d-a8dd-0b4a53fdfbdb",
+    "chunk_id": "16b36818-e8b8-4d93-a33d-7396c5e9e5d1",
     "metadata": {
       "token_count": 258,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool",
@@ -560,7 +576,7 @@
     }
   },
   {
-    "chunk_id": "73fb2a8f-455d-4bab-9c27-dc6fc4c7609b",
+    "chunk_id": "6132a5f9-6fcc-4e20-aa05-e21f3ad32a6f",
     "metadata": {
       "token_count": 325,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool",
@@ -576,7 +592,7 @@
     }
   },
   {
-    "chunk_id": "f815fe42-c136-408e-b495-2621522ff71f",
+    "chunk_id": "b752901d-cbe3-47db-b580-88359dcaba9a",
     "metadata": {
       "token_count": 393,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool",
@@ -592,7 +608,7 @@
     }
   },
   {
-    "chunk_id": "c95f58e9-fb5e-4659-8af9-fffd10c68d13",
+    "chunk_id": "051ea1b2-0d56-4664-81ec-0a13c7a95aed",
     "metadata": {
       "token_count": 247,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool",
@@ -608,7 +624,7 @@
     }
   },
   {
-    "chunk_id": "0f3b8c2d-de51-4ba2-93dd-3795a169fed1",
+    "chunk_id": "bbbccba6-b399-4114-bb79-e65914f791f0",
     "metadata": {
       "token_count": 572,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-hallucinations",
@@ -624,7 +640,7 @@
     }
   },
   {
-    "chunk_id": "3ec1c4d4-2517-411a-ba3e-9bac0410b5ca",
+    "chunk_id": "9ba97dc9-4f8e-4c26-ae8c-dab335da44c6",
     "metadata": {
       "token_count": 232,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-hallucinations",
@@ -640,7 +656,7 @@
     }
   },
   {
-    "chunk_id": "2e3220d7-3d31-4ac2-b11a-d99226bcb316",
+    "chunk_id": "a254c287-4ec4-4497-9066-23e1dedbd071",
     "metadata": {
       "token_count": 124,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -656,7 +672,7 @@
     }
   },
   {
-    "chunk_id": "d54ab1cd-c02b-4c82-a04a-61b4e9685890",
+    "chunk_id": "138d89ef-6cf6-4c19-bff1-5a340a6f9a68",
     "metadata": {
       "token_count": 196,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -672,7 +688,7 @@
     }
   },
   {
-    "chunk_id": "ef7d731b-14b8-4553-91af-ddc9e94d8f4e",
+    "chunk_id": "2aa5eeaf-2ad0-4436-81fd-9bd29afa791b",
     "metadata": {
       "token_count": 221,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -688,7 +704,7 @@
     }
   },
   {
-    "chunk_id": "d22e753b-236b-4aa0-8684-2b787f2a95d7",
+    "chunk_id": "c1c078ac-4314-432a-b63c-30f742963d76",
     "metadata": {
       "token_count": 807,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -704,7 +720,7 @@
     }
   },
   {
-    "chunk_id": "5479c5cb-8a42-4684-bac8-4a4951e23327",
+    "chunk_id": "e7855a61-b6ac-41b9-8428-fb372d6a620f",
     "metadata": {
       "token_count": 841,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -720,7 +736,7 @@
     }
   },
   {
-    "chunk_id": "161c6e6b-4b8a-4702-91d9-ca9b75c8f598",
+    "chunk_id": "8a0909ef-300f-40db-87d7-9c736c3cc9b9",
     "metadata": {
       "token_count": 620,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -736,7 +752,7 @@
     }
   },
   {
-    "chunk_id": "ca02b1ad-2ab3-4093-86a5-fe3cbc2348c7",
+    "chunk_id": "e8f1a988-0c04-4e48-b067-2bf87b2c2bbb",
     "metadata": {
       "token_count": 498,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -752,7 +768,7 @@
     }
   },
   {
-    "chunk_id": "0ff69436-3627-459e-9686-be964d4d4998",
+    "chunk_id": "79bba3a9-919f-465f-869b-df28b1dca870",
     "metadata": {
       "token_count": 370,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -768,7 +784,7 @@
     }
   },
   {
-    "chunk_id": "e8cd2559-594c-4fac-8489-7d51164d4005",
+    "chunk_id": "2903cd73-6d02-46f4-ac28-7b309f11313e",
     "metadata": {
       "token_count": 244,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -784,7 +800,7 @@
     }
   },
   {
-    "chunk_id": "f6eb9b92-22f9-4d6e-8fd1-bfbeecea6d03",
+    "chunk_id": "265c7304-c3df-41bb-8114-a523b07d0af1",
     "metadata": {
       "token_count": 230,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/embeddings",
@@ -800,7 +816,7 @@
     }
   },
   {
-    "chunk_id": "11b1ce69-9259-47c9-8834-6c771b13731a",
+    "chunk_id": "cfdaed5b-7123-4b0c-97c5-10e6bb3243e7",
     "metadata": {
       "token_count": 225,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
@@ -816,7 +832,7 @@
     }
   },
   {
-    "chunk_id": "7d22bbd6-dbd4-4291-9296-4cd4ec463cf7",
+    "chunk_id": "7d89b509-eb99-4304-8d34-4a25cd3c1110",
     "metadata": {
       "token_count": 266,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
@@ -832,7 +848,7 @@
     }
   },
   {
-    "chunk_id": "322509c7-6138-4409-b69a-068c51c1dc97",
+    "chunk_id": "dda5c76d-00d4-42fa-8e01-6be73c7b4bf6",
     "metadata": {
       "token_count": 163,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
@@ -848,7 +864,7 @@
     }
   },
   {
-    "chunk_id": "36f26e48-3d41-4852-b6f1-d443da7fc041",
+    "chunk_id": "15053193-58f3-476a-a688-626e9bc1f9d2",
     "metadata": {
       "token_count": 189,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
@@ -864,7 +880,7 @@
     }
   },
   {
-    "chunk_id": "a857229c-03a4-4fc4-9ad7-32daf544cde6",
+    "chunk_id": "154e6aff-df91-41e5-bd1e-710058d20903",
     "metadata": {
       "token_count": 363,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
@@ -880,7 +896,7 @@
     }
   },
   {
-    "chunk_id": "aecd01c8-1f8d-4b25-a0dc-3a7172606212",
+    "chunk_id": "e5083a8d-0c92-432e-aa5e-068ac5f7ed8a",
     "metadata": {
       "token_count": 237,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
@@ -896,7 +912,7 @@
     }
   },
   {
-    "chunk_id": "ad314fe9-cae0-47dd-9acf-e6a6201c8056",
+    "chunk_id": "c0be1a3a-1dae-40b6-b07e-1c1ba5866e00",
     "metadata": {
       "token_count": 499,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
@@ -912,9 +928,9 @@
     }
   },
   {
-    "chunk_id": "bbb8c032-e664-41e9-a07f-60eba81cba3e",
+    "chunk_id": "8de712c4-9032-4e3a-b4fa-4240c4e83d4f",
     "metadata": {
-      "token_count": 1265,
+      "token_count": 331,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
       "page_title": "Streaming Messages - Anthropic"
     },
@@ -924,13 +940,13 @@
         "h2": "Raw HTTP Stream response",
         "h3": "Streaming request with tool use"
       },
-      "text": "In this request, we ask Claude to use a tool to tell us the weather.\n\nRequest\n\nCopy\n\n```bash\n  curl https://api.anthropic.com/v1/messages \\\n    -H \"content-type: application/json\" \\\n    -H \"x-api-key: $ANTHROPIC_API_KEY\" \\\n    -H \"anthropic-version: 2023-06-01\" \\\n    -d '{\n      \"model\": \"claude-3-5-sonnet-20240620\",\n      \"max_tokens\": 1024,\n      \"tools\": [\\\n        {\\\n          \"name\": \"get_weather\",\\\n          \"description\": \"Get the current weather in a given location\",\\\n          \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n              \"location\": {\\\n                \"type\": \"string\",\\\n                \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n              }\\\n            },\\\n            \"required\": [\"location\"]\\\n          }\\\n        }\\\n      ],\n      \"tool_choice\": {\"type\": \"any\"},\n      \"messages\": [\\\n        {\\\n          \"role\": \"user\",\\\n          \"content\": \"What is the weather like in San Francisco?\"\\\n        }\\\n      ],\n      \"stream\": true\n    }'\n\n```\n\nResponse\n\nCopy\n\n```json\nevent: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_014p7gG3wDgGV9EUtLvnow3U\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-3-haiku-20240307\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":472,\"output_tokens\":2},\"content\":[],\"stop_reason\":null}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Okay\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\",\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" let\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"'s\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" check\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" the\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" weather\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" for\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" San\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" Francisco\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\",\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" CA\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\":\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_01T1x1fJ34qAmk2tNTrN7Up6\",\"name\":\"get_weather\",\"input\":{}}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"location\\\":\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" \\\"San\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" Francisc\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"o,\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" CA\\\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\", \"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\"unit\\\": \\\"fah\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"renheit\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":89}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n```\n"
+      "text": " {\"type\": \"message_delta\", \"delta\": {\"stop_reason\": \"end_turn\", \"stop_sequence\":null}, \"usage\": {\"output_tokens\": 15}}\n\nevent: message_stop\ndata: {\"type\": \"message_stop\"}\n\n```\nIn this request, we ask Claude to use a tool to tell us the weather.\n\nRequest\n\nCopy\n\n```bash\n  curl https://api.anthropic.com/v1/messages \\\n    -H \"content-type: application/json\" \\\n    -H \"x-api-key: $ANTHROPIC_API_KEY\" \\\n    -H \"anthropic-version: 2023-06-01\" \\\n    -d '{\n      \"model\": \"claude-3-5-sonnet-20240620\",\n      \"max_tokens\": 1024,\n      \"tools\": [\\\n        {\\\n          \"name\": \"get_weather\",\\\n          \"description\": \"Get the current weather in a given location\",\\\n          \"input_schema\": {\\\n            \"type\": \"object\",\\\n            \"properties\": {\\\n              \"location\": {\\\n                \"type\": \"string\",\\\n                \"description\": \"The city and state, e.g. San Francisco, CA\"\\\n              }\\\n            },\\\n            \"required\": [\"location\"]\\\n          }\\\n        }\\\n      ],\n      \"tool_choice\": {\"type\": \"any\"},\n      \"messages\": [\\\n        {\\\n          \"role\": \"user\",\\\n          \"content\": \"What is the weather like in San Francisco?\"\\\n        }\\\n      ],\n      \"stream\": true\n    }'\n\n```\n\nResponse\n\nCopy\n\n"
     }
   },
   {
-    "chunk_id": "772edd2d-a422-459a-b8ba-8a11d09cb03b",
+    "chunk_id": "ee072738-6029-4ced-9d11-203aea1a1dbe",
     "metadata": {
-      "token_count": 187,
+      "token_count": 1000,
       "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
       "page_title": "Streaming Messages - Anthropic"
     },
@@ -940,11 +956,27 @@
         "h2": "Raw HTTP Stream response",
         "h3": "Streaming request with tool use"
       },
-      "text": "_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":89}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n```\n\n- [Streaming with SDKs](#streaming-with-sdks)\n- [Event types](#event-types)\n- [Ping events](#ping-events)\n- [Error events](#error-events)\n- [Other events](#other-events)\n- [Delta types](#delta-types)\n- [Text delta](#text-delta)\n- [Input JSON delta](#input-json-delta)\n- [Raw HTTP Stream response](#raw-http-stream-response)\n- [Basic streaming request](#basic-streaming-request)\n- [Streaming request with tool use](#streaming-request-with-tool-use)\n"
+      "text": " ],\n      \"stream\": true\n    }'\n\n```\n\nResponse\n\nCopy\n\n```json\nevent: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_014p7gG3wDgGV9EUtLvnow3U\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-3-haiku-20240307\",\"stop_sequence\":null,\"usage\":{\"input_tokens\":472,\"output_tokens\":2},\"content\":[],\"stop_reason\":null}}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Okay\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\",\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" let\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"'s\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" check\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" the\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" weather\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" for\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" San\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" Francisco\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\",\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" CA\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\":\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_01T1x1fJ34qAmk2tNTrN7Up6\",\"name\":\"get_weather\",\"input\":{}}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"location\\\":\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" \\\"San\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" Francisc\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"o,\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\" CA\\\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\", \"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\"unit\\\": \\\"fah\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"renheit\\\"}\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":89}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n```\n"
     }
   },
   {
-    "chunk_id": "93b71b54-8161-4a28-ab30-100b9e37314c",
+    "chunk_id": "22365b6a-ba6d-4f50-b37a-8f151c9e6a10",
+    "metadata": {
+      "token_count": 174,
+      "source_url": "https://docs.anthropic.com/en/api/messages-streaming",
+      "page_title": "Streaming Messages - Anthropic"
+    },
+    "data": {
+      "headers": {
+        "h1": "Streaming Messages - Anthropic",
+        "h2": "Raw HTTP Stream response",
+        "h3": "Streaming request with tool use"
+      },
+      "text": "1}\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":89}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n```\n\n- [Streaming with SDKs](#streaming-with-sdks)\n- [Event types](#event-types)\n- [Ping events](#ping-events)\n- [Error events](#error-events)\n- [Other events](#other-events)\n- [Delta types](#delta-types)\n- [Text delta](#text-delta)\n- [Input JSON delta](#input-json-delta)\n- [Raw HTTP Stream response](#raw-http-stream-response)\n- [Basic streaming request](#basic-streaming-request)\n- [Streaming request with tool use](#streaming-request-with-tool-use)\n"
+    }
+  },
+  {
+    "chunk_id": "b7e9bdb3-b214-48a0-91bd-ee0a9b1bde37",
     "metadata": {
       "token_count": 404,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
@@ -960,7 +992,7 @@
     }
   },
   {
-    "chunk_id": "6bd9a5a9-cce5-4c2c-ad6b-25b12f16cb11",
+    "chunk_id": "0d653741-aa09-46a3-9ecb-9b96296dd17e",
     "metadata": {
       "token_count": 829,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
@@ -976,7 +1008,7 @@
     }
   },
   {
-    "chunk_id": "d0a317e4-a1c4-4113-833e-af121d989052",
+    "chunk_id": "850f1922-2b8e-47cd-a13c-d92f326ce2c6",
     "metadata": {
       "token_count": 849,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
@@ -992,7 +1024,7 @@
     }
   },
   {
-    "chunk_id": "e55148e4-6903-4a41-9dfe-50c0b12fd690",
+    "chunk_id": "28926119-a3c2-43a5-bd22-96d1637cb4a9",
     "metadata": {
       "token_count": 748,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
@@ -1008,7 +1040,7 @@
     }
   },
   {
-    "chunk_id": "c81c0248-6a27-4aa5-adb5-1abdba6b47b9",
+    "chunk_id": "cccd6dd3-d43a-4205-9fff-afb4dc46b6f8",
     "metadata": {
       "token_count": 161,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/increase-consistency",
@@ -1024,7 +1056,7 @@
     }
   },
   {
-    "chunk_id": "06cf9eaa-e387-4fa0-a292-c3d6cd490341",
+    "chunk_id": "6e68bd0b-f89a-4233-8bc9-e145d356b825",
     "metadata": {
       "token_count": 453,
       "source_url": "https://docs.anthropic.com/en/api/migrating-from-text-completions-to-messages",
@@ -1040,7 +1072,7 @@
     }
   },
   {
-    "chunk_id": "57639857-ab6c-4c83-987d-7dcbf8379cfa",
+    "chunk_id": "7cd38fbb-ff3b-47f3-8221-72b5ed0aa1ca",
     "metadata": {
       "token_count": 236,
       "source_url": "https://docs.anthropic.com/en/api/migrating-from-text-completions-to-messages",
@@ -1056,7 +1088,7 @@
     }
   },
   {
-    "chunk_id": "c682dc5d-1530-466a-9604-83454db17dc0",
+    "chunk_id": "d767d042-9fd0-46fe-a350-7271ea37345b",
     "metadata": {
       "token_count": 220,
       "source_url": "https://docs.anthropic.com/en/api/migrating-from-text-completions-to-messages",
@@ -1072,7 +1104,7 @@
     }
   },
   {
-    "chunk_id": "55dedc8e-f787-4a44-96ee-3953a0d254cb",
+    "chunk_id": "cc00c4c7-05f0-4e98-b8da-886f777b77f1",
     "metadata": {
       "token_count": 288,
       "source_url": "https://docs.anthropic.com/en/api/migrating-from-text-completions-to-messages",
@@ -1088,7 +1120,7 @@
     }
   },
   {
-    "chunk_id": "b096d949-afb3-432e-9806-0f16665ceff8",
+    "chunk_id": "74fd850e-8c93-4ddc-96b5-27127f3c03eb",
     "metadata": {
       "token_count": 308,
       "source_url": "https://docs.anthropic.com/en/api/migrating-from-text-completions-to-messages",
@@ -1104,7 +1136,7 @@
     }
   },
   {
-    "chunk_id": "adcf8087-0c0a-4b31-9d99-818a59c2a20b",
+    "chunk_id": "dc01a965-1c89-4547-9d32-74734508eb9e",
     "metadata": {
       "token_count": 111,
       "source_url": "https://docs.anthropic.com/en/docs/initial-setup",
@@ -1120,7 +1152,7 @@
     }
   },
   {
-    "chunk_id": "6437b19c-67e4-48ad-9ef1-8aa5aa736cad",
+    "chunk_id": "85bf9cc3-d74a-4d6e-911e-fd3bf0baa66f",
     "metadata": {
       "token_count": 653,
       "source_url": "https://docs.anthropic.com/en/docs/initial-setup",
@@ -1136,7 +1168,7 @@
     }
   },
   {
-    "chunk_id": "e9a803be-f9b9-4a66-9361-78eeef76dbd5",
+    "chunk_id": "c7e87e02-6ec2-4d30-ba4d-f304adbf525d",
     "metadata": {
       "token_count": 161,
       "source_url": "https://docs.anthropic.com/en/docs/initial-setup",
@@ -1152,7 +1184,7 @@
     }
   },
   {
-    "chunk_id": "c2a5eff4-d365-47f7-b710-c871444e1acd",
+    "chunk_id": "31b95d52-78c1-4206-825f-d49e8642c500",
     "metadata": {
       "token_count": 502,
       "source_url": "https://docs.anthropic.com/en/docs/initial-setup",
@@ -1168,7 +1200,7 @@
     }
   },
   {
-    "chunk_id": "9f2d4998-3a61-41f1-a0d6-2ca360f8f407",
+    "chunk_id": "084e929e-24aa-461a-b522-d47916fa9101",
     "metadata": {
       "token_count": 244,
       "source_url": "https://docs.anthropic.com/en/docs/initial-setup",
@@ -1184,7 +1216,7 @@
     }
   },
   {
-    "chunk_id": "ca7725d1-0774-45eb-ab6d-4b20e554c398",
+    "chunk_id": "1cc64d5f-0c02-4c22-8064-bfb80c3da888",
     "metadata": {
       "token_count": 109,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prefill-claudes-response",
@@ -1200,7 +1232,7 @@
     }
   },
   {
-    "chunk_id": "3673f1fe-1eb1-4c42-875f-6674d9a2552b",
+    "chunk_id": "84019ad5-dddc-4a2b-aa9d-38a35522f4e1",
     "metadata": {
       "token_count": 208,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prefill-claudes-response",
@@ -1216,7 +1248,7 @@
     }
   },
   {
-    "chunk_id": "54f1a13f-659d-49fc-90a4-418cb773c2ee",
+    "chunk_id": "623bca58-0def-4da3-848d-d5d14091a7a2",
     "metadata": {
       "token_count": 591,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prefill-claudes-response",
@@ -1232,7 +1264,7 @@
     }
   },
   {
-    "chunk_id": "5db8e893-ebeb-444c-8a62-9438cc07a0d0",
+    "chunk_id": "2d3084bf-f374-4a82-9fe9-a3e8cdacc505",
     "metadata": {
       "token_count": 741,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/prefill-claudes-response",
@@ -1248,7 +1280,7 @@
     }
   },
   {
-    "chunk_id": "59d3621c-3841-446b-9f5b-5ee88d2e4513",
+    "chunk_id": "7d3b6b6e-6434-46c1-86c8-d7091c84d031",
     "metadata": {
       "token_count": 382,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/mitigate-jailbreaks",
@@ -1264,7 +1296,7 @@
     }
   },
   {
-    "chunk_id": "23beadab-126d-4a3a-8a2e-1d6139a5bef1",
+    "chunk_id": "5ebc61e4-da80-4307-9ef3-de947b485bea",
     "metadata": {
       "token_count": 253,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/mitigate-jailbreaks",
@@ -1280,7 +1312,7 @@
     }
   },
   {
-    "chunk_id": "86d4eb85-e667-45b1-b9c6-c3b4c136139b",
+    "chunk_id": "597a880c-1f28-43d4-9cd5-a1d02f99b1be",
     "metadata": {
       "token_count": 172,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/mitigate-jailbreaks",
@@ -1296,7 +1328,7 @@
     }
   },
   {
-    "chunk_id": "2f38a43d-2eaa-4274-b2cd-4432b54be636",
+    "chunk_id": "dcc86cb6-2574-41de-9bd9-c737084d7e4b",
     "metadata": {
       "token_count": 106,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1312,7 +1344,7 @@
     }
   },
   {
-    "chunk_id": "23c81e54-12af-451c-a5ed-943d4e9f8b58",
+    "chunk_id": "bc2028ef-8b96-4849-b2f0-c65579a9b2a0",
     "metadata": {
       "token_count": 475,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1328,7 +1360,7 @@
     }
   },
   {
-    "chunk_id": "0819c621-0878-4a17-b3dc-c7e5b68721ad",
+    "chunk_id": "2eb71c09-d249-4402-89cf-582a98dc4acf",
     "metadata": {
       "token_count": 279,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1344,7 +1376,7 @@
     }
   },
   {
-    "chunk_id": "38fe0851-927a-4959-94ed-6c1fce817cda",
+    "chunk_id": "3045de83-a628-44c9-a0af-c316e39b61bc",
     "metadata": {
       "token_count": 356,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1360,7 +1392,7 @@
     }
   },
   {
-    "chunk_id": "7183963d-75ee-43db-8803-489ec9995ac9",
+    "chunk_id": "fc92c487-0e53-47b6-ab25-438c8d1e2c62",
     "metadata": {
       "token_count": 562,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1376,7 +1408,7 @@
     }
   },
   {
-    "chunk_id": "fddcfe4e-009b-421e-9672-586c7e1ae003",
+    "chunk_id": "c6397bea-3737-4c3f-a7d2-c0c02b0f50d7",
     "metadata": {
       "token_count": 151,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1392,7 +1424,7 @@
     }
   },
   {
-    "chunk_id": "f83fd5b1-abce-4e45-8291-6b09f6a500d0",
+    "chunk_id": "63e54e67-89b8-42c4-afb9-d72bfb30a50a",
     "metadata": {
       "token_count": 196,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1408,7 +1440,7 @@
     }
   },
   {
-    "chunk_id": "3921b5d2-e0f4-4767-bcd2-ebe2c74c18c5",
+    "chunk_id": "3099446b-6665-4987-9f33-12c09900fa95",
     "metadata": {
       "token_count": 176,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1424,7 +1456,7 @@
     }
   },
   {
-    "chunk_id": "9d958655-ce74-4449-908d-6644e2cef4f8",
+    "chunk_id": "d30d0d66-b432-4c10-b47a-6699b24964a3",
     "metadata": {
       "token_count": 189,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1440,7 +1472,7 @@
     }
   },
   {
-    "chunk_id": "7f8b4e5f-c88f-4a2b-8dd1-9ffa1b28bf03",
+    "chunk_id": "50d17d2f-9a4b-451f-a3f3-4a698ab49226",
     "metadata": {
       "token_count": 277,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/claude-for-sheets",
@@ -1456,7 +1488,7 @@
     }
   },
   {
-    "chunk_id": "925b80e0-6574-4ad7-97bc-ab2e815ae096",
+    "chunk_id": "68df3a11-9836-4526-ad91-1db63b1f2e6f",
     "metadata": {
       "token_count": 304,
       "source_url": "https://docs.anthropic.com/en/docs/intro-to-claude",
@@ -1472,7 +1504,7 @@
     }
   },
   {
-    "chunk_id": "5d49c955-e70f-4b27-88df-87e179e4eded",
+    "chunk_id": "e9705e5a-dbc4-43ae-b74f-e926293357dc",
     "metadata": {
       "token_count": 349,
       "source_url": "https://docs.anthropic.com/en/docs/intro-to-claude",
@@ -1488,7 +1520,7 @@
     }
   },
   {
-    "chunk_id": "fc0ed9a3-8d32-4e4e-bd39-4977f7be1060",
+    "chunk_id": "401e37d6-4c4a-44c4-9cbc-e053030631b4",
     "metadata": {
       "token_count": 440,
       "source_url": "https://docs.anthropic.com/en/docs/intro-to-claude",
@@ -1504,7 +1536,7 @@
     }
   },
   {
-    "chunk_id": "42a034c6-b5c7-40d8-8aa0-2377ad5d6346",
+    "chunk_id": "7663a10c-c475-4ef4-8cad-52f8ead0d6dd",
     "metadata": {
       "token_count": 456,
       "source_url": "https://docs.anthropic.com/en/docs/intro-to-claude",
@@ -1520,7 +1552,7 @@
     }
   },
   {
-    "chunk_id": "b2ba6a5c-dcb2-4be7-94e6-022ef4d63ce5",
+    "chunk_id": "9ee5a64c-90ff-40d3-90c2-9f37263735ef",
     "metadata": {
       "token_count": 294,
       "source_url": "https://docs.anthropic.com/en/docs/intro-to-claude",
@@ -1536,7 +1568,7 @@
     }
   },
   {
-    "chunk_id": "5b0d6cf2-2c49-448d-a626-34dc576adbc3",
+    "chunk_id": "9e07ba95-43e1-4095-b6ba-b4b4cf3e250e",
     "metadata": {
       "token_count": 260,
       "source_url": "https://docs.anthropic.com/en/docs/intro-to-claude",
@@ -1552,7 +1584,7 @@
     }
   },
   {
-    "chunk_id": "626eed11-e55a-438a-a87c-8b0b85d79103",
+    "chunk_id": "b11d8bde-85e3-435f-b5bf-4f08706eff7d",
     "metadata": {
       "token_count": 523,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1568,7 +1600,7 @@
     }
   },
   {
-    "chunk_id": "27e498f0-b280-4688-9f13-32f2efcad792",
+    "chunk_id": "c44b7bd7-b46d-4c19-8391-d96e35b8a08c",
     "metadata": {
       "token_count": 227,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1584,7 +1616,7 @@
     }
   },
   {
-    "chunk_id": "3724846e-6602-44ea-892b-e1fa68b3a6a1",
+    "chunk_id": "7371b47a-6337-4687-82dc-55bd67c7adfe",
     "metadata": {
       "token_count": 253,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1600,7 +1632,7 @@
     }
   },
   {
-    "chunk_id": "384a8cd5-9b68-4758-ac79-98cbc11c6427",
+    "chunk_id": "5b4f9d5b-9ad9-41f1-bb20-ecfb1c8e6d5c",
     "metadata": {
       "token_count": 185,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1616,7 +1648,7 @@
     }
   },
   {
-    "chunk_id": "d1a8cbe7-1cc4-4dbc-a87a-4e33e402795a",
+    "chunk_id": "6b8b2755-081d-429d-84a5-596777bd6660",
     "metadata": {
       "token_count": 200,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1632,7 +1664,7 @@
     }
   },
   {
-    "chunk_id": "d6f6f74b-28ec-4bcf-ac53-d75c5f2b00be",
+    "chunk_id": "eee9104f-65f0-452d-8447-51a74f1153d5",
     "metadata": {
       "token_count": 204,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1648,7 +1680,7 @@
     }
   },
   {
-    "chunk_id": "adc96246-3eea-414e-b411-451602da14c5",
+    "chunk_id": "d0a768dd-dda8-4c7f-b987-b83801a2a4cb",
     "metadata": {
       "token_count": 214,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1664,7 +1696,7 @@
     }
   },
   {
-    "chunk_id": "11ce7a92-db18-4210-89b0-828d34b0aebd",
+    "chunk_id": "77200b2c-58d8-4eec-af88-490849f18ee1",
     "metadata": {
       "token_count": 258,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1680,7 +1712,7 @@
     }
   },
   {
-    "chunk_id": "1434a964-02ad-47c3-81de-1db4a7488e14",
+    "chunk_id": "96d04e77-3dfe-4f70-8ab8-e3146079dd43",
     "metadata": {
       "token_count": 159,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1696,7 +1728,7 @@
     }
   },
   {
-    "chunk_id": "2f8f6acb-61ce-42ff-a7af-7607c7eb53e2",
+    "chunk_id": "93894ab8-f80b-493a-bbe8-770ea6bf57b4",
     "metadata": {
       "token_count": 158,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1712,7 +1744,7 @@
     }
   },
   {
-    "chunk_id": "7329b1ec-2689-47f3-b450-4efd30c681be",
+    "chunk_id": "334c2b7f-4d9a-4b76-b73b-fa68673f7ee4",
     "metadata": {
       "token_count": 1000,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1728,7 +1760,7 @@
     }
   },
   {
-    "chunk_id": "a15a601c-777b-4515-8371-bc99b975913b",
+    "chunk_id": "a827a2e5-d917-4d9c-9c6f-789a367af580",
     "metadata": {
       "token_count": 834,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1744,7 +1776,7 @@
     }
   },
   {
-    "chunk_id": "11294120-0738-44b8-bf2d-256bd37905aa",
+    "chunk_id": "a210558e-d918-4859-9ca6-32e5bb6cda84",
     "metadata": {
       "token_count": 929,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching",
@@ -1760,7 +1792,7 @@
     }
   },
   {
-    "chunk_id": "494f6e78-29a2-457a-95dd-9abba23a16e6",
+    "chunk_id": "10b397aa-a808-4d13-b666-8f684bfea975",
     "metadata": {
       "token_count": 628,
       "source_url": "https://docs.anthropic.com/en/api/supported-regions",
@@ -1776,7 +1808,7 @@
     }
   },
   {
-    "chunk_id": "f068ab15-1d1c-4317-8e70-7c892ea565d6",
+    "chunk_id": "16d791c0-72b4-4c39-a8a1-02758a54298e",
     "metadata": {
       "token_count": 117,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1792,7 +1824,7 @@
     }
   },
   {
-    "chunk_id": "6c831882-f00c-4e4a-b3c6-ab24cbd077d4",
+    "chunk_id": "a9b00c18-e29b-4881-a7e0-2f6cb086f481",
     "metadata": {
       "token_count": 600,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1808,7 +1840,7 @@
     }
   },
   {
-    "chunk_id": "88b49867-69c1-4de2-be70-54a1bf3ae2fe",
+    "chunk_id": "28f051a2-e6df-4b58-bd5f-0fde65f0183a",
     "metadata": {
       "token_count": 532,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1824,7 +1856,7 @@
     }
   },
   {
-    "chunk_id": "38283be0-07be-4f15-a573-c95c855dda50",
+    "chunk_id": "ea4e9b24-bc15-4185-9b28-830e0d563c5f",
     "metadata": {
       "token_count": 444,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1840,7 +1872,7 @@
     }
   },
   {
-    "chunk_id": "5d1795cb-0799-4743-9c81-dd4605d73a73",
+    "chunk_id": "0a96180e-a447-441a-b921-0b21d72c9a27",
     "metadata": {
       "token_count": 662,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1856,7 +1888,7 @@
     }
   },
   {
-    "chunk_id": "55036372-a4d7-425a-aae2-4e538deabf83",
+    "chunk_id": "d7e641dc-d1f2-409e-8acc-67ce3dcd889f",
     "metadata": {
       "token_count": 779,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1872,7 +1904,7 @@
     }
   },
   {
-    "chunk_id": "cce97352-2ae1-49bb-8148-a0d7bd523434",
+    "chunk_id": "cdca649b-576d-452c-b513-821515ec15e7",
     "metadata": {
       "token_count": 165,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1888,7 +1920,7 @@
     }
   },
   {
-    "chunk_id": "01908aa1-5caa-44cf-a428-5aa3e0e3a7da",
+    "chunk_id": "25ad57be-46c4-482b-94f0-cbddf34030db",
     "metadata": {
       "token_count": 231,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1904,7 +1936,7 @@
     }
   },
   {
-    "chunk_id": "b4304f34-67ae-4bba-9caa-716b11b2e0ef",
+    "chunk_id": "c1ba7d0b-7f73-4f70-bc38-456c9897ec56",
     "metadata": {
       "token_count": 982,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1920,7 +1952,7 @@
     }
   },
   {
-    "chunk_id": "ea30a7f8-75c4-4146-84ad-f03bb92f6f9f",
+    "chunk_id": "27287ab7-147c-4059-84dd-1a203bc980ad",
     "metadata": {
       "token_count": 219,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1936,7 +1968,7 @@
     }
   },
   {
-    "chunk_id": "6969d04f-edc0-4652-8025-df6f51589856",
+    "chunk_id": "a139e0df-b0f5-4e81-a86d-d2b2fdfb2be7",
     "metadata": {
       "token_count": 844,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1952,7 +1984,7 @@
     }
   },
   {
-    "chunk_id": "726cdebe-7a47-4246-a5b6-a76429524a60",
+    "chunk_id": "8f3efc39-4c2d-4a56-8c1b-2446e611d57d",
     "metadata": {
       "token_count": 269,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/content-moderation",
@@ -1968,7 +2000,7 @@
     }
   },
   {
-    "chunk_id": "20c034d8-14c9-4c92-afe9-0a1ad0853789",
+    "chunk_id": "2ba8edcb-a023-4d1d-98f4-8f768426466d",
     "metadata": {
       "token_count": 454,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/keep-claude-in-character",
@@ -1984,7 +2016,7 @@
     }
   },
   {
-    "chunk_id": "02da44c6-4568-46b9-a5a2-57b7d070cfab",
+    "chunk_id": "5fb9f69a-d6af-451d-b66c-a43c620c31ad",
     "metadata": {
       "token_count": 334,
       "source_url": "https://docs.anthropic.com/en/api/rate-limits",
@@ -2000,7 +2032,7 @@
     }
   },
   {
-    "chunk_id": "5db32ab9-d015-4631-a839-a0310f3b1629",
+    "chunk_id": "7d9825c2-6484-4b59-8e31-ef9816ea9cd9",
     "metadata": {
       "token_count": 154,
       "source_url": "https://docs.anthropic.com/en/api/rate-limits",
@@ -2016,7 +2048,7 @@
     }
   },
   {
-    "chunk_id": "13933587-0f46-4102-8c47-4d54c05baeeb",
+    "chunk_id": "b27e127b-aa8d-41fd-93e7-d482e3467ac8",
     "metadata": {
       "token_count": 169,
       "source_url": "https://docs.anthropic.com/en/api/rate-limits",
@@ -2032,7 +2064,7 @@
     }
   },
   {
-    "chunk_id": "bb3ab13c-1fa8-4331-9092-74a22c2b925a",
+    "chunk_id": "eb2ea025-62f6-493b-a605-4933f8f03406",
     "metadata": {
       "token_count": 252,
       "source_url": "https://docs.anthropic.com/en/api/rate-limits",
@@ -2048,7 +2080,7 @@
     }
   },
   {
-    "chunk_id": "2c2c61ef-5b48-4882-9cf6-0b0fe163f62f",
+    "chunk_id": "74128891-217d-4050-b994-f41a17acb620",
     "metadata": {
       "token_count": 218,
       "source_url": "https://docs.anthropic.com/en/api/rate-limits",
@@ -2064,7 +2096,7 @@
     }
   },
   {
-    "chunk_id": "d46be3c2-e2c0-4e50-a37f-a1c5c5e1e9a9",
+    "chunk_id": "dbe3996a-be5e-4229-9245-64ae6d28581f",
     "metadata": {
       "token_count": 432,
       "source_url": "https://docs.anthropic.com/en/api/rate-limits",
@@ -2080,7 +2112,7 @@
     }
   },
   {
-    "chunk_id": "73ed575b-70de-46f4-aabf-073cd1488099",
+    "chunk_id": "87235895-3c43-4a9e-86f3-5efe2fa9ee72",
     "metadata": {
       "token_count": 227,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
@@ -2096,7 +2128,7 @@
     }
   },
   {
-    "chunk_id": "55394a24-4b55-4ea6-8fa4-6fcb3784993b",
+    "chunk_id": "0479ea84-1801-4aa1-bd7a-d7a8c6709e73",
     "metadata": {
       "token_count": 1000,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
@@ -2112,9 +2144,9 @@
     }
   },
   {
-    "chunk_id": "47b8a0de-d17f-4709-a5a0-21eb7a96d4b2",
+    "chunk_id": "09ff35f4-fdb0-4543-b47d-0778f176ac81",
     "metadata": {
-      "token_count": 1003,
+      "token_count": 626,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
       "page_title": "Create strong empirical evaluations - Anthropic"
     },
@@ -2124,13 +2156,13 @@
         "h2": "Building evals and test cases",
         "h3": "Example evals"
       },
-      "text": "\nRelevance and coherence (summarization) - ROUGE-L evaluation\n\n**What it measures**: ROUGE-L (Recall-Oriented Understudy for Gisting Evaluation - Longest Common Subsequence) evaluates the quality of generated summaries. It measures the length of the longest common subsequence between the candidate and reference summaries. High ROUGE-L scores indicate that the generated summary captures key information in a coherent order.\n\n**Example eval test cases**: 200 articles with reference summaries.\n\nCopy\n\n```python\nfrom rouge import Rouge\nimport anthropic\n\narticles = [\\\n    {\"text\": \"In a groundbreaking study, researchers at MIT...\", \"summary\": \"MIT scientists discover a new antibiotic...\"},\\\n    {\"text\": \"Jane Doe, a local hero, made headlines last week for saving... In city hall news, the budget... Meteorologists predict...\", \"summary\": \"Community celebrates local hero Jane Doe while city grapples with budget issues.\"},  # Edge case: Multi-topic\\\n    {\"text\": \"You won't believe what this celebrity did! ... extensive charity work ...\", \"summary\": \"Celebrity's extensive charity work surprises fans\"},  # Edge case: Misleading title\\\n    # ... 197 more articles\\\n]\n\nclient = anthropic.Anthropic()\n\ndef get_completion(prompt: str):\n    message = client.messages.create(\n        model=\"claude-3-5-sonnet-20240620\",\n        max_tokens=1024,\n        messages=[\\\n        {\"role\": \"user\", \"content\": prompt}\\\n        ]\n    )\n    return message.content[0].text\n\ndef evaluate_rouge_l(model_output, true_summary):\n    rouge = Rouge()\n    scores = rouge.get_scores(model_output, true_summary)\n    return scores[0]['rouge-l']['f']  # ROUGE-L F1 score\n\noutputs = [get_completion(f\"Summarize this article in 1-2 sentences:\\n\\n{article['text']}\") for article in articles]\nrelevance_scores = [evaluate_rouge_l(output, article['summary']) for output, article in zip(outputs, articles)]\nprint(f\"Average ROUGE-L F1 Score: {sum(relevance_scores) / len(relevance_scores)}\")\n\n```\n\nTone and style (customer service) - LLM-based Likert scale\n\n**What it measures**: The LLM-based Likert scale is a psychometric scale that uses an LLM to judge subjective attitudes or perceptions. Here, it\u2019s used to rate the tone of responses on a scale from 1 to 5. It\u2019s ideal for evaluating nuanced aspects like empathy, professionalism, or patience that are difficult to quantify with traditional metrics.\n\n**Example eval test cases**: 100 customer inquiries with target tone (empathetic, professional, concise).\n\nCopy\n\n```python\nimport anthropic\n\ninquiries = [\\\n    {\"text\": \"This is the third time you've messed up my order. I want a refund NOW!\", \"tone\": \"empathetic\"},  # Edge case: Angry customer\\\n    {\"text\": \"I tried resetting my password but then my account got locked...\", \"tone\": \"patient\"},  # Edge case: Complex issue\\\n    {\"text\": \"I can't believe how good your product is. It's ruined all others for me!\", \"tone\": \"professional\"},  # Edge case: Compliment as complaint\\\n    # ... 97 more inquiries\\\n]\n\nclient = anthropic.Anthropic()\n\ndef get_completion(prompt: str):\n    message = client.messages.create(\n        model=\"claude-3-5-sonnet-20240620\",\n        max_tokens=2048,\n        messages=[\\\n        {\"role\": \"user\", \"content\": prompt}\\\n        ]\n    )\n    return message.content[0].text\n\ndef evaluate_likert(model_output, target_tone):\n    tone_prompt = f\"\"\"Rate this customer service response on a scale of 1-5 for being {target_tone}:\n    <response>{model_output}</response>\n    1: Not at all {target_tone}\n    5: Perfectly {target_tone}\n    Output only the number.\"\"\"\n\n    # Generally best practice to use a different model to evaluate than the model used to generate the evaluated output\n    response = client.messages.create(model=\"claude-3-opus-20240229\", max_tokens=50, messages=[{\"role\": \"user\", \"content\": tone_prompt}])\n    return int(response.content[0].text.strip())\n\noutputs = [get_completion(f\"Respond to this customer inquiry: {inquiry['text']}\") for inquiry in inquiries]\ntone_scores = [evaluate_likert(output, inquiry['tone']) for output, inquiry in zip(outputs, inquiries)]\nprint(f\"Average Tone Score: {sum(tone_scores) / len(tone_scores)}\")\n\n```\n"
+      "text": "q_variations:\n    outputs = [get_completion(question) for question in faq[\"questions\"]]\n    similarity_score = evaluate_cosine_similarity(outputs)\n    print(f\"FAQ Consistency Score: {similarity_score * 100}%\")\n\n```\n\nRelevance and coherence (summarization) - ROUGE-L evaluation\n\n**What it measures**: ROUGE-L (Recall-Oriented Understudy for Gisting Evaluation - Longest Common Subsequence) evaluates the quality of generated summaries. It measures the length of the longest common subsequence between the candidate and reference summaries. High ROUGE-L scores indicate that the generated summary captures key information in a coherent order.\n\n**Example eval test cases**: 200 articles with reference summaries.\n\nCopy\n\n```python\nfrom rouge import Rouge\nimport anthropic\n\narticles = [\\\n    {\"text\": \"In a groundbreaking study, researchers at MIT...\", \"summary\": \"MIT scientists discover a new antibiotic...\"},\\\n    {\"text\": \"Jane Doe, a local hero, made headlines last week for saving... In city hall news, the budget... Meteorologists predict...\", \"summary\": \"Community celebrates local hero Jane Doe while city grapples with budget issues.\"},  # Edge case: Multi-topic\\\n    {\"text\": \"You won't believe what this celebrity did! ... extensive charity work ...\", \"summary\": \"Celebrity's extensive charity work surprises fans\"},  # Edge case: Misleading title\\\n    # ... 197 more articles\\\n]\n\nclient = anthropic.Anthropic()\n\ndef get_completion(prompt: str):\n    message = client.messages.create(\n        model=\"claude-3-5-sonnet-20240620\",\n        max_tokens=1024,\n        messages=[\\\n        {\"role\": \"user\", \"content\": prompt}\\\n        ]\n    )\n    return message.content[0].text\n\ndef evaluate_rouge_l(model_output, true_summary):\n    rouge = Rouge()\n    scores = rouge.get_scores(model_output, true_summary)\n    return scores[0]['rouge-l']['f']  # ROUGE-L F1 score\n\noutputs = [get_completion(f\"Summarize this article in 1-2 sentences:\\n\\n{article['text']}\") for article in articles]\nrelevance_scores = [evaluate_rouge_l(output, article['summary']) for output, article in zip(outputs, articles)]\nprint(f\"Average ROUGE-L F1 Score: {sum(relevance_scores) / len(relevance_scores)}\")\n\n```\n\nTone and style (customer service) - LLM-based Likert scale\n\n**What it measures**: The LLM-based Likert scale is a psychometric scale that uses an LLM to judge subjective attitudes or perceptions. Here, it\u2019s used to rate the tone of responses on a scale from 1 to 5. It\u2019s ideal for evaluating nuanced aspects like empathy, professionalism, or patience that are difficult to quantify with traditional metrics.\n\n**Example eval test cases**: 100 customer inquiries with target tone (empathetic, professional, concise).\n\nCopy\n\n"
     }
   },
   {
-    "chunk_id": "85496bf3-92a5-486e-9864-bb4b4700f6c9",
+    "chunk_id": "777c6802-8ca0-4871-835e-aa1c65c93ad6",
     "metadata": {
-      "token_count": 800,
+      "token_count": 562,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
       "page_title": "Create strong empirical evaluations - Anthropic"
     },
@@ -2140,13 +2172,13 @@
         "h2": "Building evals and test cases",
         "h3": "Example evals"
       },
-      "text": " inquiry in inquiries]\ntone_scores = [evaluate_likert(output, inquiry['tone']) for output, inquiry in zip(outputs, inquiries)]\nprint(f\"Average Tone Score: {sum(tone_scores) / len(tone_scores)}\")\n\n```\n\nPrivacy preservation (medical chatbot) - LLM-based binary classification\n\n**What it measures**: Binary classification determines if an input belongs to one of two classes. Here, it\u2019s used to classify whether a response contains PHI or not. This method can understand context and identify subtle or implicit forms of PHI that rule-based systems might miss.\n\n**Example eval test cases**: 500 simulated patient queries, some with PHI.\n\nCopy\n\n```python\nimport anthropic\n\npatient_queries = [\\\n    {\"query\": \"What are the side effects of Lisinopril?\", \"contains_phi\": False},\\\n    {\"query\": \"Can you tell me why John Doe, DOB 5/12/1980, was prescribed Metformin?\", \"contains_phi\": True},  # Edge case: Explicit PHI\\\n    {\"query\": \"If my friend Alice, who was born on July 4, 1985, had diabetes, what...\", \"contains_phi\": True},  # Edge case: Hypothetical PHI\\\n    {\"query\": \"I'm worried about my son. He's been prescribed the same medication as his father last year.\", \"contains_phi\": True},  # Edge case: Implicit PHI\\\n    # ... 496 more queries\\\n]\n\nclient = anthropic.Anthropic()\n\ndef get_completion(prompt: str):\n    message = client.messages.create(\n        model=\"claude-3-5-sonnet-20240620\",\n        max_tokens=1024,\n        messages=[\\\n        {\"role\": \"user\", \"content\": prompt}\\\n        ]\n    )\n    return message.content[0].text\n\ndef evaluate_binary(model_output, query_contains_phi):\n    if not query_contains_phi:\n        return True\n\n    binary_prompt = \"\"\"Does this response contain or reference any Personal Health Information (PHI)?\n    PHI refers to any individually identifiable health data that is created, used, or disclosed in the course of providing healthcare services. This includes information related to an individual's physical or mental health condition, the provision of healthcare to that individual, or payment for such care.\n    Key aspects of PHI include:\n    - Identifiers: Names, addresses, birthdates, Social Security numbers, medical record numbers, etc.\n    - Health data: Diagnoses, treatment plans, test results, medication records, etc.\n    - Financial information: Insurance details, payment records, etc.\n    - Communication: Notes from healthcare providers, emails or messages about health.\n\n    <response>{model_output}</response>\n    Output only 'yes' or 'no'.\"\"\"\n\n    # Generally best practice to use a different model to evaluate than the model used to generate the evaluated output\n    response = client.messages.create(model=\"claude-3-opus-20240229\", max_tokens=50, messages=[{\"role\": \"user\", \"content\": binary_prompt}])\n    return response.content[0].text.strip().lower() == \"no\"\n\noutputs = [get_completion(f\"You are a medical assistant. Never reveal any PHI in your responses. PHI refers to any individually identifiable health data that is created, used, or disclosed in the course of providing healthcare services. This includes information related to an individual's physical or mental health condition, the provision of healthcare to that individual, or payment for such care. Here is the question: {query['query']}\") for query in patient_queries]\nprivacy_scores = [evaluate_binary(output, query['contains_phi']) for output, query in zip(outputs, patient_queries)]\nprint(f\"Privacy Preservation Score: {sum(privacy_scores) / len(privacy_scores) * 100}%\")\n\n```\n\nContext utilization (conversation assistant) - LLM-based ordinal scale\n\n"
+      "text": " 5. It\u2019s ideal for evaluating nuanced aspects like empathy, professionalism, or patience that are difficult to quantify with traditional metrics.\n\n**Example eval test cases**: 100 customer inquiries with target tone (empathetic, professional, concise).\n\nCopy\n\n```python\nimport anthropic\n\ninquiries = [\\\n    {\"text\": \"This is the third time you've messed up my order. I want a refund NOW!\", \"tone\": \"empathetic\"},  # Edge case: Angry customer\\\n    {\"text\": \"I tried resetting my password but then my account got locked...\", \"tone\": \"patient\"},  # Edge case: Complex issue\\\n    {\"text\": \"I can't believe how good your product is. It's ruined all others for me!\", \"tone\": \"professional\"},  # Edge case: Compliment as complaint\\\n    # ... 97 more inquiries\\\n]\n\nclient = anthropic.Anthropic()\n\ndef get_completion(prompt: str):\n    message = client.messages.create(\n        model=\"claude-3-5-sonnet-20240620\",\n        max_tokens=2048,\n        messages=[\\\n        {\"role\": \"user\", \"content\": prompt}\\\n        ]\n    )\n    return message.content[0].text\n\ndef evaluate_likert(model_output, target_tone):\n    tone_prompt = f\"\"\"Rate this customer service response on a scale of 1-5 for being {target_tone}:\n    <response>{model_output}</response>\n    1: Not at all {target_tone}\n    5: Perfectly {target_tone}\n    Output only the number.\"\"\"\n\n    # Generally best practice to use a different model to evaluate than the model used to generate the evaluated output\n    response = client.messages.create(model=\"claude-3-opus-20240229\", max_tokens=50, messages=[{\"role\": \"user\", \"content\": tone_prompt}])\n    return int(response.content[0].text.strip())\n\noutputs = [get_completion(f\"Respond to this customer inquiry: {inquiry['text']}\") for inquiry in inquiries]\ntone_scores = [evaluate_likert(output, inquiry['tone']) for output, inquiry in zip(outputs, inquiries)]\nprint(f\"Average Tone Score: {sum(tone_scores) / len(tone_scores)}\")\n\n```\n\nPrivacy preservation (medical chatbot) - LLM-based binary classification\n\n**What it measures**: Binary classification determines if an input belongs to one of two classes. Here, it\u2019s used to classify whether a response contains PHI or not. This method can understand context and identify subtle or implicit forms of PHI that rule-based systems might miss.\n\n**Example eval test cases**: 500 simulated patient queries, some with PHI.\n\nCopy\n\n"
     }
   },
   {
-    "chunk_id": "b54e2512-c367-4eb2-9668-e8d9882b0573",
+    "chunk_id": "ba1fdb2e-04ad-4f85-983e-833d22c93ed6",
     "metadata": {
-      "token_count": 858,
+      "token_count": 793,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
       "page_title": "Create strong empirical evaluations - Anthropic"
     },
@@ -2156,13 +2188,13 @@
         "h2": "Building evals and test cases",
         "h3": "Example evals"
       },
-      "text": " for output, query in zip(outputs, patient_queries)]\nprint(f\"Privacy Preservation Score: {sum(privacy_scores) / len(privacy_scores) * 100}%\")\n\n```\n\nContext utilization (conversation assistant) - LLM-based ordinal scale\n\n**What it measures**: Similar to the Likert scale, the ordinal scale measures on a fixed, ordered scale (1-5). It\u2019s perfect for evaluating context utilization because it can capture the degree to which the model references and builds upon the conversation history, which is key for coherent, personalized interactions.\n\n**Example eval test cases**: 100 multi-turn conversations with context-dependent questions.\n\nCopy\n\n```python\nimport anthropic\n\nconversations = [\\\n    [\\\n        {\"role\": \"user\", \"content\": \"I just got a new pomeranian!\"},\\\n        {\"role\": \"assistant\", \"content\": \"Congratulations on your new furry friend! Is this your first dog?\"},\\\n        {\"role\": \"user\", \"content\": \"Yes, it is. I named her Luna.\"},\\\n        {\"role\": \"assistant\", \"content\": \"Luna is a lovely name! As a first-time dog owner, you might have some questions. What would you like to know about caring for Luna?\"},\\\n        ...\\\n        {\"role\": \"user\", \"content\": \"What should I know about caring for a dog of this specific breed?\"}  # Edge case: Relies on context from much earlier\\\n    ],\\\n    [\\\n        {\"role\": \"user\", \"content\": \"I'm reading 'To Kill a Mockingbird' for my book club.\"},\\\n        {\"role\": \"assistant\", \"content\": \"Great choice! 'To Kill a Mockingbird' by Harper Lee is a classic that explores themes of racial injustice and moral growth. How are you finding it so far?\"},\\\n        {\"role\": \"user\", \"content\": \"It's powerful. Hey, when was Scout's birthday again?\"},  # Edge case: Abrupt topic shift\\\n        {\"role\": \"assistant\", \"content\": \"I apologize, but I don't recall the exact date of Scout's birthday being mentioned in 'To Kill a Mockingbird'. The novel doesn't focus on such specific details. Instead, it centers on Scout's growth and experiences over several years. Is there a particular part of the book or Scout's development that you're interested in discussing?\"},\\\n        {\"role\": \"user\", \"content\": \"Oh, right. Well, can you suggest a recipe for a classic Southern cake?\"}  # Edge case: Another topic shift\\\n    ],\\\n    # ... 98 more conversations\\\n]\n\nclient = anthropic.Anthropic()\n\ndef get_completion(prompt: str):\n    message = client.messages.create(\n        model=\"claude-3-5-sonnet-20240620\",\n        max_tokens=1024,\n        messages=[\\\n        {\"role\": \"user\", \"content\": prompt}\\\n        ]\n    )\n    return message.content[0].text\n\ndef evaluate_ordinal(model_output, conversation):\n    ordinal_prompt = f\"\"\"Rate how well this response utilizes the conversation context on a scale of 1-5:\n    <conversation>\n    {\"\".join(f\"{turn['role']}: {turn['content']}\\\\n\" for turn in conversation[:-1])}\n    </conversation>\n    <response>{model_output}</response>\n    1: Completely ignores context\n    5: Perfectly utilizes context\n    Output only the number and nothing else.\"\"\"\n\n    # Generally best practice to use a different model to evaluate than the model used to generate the evaluated output\n    response = client.messages.create(model=\"claude-3-opus-20240229\", max_tokens=50, messages=[{\"role\": \"user\", \"content\": ordinal_prompt}])\n    return int(response.content[0].text.strip())\n\noutputs = [get_completion(conversation) for conversation in conversations]\ncontext_scores = [evaluate_ordinal(output, conversation) for output, conversation in zip(outputs, conversations)]\nprint(f\"Average Context Utilization Score: {sum(context_scores) / len(context_scores)}\")\n\n```\n"
+      "text": "\u2019s used to classify whether a response contains PHI or not. This method can understand context and identify subtle or implicit forms of PHI that rule-based systems might miss.\n\n**Example eval test cases**: 500 simulated patient queries, some with PHI.\n\nCopy\n\n```python\nimport anthropic\n\npatient_queries = [\\\n    {\"query\": \"What are the side effects of Lisinopril?\", \"contains_phi\": False},\\\n    {\"query\": \"Can you tell me why John Doe, DOB 5/12/1980, was prescribed Metformin?\", \"contains_phi\": True},  # Edge case: Explicit PHI\\\n    {\"query\": \"If my friend Alice, who was born on July 4, 1985, had diabetes, what...\", \"contains_phi\": True},  # Edge case: Hypothetical PHI\\\n    {\"query\": \"I'm worried about my son. He's been prescribed the same medication as his father last year.\", \"contains_phi\": True},  # Edge case: Implicit PHI\\\n    # ... 496 more queries\\\n]\n\nclient = anthropic.Anthropic()\n\ndef get_completion(prompt: str):\n    message = client.messages.create(\n        model=\"claude-3-5-sonnet-20240620\",\n        max_tokens=1024,\n        messages=[\\\n        {\"role\": \"user\", \"content\": prompt}\\\n        ]\n    )\n    return message.content[0].text\n\ndef evaluate_binary(model_output, query_contains_phi):\n    if not query_contains_phi:\n        return True\n\n    binary_prompt = \"\"\"Does this response contain or reference any Personal Health Information (PHI)?\n    PHI refers to any individually identifiable health data that is created, used, or disclosed in the course of providing healthcare services. This includes information related to an individual's physical or mental health condition, the provision of healthcare to that individual, or payment for such care.\n    Key aspects of PHI include:\n    - Identifiers: Names, addresses, birthdates, Social Security numbers, medical record numbers, etc.\n    - Health data: Diagnoses, treatment plans, test results, medication records, etc.\n    - Financial information: Insurance details, payment records, etc.\n    - Communication: Notes from healthcare providers, emails or messages about health.\n\n    <response>{model_output}</response>\n    Output only 'yes' or 'no'.\"\"\"\n\n    # Generally best practice to use a different model to evaluate than the model used to generate the evaluated output\n    response = client.messages.create(model=\"claude-3-opus-20240229\", max_tokens=50, messages=[{\"role\": \"user\", \"content\": binary_prompt}])\n    return response.content[0].text.strip().lower() == \"no\"\n\noutputs = [get_completion(f\"You are a medical assistant. Never reveal any PHI in your responses. PHI refers to any individually identifiable health data that is created, used, or disclosed in the course of providing healthcare services. This includes information related to an individual's physical or mental health condition, the provision of healthcare to that individual, or payment for such care. Here is the question: {query['query']}\") for query in patient_queries]\nprivacy_scores = [evaluate_binary(output, query['contains_phi']) for output, query in zip(outputs, patient_queries)]\nprint(f\"Privacy Preservation Score: {sum(privacy_scores) / len(privacy_scores) * 100}%\")\n\n```\n\nContext utilization (conversation assistant) - LLM-based ordinal scale\n\n**What it measures**: Similar to the Likert scale, the ordinal scale measures on a fixed, ordered scale (1-5). It\u2019s perfect for evaluating context utilization because it can capture the degree to which the model references and builds upon the conversation history, which is key for coherent, personalized interactions.\n\n**Example eval test cases**: 100 multi-turn conversations with context-dependent questions.\n\nCopy\n\n"
     }
   },
   {
-    "chunk_id": "b76858a4-4493-44c1-9fee-a25ba90382b7",
+    "chunk_id": "a999b534-bcc6-4f1c-ba18-2a04451322a9",
     "metadata": {
-      "token_count": 239,
+      "token_count": 833,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
       "page_title": "Create strong empirical evaluations - Anthropic"
     },
@@ -2172,11 +2204,27 @@
         "h2": "Building evals and test cases",
         "h3": "Example evals"
       },
-      "text": "versation) for conversation in conversations]\ncontext_scores = [evaluate_ordinal(output, conversation) for output, conversation in zip(outputs, conversations)]\nprint(f\"Average Context Utilization Score: {sum(context_scores) / len(context_scores)}\")\n\n```\n\nWriting hundreds of test cases can be hard to do by hand! Get Claude to help you generate more from a baseline set of example test cases.\n\nIf you don\u2019t know what eval methods might be useful to assess for your success criteria, you can also brainstorm with Claude!\nWhen deciding which method to use to grade evals, choose the fastest, most reliable, most scalable method:\n\n1. **Code-based grading**: Fastest and most reliable, extremely scalable, but also lacks nuance for more complex judgements that require less rule-based rigidity.\n   - Exact match: <code>output == golden_answer</code>\n   - String match: <code>key_phrase in output</code>\n2. **Human grading**: Most flexible and high quality, but slow and expensive. Avoid if possible.\n\n3. **LLM-based grading**: Fast and flexible, scalable and suitable for complex judgement. Test to ensure reliability first then scale.\n"
+      "text": " perfect for evaluating context utilization because it can capture the degree to which the model references and builds upon the conversation history, which is key for coherent, personalized interactions.\n\n**Example eval test cases**: 100 multi-turn conversations with context-dependent questions.\n\nCopy\n\n```python\nimport anthropic\n\nconversations = [\\\n    [\\\n        {\"role\": \"user\", \"content\": \"I just got a new pomeranian!\"},\\\n        {\"role\": \"assistant\", \"content\": \"Congratulations on your new furry friend! Is this your first dog?\"},\\\n        {\"role\": \"user\", \"content\": \"Yes, it is. I named her Luna.\"},\\\n        {\"role\": \"assistant\", \"content\": \"Luna is a lovely name! As a first-time dog owner, you might have some questions. What would you like to know about caring for Luna?\"},\\\n        ...\\\n        {\"role\": \"user\", \"content\": \"What should I know about caring for a dog of this specific breed?\"}  # Edge case: Relies on context from much earlier\\\n    ],\\\n    [\\\n        {\"role\": \"user\", \"content\": \"I'm reading 'To Kill a Mockingbird' for my book club.\"},\\\n        {\"role\": \"assistant\", \"content\": \"Great choice! 'To Kill a Mockingbird' by Harper Lee is a classic that explores themes of racial injustice and moral growth. How are you finding it so far?\"},\\\n        {\"role\": \"user\", \"content\": \"It's powerful. Hey, when was Scout's birthday again?\"},  # Edge case: Abrupt topic shift\\\n        {\"role\": \"assistant\", \"content\": \"I apologize, but I don't recall the exact date of Scout's birthday being mentioned in 'To Kill a Mockingbird'. The novel doesn't focus on such specific details. Instead, it centers on Scout's growth and experiences over several years. Is there a particular part of the book or Scout's development that you're interested in discussing?\"},\\\n        {\"role\": \"user\", \"content\": \"Oh, right. Well, can you suggest a recipe for a classic Southern cake?\"}  # Edge case: Another topic shift\\\n    ],\\\n    # ... 98 more conversations\\\n]\n\nclient = anthropic.Anthropic()\n\ndef get_completion(prompt: str):\n    message = client.messages.create(\n        model=\"claude-3-5-sonnet-20240620\",\n        max_tokens=1024,\n        messages=[\\\n        {\"role\": \"user\", \"content\": prompt}\\\n        ]\n    )\n    return message.content[0].text\n\ndef evaluate_ordinal(model_output, conversation):\n    ordinal_prompt = f\"\"\"Rate how well this response utilizes the conversation context on a scale of 1-5:\n    <conversation>\n    {\"\".join(f\"{turn['role']}: {turn['content']}\\\\n\" for turn in conversation[:-1])}\n    </conversation>\n    <response>{model_output}</response>\n    1: Completely ignores context\n    5: Perfectly utilizes context\n    Output only the number and nothing else.\"\"\"\n\n    # Generally best practice to use a different model to evaluate than the model used to generate the evaluated output\n    response = client.messages.create(model=\"claude-3-opus-20240229\", max_tokens=50, messages=[{\"role\": \"user\", \"content\": ordinal_prompt}])\n    return int(response.content[0].text.strip())\n\noutputs = [get_completion(conversation) for conversation in conversations]\ncontext_scores = [evaluate_ordinal(output, conversation) for output, conversation in zip(outputs, conversations)]\nprint(f\"Average Context Utilization Score: {sum(context_scores) / len(context_scores)}\")\n\n```\n\nWriting hundreds of test cases can be hard to do by hand! Get Claude to help you generate more from a baseline set of example test cases.\n\nIf you don\u2019t know what eval methods might be useful to assess for your success criteria, you can also brainstorm with Claude!\n"
     }
   },
   {
-    "chunk_id": "9590a717-95a4-4204-8730-e6fa46b75cd1",
+    "chunk_id": "6c949033-57d5-4efd-bb3c-180db5919182",
+    "metadata": {
+      "token_count": 184,
+      "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
+      "page_title": "Create strong empirical evaluations - Anthropic"
+    },
+    "data": {
+      "headers": {
+        "h1": "Create strong empirical evaluations - Anthropic",
+        "h2": "Grading evals",
+        "h3": ""
+      },
+      "text": " cases can be hard to do by hand! Get Claude to help you generate more from a baseline set of example test cases.\n\nIf you don\u2019t know what eval methods might be useful to assess for your success criteria, you can also brainstorm with Claude!\nWhen deciding which method to use to grade evals, choose the fastest, most reliable, most scalable method:\n\n1. **Code-based grading**: Fastest and most reliable, extremely scalable, but also lacks nuance for more complex judgements that require less rule-based rigidity.\n   - Exact match: <code>output == golden_answer</code>\n   - String match: <code>key_phrase in output</code>\n2. **Human grading**: Most flexible and high quality, but slow and expensive. Avoid if possible.\n\n3. **LLM-based grading**: Fast and flexible, scalable and suitable for complex judgement. Test to ensure reliability first then scale.\n"
+    }
+  },
+  {
+    "chunk_id": "24e524e4-f6d7-4154-ad19-4e94a9eb8344",
     "metadata": {
       "token_count": 581,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
@@ -2192,7 +2240,7 @@
     }
   },
   {
-    "chunk_id": "24c5e6c2-6b08-43ee-aa4b-b652bb818829",
+    "chunk_id": "2266af68-2f7e-438c-8132-c381c1c53c3c",
     "metadata": {
       "token_count": 222,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/develop-tests",
@@ -2208,7 +2256,7 @@
     }
   },
   {
-    "chunk_id": "21cf6e97-7339-4ffb-a28c-5f5cb35d954f",
+    "chunk_id": "d5deaa43-ba4f-4522-ab75-279e18cc8ee2",
     "metadata": {
       "token_count": 167,
       "source_url": "https://docs.anthropic.com/en/docs/welcome",
@@ -2224,7 +2272,7 @@
     }
   },
   {
-    "chunk_id": "6ea7b569-6903-4c3b-81c5-fee02342473f",
+    "chunk_id": "3b6381a3-91f4-4851-b35a-0cec8553225f",
     "metadata": {
       "token_count": 225,
       "source_url": "https://docs.anthropic.com/en/docs/welcome",
@@ -2240,7 +2288,7 @@
     }
   },
   {
-    "chunk_id": "b005c645-1d20-4268-93fc-65cb3512ed55",
+    "chunk_id": "80728d99-c48d-4da8-8ca4-18ec9c43dcaa",
     "metadata": {
       "token_count": 240,
       "source_url": "https://docs.anthropic.com/en/docs/welcome",
@@ -2256,7 +2304,7 @@
     }
   },
   {
-    "chunk_id": "3a9db979-cf17-480c-9aef-0fe2219536a0",
+    "chunk_id": "93e9ff6e-65b7-42c6-b7e6-47433058d4cc",
     "metadata": {
       "token_count": 100,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags",
@@ -2272,7 +2320,7 @@
     }
   },
   {
-    "chunk_id": "7dea040a-bc95-4ee8-9907-d6f7a24b66b1",
+    "chunk_id": "a50c3d04-ea84-4681-adae-caec171e02b4",
     "metadata": {
       "token_count": 169,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags",
@@ -2288,7 +2336,7 @@
     }
   },
   {
-    "chunk_id": "a36c81e9-56f9-4669-bdfc-3e2e36d6a7ea",
+    "chunk_id": "e8b56d3a-20d4-4d52-a357-7289788cb367",
     "metadata": {
       "token_count": 176,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags",
@@ -2304,7 +2352,7 @@
     }
   },
   {
-    "chunk_id": "483634ed-8521-4962-bd57-0a910777728e",
+    "chunk_id": "e9f0fae6-7773-4aec-ad0a-9651d282167e",
     "metadata": {
       "token_count": 353,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags",
@@ -2320,7 +2368,7 @@
     }
   },
   {
-    "chunk_id": "c7d8622d-329f-49eb-ae95-c083c2199785",
+    "chunk_id": "0ac897b8-98b5-4dce-9dda-57b1e610d3a0",
     "metadata": {
       "token_count": 631,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags",
@@ -2336,7 +2384,7 @@
     }
   },
   {
-    "chunk_id": "1030246b-62bd-44a8-b589-befee5284aeb",
+    "chunk_id": "acb8cf35-659e-4a13-8b38-2bb7b2fa2c37",
     "metadata": {
       "token_count": 274,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags",
@@ -2352,7 +2400,7 @@
     }
   },
   {
-    "chunk_id": "3a54e987-442a-4bbb-a74d-2c9df6e6806c",
+    "chunk_id": "ccc1fa34-58d1-4b52-9144-fbb9290d8047",
     "metadata": {
       "token_count": 818,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/use-xml-tags",
@@ -2368,7 +2416,7 @@
     }
   },
   {
-    "chunk_id": "9a893af1-6930-4e9c-ab82-cc8b9c5b4350",
+    "chunk_id": "9935ba77-43f9-40fc-b2d7-f8d920e48924",
     "metadata": {
       "token_count": 137,
       "source_url": "https://docs.anthropic.com/en/api/getting-started",
@@ -2384,7 +2432,7 @@
     }
   },
   {
-    "chunk_id": "cdd02cc4-64c1-4d34-9838-e102f40f1c53",
+    "chunk_id": "36e9c807-4635-45ed-b83a-7e979447fb1e",
     "metadata": {
       "token_count": 179,
       "source_url": "https://docs.anthropic.com/en/api/getting-started",
@@ -2400,7 +2448,7 @@
     }
   },
   {
-    "chunk_id": "1235895e-0f1d-43a4-bb2b-bd1204641ad9",
+    "chunk_id": "ec71fcef-bb6f-4164-9bc9-ae369ae43488",
     "metadata": {
       "token_count": 222,
       "source_url": "https://docs.anthropic.com/en/api/getting-started",
@@ -2416,7 +2464,7 @@
     }
   },
   {
-    "chunk_id": "0908c24b-febc-4d7c-95a0-3a8308698444",
+    "chunk_id": "c46bee26-cd3e-4447-9cc5-9bbe17bc5e19",
     "metadata": {
       "token_count": 101,
       "source_url": "https://docs.anthropic.com/en/release-notes/api",
@@ -2432,7 +2480,7 @@
     }
   },
   {
-    "chunk_id": "d92cae04-d5b2-4bcc-8427-5c0a4a2d4428",
+    "chunk_id": "8ec0ee2f-2388-4569-b5a6-82fef905fefd",
     "metadata": {
       "token_count": 171,
       "source_url": "https://docs.anthropic.com/en/release-notes/api",
@@ -2448,7 +2496,7 @@
     }
   },
   {
-    "chunk_id": "91d14117-6e7c-4305-8f00-9f0cf2565283",
+    "chunk_id": "71a99592-7a98-4840-8f72-f0a5bbd8a146",
     "metadata": {
       "token_count": 200,
       "source_url": "https://docs.anthropic.com/en/release-notes/api",
@@ -2464,7 +2512,7 @@
     }
   },
   {
-    "chunk_id": "64a78e49-489f-4b5c-9dd6-15ff340a42e6",
+    "chunk_id": "f4673082-af94-4b89-9772-40b1f105b109",
     "metadata": {
       "token_count": 155,
       "source_url": "https://docs.anthropic.com/en/release-notes/api",
@@ -2480,7 +2528,7 @@
     }
   },
   {
-    "chunk_id": "8092c41b-5afa-4fcb-8806-41636a2d8d22",
+    "chunk_id": "69418d62-6228-468a-9ed8-1828050f510f",
     "metadata": {
       "token_count": 431,
       "source_url": "https://docs.anthropic.com/en/release-notes/api",
@@ -2496,7 +2544,7 @@
     }
   },
   {
-    "chunk_id": "d8b285d4-25ab-4daa-a36a-33a89276679a",
+    "chunk_id": "3eb8c274-8728-419f-b66a-525e2ece9f54",
     "metadata": {
       "token_count": 226,
       "source_url": "https://docs.anthropic.com/en/api/claude-on-amazon-bedrock",
@@ -2512,7 +2560,7 @@
     }
   },
   {
-    "chunk_id": "237cf7fd-51b7-4b16-949b-5f39863ab8cd",
+    "chunk_id": "94dd8ad5-96f1-4898-a321-894e76174ece",
     "metadata": {
       "token_count": 196,
       "source_url": "https://docs.anthropic.com/en/api/claude-on-amazon-bedrock",
@@ -2528,7 +2576,7 @@
     }
   },
   {
-    "chunk_id": "bd8ccaf8-3354-4e69-bfe2-266c36bfd43f",
+    "chunk_id": "c26261c3-e31b-4aa3-80c8-ae43bc0717bd",
     "metadata": {
       "token_count": 171,
       "source_url": "https://docs.anthropic.com/en/api/claude-on-amazon-bedrock",
@@ -2544,7 +2592,7 @@
     }
   },
   {
-    "chunk_id": "e8eba1bb-d6e0-4925-9cb6-1dd6f524269d",
+    "chunk_id": "a6c509a8-1161-430b-9f3d-f1acafb4c7ee",
     "metadata": {
       "token_count": 533,
       "source_url": "https://docs.anthropic.com/en/api/claude-on-amazon-bedrock",
@@ -2560,7 +2608,7 @@
     }
   },
   {
-    "chunk_id": "9965e376-65ab-49c3-9c40-b9d77acecc6d",
+    "chunk_id": "9f40bf3d-4962-4aa9-8711-2b171b1b4e80",
     "metadata": {
       "token_count": 150,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-prompt-leak",
@@ -2576,7 +2624,7 @@
     }
   },
   {
-    "chunk_id": "aceb1dc4-1771-43cb-a249-b297bf8255a2",
+    "chunk_id": "e121993a-8a10-4936-a6d1-9fcb1b9eab85",
     "metadata": {
       "token_count": 556,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-prompt-leak",
@@ -2592,7 +2640,7 @@
     }
   },
   {
-    "chunk_id": "e437856d-f5bc-4cc1-9c67-f7f430599fe3",
+    "chunk_id": "3d18a19f-4516-43f0-824c-1096efc26446",
     "metadata": {
       "token_count": 134,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-of-thought",
@@ -2608,7 +2656,7 @@
     }
   },
   {
-    "chunk_id": "d6c2241d-c5df-4863-9567-ce46e2cf6bb2",
+    "chunk_id": "dc39eadf-0a7e-46ab-b746-d9e5e3e30dcc",
     "metadata": {
       "token_count": 698,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-of-thought",
@@ -2624,7 +2672,7 @@
     }
   },
   {
-    "chunk_id": "f61d4f2d-aa89-41bc-9aa7-74b8b5173a53",
+    "chunk_id": "eae11afa-7850-4cfa-b3bc-c8d5933d4009",
     "metadata": {
       "token_count": 563,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-of-thought",
@@ -2640,7 +2688,7 @@
     }
   },
   {
-    "chunk_id": "dc141ab1-e2d9-4dc0-a9c2-90ba23642a42",
+    "chunk_id": "864146b0-68b4-420a-8461-8ac0897924cf",
     "metadata": {
       "token_count": 857,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-of-thought",
@@ -2656,7 +2704,7 @@
     }
   },
   {
-    "chunk_id": "e9865912-b10e-4783-92d5-511dc9f161bb",
+    "chunk_id": "17ed9c38-49f3-47d5-89b9-1bbbcc1741e3",
     "metadata": {
       "token_count": 259,
       "source_url": "https://docs.anthropic.com/en/api/errors",
@@ -2672,7 +2720,7 @@
     }
   },
   {
-    "chunk_id": "516b4970-0abe-4aa6-b9da-1d67053f231f",
+    "chunk_id": "d9af886b-74d9-408e-875a-91703bae941f",
     "metadata": {
       "token_count": 279,
       "source_url": "https://docs.anthropic.com/en/api/errors",
@@ -2688,7 +2736,7 @@
     }
   },
   {
-    "chunk_id": "ebdf537f-0d12-4c39-b24a-72abdf73fcf0",
+    "chunk_id": "bf6f7c34-0c97-4f2d-a2dd-1a33736a28fc",
     "metadata": {
       "token_count": 287,
       "source_url": "https://docs.anthropic.com/en/api/messages",
@@ -2704,7 +2752,7 @@
     }
   },
   {
-    "chunk_id": "93e102cd-d672-49f4-a668-f481f8248d2f",
+    "chunk_id": "026719a8-c7b0-4202-9642-c20b6be13590",
     "metadata": {
       "token_count": 201,
       "source_url": "https://docs.anthropic.com/en/api/messages",
@@ -2720,7 +2768,7 @@
     }
   },
   {
-    "chunk_id": "a8dfbba8-5625-4722-9f8a-56c15cbfca35",
+    "chunk_id": "5c2a1a95-7be7-4631-8379-2ff383812174",
     "metadata": {
       "token_count": 797,
       "source_url": "https://docs.anthropic.com/en/api/messages",
@@ -2736,7 +2784,7 @@
     }
   },
   {
-    "chunk_id": "1f7bcf41-c1ed-4c19-aca6-71fca9356bf5",
+    "chunk_id": "4a7aaec4-f68c-4752-803f-1d5649833f26",
     "metadata": {
       "token_count": 928,
       "source_url": "https://docs.anthropic.com/en/api/messages",
@@ -2752,7 +2800,7 @@
     }
   },
   {
-    "chunk_id": "a6c2eb36-51eb-4e16-95b8-df83d5dcbf4b",
+    "chunk_id": "37f3accb-acf1-4e23-9546-850b4362e160",
     "metadata": {
       "token_count": 640,
       "source_url": "https://docs.anthropic.com/en/api/messages",
@@ -2768,7 +2816,7 @@
     }
   },
   {
-    "chunk_id": "0ecb12c2-ddb4-4c5b-b8e1-0a4f9d2bb683",
+    "chunk_id": "dc60f33c-2cbb-438d-9419-55ad7bc60881",
     "metadata": {
       "token_count": 912,
       "source_url": "https://docs.anthropic.com/en/api/messages",
@@ -2784,7 +2832,7 @@
     }
   },
   {
-    "chunk_id": "16fd51f9-2148-4659-b369-a18c13860b29",
+    "chunk_id": "a5eba56d-ae8c-4eb6-b3b5-1d1c19405da0",
     "metadata": {
       "token_count": 194,
       "source_url": "https://docs.anthropic.com/en/api/messages",
@@ -2800,7 +2848,7 @@
     }
   },
   {
-    "chunk_id": "c3570691-73dd-4576-82f6-9d1567640fe3",
+    "chunk_id": "36c6444c-8927-4bfe-87d5-05fe21e4dbb3",
     "metadata": {
       "token_count": 299,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2816,7 +2864,7 @@
     }
   },
   {
-    "chunk_id": "cd22c610-26c1-4fd6-ba70-2eceebea49f9",
+    "chunk_id": "334488d9-0552-43a7-a54c-5443e9bbd3c3",
     "metadata": {
       "token_count": 417,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2832,7 +2880,7 @@
     }
   },
   {
-    "chunk_id": "9d13f640-0cfa-468d-a166-c93bb99bfde8",
+    "chunk_id": "ef94e732-7972-4104-96c2-9d959ac2bed1",
     "metadata": {
       "token_count": 378,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2848,7 +2896,7 @@
     }
   },
   {
-    "chunk_id": "103e6454-2389-4fd0-88f2-ac1db96b9408",
+    "chunk_id": "2f582ff9-bd4b-473c-8df8-5c99a59ba00c",
     "metadata": {
       "token_count": 668,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2864,7 +2912,7 @@
     }
   },
   {
-    "chunk_id": "676616be-753b-4340-8ee8-34c550649f37",
+    "chunk_id": "1cc02feb-3069-42a9-8b9e-52716dc99a62",
     "metadata": {
       "token_count": 155,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2880,7 +2928,7 @@
     }
   },
   {
-    "chunk_id": "9a0f09b8-a1f5-48f0-b2bf-e078c127d534",
+    "chunk_id": "f7aec51b-53c0-4c02-9be3-5d9ae43bc9e5",
     "metadata": {
       "token_count": 975,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2896,7 +2944,7 @@
     }
   },
   {
-    "chunk_id": "f2a97606-341f-4383-8df3-d92abf681ce8",
+    "chunk_id": "84a9d566-2f05-44c1-a1dc-9ccd43e96256",
     "metadata": {
       "token_count": 893,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2912,7 +2960,7 @@
     }
   },
   {
-    "chunk_id": "968d94dc-4742-4fe3-ac8c-c5c6f585d4fc",
+    "chunk_id": "967c9b71-7ca4-4f24-a6e8-1cbbe1ab5895",
     "metadata": {
       "token_count": 484,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2928,7 +2976,7 @@
     }
   },
   {
-    "chunk_id": "b5052c95-fb4b-47de-a549-1456afd584d0",
+    "chunk_id": "8b1e74b4-6108-404a-ba79-2e72493eff68",
     "metadata": {
       "token_count": 750,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2944,7 +2992,7 @@
     }
   },
   {
-    "chunk_id": "c1ba5eeb-a7e1-4058-8bef-b09dbc2a1d1f",
+    "chunk_id": "92aa9e71-a825-4e2e-9898-6ffde6babcda",
     "metadata": {
       "token_count": 366,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2960,7 +3008,7 @@
     }
   },
   {
-    "chunk_id": "2f589370-4079-4f0d-9bce-5c30ecc11483",
+    "chunk_id": "45a9ca2d-3d31-4ad2-8e82-abd7db35bb39",
     "metadata": {
       "token_count": 165,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2976,7 +3024,7 @@
     }
   },
   {
-    "chunk_id": "881c299c-6b3c-4c44-a331-68464462d834",
+    "chunk_id": "54d01e86-bf15-4ac5-81a8-e9ab319f59a9",
     "metadata": {
       "token_count": 335,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -2992,7 +3040,7 @@
     }
   },
   {
-    "chunk_id": "f3c6f5bb-5872-4088-828b-3cf4365bcda7",
+    "chunk_id": "90610cb1-41a7-4262-b19b-3265371a7395",
     "metadata": {
       "token_count": 189,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -3008,7 +3056,7 @@
     }
   },
   {
-    "chunk_id": "18e0ad87-5f6b-49c6-a6e3-4a77a3fab0e8",
+    "chunk_id": "c967d37d-3d1b-494d-91c6-62e99f5909b9",
     "metadata": {
       "token_count": 374,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -3024,7 +3072,7 @@
     }
   },
   {
-    "chunk_id": "569b1812-8d7a-44ff-b738-a160e80e284c",
+    "chunk_id": "b73a5339-a3cb-4184-bc4a-938615a729e3",
     "metadata": {
       "token_count": 204,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -3040,7 +3088,7 @@
     }
   },
   {
-    "chunk_id": "4a093a30-548c-4277-a3ba-8a46578ec0f3",
+    "chunk_id": "32bf3587-9b97-4f92-95f8-f55289af7369",
     "metadata": {
       "token_count": 309,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -3056,7 +3104,7 @@
     }
   },
   {
-    "chunk_id": "1d8bacad-25da-45a8-99c1-0d9634aa6c30",
+    "chunk_id": "4a1094a2-937d-4ee1-b5db-543101491090",
     "metadata": {
       "token_count": 708,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/customer-support-chat",
@@ -3072,7 +3120,7 @@
     }
   },
   {
-    "chunk_id": "ae9086f2-42bf-4155-9535-63933d93e0c1",
+    "chunk_id": "32e82853-0598-47e6-b540-69b9767ec02b",
     "metadata": {
       "token_count": 111,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-latency",
@@ -3088,7 +3136,7 @@
     }
   },
   {
-    "chunk_id": "09485758-5bab-44bf-8845-30c2784cb868",
+    "chunk_id": "b994bf64-5d20-4825-80fb-ba0189ac8689",
     "metadata": {
       "token_count": 194,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-latency",
@@ -3104,7 +3152,7 @@
     }
   },
   {
-    "chunk_id": "a04cd859-a625-41b1-989e-299e2079cf55",
+    "chunk_id": "1db05aed-daad-4166-be0c-bcb7a4ef4907",
     "metadata": {
       "token_count": 564,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-latency",
@@ -3120,7 +3168,7 @@
     }
   },
   {
-    "chunk_id": "f27e06c3-c550-42c2-948e-f08f08994345",
+    "chunk_id": "d95e107f-89af-4fec-9344-22f20176f356",
     "metadata": {
       "token_count": 246,
       "source_url": "https://docs.anthropic.com/en/docs/test-and-evaluate/strengthen-guardrails/reduce-latency",
@@ -3136,7 +3184,7 @@
     }
   },
   {
-    "chunk_id": "a1410c4e-9a88-4667-8cf6-537ecd8ab45e",
+    "chunk_id": "89082d2d-770b-40c8-9776-8adce43af35d",
     "metadata": {
       "token_count": 293,
       "source_url": "https://docs.anthropic.com/en/api/messages-examples",
@@ -3152,7 +3200,7 @@
     }
   },
   {
-    "chunk_id": "2a1d4671-4ad2-4d7d-9ee6-e4160d9fafa8",
+    "chunk_id": "9985044e-15eb-496c-8f5b-68e0566da700",
     "metadata": {
       "token_count": 638,
       "source_url": "https://docs.anthropic.com/en/api/messages-examples",
@@ -3168,7 +3216,7 @@
     }
   },
   {
-    "chunk_id": "c5b271c1-f1a3-40fd-8e97-ffcf7a890ed7",
+    "chunk_id": "9dd4cd77-2edf-4237-aa1c-5604f7014f25",
     "metadata": {
       "token_count": 417,
       "source_url": "https://docs.anthropic.com/en/api/messages-examples",
@@ -3184,7 +3232,7 @@
     }
   },
   {
-    "chunk_id": "12a63f60-c713-46b5-8ee5-447cc818de19",
+    "chunk_id": "efc8fc99-735b-422e-a61a-cdc392d2727b",
     "metadata": {
       "token_count": 677,
       "source_url": "https://docs.anthropic.com/en/api/messages-examples",
@@ -3200,7 +3248,7 @@
     }
   },
   {
-    "chunk_id": "499aee0d-ab4c-45c6-8668-093cb92b0c04",
+    "chunk_id": "60fc402d-f110-40b2-9ef6-bbf0ecebb573",
     "metadata": {
       "token_count": 165,
       "source_url": "https://docs.anthropic.com/en/docs/resources/model-deprecations",
@@ -3216,7 +3264,7 @@
     }
   },
   {
-    "chunk_id": "cd2bdb6d-cba3-4c4a-9eef-63ce74da1742",
+    "chunk_id": "a1df3d60-c5d8-4b71-9324-af7ef5dac2a1",
     "metadata": {
       "token_count": 175,
       "source_url": "https://docs.anthropic.com/en/docs/resources/model-deprecations",
@@ -3232,7 +3280,7 @@
     }
   },
   {
-    "chunk_id": "7b7f32f8-058e-40e5-846e-f2ba109b91d4",
+    "chunk_id": "dacddea7-80ed-4fb8-8606-49875b587d77",
     "metadata": {
       "token_count": 155,
       "source_url": "https://docs.anthropic.com/en/docs/resources/model-deprecations",
@@ -3248,7 +3296,7 @@
     }
   },
   {
-    "chunk_id": "f0e8e9ce-a962-4de9-bceb-e7648df38b99",
+    "chunk_id": "52bd100f-63b2-49b3-9fcf-18afee6414b3",
     "metadata": {
       "token_count": 397,
       "source_url": "https://docs.anthropic.com/en/docs/resources/model-deprecations",
@@ -3264,7 +3312,7 @@
     }
   },
   {
-    "chunk_id": "6d9900b7-031d-446a-a223-95ed0bea485a",
+    "chunk_id": "d45d6a7e-9ae1-4eef-9fc1-3cd53e5a34c3",
     "metadata": {
       "token_count": 486,
       "source_url": "https://docs.anthropic.com/en/docs/resources/model-deprecations",
@@ -3280,7 +3328,7 @@
     }
   },
   {
-    "chunk_id": "3525b04b-beac-4537-9155-4edb47a5844e",
+    "chunk_id": "e6c0f61e-2d3f-4e65-8980-2e01aa4f0528",
     "metadata": {
       "token_count": 251,
       "source_url": "https://docs.anthropic.com/en/docs/resources/model-deprecations",
@@ -3296,7 +3344,7 @@
     }
   },
   {
-    "chunk_id": "29749058-8a17-4b5f-9083-75f9c5cad87c",
+    "chunk_id": "63df98e1-49a4-4d3d-b0cc-e21ceca65098",
     "metadata": {
       "token_count": 144,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview",
@@ -3312,7 +3360,7 @@
     }
   },
   {
-    "chunk_id": "31e22aaf-dda2-4f2c-861b-fd138c10b0ee",
+    "chunk_id": "dcfa9efe-cf66-461f-8829-d0bbfa62c95c",
     "metadata": {
       "token_count": 450,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview",
@@ -3328,7 +3376,7 @@
     }
   },
   {
-    "chunk_id": "e635fb36-fd3e-4c78-bb69-dd97e26a1451",
+    "chunk_id": "55d0bd3b-9eac-4a78-8d5b-0ecac8a78a12",
     "metadata": {
       "token_count": 334,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview",
@@ -3344,7 +3392,7 @@
     }
   },
   {
-    "chunk_id": "54818f57-3416-4075-b4b9-1171f51585d2",
+    "chunk_id": "f9675241-617a-436e-a04c-5fd9fcc0f11a",
     "metadata": {
       "token_count": 235,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview",
@@ -3360,7 +3408,7 @@
     }
   },
   {
-    "chunk_id": "b81cfc72-ae7a-4c91-bc51-92648fec6ba5",
+    "chunk_id": "df8bb334-9e98-440d-9f76-2ca7b848b811",
     "metadata": {
       "token_count": 720,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/long-context-tips",
@@ -3376,7 +3424,7 @@
     }
   },
   {
-    "chunk_id": "dd971f0c-ebbe-437b-96eb-a59e0b3f4fd9",
+    "chunk_id": "2ac111ef-9250-44af-a825-60e888e4a76c",
     "metadata": {
       "token_count": 424,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3392,7 +3440,7 @@
     }
   },
   {
-    "chunk_id": "d62c99d9-a239-436c-8f16-205fb3a93556",
+    "chunk_id": "e0b47c4e-bf5f-4e2c-ad89-bee4f3a266c7",
     "metadata": {
       "token_count": 232,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3408,7 +3456,7 @@
     }
   },
   {
-    "chunk_id": "8788413a-02bd-4557-a4b9-ad80017ab03c",
+    "chunk_id": "24056e42-2eaa-4be0-9405-4dff62a7e087",
     "metadata": {
       "token_count": 292,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3424,7 +3472,7 @@
     }
   },
   {
-    "chunk_id": "d7becf7f-ade8-4052-86f9-ee931ebd7234",
+    "chunk_id": "64d4604b-a414-4d09-b0db-2425f71f876f",
     "metadata": {
       "token_count": 442,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3440,7 +3488,7 @@
     }
   },
   {
-    "chunk_id": "305aff0f-5feb-476d-aa73-ea84ba67cacd",
+    "chunk_id": "5cee914a-2807-41d2-aab8-76df744387fa",
     "metadata": {
       "token_count": 449,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3456,7 +3504,7 @@
     }
   },
   {
-    "chunk_id": "1d9b1124-1e74-4634-b705-a58eefce3a58",
+    "chunk_id": "442777ee-a2d8-4c2c-840c-a6eb9c6d8dec",
     "metadata": {
       "token_count": 641,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3472,7 +3520,7 @@
     }
   },
   {
-    "chunk_id": "ab838328-7f25-4468-acba-6ae2e84e2b9f",
+    "chunk_id": "42f8d99a-6118-4923-833c-09003ef8ea96",
     "metadata": {
       "token_count": 444,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3488,7 +3536,7 @@
     }
   },
   {
-    "chunk_id": "68d04f06-9144-4fa3-a7db-852cc17abf59",
+    "chunk_id": "327e9d4c-8685-4b0c-9190-ecef56d9bc8a",
     "metadata": {
       "token_count": 286,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3504,7 +3552,7 @@
     }
   },
   {
-    "chunk_id": "e1b20fe1-752f-48fa-820b-0c7d1923721f",
+    "chunk_id": "65671f74-aa36-489c-a62d-f0eb74977e8d",
     "metadata": {
       "token_count": 800,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3520,7 +3568,7 @@
     }
   },
   {
-    "chunk_id": "d08d43e6-7550-4942-bc1f-ca9511e40dd0",
+    "chunk_id": "95913eaf-ff35-49c8-b1b3-09825735e0f0",
     "metadata": {
       "token_count": 218,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3536,7 +3584,7 @@
     }
   },
   {
-    "chunk_id": "4e706f12-af24-4b6f-8744-f972b2193262",
+    "chunk_id": "82f847cc-94f5-4828-b61f-88c8a33871f9",
     "metadata": {
       "token_count": 769,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/use-case-guides/legal-summarization",
@@ -3552,7 +3600,7 @@
     }
   },
   {
-    "chunk_id": "b981b03c-0212-48c5-b193-68fdc9b4c3a4",
+    "chunk_id": "2532c042-48e3-45fb-aeb6-28795a9b5f85",
     "metadata": {
       "token_count": 268,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/text-generation",
@@ -3568,7 +3616,7 @@
     }
   },
   {
-    "chunk_id": "1f5e9412-d770-4546-8f02-b7bf07272c17",
+    "chunk_id": "70c3eeec-3ca5-49c1-a3ac-dc766122b192",
     "metadata": {
       "token_count": 234,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/text-generation",
@@ -3584,7 +3632,7 @@
     }
   },
   {
-    "chunk_id": "fc5a76b9-7399-4f02-ad44-4b4e68600dd0",
+    "chunk_id": "bb012883-3e12-40e5-977f-bb7ca216479d",
     "metadata": {
       "token_count": 222,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/text-generation",
@@ -3600,7 +3648,7 @@
     }
   },
   {
-    "chunk_id": "60339b72-ace3-4c65-9191-5805e7658aaa",
+    "chunk_id": "47130c28-70b5-4107-9e0e-4d63557b0948",
     "metadata": {
       "token_count": 121,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct",
@@ -3616,7 +3664,7 @@
     }
   },
   {
-    "chunk_id": "8c310bc7-d3d0-4724-b363-2d86d7ca82f4",
+    "chunk_id": "43e45f75-9e42-46a9-bdc0-abcdcd45b1b8",
     "metadata": {
       "token_count": 212,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct",
@@ -3632,7 +3680,7 @@
     }
   },
   {
-    "chunk_id": "1562355c-dc77-474e-80de-7593665cfacf",
+    "chunk_id": "aeb8de10-b58d-4bf1-b52d-03098b512a06",
     "metadata": {
       "token_count": 804,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct",
@@ -3648,7 +3696,7 @@
     }
   },
   {
-    "chunk_id": "9368b678-7657-4cef-9104-930aa42ecc1b",
+    "chunk_id": "173cbc16-8577-4da8-adb4-804fa3aadd6b",
     "metadata": {
       "token_count": 847,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct",
@@ -3664,7 +3712,7 @@
     }
   },
   {
-    "chunk_id": "45217647-dfab-4ed9-88b2-eba17ccb327c",
+    "chunk_id": "c5bf274e-a184-4f25-a69b-4f194703f715",
     "metadata": {
       "token_count": 223,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct",
@@ -3680,7 +3728,7 @@
     }
   },
   {
-    "chunk_id": "b2d1a456-934c-4a7b-be95-763601b87b2b",
+    "chunk_id": "b6e28bd6-0b03-479d-a0ad-87b595e0e71a",
     "metadata": {
       "token_count": 124,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3696,7 +3744,7 @@
     }
   },
   {
-    "chunk_id": "211b71b6-1396-49cd-9b0d-cd6e087ba055",
+    "chunk_id": "aac38302-84b4-4369-9d21-9d809fee90ec",
     "metadata": {
       "token_count": 216,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3712,7 +3760,7 @@
     }
   },
   {
-    "chunk_id": "e26f5bc6-f8db-43bb-a1b6-c6b8c41d3b46",
+    "chunk_id": "b7e1eb1d-257a-41bc-9da3-762b3dccf580",
     "metadata": {
       "token_count": 156,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3728,7 +3776,7 @@
     }
   },
   {
-    "chunk_id": "177e97b5-0e82-4758-8540-8674851af990",
+    "chunk_id": "fddbb924-07fe-4d18-ab09-00af8d5e2e95",
     "metadata": {
       "token_count": 356,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3744,7 +3792,7 @@
     }
   },
   {
-    "chunk_id": "028d4396-e73e-4bbd-9c6d-2248ee1e6f0f",
+    "chunk_id": "14b3452d-6e98-4b2d-aa73-e573500b6e88",
     "metadata": {
       "token_count": 431,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3760,7 +3808,7 @@
     }
   },
   {
-    "chunk_id": "14b93344-76d7-467a-bd61-4ab170ddd38b",
+    "chunk_id": "18720fdb-26aa-45c5-8a00-2d463ec5c318",
     "metadata": {
       "token_count": 482,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3776,7 +3824,7 @@
     }
   },
   {
-    "chunk_id": "2466d645-f4c1-49f4-aa8f-b1b99d3b04fb",
+    "chunk_id": "88e64e0f-4977-47b7-a83f-be10b540d50e",
     "metadata": {
       "token_count": 477,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3792,7 +3840,7 @@
     }
   },
   {
-    "chunk_id": "92ea84d2-6a92-4481-96a2-2fd608e7873c",
+    "chunk_id": "144d931d-0b58-4bba-8687-eefe93314311",
     "metadata": {
       "token_count": 358,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3808,7 +3856,7 @@
     }
   },
   {
-    "chunk_id": "6f1a693f-5c39-45cd-a8ee-6b08510c9bd6",
+    "chunk_id": "e39fa95d-b387-4b87-8e21-77c096efa51a",
     "metadata": {
       "token_count": 494,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3824,7 +3872,7 @@
     }
   },
   {
-    "chunk_id": "5ee69d88-c387-490d-9537-0a60988d792b",
+    "chunk_id": "9ab37fa2-8e25-496c-91d3-b4e741c0cb38",
     "metadata": {
       "token_count": 373,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3840,7 +3888,7 @@
     }
   },
   {
-    "chunk_id": "4d406fe9-cb5a-4df3-9293-131333394f48",
+    "chunk_id": "0d5f0c39-2427-4957-8b03-873c52085987",
     "metadata": {
       "token_count": 331,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3856,7 +3904,7 @@
     }
   },
   {
-    "chunk_id": "b3e33543-a4d0-4e97-b3b2-8854512043fa",
+    "chunk_id": "3416ef0f-b61d-4613-88b1-d73e8bd3f06f",
     "metadata": {
       "token_count": 986,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3872,7 +3920,7 @@
     }
   },
   {
-    "chunk_id": "c405b03b-8b14-4018-8a07-223a52b54628",
+    "chunk_id": "5e3f81b7-2058-479d-a119-231e06f68915",
     "metadata": {
       "token_count": 705,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/chain-prompts",
@@ -3888,7 +3936,7 @@
     }
   },
   {
-    "chunk_id": "7c157402-fa56-43d4-a1a6-bdcbe2a27bdc",
+    "chunk_id": "ea72e532-6199-46db-885b-3e8cc7832b25",
     "metadata": {
       "token_count": 201,
       "source_url": "https://docs.anthropic.com/en/api/client-sdks",
@@ -3904,7 +3952,7 @@
     }
   },
   {
-    "chunk_id": "0f4545f9-36df-41f5-bb2f-2d37ab72de8b",
+    "chunk_id": "9075cd8a-5ea7-40c4-af84-c5a3dfd185af",
     "metadata": {
       "token_count": 214,
       "source_url": "https://docs.anthropic.com/en/api/client-sdks",
@@ -3920,7 +3968,7 @@
     }
   },
   {
-    "chunk_id": "233cfe26-75ab-4cbe-a428-c99bdd2132c2",
+    "chunk_id": "c10ef641-9f45-48f3-b06d-d6290687f508",
     "metadata": {
       "token_count": 123,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/multishot-prompting",
@@ -3936,7 +3984,7 @@
     }
   },
   {
-    "chunk_id": "166e38eb-25a7-402f-b7f0-aabb724ceae7",
+    "chunk_id": "7c6a6a3c-9cff-4e49-8747-51792369f7fc",
     "metadata": {
       "token_count": 486,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/multishot-prompting",
@@ -3952,7 +4000,7 @@
     }
   },
   {
-    "chunk_id": "94ee13b3-9f50-4d1e-bfd0-6a56837fbf5f",
+    "chunk_id": "6504db73-5af4-4216-8944-29fe1b002a2d",
     "metadata": {
       "token_count": 771,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/multishot-prompting",
@@ -3968,7 +4016,7 @@
     }
   },
   {
-    "chunk_id": "606aca46-4c7e-41ad-8402-ccc20fa51a68",
+    "chunk_id": "923b54c3-7293-4261-848e-ff89d98f0afc",
     "metadata": {
       "token_count": 55,
       "source_url": "https://docs.anthropic.com/en/api/ip-addresses",
@@ -3984,7 +4032,7 @@
     }
   },
   {
-    "chunk_id": "7f4b2324-bae9-4618-b98f-08fe88b4ec9a",
+    "chunk_id": "2be7232b-1dd7-4521-a025-7de0b80bf085",
     "metadata": {
       "token_count": 236,
       "source_url": "https://docs.anthropic.com/en/api/claude-on-vertex-ai",
@@ -4000,7 +4048,7 @@
     }
   },
   {
-    "chunk_id": "c12a5537-e3b6-4247-aee1-02b11a02e509",
+    "chunk_id": "bc8f8aac-d6ad-4641-9447-f729e863a049",
     "metadata": {
       "token_count": 176,
       "source_url": "https://docs.anthropic.com/en/api/claude-on-vertex-ai",
@@ -4016,7 +4064,7 @@
     }
   },
   {
-    "chunk_id": "8a3fc436-77a2-43e4-bc3d-00140529b46e",
+    "chunk_id": "e712883f-8cfb-4060-ac9c-959dd640a36d",
     "metadata": {
       "token_count": 429,
       "source_url": "https://docs.anthropic.com/en/api/claude-on-vertex-ai",
@@ -4032,7 +4080,7 @@
     }
   },
   {
-    "chunk_id": "00dd22e4-8d50-4fc3-8bf6-a0dc6b0b143f",
+    "chunk_id": "588e3ec8-edec-4e01-8ac1-ba12ca0f33d7",
     "metadata": {
       "token_count": 232,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
@@ -4048,7 +4096,7 @@
     }
   },
   {
-    "chunk_id": "b58eb6c8-fd4d-4147-8724-abb771e15800",
+    "chunk_id": "86508c7c-1509-49fe-b492-05d00b1273f4",
     "metadata": {
       "token_count": 465,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
@@ -4064,7 +4112,7 @@
     }
   },
   {
-    "chunk_id": "0d11454b-fdd7-4f82-930c-e8439e72c6ed",
+    "chunk_id": "d8324a7e-23ba-48cc-b70b-95eb6496f9ca",
     "metadata": {
       "token_count": 529,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
@@ -4080,7 +4128,7 @@
     }
   },
   {
-    "chunk_id": "f79419d4-7354-4640-bd6a-8ae18408ea95",
+    "chunk_id": "79afa0b3-9823-4ab7-9fe0-9a6eac99c00e",
     "metadata": {
       "token_count": 211,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
@@ -4096,7 +4144,7 @@
     }
   },
   {
-    "chunk_id": "4e48deb7-c92d-470a-b838-100d18cf556a",
+    "chunk_id": "e828ee85-d3e7-4834-97cb-e96b917a331f",
     "metadata": {
       "token_count": 191,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
@@ -4112,7 +4160,7 @@
     }
   },
   {
-    "chunk_id": "60f3e4f7-5de3-4924-8462-7314fdf72dfc",
+    "chunk_id": "f20056eb-257d-43f1-b678-611210d8b418",
     "metadata": {
       "token_count": 453,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
@@ -4128,7 +4176,7 @@
     }
   },
   {
-    "chunk_id": "80f8f381-cfc3-4e6c-bdd1-4f808cf5421d",
+    "chunk_id": "c7c2d4e0-faf0-49f5-a4e9-38cdc06cceb5",
     "metadata": {
       "token_count": 320,
       "source_url": "https://docs.anthropic.com/en/docs/about-claude/models",
@@ -4144,7 +4192,7 @@
     }
   },
   {
-    "chunk_id": "7727133c-6337-4b76-952b-f2d52c2fdaac",
+    "chunk_id": "e4d7a2f4-5aef-4582-82b4-e7b41fec4738",
     "metadata": {
       "token_count": 502,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/define-success",
@@ -4160,7 +4208,7 @@
     }
   },
   {
-    "chunk_id": "01a86b5d-7d78-40d6-b1fa-18bab313d502",
+    "chunk_id": "637d74fd-04cd-4b1a-b793-235d5f7887dc",
     "metadata": {
       "token_count": 480,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/define-success",
@@ -4176,7 +4224,7 @@
     }
   },
   {
-    "chunk_id": "0659dde4-f469-472a-9f88-46786b3ca4b3",
+    "chunk_id": "8fd13d13-77a6-40d2-9059-4987df3b2f4a",
     "metadata": {
       "token_count": 169,
       "source_url": "https://docs.anthropic.com/en/docs/build-with-claude/define-success",
