@@ -8,22 +8,17 @@ def main():
 
     # Initialize components
     vector_db = VectorDB()
+    claude_assistant = ClaudeAssistant()
 
     # let's load some docs
     file_names = ["cra_docs_en_20240912_082455-chunked.json", "cra_docs_en_20240914_172207-chunked.json"]  # Add all document file names
     for file_name in file_names:
         document_loader = DocumentProcessor(file_name)
         json_data = document_loader.load_json()
-        vector_db.add_documents(json_data)
-
+        vector_db.add_documents(json_data, claude_assistant)
 
     reranker = Reranker()
-
     retriever = ResultRetriever(vector_db=vector_db, reranker=reranker)
-
-    claude_assistant = ClaudeAssistant()
-    # Update Claude's system prompt with all document summaries
-    claude_assistant.update_system_prompt(vector_db.get_document_summaries())
 
     # Set retriever in the assistant
     claude_assistant.retriever = retriever

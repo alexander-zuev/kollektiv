@@ -8,6 +8,7 @@ import json
 import os
 import cohere
 
+from generation.claude_assistant import ClaudeAssistant
 from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
 from src.generation.claude_assistant import QueryGenerator
@@ -49,24 +50,28 @@ class VectorDB:
         self._init()
 
     def _init(self):
-        try:
-            self.client = chromadb.PersistentClient() # using default path for Chroma
-            self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-                api_key=self.openai_api_key,
-                model_name=self.embedding_function_name
-            )
-            self.collection = self.client.get_or_create_collection(
-                self.collection_name, embedding_function=self.embedding_function
-            )
-            logger.info(f"Successfully initialized ChromaDb with collection: {self.collection_name}")
-            if self.collection.count() == 0:
-                logger.warning("No documents in the database")
-            else:
-                logger.info(f"A total number of documents in the database: {self.collection.count()}")
-        except Exception as e:
-            logger.error(f"Error initializing ChromaDB: {e}")
-            raise
+        self.client = chromadb.PersistentClient() # using default path for Chroma
+        self._load_existing_summaries()
+        self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
+            api_key=self.openai_api_key,
+            model_name=self.embedding_function_name
+        )
+        self.collection = self.client.get_or_create_collection(
+            self.collection_name, embedding_function=self.embedding_function
+        )
+        logger.info(f"Successfully initialized ChromaDb with collection: {self.collection_name}")
+        if self.collection.count() == 0:
+            logger.warning("No documents in the database")
+        else:
+            logger.info(f"A total number of documents in the database: {self.collection.count()}")
 
+    @error_handler(logger)
+    def _load_existing_summaries(self):
+        summaries_file = os.path.join("src/vector_storage", "document_summaries.json")
+        if os.path.exists(summaries_file):
+            with open(summaries_file, 'r') as f:
+                self.document_summaries = json.load(f)
+            logger.info(f"Loaded {len(self.document_summaries)} existing document summaries")
 
     def prepare_documents(self, chunks: List[Dict]) -> Dict[str, List[str]]:
         ids = []
@@ -93,21 +98,17 @@ class VectorDB:
                 'page_title': chunk['metadata']['page_title'],
             })
 
-            # Generate document summary
-            document_summary = self._generate_document_summary(data)
 
-        return {'ids': ids, 'documents': documents, 'metadatas': metadatas, 'summary': document_summary}
+        return {'ids': ids, 'documents': documents, 'metadatas': metadatas}
 
     @error_handler(logger)
-    def add_documents(self, json_data: List[Dict]) -> str:
-        # , processed_docs: Dict[str, List[str]]):
+    def add_documents(self, json_data: List[Dict], claude_assistant: ClaudeAssistant) -> str:
 
         processed_docs = self.prepare_documents(json_data)
 
         ids = processed_docs['ids']
         documents = processed_docs['documents']
         metadatas = processed_docs['metadatas']
-        summary = processed_docs['summary']
 
         # check if documents exist
         all_exist, missing_ids = self.check_documents_exist(ids)
@@ -125,24 +126,29 @@ class VectorDB:
             docs_n = len(ids)
             logger.info(f"Added {docs_n} documents to ChromaDB")
 
-            self.document_summaries.append(summary)
-            return summary
+        # Generate summary for the entire document
+        summary = claude_assistant.generate_document_summary(json_data)
+        self.document_summaries.append(summary)
 
-    def _generate_document_summary(self, data: Dict[str, Any]) -> str:
-        input_url = data.get('input_url', 'Unknown URL')
-        total_pages = data.get('total_pages', 0)
-        sample_content = data[0].get('data')
+        # Update Claude's system prompt with all document summaries
+        claude_assistant.update_system_prompt(self.document_summaries)
 
-        summary = f"""
-        Source URL: {input_url}
-        Total Pages: {total_pages}
-        Sample Content: {sample_content[:200]}...
-        """
-        return summary.strip()
+        # Save updated summaries
+        self._save_summaries()
+        return summary
+
+
+    @error_handler(logger)
+    def _save_summaries(self):
+        summaries_file = os.path.join("src/vector_storage", "document_summaries.json")
+        with open(summaries_file, 'w') as f:
+            json.dump(self.document_summaries, f, indent=2)
+        logger.info(f"Saved {len(self.document_summaries)} document summaries")
 
     @error_handler(logger)
     def get_document_summaries(self) -> List[str]:
-        return self.document_summaries
+        return list(self.document_summaries.values())
+
 
     @error_handler(logger)
     def check_documents_exist(self, document_ids: List[str]) -> Tuple[bool, List[str]]:

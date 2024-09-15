@@ -57,10 +57,12 @@ class ClaudeAssistant:
         self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
         self.logger.info("Successfully initialized Anthropic client")
 
-
     @error_handler(logger)
-    def update_system_prompt(self, document_summaries: List[str]):
-        summaries_text = "\n".join(f"- {summary}" for summary in document_summaries)
+    def update_system_prompt(self, document_summaries: List[Dict[str, Any]]):
+        summaries_text = "\n".join(
+            f"- Document URL: {summary['source_url']}):\n Summary: {summary['summary']}"
+            for summary in document_summaries
+        )
         self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
         self.logger.info("Updated system prompt with new document summaries")
 
@@ -168,6 +170,44 @@ class ClaudeAssistant:
     def update_conversation_history(self, user_input: str, assistant_response: str):
         self.conversation_history.append({"role": "user", "content": user_input})
         self.conversation_history.append({"role": "assistant", "content": assistant_response})
+
+    @error_handler(logger)
+    def generate_document_summary(self, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Extract basic metadata from the first chunk
+        first_chunk = chunks[0]
+        source_url = first_chunk['metadata']['source_url']
+        total_chunks = len(chunks)
+
+        # Prepare content for summary generation
+        content_sample = "\n\n".join(
+            [chunk['data']['text'][:500] for chunk in chunks[:5]])  # First 500 chars of first 5 chunks
+
+        summary_prompt = f"""
+            Generate a concise summary of the following document. Include key topics or themes.
+            Limit the summary to 150 words.
+
+            Document metadata:
+            Source URL: {source_url}
+            Total Chunks: {total_chunks}
+
+            Content Sample:
+            {content_sample}
+            """
+
+        response = self.client.messages.create(
+            model=self.model_name,
+            max_tokens=200,
+            system="You are an expert at summarizing documents concisely and accurately.",
+            messages=[{"role": "user", "content": summary_prompt}]
+        )
+
+        summary = response.content[0].text
+
+        return {
+            'source_url': source_url,
+            'total_chunks': total_chunks,
+            'summary': summary,
+        }
 
     @error_handler(logger)
     def preprocess_ranked_documents(self, ranked_documents: Dict[str, Any]) -> List[str]:
