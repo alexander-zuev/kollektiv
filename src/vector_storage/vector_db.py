@@ -7,10 +7,10 @@ import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
 import cohere
 
-from generation.claude_assistant import ClaudeAssistant
+from src.generation.claude_assistant import ClaudeAssistant
 from src.utils.config import COHERE_API_KEY, LOG_DIR, OPENAI_API_KEY, PROCESSED_DATA_DIR
+from src.utils.decorators import error_handler
 from src.utils.logger import setup_logger
-from utils.decorators import error_handler
 
 # Set up logger
 logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
