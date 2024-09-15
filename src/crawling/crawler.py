@@ -67,12 +67,7 @@ class FireCrawler:
             params = {
                 "limit": page_limit,
                 "maxDepth": 5,
-                "includePaths": [
-                    "/api_reference/*",
-                    "/module_guides/*",
-                    "/examples/*",
-                    "/understanding/*," "/optimizing/*",
-                ],
+                "includePaths": [],
                 "scrapeOptions": {"formats": ["markdown"]},
             }
 
@@ -331,10 +326,10 @@ def main():
 
     # Testing crawl_url
     urls_to_crawl = [
-        "https://docs.llamaindex.ai/en/stable",
+        "https://supabase.com/docs/guides/auth",
     ]
     crawler.async_crawl_url(urls_to_crawl, page_limit=1)
-    # crawler.build_example_file("cra_supabase_docs_2024-09-11 07:16:11.json")
+    crawler.build_example_file("cra_docs_en_20240912_082455.json")
 
 
 if __name__ == "__main__":
