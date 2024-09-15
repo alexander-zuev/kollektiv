@@ -76,7 +76,7 @@ class VectorDB:
     def prepare_documents(self, chunks: List[Dict]) -> Dict[str, List[str]]:
         ids = []
         documents = []
-        metadatas = [] # metadatas used for filtering
+        metadatas = [] # used for filtering
 
         for chunk in chunks:
             # extract headers
@@ -192,6 +192,15 @@ class VectorDB:
             include=['documents', 'distances', 'embeddings']
         )
         return search_results
+
+    @error_handler(logger)
+    def reset_database(self):
+        self.client.delete_collection(self.collection_name)
+        self.collection = self.client.create_collection(
+            self.collection_name, embedding_function=self.embedding_function
+        )
+        self.document_summaries = []
+        logger.info("Database reset")
 
     def process_results_to_print(self, search_results: Dict[str, Any]):
         documents = search_results['documents'][0]
@@ -322,30 +331,8 @@ class ResultRetriever:
 
 
 def main():
-    filename = "cra_docs_en_20240912_082455-chunked.json"
-
-    document_processor = DocumentProcessor(filename)
-    db = VectorDB()
-
-    llm_client = QueryGenerator()
-
-    reranker = Reranker()
-    logger.info("All components initialized successfully")
-
-    # initialize
-    retriever = ResultRetriever(vector_db=db, reranker=reranker)
-
-    # Now proceed with the query process
-    user_query = input("What do you want to know about: ")
-    results = retriever.retrieve(user_query)
-
-    # # Send to the generation
-    # claude = ClaudeAssistant()
-    # claude.init()
-    # response = claude.get_augmented_response(user_query, results)
-    # print("FINAL REPLY")
-    # print(response)
-
+    vector_db = VectorDB()
+    vector_db.reset_database()
 
 if __name__ == "__main__":
     main()

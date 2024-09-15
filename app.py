@@ -8,6 +8,7 @@ def main():
 
     # Initialize components
     vector_db = VectorDB()
+    # vector_db.reset_database()
     claude_assistant = ClaudeAssistant()
 
     # let's load some docs

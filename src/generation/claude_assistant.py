@@ -60,15 +60,15 @@ class ClaudeAssistant:
     @error_handler(logger)
     def update_system_prompt(self, document_summaries: List[Dict[str, Any]]):
         summaries_text = "\n".join(
-            f"- Document URL: {summary['source_url']}):\n Summary: {summary['summary']}"
+            f"- {summary['summary']}"
             for summary in document_summaries
         )
         self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
-        self.logger.info(f"Updated system prompt: {self.system_prompt}")
+        # self.logger.info(f"Updated system prompt: {self.system_prompt}")
 
     @error_handler(logger)
+    @error_handler(logger)
     def generate_response(self, user_input: str) -> str:
-
         messages = self.conversation_history + [{"role": "user", "content": user_input}]
 
         response = self.client.messages.create(
@@ -79,13 +79,18 @@ class ClaudeAssistant:
             tools=self.tool_manager.get_all_tools()
         )
 
-        # check for tool use
+        # Check if tool use is required
         if response.stop_reason == "tool_use":
+            tool_use_messages = []
             for content in response.content:
                 if content.type == 'tool_use' and content.name == 'rag_search':
+                    tool_use_messages.append({
+                        "role": "assistant",
+                        "content": [content]
+                    })
                     # Formulate the best possible query using recent context
                     tool_result = self.call_tool(content.name, content.input, user_input)
-                    messages.append({
+                    tool_use_messages.append({
                         'role': 'user',
                         'content': [{
                             'type': 'tool_result',
@@ -94,18 +99,28 @@ class ClaudeAssistant:
                         }]
                     })
 
+            # Add tool use and results to the conversation
+            messages.extend(tool_use_messages)
+
+            # Make a second API call with the tool results
             final_response = self.client.messages.create(
                 model=self.model_name,
                 max_tokens=8192,
                 system=self.system_prompt,
                 messages=messages,
+                tools=self.tool_manager.get_all_tools()
             )
             assistant_response = final_response.content[0].text
-            self.update_conversation_history(user_input, assistant_response)
         else:
+            # If no tool use is required, use the response from the first API call
             assistant_response = response.content[0].text
-            self.update_conversation_history(user_input, assistant_response)
-            return assistant_response
+
+        # Update conversation history with the full exchange
+        self.update_conversation_history(user_input, assistant_response)
+        if response.stop_reason == "tool_use":
+            self.conversation_history.extend(tool_use_messages)
+
+        return assistant_response
 
     @error_handler(logger)
     def formulate_rag_query(self, user_input: str, recent_context: List[Dict[str, str]]) -> str:
@@ -173,43 +188,70 @@ class ClaudeAssistant:
 
     @error_handler(logger)
     def generate_document_summary(self, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
-        # Extract basic metadata from the first chunk
-        first_chunk = chunks[0]
-        source_url = first_chunk['metadata']['source_url']
-        total_chunks = len(chunks)
+        # Aggregate metadata
+        unique_urls = set(chunk['metadata']['source_url'] for chunk in chunks)
+        unique_titles = set(chunk['metadata']['page_title'] for chunk in chunks)
 
-        # Prepare content for summary generation
-        content_sample = "\n\n".join(
-            [chunk['data']['text'][:500] for chunk in chunks[:5]])  # First 500 chars of first 5 chunks
+        # Select diverse content samples
+        sample_chunks = self._select_diverse_chunks(chunks, 5)
+        content_samples = [chunk['data']['text'][:300] for chunk in sample_chunks]
 
+        # Construct the summary prompt
         summary_prompt = f"""
-            Generate a concise summary of the following document. Include key topics or themes.
-            Limit the summary to 150 words. Do not include any pre-ambule or boilerplate text.
+        Generate a concise yet informative summary of the following documentation. Focus on key topics, themes, and the overall structure of the content.
 
-            Document metadata:
-            Source URL: {source_url}
-            Total Chunks: {total_chunks}
+        Document Metadata:
+        - Unique URLs: {len(unique_urls)}
+        - Unique Titles: {len(unique_titles)}
 
-            Content Sample:
-            {content_sample}
-            """
+        Content Structure:
+        {self._summarize_content_structure(chunks)}
+
+        Content Samples:
+        {self._format_content_samples(content_samples)}
+
+        Instructions:
+        1. Provide a 150-200 word summary that captures the essence of the documentation.
+        2. Highlight the main topics or sections covered.
+        3. Mention any notable features or key points that stand out.
+        4. If applicable, briefly describe the type of documentation (e.g., API reference, user guide, etc.).
+        5. Do not use phrases like "This documentation covers" or "This summary describes". Start directly with the key information.
+        """
 
         response = self.client.messages.create(
             model=self.model_name,
-            max_tokens=200,
-            system="You are an AI assistant that is used in the RAG system. Your goal is to generate a concise "
-                   "summary of the documents in the database, that are loaded into the database. You are perfect at "
-                   "making concise summaries that capture the core meaning, topics, themes of the loaded documents.",
+            max_tokens=300,
+            system="You are an expert at summarizing technical documentation concisely and accurately. Your summaries capture the essence of the content, making it easy for users to understand the scope and main topics of the documentation.",
             messages=[{"role": "user", "content": summary_prompt}]
         )
 
         summary = response.content[0].text
 
         return {
-            'source_url': source_url,
-            'total_chunks': total_chunks,
             'summary': summary,
         }
+
+    def _select_diverse_chunks(self, chunks: List[Dict[str, Any]], n: int) -> List[Dict[str, Any]]:
+        # Implementation to select diverse chunks based on headers or content
+        # This could involve clustering or simple heuristics to ensure variety
+        # For simplicity, we'll just take evenly spaced chunks
+        step = max(1, len(chunks) // n)
+        return chunks[::step][:n]
+
+    def _summarize_content_structure(self, chunks: List[Dict[str, Any]]) -> str:
+        # Analyze the structure based on headers
+        header_structure = {}
+        for chunk in chunks:
+            headers = chunk['data']['headers']
+            for level, header in headers.items():
+                if header:
+                    header_structure.setdefault(level, set()).add(header)
+
+        return "\n".join([f"{level}: {', '.join(headers)}" for level, headers in header_structure.items()])
+
+    def _format_content_samples(self, samples: List[str]) -> str:
+        return "\n\n".join(f"Sample {i + 1}:\n{sample}" for i, sample in enumerate(samples))
+
 
     @error_handler(logger)
     def preprocess_ranked_documents(self, ranked_documents: Dict[str, Any]) -> List[str]:
