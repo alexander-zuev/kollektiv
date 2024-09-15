@@ -1,18 +1,39 @@
-# 🚀 RAG 4 Docs - LLMs + up to date docs
+# 🚀 RAG Dodc - Chat with your library docs
 
 ## 🌟 Overview
 
-RAG for Docs is a Retrieval-Augmented Generation (RAG) system designed to improve LLM responses when working with recent or private documentation. This project aims to reduce hallucinations and inaccuracies in LLM outputs by providing access to up-to-date information.
+RAG Docs is a Retrieval-Augmented Generation (RAG) system designed for one purpose - allow you to chat with your
+favorite library docs easily. How many times were you let down by those pesky knowledge cutoff dates? No more!
+
+This project aims to allow LLMs to tap into the most up to date knowledge in 2 clicks so that you don't have to
+worry about incorrect replies, hallucinations when working with the best LLMs.
 
 ## ❓Why?
-Large Language Models (LLMs) often lack access to the most recent documentation or private knowledge, leading to hallucinations in answers or inaccurate or outdated information in responses. This limits the usefulness of LLMs for buidling with the latest tools that were released after knowledge cutoff date.
+This project was born out of a personal itch - whenever a new feature of my favorite library comes up, I know I
+can't rely on the LLM to help me build with it - because it simply doesn't know about it!
+
+The root cause - LLMs lack access to the most recent documentation or private knowledge, as they are trained on a
+set of data that was accumulated way back (sometimes more than a year ago).
+
+The impact - hallucinations in answers, inaccurate, incorrect or outdated information, which directly decreases
+productivity and usefulness of using LLMs
+
+**But there is a better way...**
 
 What if LLMs could tap into a source of up to date information on libraries, tools, frameworks you are building with?
 
 Imagine you could use the power of reasoning of modern LLMs but not be limited by their knowledgde cutoff date?
 
 ## 🎯 Goal
-This project addresses these issues by implementing a RAG system that can access and utilize current documentation so that you can ask it to use any tool **in a correct way (without hallucinating or providing wrong implementation details**
+Meet RAG Docs -> an open-source RAG app that helps you easily:
+- parse the docs of your favorite libraries
+- efficiently stores and embeds it in a local vector storage
+- sets up an LLM chat which you can rely on
+
+**Note this is v.0.1.0 and reliability of the system can be characterized as following:
+- in 50% of the times it works every time!
+
+So do let me know, if you are experiencing issues and I'll try to fix them.
 
 ## ⚙️ Key Features
 
