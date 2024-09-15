@@ -13,6 +13,12 @@ logger = setup_logger('claude_assistant', "claude_assistant.log")
 
 # Client Class
 class ClaudeAssistant:
+    """
+        ClaudeAssistant is an AI assistant class with a focus on providing accurate, relevant, and helpful information utilizing a Retrieval Augmented Generation (RAG) system.
+
+        :param api_key: API key used for authenticating with the Claude API service.
+        :param model_name: Name of the language model to be used.
+    """
     def __init__(self, api_key :str =ANTHROPIC_API_KEY, model_name:str ="claude-3-5-sonnet-20240620"):
         self.client = None
         self.api_key = api_key
@@ -67,50 +73,20 @@ class ClaudeAssistant:
         # self.logger.info(f"Updated system prompt: {self.system_prompt}")
 
     @error_handler(logger)
-    @error_handler(logger)
     def generate_response(self, user_input: str) -> str:
         messages = self.conversation_history + [{"role": "user", "content": user_input}]
 
-        response = self.client.messages.create(
-            model=self.model_name,
-            max_tokens=8192,
-            system=self.system_prompt,
-            messages=messages,
-            tools=self.tool_manager.get_all_tools()
-        )
+        response = self.send_claude_request(messages=messages)
 
         # Check if tool use is required
         if response.stop_reason == "tool_use":
-            # tool_use_messages = []
-            # for content in response.content:
-            #     if content.type == 'tool_use' and content.name == 'rag_search':
-            #         tool_use_messages.append({
-            #             "role": "assistant",
-            #             "content": [content]
-            #         })
-            #         # Formulate the best possible query using recent context
-            #         tool_result = self.call_tool(content.name, content.input, user_input)
-            #         tool_use_messages.append({
-            #             'role': 'user',
-            #             'content': [{
-            #                 'type': 'tool_result',
-            #                 'tool_use_id': content.id,
-            #                 'content': tool_result
-            #             }]
-            #         })
             tool_use_response = self.handle_tool_use(response, user_input)
 
             # Add tool use and results to the conversation
             messages.extend(tool_use_response)
 
             # Make a second API call with the tool results
-            final_response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=8192,
-                system=self.system_prompt,
-                messages=messages,
-                tools=self.tool_manager.get_all_tools()
-            )
+            final_response = self.send_claude_request(messages=messages)
             assistant_response = final_response.content[0].text
         else:
             # If no tool use is required, use the response from the first API call
@@ -122,6 +98,32 @@ class ClaudeAssistant:
             self.conversation_history.extend(tool_use_response)
 
         return assistant_response
+
+    @error_handler(logger)
+    def send_claude_request(self,
+                            model: str = None,
+                            max_tokens: int = None,
+                            system: str = None,
+                            messages: List[Dict[str, str]] = None,
+                            tools: List[Dict[str, Any]] = None):
+        """
+        Send a request to the Claude API with the specified parameters.
+        """
+        # Use instance attributes as defaults if not provided
+        model = model or self.model_name
+        max_tokens = max_tokens or 8192
+        system = system or self.system_prompt
+        tools = tools or self.tool_manager.get_all_tools()
+
+        response = self.client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=messages,
+            tools=tools
+        )
+        return response
+
 
     @error_handler(logger)
     def handle_tool_use(self, response: Dict[str, Any], user_input: str) -> List[Dict[str, Any]]:
@@ -335,16 +337,3 @@ class ClaudeAssistant:
             raise
 
         return content
-
-
-
-def main():
-    ca = ClaudeAssistant()
-
-    user_input = input("What do you want to chat about? ")
-    while user_input != "exit":
-        response = ca.generate_response(user_input)
-        print(response)
-
-if __name__ == "__main__":
-    main()
