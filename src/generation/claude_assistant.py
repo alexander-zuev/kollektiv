@@ -80,10 +80,16 @@ class ClaudeAssistant:
 
         # Check if tool use is required
         if response.stop_reason == "tool_use":
+            assistant_partial_response = response.content[0].text
+            # Print the tool result to the user
+            print(f"Tool was used\n Initial tool response: {assistant_partial_response}\n")
+
             tool_use_response = self.handle_tool_use(response, user_input)
+            self.logger.info(f"Printing full tool use response: {tool_use_response}")
 
             # Add tool use and results to the conversation
             messages.extend(tool_use_response)
+            self.logger.info(f"Printing updated message history: {messages}")
 
             # Make a second API call with the tool results
             final_response = self.send_claude_request(messages=messages)
@@ -148,8 +154,11 @@ class ClaudeAssistant:
         return tool_use_response
 
     @error_handler(logger)
-    def formulate_rag_query(self, user_input: str, recent_context: List[Dict[str, str]]) -> str:
-        context_prompt = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_context])
+    def formulate_rag_query(self,
+                            user_input: str,
+                            recent_conversation_history: List[Dict[str, str]],
+                            important_context: str) -> str:
+        recent_conversation_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_conversation_history])
 
         query_generation_prompt = f"""
         Based on the following conversation context and the user's latest input, formulate the best possible search 
@@ -157,22 +166,28 @@ class ClaudeAssistant:
         
         Query requirements:
         - Do not include any other text in your response, except for the query.
+        
+        Important context to consider:
+        {important_context}
 
         Recent conversation context:
-        {context_prompt}
+        {recent_conversation_history}
 
         User's latest input: {user_input}
 
         Formulated search query:
         """
 
-        response = self.client.messages.create(
-            model=self.model_name,
-            max_tokens=150,
-            system="You are world's best query formulator for a RAG system. You know how to properly formulate search "
-                   "queries that are relevant to the user's inquiry and take into account the recent conversation context.",
-            messages=[{"role": "user", "content": query_generation_prompt}]
-        )
+        system_prompt = ("You are world's best query formulator for a RAG system. You know how to properly formulate search "
+                         "queries that are relevant to the user's inquiry and take into account the recent conversation context.")
+        messages = [{"role": "user", "content": query_generation_prompt}]
+        max_tokens = 150
+
+        response = self.send_claude_request(max_tokens=max_tokens,
+                                            system=system_prompt,
+                                            messages=messages,
+                                            tools=None
+                                            )
 
         return response.content[0].text.strip()
 
@@ -186,18 +201,23 @@ class ClaudeAssistant:
                   tool_input: Dict[str, Any],
                   user_input: str) -> str:
         if tool_name == "rag_search":
-            search_results = self.use_rag_search(user_input)
+            search_results = self.use_rag_search(user_input, tool_input)
             return json.dumps(search_results)  # Convert results to a string for passing back to Claude
         else:
             raise ValueError(f"Tool {tool_name} not supported")
 
     @error_handler(logger)
-    def use_rag_search(self, user_input: str) -> str:
+    def use_rag_search(self, user_input: str, tool_input: Dict[str, Any]) -> str:
         # Get recent conversation context (last 3 messages)
-        recent_context = self.get_recent_context()
+        recent_conversation_history = self.get_recent_context()
+
+        # important context
+        important_context = tool_input['important_context']
+        self.logger.info(f"Extracted important context: {important_context}")
 
         # prepare queries for search
-        rag_query = self.formulate_rag_query(user_input, recent_context)
+        rag_query = self.formulate_rag_query(user_input, recent_conversation_history, important_context)
+        self.logger.info(f"Printing formulated RAG query: {rag_query}")
         multiple_queries = self.query_generator.generate_multi_query(rag_query)
         combined_queries = self.query_generator.combine_queries(rag_query, multiple_queries)
 

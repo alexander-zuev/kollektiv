@@ -32,25 +32,37 @@ rag_search_tool = Tool(
     name='rag_search',
     description="""
     Retrieves relevant information from a local document database using RAG (Retrieval Augmented Generation).
-    Use this tool when:
-    1. The user asks about specific information that might be in the document database.
-    2. You need to verify or expand on information related to the documents in the database.
-    3. The query requires up-to-date or detailed information that might not be in your training data.
     
-    To use effectively:
-    1. Consider the user's question and recent conversation context.
-    2. Formulate a clear, specific query that captures the essence of the information needed.
-    3. Use the query to search the database and retrieve relevant document chunks.
+    When to use this tool:
+    1. The user request / input requires up to date information about libraries that are indexed in the local vector 
+    database.
+    2. The user's request can be validated by the information that you have in the database.
+    3. You need to verify or expand on information related to the documents in the database.
+    
+    
+    How to use this tool effectively:
+    1. Start by analyzing and understanding the conversation context
+    2. Then analyze the most recent user request
+    3. Then define what is the most important context that should be taken into account by the LLM assistant that is 
+    formulating the actual search query. Keep in mind that the search query is going to be used for RAG search, 
+    based on vector similarity.
+    
+    How this tool results are going to be used:
+    - You call the tool_use, if necessary
+    - Another method is formulating the best rag query based on your input, recent conversation history
+    - RAG search and retrieval is performed
+
     """,
     input_schema= {
         "type": "object",
             "properties": {
-              "query": {
+              "important_context": {
                 "type": "string",
-                "description": "A well-formulated search query based on the user's question and conversation context"
+                "description": "The most important context that should be taken into account by the LLM assistant "
+                               "that is going to be generating the actual search query."
               }
             },
-            "required": ["query"]
+            "required": ["important_context"]
     }
 )
 
