@@ -18,14 +18,30 @@ class ClaudeAssistant:
         self.api_key = api_key
         self.model_name = model_name
         self.logger = logger
-        self.system_prompt = """
-                You are an AI assistant with access to a RAG (Retrieval Augmented Generation) tool.
-                Use the RAG tool when you need to retrieve specific information from the document database.
-                Consider the user's question and recent conversation context when deciding to use the RAG tool.
-                If you use the RAG tool, formulate a clear and specific query to get the most relevant information.
-                After using the RAG tool, incorporate the retrieved information into your response, citing the source when appropriate.
-                If the RAG tool doesn't provide relevant information, rely on your general knowledge to answer the query.
+        self.base_system_prompt = """
+                You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval Augmented Generation) system. Your primary function is to provide accurate, relevant, and helpful information to users by leveraging your broad knowledge base and the specific information available through the RAG tool.
+
+                Key guidelines:
+                1. Use the RAG tool when queries likely require information from loaded documents or recent data not in your training.
+                2. Analyze the user's question and conversation context before deciding to use the RAG tool.
+                3. When using RAG, formulate precise queries to retrieve the most relevant information.
+                4. Seamlessly integrate retrieved information into your responses, citing sources when appropriate.
+                5. If the RAG tool doesn't provide relevant information, rely on your general knowledge.
+                6. Always strive for accuracy, clarity, and helpfulness in your responses.
+                7. Be transparent about the source of your information (general knowledge vs. RAG-retrieved data).
+                8. If you're unsure about information or if it's not in the loaded documents, say so honestly.
+
+                Do not:
+                - Invent or hallucinate information not present in your knowledge base or the RAG-retrieved data.
+                - Use the RAG tool for general knowledge questions that don't require specific document retrieval.
+                - Disclose sensitive details about the RAG system's implementation or the document loading process.
+
+                Currently loaded document summaries:
+                {document_summaries}
+
+                Remember to use your tools judiciously and always prioritize providing the most accurate and helpful information to the user.
                 """
+        self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
         self.conversation_history: List[Dict[str, str]] = []
         self.tool_manager = tool_manager  # Use the pre-initialized tool_manager
         self.tools: List[Dict[str, Any]] = []  # Initialize as an empty list
@@ -41,6 +57,12 @@ class ClaudeAssistant:
         self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
         self.logger.info("Successfully initialized Anthropic client")
 
+
+    @error_handler(logger)
+    def update_system_prompt(self, document_summaries: List[str]):
+        summaries_text = "\n".join(f"- {summary}" for summary in document_summaries)
+        self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
+        self.logger.info("Updated system prompt with new document summaries")
 
     @error_handler(logger)
     def generate_response(self, user_input: str) -> str:

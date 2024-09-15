@@ -10,11 +10,11 @@ def main():
     vector_db = VectorDB()
 
     # let's load some docs
-    filename = "cra_docs_en_20240912_082455-chunked.json"
-    doc_processor = DocumentProcessor(filename)
-    data = doc_processor.load_json()
-    chunks = doc_processor.prepare_documents(data)
-    vector_db.add_documents(chunks)
+    file_names = ["cra_docs_en_20240912_082455-chunked.json", "cra_docs_en_20240914_172207-chunked.json"]  # Add all document file names
+    for file_name in file_names:
+        document_loader = DocumentProcessor(file_name)
+        json_data = document_loader.load_json()
+        vector_db.add_documents(json_data)
 
 
     reranker = Reranker()
@@ -22,6 +22,8 @@ def main():
     retriever = ResultRetriever(vector_db=vector_db, reranker=reranker)
 
     claude_assistant = ClaudeAssistant()
+    # Update Claude's system prompt with all document summaries
+    claude_assistant.update_system_prompt(vector_db.get_document_summaries())
 
     # Set retriever in the assistant
     claude_assistant.retriever = retriever

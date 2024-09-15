@@ -11,7 +11,7 @@ import cohere
 from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
 from src.generation.claude_assistant import QueryGenerator
-
+from utils.decorators import error_handler
 
 # Set up logger
 logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
@@ -33,28 +33,6 @@ class DocumentProcessor:
             logger.error(f"Invalid JSON in file: {self.file_path}")
             raise
 
-    def prepare_documents(self, chunks: List[Dict]) -> Dict[str, List[str]]:
-        ids = []
-        documents = []
-        for chunk in chunks:
-            # extract headers
-            data = chunk['data']
-            headers = data['headers']
-            header_text = " ".join(f"{key}: {value}" for key, value in headers.items() if value)
-
-            # extract content
-            content = data['text']
-
-            # Check if overlap_text exists, use an empty string if it doesn't
-            overlap_content = data.get('overlap_text', '')
-
-            # combine
-            combined_text = f"Previous chunk: {overlap_content}\n\n Headers: {header_text}\n\n Content: {content}"
-            ids.append(chunk['chunk_id'])
-
-            documents.append(combined_text)
-
-        return {'ids': ids, 'documents': documents}
 
 class VectorDB:
     def __init__(self,
@@ -66,6 +44,7 @@ class VectorDB:
         self.embedding_function_name = embedding_function
         self.openai_api_key = openai_api_key
         self.collection_name = "local-collection"
+        self.document_summaries = []
 
         self._init()
 
@@ -88,6 +67,84 @@ class VectorDB:
             logger.error(f"Error initializing ChromaDB: {e}")
             raise
 
+
+    def prepare_documents(self, chunks: List[Dict]) -> Dict[str, List[str]]:
+        ids = []
+        documents = []
+        metadatas = [] # metadatas used for filtering
+
+        for chunk in chunks:
+            # extract headers
+            data = chunk['data']
+            headers = data['headers']
+            header_text = " ".join(f"{key}: {value}" for key, value in headers.items() if value)
+
+            # extract content
+            content = data['text']
+
+            # combine
+            combined_text = f"Headers: {header_text}\n\n Content: {content}"
+            ids.append(chunk['chunk_id'])
+
+            documents.append(combined_text)
+
+            metadatas.append({
+                'source_url': chunk['metadata']['source_url'],
+                'page_title': chunk['metadata']['page_title'],
+            })
+
+            # Generate document summary
+            document_summary = self._generate_document_summary(data)
+
+        return {'ids': ids, 'documents': documents, 'metadatas': metadatas, 'summary': document_summary}
+
+    @error_handler(logger)
+    def add_documents(self, json_data: List[Dict]) -> str:
+        # , processed_docs: Dict[str, List[str]]):
+
+        processed_docs = self.prepare_documents(json_data)
+
+        ids = processed_docs['ids']
+        documents = processed_docs['documents']
+        metadatas = processed_docs['metadatas']
+        summary = processed_docs['summary']
+
+        # check if documents exist
+        all_exist, missing_ids = self.check_documents_exist(ids)
+
+        if all_exist:
+            logger.info("Documents with the same chunk ids exist in the database, skipping insertion")
+            return
+
+        else: # try to add all documents (handling only simplified case)
+            self.collection.add(
+                ids=ids,
+                documents=documents,
+                metadatas=metadatas,
+            )
+            docs_n = len(ids)
+            logger.info(f"Added {docs_n} documents to ChromaDB")
+
+            self.document_summaries.append(summary)
+            return summary
+
+    def _generate_document_summary(self, data: Dict[str, Any]) -> str:
+        input_url = data.get('input_url', 'Unknown URL')
+        total_pages = data.get('total_pages', 0)
+        sample_content = data[0].get('data')
+
+        summary = f"""
+        Source URL: {input_url}
+        Total Pages: {total_pages}
+        Sample Content: {sample_content[:200]}...
+        """
+        return summary.strip()
+
+    @error_handler(logger)
+    def get_document_summaries(self) -> List[str]:
+        return self.document_summaries
+
+    @error_handler(logger)
     def check_documents_exist(self, document_ids: List[str]) -> Tuple[bool, List[str]]:
         """Checks, if chunks are already added to the database based on chunk ids"""
 
@@ -114,30 +171,7 @@ class VectorDB:
             logger.error(f"Error checking document existence {e}")
             return False, document_ids
 
-    def add_documents(self, processed_docs: Dict[str, List[str]]) -> None:
-        try:
-            ids = processed_docs['ids']
-            documents = processed_docs['documents']
-
-            # check if documents exist
-            all_exist, missing_ids = self.check_documents_exist(ids)
-
-            if all_exist:
-                logger.info("Documents with the same chunk ids exist in the database, skipping insertion")
-                return
-
-            else: # try to add all documents (handling only simplified case
-                self.collection.add(
-                    ids=ids,
-                    documents=documents
-                )
-                docs_n = len(ids)
-                logger.info(f"Added {docs_n} documents to ChromaDB")
-        except Exception as e:
-            logger.error(f"Error adding documents to ChromaDB: {e}")
-            raise
-
-
+    @error_handler(logger)
     def query(self, user_query: Union[str, List[str]], n_results: int = 5):
         """
         Handles both a single query and multiple queris
