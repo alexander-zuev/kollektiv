@@ -1,5 +1,7 @@
 import functools
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
+
 
 def error_handler(logger):
     def decorator(func: Callable) -> Callable:
@@ -10,5 +12,7 @@ def error_handler(logger):
             except Exception as e:
                 logger.error(f"Error in {func.__name__}: {str(e)}")
                 raise
+
         return wrapper
+
     return decorator

@@ -300,3 +300,5 @@ logs/*
 
 # But don't ignore the logs directory itself
 !logs/.gitkeep
+
+.mypy_cache/

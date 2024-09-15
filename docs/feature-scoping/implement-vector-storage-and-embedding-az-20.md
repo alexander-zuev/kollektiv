@@ -60,7 +60,7 @@ class VectorDB:
         similarities = np.dot(self.embeddings, query_embedding)
         top_indices = np.argsort(similarities)[::-1]
         top_examples = []
-        
+
         for idx in top_indices:
             if similarities[idx] >= similarity_threshold:
                 example = {
@@ -68,7 +68,7 @@ class VectorDB:
                     "similarity": similarities[idx],
                 }
                 top_examples.append(example)
-                
+
                 if len(top_examples) >= k:
                     break
         self.save_db()
@@ -307,10 +307,10 @@ class ResultsRetriever:
 
         # Remove duplicates
         unique_results = {doc['id']: doc for doc in all_results}.values()
-        
+
         # Rerank the combined results
         reranked_results = self.reranker.rerank(query, list(unique_results), top_n=n_results)
-        
+
         return reranked_results
 
 # Usage
@@ -330,11 +330,11 @@ def main():
     doc_processor = DocumentProcessor('path/to/your/chunks.json')
     vector_db = VectorDB('/path/to/persist', 'my_collection')
     vector_db.init()
-    
+
     llm_client = LLMClient('your-openai-api-key')
     query_expander = QueryExpander(llm_client)
     reranker = ReRanker('your-cohere-api-key')
-    
+
     results_retriever = ResultsRetriever(vector_db, query_expander, reranker)
 
     # Load and prepare documents

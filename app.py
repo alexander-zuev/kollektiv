@@ -1,14 +1,15 @@
 from src.generation.claude_assistant import ClaudeAssistant
-from src.vector_storage.vector_db import VectorDB, Reranker, ResultRetriever, DocumentProcessor
 from src.utils.logger import setup_logger
+from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, VectorDB
+
 
 def main():
     # Initialize logger
-    logger = setup_logger('app', "app.log")
+    logger = setup_logger("app", "app.log")
 
     # Initialize components
     vector_db = VectorDB()
-    # vector_db.reset_database()
+    vector_db.reset_database()
     claude_assistant = ClaudeAssistant()
 
     # let's load some docs
@@ -30,10 +31,11 @@ def main():
     while True:
         user_input = input("You: ")
         # user_input="How to implement prompt caching in Claude API"
-        if user_input.lower() in ['exit', 'quit']:
+        if user_input.lower() in ["exit", "quit"]:
             break
         response = claude_assistant.generate_response(user_input)
         print(f"Assistant: {response}")
+
 
 if __name__ == "__main__":
     main()

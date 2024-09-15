@@ -7,7 +7,7 @@ RAG for Docs is a Retrieval-Augmented Generation (RAG) system designed to improv
 ## ❓Why?
 Large Language Models (LLMs) often lack access to the most recent documentation or private knowledge, leading to hallucinations in answers or inaccurate or outdated information in responses. This limits the usefulness of LLMs for buidling with the latest tools that were released after knowledge cutoff date.
 
-What if LLMs could tap into a source of up to date information on libraries, tools, frameworks you are building with? 
+What if LLMs could tap into a source of up to date information on libraries, tools, frameworks you are building with?
 
 Imagine you could use the power of reasoning of modern LLMs but not be limited by their knowledgde cutoff date?
 
@@ -101,7 +101,7 @@ This project addresses these issues by implementing a RAG system that can access
 `
 ## ❤️‍🩹 Current Limitations
 
-- Supports only text documentation in English 
+- Supports only text documentation in English
 - Limited to processing a single documentation set at a time
 - No automatic database updates
 - Depends on FireCrawl for initial document retrieval

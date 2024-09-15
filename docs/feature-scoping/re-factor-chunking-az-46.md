@@ -1,5 +1,5 @@
 # Description
-Currently, chunking is very brittle and frankly incorrect. I need to re-factor the way chunking works so that a 
+Currently, chunking is very brittle and frankly incorrect. I need to re-factor the way chunking works so that a
 correct input is always provided as chunks into the vector database.
 
 ## Problem statements
@@ -15,7 +15,7 @@ correct input is always provided as chunks into the vector database.
   - completeness of all H1 headers and H2 headers
 
 ### Out of scope
-- Flexible or smart chunking - that selects the chunking strategy based on the markdown structure. If it can be done 
+- Flexible or smart chunking - that selects the chunking strategy based on the markdown structure. If it can be done
   easily - then yes, but I doubt that. The MVP version should be limited to working with Supabase documentation only.
 
 ## Approach
@@ -46,11 +46,11 @@ methods:
 
 **Chunking**
 - What is the content structure of markdown files?
-  - Main header denoted with # 
+  - Main header denoted with #
   - Then there are multiple sections with ## headers
   - Some sections have ### sub-headers
   - Code blocks are enclosed in backticks (`)
-  - There are horizontal rules (---) denoted end of the page (we don't need it, because we can rely on the items in 
+  - There are horizontal rules (---) denoted end of the page (we don't need it, because we can rely on the items in
     object list)
 - What should be the chunking strategy:
   - Page-level chunking
@@ -120,7 +120,7 @@ methods:
   }
 }
 ```
-- LlamaIndex results 
+- LlamaIndex results
   - The chunks are much smaller than our target of 1000 tokens (soft limit 800).
   - Many chunks contain only headers or very short snippets of content.
   - The chunking doesn't seem to respect the hierarchical structure of the markdown (H1, H2, H3).

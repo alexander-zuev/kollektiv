@@ -1,30 +1,29 @@
+import json
+import os
 from fileinput import filename
-from pprint import pprint
+from typing import Any
 
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
-from typing import List, Dict, Any, Tuple, Union
-import json
-import os
 import cohere
 
 from generation.claude_assistant import ClaudeAssistant
-from src.utils.config import OPENAI_API_KEY, COHERE_API_KEY, LOG_DIR, PROCESSED_DATA_DIR
+from src.utils.config import COHERE_API_KEY, LOG_DIR, OPENAI_API_KEY, PROCESSED_DATA_DIR
 from src.utils.logger import setup_logger
-from src.generation.claude_assistant import QueryGenerator
 from utils.decorators import error_handler
 
 # Set up logger
 logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
+
 
 class DocumentProcessor:
     def __init__(self, file_name):
         self.file_name = file_name
         self.file_path = os.path.join(PROCESSED_DATA_DIR, file_name)
 
-    def load_json(self) -> List[Dict]:
+    def load_json(self) -> list[dict]:
         try:
-            with open(self.file_path, 'r') as f:
+            with open(self.file_path) as f:
                 data = json.load(f)
             return data
         except FileNotFoundError:
@@ -36,9 +35,7 @@ class DocumentProcessor:
 
 
 class VectorDB:
-    def __init__(self,
-                 embedding_function: str = "text-embedding-3-small",
-                 openai_api_key: str = OPENAI_API_KEY):
+    def __init__(self, embedding_function: str = "text-embedding-3-small", openai_api_key: str = OPENAI_API_KEY):
         self.embedding_function = None
         self.client = None
         self.collection = None
@@ -50,62 +47,63 @@ class VectorDB:
         self._init()
 
     def _init(self):
-        self.client = chromadb.PersistentClient() # using default path for Chroma
+        self.client = chromadb.PersistentClient(path="src/vector_storage/chroma")  # using default path for Chroma
         self._load_existing_summaries()
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-            api_key=self.openai_api_key,
-            model_name=self.embedding_function_name
+            api_key=self.openai_api_key, model_name=self.embedding_function_name
         )
         self.collection = self.client.get_or_create_collection(
             self.collection_name, embedding_function=self.embedding_function
         )
-        logger.info(f"Successfully initialized ChromaDb with collection: {self.collection_name}\n with "
-                    f"{self.collection.count()} documents (chunks)")
-
+        logger.info(
+            f"Successfully initialized ChromaDb with collection: {self.collection_name}\n with "
+            f"{self.collection.count()} documents (chunks)"
+        )
 
     @error_handler(logger)
     def _load_existing_summaries(self):
         summaries_file = os.path.join("src/vector_storage", "document_summaries.json")
         if os.path.exists(summaries_file):
-            with open(summaries_file, 'r') as f:
+            with open(summaries_file) as f:
                 self.document_summaries = json.load(f)
 
-    def prepare_documents(self, chunks: List[Dict]) -> Dict[str, List[str]]:
+    def prepare_documents(self, chunks: list[dict]) -> dict[str, list[str]]:
         ids = []
         documents = []
-        metadatas = [] # used for filtering
+        metadatas = []  # used for filtering
 
         for chunk in chunks:
             # extract headers
-            data = chunk['data']
-            headers = data['headers']
+            data = chunk["data"]
+            headers = data["headers"]
             header_text = " ".join(f"{key}: {value}" for key, value in headers.items() if value)
 
             # extract content
-            content = data['text']
+            content = data["text"]
 
             # combine
             combined_text = f"Headers: {header_text}\n\n Content: {content}"
-            ids.append(chunk['chunk_id'])
+            ids.append(chunk["chunk_id"])
 
             documents.append(combined_text)
 
-            metadatas.append({
-                'source_url': chunk['metadata']['source_url'],
-                'page_title': chunk['metadata']['page_title'],
-            })
+            metadatas.append(
+                {
+                    "source_url": chunk["metadata"]["source_url"],
+                    "page_title": chunk["metadata"]["page_title"],
+                }
+            )
 
-
-        return {'ids': ids, 'documents': documents, 'metadatas': metadatas}
+        return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
     @error_handler(logger)
-    def add_documents(self, json_data: List[Dict], claude_assistant: ClaudeAssistant) -> str:
+    def add_documents(self, json_data: list[dict], claude_assistant: ClaudeAssistant) -> str:
 
         processed_docs = self.prepare_documents(json_data)
 
-        ids = processed_docs['ids']
-        documents = processed_docs['documents']
-        metadatas = processed_docs['metadatas']
+        ids = processed_docs["ids"]
+        documents = processed_docs["documents"]
+        metadatas = processed_docs["metadatas"]
 
         # check if documents exist
         all_exist, missing_ids = self.check_documents_exist(ids)
@@ -114,7 +112,7 @@ class VectorDB:
             logger.info("Documents with the same chunk ids exist in the database, skipping insertion")
             return
 
-        else: # try to add all documents (handling only simplified case)
+        else:  # try to add all documents (handling only simplified case)
             self.collection.add(
                 ids=ids,
                 documents=documents,
@@ -134,32 +132,27 @@ class VectorDB:
         self._save_summaries()
         return summary
 
-
     @error_handler(logger)
     def _save_summaries(self):
         summaries_file = os.path.join("src/vector_storage", "document_summaries.json")
-        with open(summaries_file, 'w') as f:
+        with open(summaries_file, "w") as f:
             json.dump(self.document_summaries, f, indent=2)
         logger.info(f"Saved {len(self.document_summaries)} document summaries")
 
     @error_handler(logger)
-    def get_document_summaries(self) -> List[str]:
+    def get_document_summaries(self) -> list[str]:
         return list(self.document_summaries.values())
 
-
     @error_handler(logger)
-    def check_documents_exist(self, document_ids: List[str]) -> Tuple[bool, List[str]]:
+    def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
         """Checks, if chunks are already added to the database based on chunk ids"""
 
         try:
             # Get all current document ids from the db
-            result = self.collection.get(
-                ids=document_ids,
-                include=[]
-            )
+            result = self.collection.get(ids=document_ids, include=[])
 
             # get the existing set of ids
-            existing_ids = set(result['ids'])
+            existing_ids = set(result["ids"])
 
             # find missing ids
             missing_ids = list(set(document_ids) - existing_ids)
@@ -175,7 +168,7 @@ class VectorDB:
             return False, document_ids
 
     @error_handler(logger)
-    def query(self, user_query: Union[str, List[str]], n_results: int = 5):
+    def query(self, user_query: str | list[str], n_results: int = 5):
         """
         Handles both a single query and multiple queris
         """
@@ -184,9 +177,7 @@ class VectorDB:
         if isinstance(user_query, list):
             query_texts = user_query
         search_results = self.collection.query(
-            query_texts=query_texts,
-            n_results=n_results,
-            include=['documents', 'distances', 'embeddings']
+            query_texts=query_texts, n_results=n_results, include=["documents", "distances", "embeddings"]
         )
         return search_results
 
@@ -199,39 +190,35 @@ class VectorDB:
         self.document_summaries = []
         logger.info("Database reset")
 
-    def process_results_to_print(self, search_results: Dict[str, Any]):
-        documents = search_results['documents'][0]
-        distances = search_results['distances'][0]
+    def process_results_to_print(self, search_results: dict[str, Any]):
+        documents = search_results["documents"][0]
+        distances = search_results["distances"][0]
 
         output = []
-        for docs, dist in zip(documents, distances):
+        for docs, dist in zip(documents, distances, strict=True):
             output.append(f"Distance: {dist:.2f}\n\n{docs}")
         return output
 
-    def deduplicate_documents(self, search_results: Dict[str, Any]) -> Dict[str, Any]:
-        documents = search_results['documents'][0]
-        distances = search_results['distances'][0]
-        ids = search_results['ids'][0]
+    def deduplicate_documents(self, search_results: dict[str, Any]) -> dict[str, Any]:
+        documents = search_results["documents"][0]
+        distances = search_results["distances"][0]
+        ids = search_results["ids"][0]
 
         unique_documents = {}
 
-        for chunk_id, doc, distance in zip(ids, documents, distances):
+        for chunk_id, doc, distance in zip(ids, documents, distances, strict=True):
             if chunk_id not in unique_documents:
-                unique_documents[chunk_id] = {
-                    'text' : doc,
-                    'distance' : distance
-                }
+                unique_documents[chunk_id] = {"text": doc, "distance": distance}
         return unique_documents
 
 
 class Reranker:
-    def __init__(self, cohere_api_key: str = COHERE_API_KEY, model_name: str = 'rerank-english-v3.0'):
+    def __init__(self, cohere_api_key: str = COHERE_API_KEY, model_name: str = "rerank-english-v3.0"):
         self.cohere_api_key = cohere_api_key
         self.model_name = model_name
         self.client = None
 
         self._init()
-
 
     def _init(self):
         try:
@@ -241,20 +228,16 @@ class Reranker:
             logger.error(f"Error initializing Cohere client: {e}")
             raise
 
-    def extract_documents_list(self, unique_documents: Dict[str, Any]) -> List[str]:
+    def extract_documents_list(self, unique_documents: dict[str, Any]) -> list[str]:
         """
         Prepares the unique documents list for processing by Cohere.
         """
         # extract the 'text' field from each unique document
-        document_texts = [chunk['text'] for chunk in unique_documents.values()]
+        document_texts = [chunk["text"] for chunk in unique_documents.values()]
         return document_texts
 
-    def filter_irrelevant_results(self, response: Dict[str, Any], relevance_threshold: float =
-    0.1) \
-            -> (
-            Dict)[
-        str, Any]:
-        """ Filters out irrelevant result from Cohere reranking"""
+    def filter_irrelevant_results(self, response: dict[str, Any], relevance_threshold: float = 0.1) -> (dict)[str, Any]:
+        """Filters out irrelevant result from Cohere reranking"""
         relevant_results = {}
 
         for result in response.results:
@@ -264,15 +247,14 @@ class Reranker:
 
             if relevance_score >= relevance_threshold:
                 relevant_results[index] = {
-                    'text' : text,
-                    'index' : index,
-                    'relevance_score' : relevance_score,
+                    "text": text,
+                    "index": index,
+                    "relevance_score": relevance_score,
                 }
 
         return relevant_results
 
-
-    def rerank(self, query: str, documents: Dict[str, Any], relevance_threshold: float = 0.1, return_documents=True):
+    def rerank(self, query: str, documents: dict[str, Any], relevance_threshold: float = 0.1, return_documents=True):
         """
         Use Cohere rerank API to score and rank documents based on the query.
         Excludes irrelevant documents.
@@ -283,22 +265,19 @@ class Reranker:
 
         # get indexed results
         response = self.client.rerank(
-            model = self.model_name,
-            query = query,
-            documents = document_texts,
-            return_documents=return_documents
+            model=self.model_name, query=query, documents=document_texts, return_documents=return_documents
         )
 
         logger.info(f"Received {len(response.results)} documents from Cohere.")
         # pprint(response.results)
 
         # filter irrelevant results
-        logger.info(f"Filtering out the results with less than {relevance_threshold} relevance "
-                    f"score")
+        logger.info(f"Filtering out the results with less than {relevance_threshold} relevance " f"score")
         relevant_results = self.filter_irrelevant_results(response, relevance_threshold)
         logger.info(f"{len(relevant_results)} documents remaining after filtering.")
 
         return relevant_results
+
 
 class ResultRetriever:
     def __init__(self, vector_db: VectorDB, reranker: Reranker):
@@ -306,8 +285,7 @@ class ResultRetriever:
         self.db = vector_db
         self.reranker = reranker
 
-
-    def retrieve(self, user_query: str, combined_queries: List[str]):
+    def retrieve(self, user_query: str, combined_queries: list[str]):
         """Returns ranked documents based on the user query"""
         try:
 
@@ -329,6 +307,7 @@ class ResultRetriever:
 def main():
     vector_db = VectorDB()
     vector_db.reset_database()
+
 
 if __name__ == "__main__":
     main()

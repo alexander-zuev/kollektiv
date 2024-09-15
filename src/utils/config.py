@@ -1,4 +1,5 @@
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,7 +22,7 @@ COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 
 # File Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-SRC_ROOT = os.path.join(BASE_DIR, 'src')
+SRC_ROOT = os.path.join(BASE_DIR, "src")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 JOB_FILE_DIR = os.path.join(BASE_DIR, "src", "crawling")
 RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "data", "raw")

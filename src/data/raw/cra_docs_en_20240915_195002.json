@@ -1,0 +1,19 @@
+{
+  "input_url": "https://docs.llamaindex.ai/en/stable",
+  "total_pages": 1,
+  "unique_links": [
+    "https://docs.llamaindex.ai/en/stable/api_reference/"
+  ],
+  "data": [
+    {
+      "markdown": "[Skip to content](https://docs.llamaindex.ai/en/stable/api_reference/#api-reference)\n\n# API Reference [\\#](https://docs.llamaindex.ai/en/stable/api_reference/\\#api-reference \"Permanent link\")\n\nLlamaIndex provides thorough documentation of modules and integrations used in the framework.\n\nUse the navigation or search to find the classes you are interested in!\n\nBack to top\n\nHi, how can I help you?\n\n\ud83e\udd99",
+      "metadata": {
+        "title": "API Reference - LlamaIndex",
+        "language": "en",
+        "sourceURL": "https://docs.llamaindex.ai/en/stable/api_reference/",
+        "ogLocaleAlternate": [],
+        "statusCode": 200
+      }
+    }
+  ]
+}
