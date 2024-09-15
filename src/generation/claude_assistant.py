@@ -4,7 +4,7 @@ from pprint import pprint
 from src.utils.logger import setup_logger
 from src.utils.config import ANTHROPIC_API_KEY
 from src.utils.decorators import error_handler
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union
 from src.generation.tool_definitions import ToolManager, tool_manager
 from src.generation.query_generator import QueryGenerator
 
@@ -50,8 +50,8 @@ class ClaudeAssistant:
                 """
         self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
         self.conversation_history: List[Dict[str, str]] = []
-        self.tool_manager = tool_manager  # Use the pre-initialized tool_manager
-        self.tools: List[Dict[str, Any]] = []  # Initialize as an empty list
+        self.tool_manager = tool_manager
+        self.tools: List[Dict[str, Any]] = []
         self.retriever = None
         self.query_generator = QueryGenerator()
 
@@ -62,7 +62,6 @@ class ClaudeAssistant:
     def _init(self):
         self.client = anthropic.Anthropic(api_key=self.api_key)
         self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
-        self.logger.info("Successfully initialized Anthropic client")
 
     @error_handler(logger)
     def update_system_prompt(self, document_summaries: List[Dict[str, Any]]):
@@ -71,7 +70,7 @@ class ClaudeAssistant:
             for summary in document_summaries
         )
         self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
-        # self.logger.info(f"Updated system prompt: {self.system_prompt}")
+        self.logger.debug(f"Updated system prompt: {self.system_prompt}")
 
     @error_handler(logger)
     def generate_response(self, user_input: str) -> str:
@@ -102,12 +101,12 @@ class ClaudeAssistant:
 
                 self.conversation_history.append({"role": "assistant", "content": assistant_message})
                 for index, message in enumerate(self.conversation_history):
-                    print(f"CONVERSATION HISTORY {index}: {message}")
+                    self.logger.debug(f"CONVERSATION HISTORY {index}: {message}")
+
 
                 tool_results = []
                 for content in response.content:
                     if content.type == 'text':
-                        print(f"Claude response: {content.text}")
                     if content.type == 'tool_use':
                         tool_result = self.handle_tool_use(content, user_input)
                         self.logger.debug(f"Tool result: {tool_result}")
@@ -122,26 +121,23 @@ class ClaudeAssistant:
                                                               messages=messages)
                 self.conversation_history.append({"role": "assistant", "content": augmented_reply})
                 for index, message in enumerate(self.conversation_history):
-                    print(f"CONVERSATION HISTORY {index}: {message}")
+                    self.logger.debug(f"CONVERSATION HISTORY {index}: {message}")
 
                 return augmented_reply
 
             # If we're here, it's not a tool use response
-            self.logger.info("Printing the assistant response:")
             assistant_response = response.content[0].text
             self.conversation_history.append({"role": "assistant", "content": assistant_response})
             return assistant_response
 
         except Exception as e:
             self.logger.error(f"Error generating response: {str(e)}")
-            # Don't add error message to conversation history
             return f"An error occurred: {str(e)}"
 
 
 
     @error_handler(logger)
-    def handle_tool_use(self, tool_use_content: Dict[str, Any], user_input: str) -> Dict[str, any]:
-        tool_use_id = tool_use_content.id
+    def handle_tool_use(self, tool_use_content: Dict[str, Any], user_input: str) -> Union[Dict[str, any], str]:
         tool_name = tool_use_content.name
         tool_input = tool_use_content.input
 
@@ -223,7 +219,7 @@ class ClaudeAssistant:
 
         # prepare queries for search
         rag_query = self.formulate_rag_query(user_input, recent_conversation_history, important_context)
-        self.logger.info(f"RAG Search query: {rag_query}")
+        self.logger.debug(f"Using this query for RAG search: {rag_query}")
         multiple_queries = self.query_generator.generate_multi_query(rag_query)
         combined_queries = self.query_generator.combine_queries(rag_query, multiple_queries)
 
@@ -306,7 +302,6 @@ class ClaudeAssistant:
         """
         Converts ranked documents into a structured string for passing to the Claude API.
         """
-        self.logger.info("Started to preprocess the documents")
         preprocessed_context = []
 
         for _, result in ranked_documents.items(): # The first item (_) is the key, second (result) is the dictionary.
@@ -357,7 +352,6 @@ class ClaudeAssistant:
                 tools=self.tools
             )
             content = response.content[0].text
-            self.logger.debug("Received response from Anthropic")
         except Exception as e:
             self.logger.error(f"Exception while processing Anthropic response: {e}")
             raise
