@@ -59,11 +59,9 @@ class VectorDB:
         self.collection = self.client.get_or_create_collection(
             self.collection_name, embedding_function=self.embedding_function
         )
-        logger.info(f"Successfully initialized ChromaDb with collection: {self.collection_name}")
-        if self.collection.count() == 0:
-            logger.warning("No documents in the database")
-        else:
-            logger.info(f"A total number of documents in the database: {self.collection.count()}")
+        logger.info(f"Successfully initialized ChromaDb with collection: {self.collection_name}\n with "
+                    f"{self.collection.count()} documents (chunks)")
+
 
     @error_handler(logger)
     def _load_existing_summaries(self):
@@ -71,7 +69,6 @@ class VectorDB:
         if os.path.exists(summaries_file):
             with open(summaries_file, 'r') as f:
                 self.document_summaries = json.load(f)
-            logger.info(f"Loaded {len(self.document_summaries)} existing document summaries")
 
     def prepare_documents(self, chunks: List[Dict]) -> Dict[str, List[str]]:
         ids = []
@@ -239,7 +236,7 @@ class Reranker:
     def _init(self):
         try:
             self.client = cohere.Client(os.getenv("COHERE_API_KEY"))
-            logger.info("Successfully initialized Cohere client")
+            logger.debug("Successfully initialized Cohere client")
         except Exception as e:
             logger.error(f"Error initializing Cohere client: {e}")
             raise

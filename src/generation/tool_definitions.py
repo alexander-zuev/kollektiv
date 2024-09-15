@@ -39,7 +39,6 @@ rag_search_tool = Tool(
     2. The user's request can be validated by the information that you have in the database.
     3. You need to verify or expand on information related to the documents in the database.
     
-    
     How to use this tool effectively:
     1. Start by analyzing and understanding the conversation context
     2. Then analyze the most recent user request

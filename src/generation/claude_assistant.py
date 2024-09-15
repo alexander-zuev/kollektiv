@@ -1,4 +1,5 @@
 import json
+from pprint import pprint
 
 from src.utils.logger import setup_logger
 from src.utils.config import ANTHROPIC_API_KEY
@@ -84,30 +85,36 @@ class ClaudeAssistant:
         messages.append({'role': 'assistant', 'content': response.content})
 
         if response.stop_reason == "tool_use":
-            self.logger.info(f"Assistant decided to use a tool: {response.content[0].text}")
+            print(f"Assistant decided to use a tool: {response.content[0].text}")
 
             # Handle the tool use and get the tool result message
-            tool_result_message = self.handle_tool_use(response, user_input)
+            tool_result = self.handle_tool_use(response, user_input)
 
             # Append the tool result message to messages
-            messages.append(tool_result_message)
+            messages.append(tool_result)
 
             # Second API call with updated messages
-            final_response = self.send_claude_request(messages=messages)
+            final_response = self.send_claude_request(messages=messages, tools=self.tools)
             assistant_response = final_response.content[0].text
 
             # Append the assistant's final response to messages
-            messages.append({'role': 'assistant', 'content': final_response.content[0].text})
+            messages.append({'role': 'assistant', 'content': assistant_response})
+            print("Final assistant response")
+            pprint(messages)
 
             # Update conversation history with the last four messages
             self.conversation_history.extend(messages[-4:])
+            self.logger.info(f"Updated conversation history {self.conversation_history[-4:]}")
         else:
             # If no tool use is required, use the response from the first API call
             assistant_response = response.content[0].text
+            self.logger.info(f"Final reply: {assistant_response}")
             # Update conversation history with the exchange
             self.conversation_history.extend(messages[-2:])
+            self.logger.info(f"Updated conversation history {self.conversation_history[-2:]}")
 
         return assistant_response
+
 
     @error_handler(logger)
     def send_claude_request(self,
@@ -166,23 +173,25 @@ class ClaudeAssistant:
                             important_context: str) -> str:
         recent_conversation_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in recent_conversation_history])
 
+        if not recent_conversation_history:
+            recent_conversation_history = "No conversation history yet, this might be the first message."
+
         query_generation_prompt = f"""
         Based on the following conversation context and the user's latest input, formulate the best possible search 
         query for retrieving relevant information using RAG from a local vector database.
         
         Query requirements:
         - Do not include any other text in your response, except for the query.
-        
-        Important context to consider:
-        {important_context}
 
-        Recent conversation context:
+        Consider recent conversation history:
         {recent_conversation_history}
 
-        User's latest input: {user_input}
+        Consider user's input itself: {user_input}
 
         Formulated search query:
         """
+
+        self.logger.debug(f"Printing query generation prompt: {query_generation_prompt}")
 
         system_prompt = ("You are world's best query formulator for a RAG system. You know how to properly formulate search "
                          "queries that are relevant to the user's inquiry and take into account the recent conversation context.")
@@ -214,16 +223,15 @@ class ClaudeAssistant:
 
     @error_handler(logger)
     def use_rag_search(self, user_input: str, tool_input: Dict[str, Any]) -> str:
-        # Get recent conversation context (last 3 messages)
+        # Get recent conversation context (last n messages for each role)
         recent_conversation_history = self.get_recent_context()
 
         # important context
         important_context = tool_input['important_context']
-        self.logger.info(f"Extracted important context: {important_context}")
 
         # prepare queries for search
         rag_query = self.formulate_rag_query(user_input, recent_conversation_history, important_context)
-        self.logger.info(f"Printing formulated RAG query: {rag_query}")
+        self.logger.info(f"RAG Search query: {rag_query}")
         multiple_queries = self.query_generator.generate_multi_query(rag_query)
         combined_queries = self.query_generator.combine_queries(rag_query, multiple_queries)
 

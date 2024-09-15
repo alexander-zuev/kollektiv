@@ -24,6 +24,8 @@ def main():
     # Set retriever in the assistant
     claude_assistant.retriever = retriever
 
+    logger.info("Application successfully initialized.")
+
     # Start interaction loop
     while True:
         user_input = input("You: ")
