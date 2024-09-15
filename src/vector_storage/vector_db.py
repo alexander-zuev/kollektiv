@@ -109,7 +109,7 @@ class VectorDB:
         all_exist, missing_ids = self.check_documents_exist(ids)
 
         if all_exist:
-            logger.info("Documents with the same chunk ids exist in the database, skipping insertion")
+            logger.info("Chunks with the same IDs already exist in the DB, skipping insertion.")
             return
 
         else:  # try to add all documents (handling only simplified case)
@@ -160,7 +160,7 @@ class VectorDB:
             all_exist = len(missing_ids) == 0
 
             if not all_exist:
-                logger.warning("Found missing chunks by chunk ID, reloading the full documents list.")
+                logger.warning("Not all chunk IDs exist - reloading the database.")
             return all_exist, missing_ids
 
         except Exception as e:

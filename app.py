@@ -9,11 +9,15 @@ def main():
 
     # Initialize components
     vector_db = VectorDB()
-    vector_db.reset_database()
+    # vector_db.reset_database()
     claude_assistant = ClaudeAssistant()
 
     # let's load some docs
-    file_names = ["cra_docs_en_20240912_082455-chunked.json", "cra_docs_en_20240914_172207-chunked.json"]
+    file_names = [
+        "cra_docs_en_20240912_082455-chunked.json",  # Anthropic docs
+        "cra_supabase_docs_20240911_071307-chunked.json",  # Supabase Auth docs
+        "cra_supabase_docs_20240911_071611-chunked.json",  # Supabase AI docs
+    ]
     for file_name in file_names:
         document_loader = DocumentProcessor(file_name)
         json_data = document_loader.load_json()

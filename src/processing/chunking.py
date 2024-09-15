@@ -699,7 +699,7 @@ class MarkdownChunkValidator:
 
 # Test usage
 def main():
-    markdown_chunker = MarkdownChunker(input_filename="cra_docs_en_20240912_082455.json")
+    markdown_chunker = MarkdownChunker(input_filename="cra_supabase_docs_20240911_071307.json")
     result = markdown_chunker.load_data()
     chunks = markdown_chunker.process_pages(result)
     markdown_chunker.save_chunks(chunks)
