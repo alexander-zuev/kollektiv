@@ -64,7 +64,7 @@ class ClaudeAssistant:
             for summary in document_summaries
         )
         self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
-        self.logger.info("Updated system prompt with new document summaries")
+        self.logger.info(f"Updated system prompt: {self.system_prompt}")
 
     @error_handler(logger)
     def generate_response(self, user_input: str) -> str:
@@ -184,7 +184,7 @@ class ClaudeAssistant:
 
         summary_prompt = f"""
             Generate a concise summary of the following document. Include key topics or themes.
-            Limit the summary to 150 words.
+            Limit the summary to 150 words. Do not include any pre-ambule or boilerplate text.
 
             Document metadata:
             Source URL: {source_url}
@@ -197,7 +197,9 @@ class ClaudeAssistant:
         response = self.client.messages.create(
             model=self.model_name,
             max_tokens=200,
-            system="You are an expert at summarizing documents concisely and accurately.",
+            system="You are an AI assistant that is used in the RAG system. Your goal is to generate a concise "
+                   "summary of the documents in the database, that are loaded into the database. You are perfect at "
+                   "making concise summaries that capture the core meaning, topics, themes of the loaded documents.",
             messages=[{"role": "user", "content": summary_prompt}]
         )
 

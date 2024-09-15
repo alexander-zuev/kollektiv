@@ -11,7 +11,7 @@ def main():
     claude_assistant = ClaudeAssistant()
 
     # let's load some docs
-    file_names = ["cra_docs_en_20240912_082455-chunked.json", "cra_docs_en_20240914_172207-chunked.json"]  # Add all document file names
+    file_names = ["cra_docs_en_20240912_082455-chunked.json", "cra_docs_en_20240914_172207-chunked.json"]
     for file_name in file_names:
         document_loader = DocumentProcessor(file_name)
         json_data = document_loader.load_json()
