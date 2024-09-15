@@ -26,15 +26,14 @@ implementation that I'd want to address before calling it a v0.1 release.
 
 # Scope
 1. Fix identified chunking issues- DONE
-2. Setup basic RAG evaluation suite
-3. Implement flow orchestrator
+2. Setup basic RAG evaluation suite - POSTPONED
+3. Implement flow orchestrator - DONE
    - Sonnet 3.5
    - Tool definition
       - RAG
    - Intelligent dynamic system prompt
-   -
-4. Re-factor and simplify implementation
-5. Implement chainlit for basic UI
+4. Re-factor and simplify implementation - DONE
+5. Implement chainlit for basic UI - POSTPONED
 6. Create a live demo using Supabase or Anthropic docs
 7. Create a user guide (md) on how to use key modules and limitations
 8. Create an in-depth video on how to use RAGDocs over your own data
