@@ -107,6 +107,7 @@ class ClaudeAssistant:
                 tool_results = []
                 for content in response.content:
                     if content.type == 'text':
+                        print(f"Tool use: {content.text}")
                     if content.type == 'tool_use':
                         tool_result = self.handle_tool_use(content, user_input)
                         self.logger.debug(f"Tool result: {tool_result}")
@@ -144,7 +145,6 @@ class ClaudeAssistant:
         try:
             # Execute the tool
             tool_result = self.call_tool(tool_name, tool_input, user_input)
-            print(f"Printing type of the result: {type(tool_result)}")
             return {'content' : tool_result}
         except Exception as e:
             self.logger.error(f"Error executing tool {tool_name}: {str(e)}")

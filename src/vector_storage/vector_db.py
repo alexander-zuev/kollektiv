@@ -250,7 +250,7 @@ class Reranker:
         return document_texts
 
     def filter_irrelevant_results(self, response: Dict[str, Any], relevance_threshold: float =
-    0.01) \
+    0.1) \
             -> (
             Dict)[
         str, Any]:
@@ -272,7 +272,7 @@ class Reranker:
         return relevant_results
 
 
-    def rerank(self, query: str, documents: Dict[str, Any], relevance_threshold: float = 0.01, return_documents=True):
+    def rerank(self, query: str, documents: Dict[str, Any], relevance_threshold: float = 0.1, return_documents=True):
         """
         Use Cohere rerank API to score and rank documents based on the query.
         Excludes irrelevant documents.
