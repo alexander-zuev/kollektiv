@@ -81,26 +81,27 @@ class ClaudeAssistant:
 
         # Check if tool use is required
         if response.stop_reason == "tool_use":
-            tool_use_messages = []
-            for content in response.content:
-                if content.type == 'tool_use' and content.name == 'rag_search':
-                    tool_use_messages.append({
-                        "role": "assistant",
-                        "content": [content]
-                    })
-                    # Formulate the best possible query using recent context
-                    tool_result = self.call_tool(content.name, content.input, user_input)
-                    tool_use_messages.append({
-                        'role': 'user',
-                        'content': [{
-                            'type': 'tool_result',
-                            'tool_use_id': content.id,
-                            'content': tool_result
-                        }]
-                    })
+            # tool_use_messages = []
+            # for content in response.content:
+            #     if content.type == 'tool_use' and content.name == 'rag_search':
+            #         tool_use_messages.append({
+            #             "role": "assistant",
+            #             "content": [content]
+            #         })
+            #         # Formulate the best possible query using recent context
+            #         tool_result = self.call_tool(content.name, content.input, user_input)
+            #         tool_use_messages.append({
+            #             'role': 'user',
+            #             'content': [{
+            #                 'type': 'tool_result',
+            #                 'tool_use_id': content.id,
+            #                 'content': tool_result
+            #             }]
+            #         })
+            tool_use_response = self.handle_tool_use(response, user_input)
 
             # Add tool use and results to the conversation
-            messages.extend(tool_use_messages)
+            messages.extend(tool_use_response)
 
             # Make a second API call with the tool results
             final_response = self.client.messages.create(
@@ -118,9 +119,31 @@ class ClaudeAssistant:
         # Update conversation history with the full exchange
         self.update_conversation_history(user_input, assistant_response)
         if response.stop_reason == "tool_use":
-            self.conversation_history.extend(tool_use_messages)
+            self.conversation_history.extend(tool_use_response)
 
         return assistant_response
+
+    @error_handler(logger)
+    def handle_tool_use(self, response: Dict[str, Any], user_input: str) -> List[Dict[str, Any]]:
+        tool_use_response = []
+
+        for content in response.content:
+            if content.type == 'tool_use' and content.name == 'rag_search':
+                tool_use_response.append({
+                    "role": "assistant",
+                    "content": [content]
+                })
+                # Formulate the best possible query using recent context
+                tool_result = self.call_tool(content.name, content.input, user_input)
+                tool_use_response.append({
+                    'role': 'user',
+                    'content': [{
+                        'type': 'tool_result',
+                        'tool_use_id': content.id,
+                        'content': tool_result
+                    }]
+                })
+        return tool_use_response
 
     @error_handler(logger)
     def formulate_rag_query(self, user_input: str, recent_context: List[Dict[str, str]]) -> str:
