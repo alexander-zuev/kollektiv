@@ -266,7 +266,7 @@ class Reranker:
                 relevant_results[index] = {
                     'text' : text,
                     'index' : index,
-                    'relevant_score' : relevance_score,
+                    'relevance_score' : relevance_score,
                 }
 
         return relevant_results
@@ -286,7 +286,7 @@ class Reranker:
             model = self.model_name,
             query = query,
             documents = document_texts,
-            return_documents=True
+            return_documents=return_documents
         )
 
         logger.info(f"Received {len(response.results)} documents from Cohere.")
@@ -308,7 +308,7 @@ class ResultRetriever:
 
 
     def retrieve(self, user_query: str, combined_queries: List[str]):
-        """Given the user query run the full end to end flow"""
+        """Returns ranked documents based on the user query"""
         try:
 
             # get expanded search results
@@ -320,7 +320,6 @@ class ResultRetriever:
             ranked_documents = self.reranker.rerank(user_query, unique_documents)
             logger.debug(f"Debugging ranked documents {ranked_documents}")
 
-            logger.debug("End to end flow works")
             return ranked_documents
         except Exception as e:
             logger.error(f"Error retrieving documents: {e}")

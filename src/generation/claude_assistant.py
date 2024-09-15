@@ -75,96 +75,84 @@ class ClaudeAssistant:
 
     @error_handler(logger)
     def generate_response(self, user_input: str) -> str:
-        # Start with the conversation history and the new user input
-        messages = self.conversation_history + [{"role": "user", "content": user_input}]
+        self.conversation_history.append({"role": "user", "content": user_input})
 
-        # First API call
-        response = self.send_claude_request(messages=messages)
+        try:
+            messages = self.conversation_history.copy()
+            response = self.client.messages.create(
+                messages=messages,
+                system=self.system_prompt,
+                max_tokens=8192,
+                model=self.model_name,
+                tools=self.tools
+            )
 
-        # Append the assistant's response to messages
-        messages.append({'role': 'assistant', 'content': response.content})
+            if response.stop_reason == "tool_use":
+                assistant_message = []
+                for content in response.content:
+                    if content.type == 'text':
+                        assistant_message.append({"type": "text", "text": content.text})
+                    elif content.type == 'tool_use':
+                        assistant_message.append({
+                            "type": "tool_use",
+                            "id": content.id,
+                            "name": content.name,
+                            "input": content.input
+                        })
 
-        if response.stop_reason == "tool_use":
-            print(f"Assistant decided to use a tool: {response.content[0].text}")
+                self.conversation_history.append({"role": "assistant", "content": assistant_message})
+                for index, message in enumerate(self.conversation_history):
+                    print(f"CONVERSATION HISTORY {index}: {message}")
 
-            # Handle the tool use and get the tool result message
-            tool_result = self.handle_tool_use(response, user_input)
+                tool_results = []
+                for content in response.content:
+                    if content.type == 'text':
+                        print(f"Claude response: {content.text}")
+                    if content.type == 'tool_use':
+                        tool_result = self.handle_tool_use(content, user_input)
+                        self.logger.debug(f"Tool result: {tool_result}")
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": content.id,
+                            "content": tool_result
+                        })
+                messages = self.conversation_history.copy()
+                augmented_reply = self.get_augmented_response(user_input,
+                                                              tool_results,
+                                                              messages=messages)
+                self.conversation_history.append({"role": "assistant", "content": augmented_reply})
+                for index, message in enumerate(self.conversation_history):
+                    print(f"CONVERSATION HISTORY {index}: {message}")
 
-            # Append the tool result message to messages
-            messages.append(tool_result)
+                return augmented_reply
 
-            # Second API call with updated messages
-            final_response = self.send_claude_request(messages=messages, tools=self.tools)
-            assistant_response = final_response.content[0].text
-
-            # Append the assistant's final response to messages
-            messages.append({'role': 'assistant', 'content': assistant_response})
-            print("Final assistant response")
-            pprint(messages)
-
-            # Update conversation history with the last four messages
-            self.conversation_history.extend(messages[-4:])
-            self.logger.info(f"Updated conversation history {self.conversation_history[-4:]}")
-        else:
-            # If no tool use is required, use the response from the first API call
+            # If we're here, it's not a tool use response
+            self.logger.info("Printing the assistant response:")
             assistant_response = response.content[0].text
-            self.logger.info(f"Final reply: {assistant_response}")
-            # Update conversation history with the exchange
-            self.conversation_history.extend(messages[-2:])
-            self.logger.info(f"Updated conversation history {self.conversation_history[-2:]}")
+            self.conversation_history.append({"role": "assistant", "content": assistant_response})
+            return assistant_response
 
-        return assistant_response
+        except Exception as e:
+            self.logger.error(f"Error generating response: {str(e)}")
+            # Don't add error message to conversation history
+            return f"An error occurred: {str(e)}"
 
 
-    @error_handler(logger)
-    def send_claude_request(self,
-                            model: str = None,
-                            max_tokens: int = None,
-                            system: str = None,
-                            messages: List[Dict[str, str]] = None,
-                            tools: List[Dict[str, Any]] = None):
-        """
-        Send a request to the Claude API with the specified parameters.
-        """
-        # Use instance attributes as defaults if not provided
-        model = model or self.model_name
-        max_tokens = max_tokens or 8192
-        system = system or self.system_prompt
-        tools = tools if tools is not None else self.tool_manager.get_all_tools()
-
-        response = self.client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=system,
-            messages=messages,
-            tools=tools
-        )
-        return response
 
     @error_handler(logger)
-    def handle_tool_use(self, response: Dict[str, Any], user_input: str) -> Dict[str, Any]:
-        for content in response.content:
-            if content.type == 'tool_use':
-                tool_use_id = content.id
-                tool_name = content.name
-                tool_input = content.input
+    def handle_tool_use(self, tool_use_content: Dict[str, Any], user_input: str) -> Dict[str, any]:
+        tool_use_id = tool_use_content.id
+        tool_name = tool_use_content.name
+        tool_input = tool_use_content.input
 
-                # Execute the tool
-                tool_result = self.call_tool(tool_name, tool_input, user_input)
-
-                # Return a message with role 'user' containing the 'tool_result' content block
-                return {
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'tool_result',
-                            'tool_use_id': tool_use_id,
-                            'content': tool_result
-                        }
-                    ]
-                }
-        # If no tool_use content block is found, return an empty dict
-        return {}
+        try:
+            # Execute the tool
+            tool_result = self.call_tool(tool_name, tool_input, user_input)
+            print(f"Printing type of the result: {type(tool_result)}")
+            return {'content' : tool_result}
+        except Exception as e:
+            self.logger.error(f"Error executing tool {tool_name}: {str(e)}")
+            return f"Error: {str(e)}"
 
     @error_handler(logger)
     def formulate_rag_query(self,
@@ -178,7 +166,11 @@ class ClaudeAssistant:
 
         query_generation_prompt = f"""
         Based on the following conversation context and the user's latest input, formulate the best possible search 
-        query for retrieving relevant information using RAG from a local vector database.
+        query for retrieval augmented generation of information from local vector database.
+        
+        When preparing the query please take into account the following:
+        - query will be used to retrieve the documents from a local vector database
+        - type of search used: vector similarity search
         
         Query requirements:
         - Do not include any other text in your response, except for the query.
@@ -198,10 +190,10 @@ class ClaudeAssistant:
         messages = [{"role": "user", "content": query_generation_prompt}]
         max_tokens = 150
 
-        response = self.send_claude_request(max_tokens=max_tokens,
+        response = self.client.messages.create(max_tokens=max_tokens,
                                             system=system_prompt,
                                             messages=messages,
-                                            tools=[]
+                                            model=self.model_name,
                                             )
 
         return response.content[0].text.strip()
@@ -214,15 +206,15 @@ class ClaudeAssistant:
     @error_handler(logger)
     def call_tool(self, tool_name: str,
                   tool_input: Dict[str, Any],
-                  user_input: str) -> str:
+                  user_input: str) -> Dict[str, Any]:
         if tool_name == "rag_search":
             search_results = self.use_rag_search(user_input, tool_input)
-            return json.dumps(search_results)  # Convert results to a string for passing back to Claude
+            return search_results
         else:
             raise ValueError(f"Tool {tool_name} not supported")
 
     @error_handler(logger)
-    def use_rag_search(self, user_input: str, tool_input: Dict[str, Any]) -> str:
+    def use_rag_search(self, user_input: str, tool_input: Dict[str, Any]) -> Dict[str, Any]:
         # Get recent conversation context (last n messages for each role)
         recent_conversation_history = self.get_recent_context()
 
@@ -237,7 +229,7 @@ class ClaudeAssistant:
 
         # get search ranked search results
         results = self.retriever.retrieve(rag_query, combined_queries)
-        return json.dumps(results)
+        return results
 
 
     @error_handler(logger)
@@ -291,9 +283,6 @@ class ClaudeAssistant:
         }
 
     def _select_diverse_chunks(self, chunks: List[Dict[str, Any]], n: int) -> List[Dict[str, Any]]:
-        # Implementation to select diverse chunks based on headers or content
-        # This could involve clustering or simple heuristics to ensure variety
-        # For simplicity, we'll just take evenly spaced chunks
         step = max(1, len(chunks) // n)
         return chunks[::step][:n]
 
@@ -317,10 +306,11 @@ class ClaudeAssistant:
         """
         Converts ranked documents into a structured string for passing to the Claude API.
         """
+        self.logger.info("Started to preprocess the documents")
         preprocessed_context = []
 
         for _, result in ranked_documents.items(): # The first item (_) is the key, second (result) is the dictionary.
-            relevance_score = result.get('relevance_score')
+            relevance_score = result.get('relevance_score', None)
             text = result.get('text')
 
             # create a structured format
@@ -331,38 +321,40 @@ class ClaudeAssistant:
             )
             preprocessed_context.append(formatted_document)
 
-            # self.logger.debug(f"Printing pre-chunks preprocessed_context {formatted_document}")
+            # self.logger.info(f"Printing pre-chunks preprocessed_context {formatted_document}")
 
         return preprocessed_context
 
     @error_handler(logger)
-    def get_augmented_response(self, user_query: str, context: Dict[str, Any], model_name: str =
-    "claude-3-5-sonnet-20240620"):
+    def get_augmented_response(self, user_input: str, tool_results: List[Dict[str, Any]], messages: List[Dict[str,
+    str]]):
 
         # process context
-        preprocessed_context = self.preprocess_ranked_documents(context)
+        preprocessed_context = self.preprocess_ranked_documents(tool_results[0]['content']['content'])
 
-        system_prompt = (
-            f"You are a knowledgable financial research assistant. Your users are inquiring about an annual report."
-            f"You will be given context, extracted by an LLM that will help in answering the "
-            f"questions. Each context has a relevance score and the document itself"
-            f"If the provided context is not relevant, please inform the user that you can not "
-            f"answer the question based on the provided information."
-            f"If the provided context is relevant, answer the question based on the contex")
-
-        messages = [
-            {"role": "user", "content": f"Context: \n\n{preprocessed_context}\n\n."
-                                    f"Answer the questions based on the provided context."
-                                    f"Question: {user_query}"},
-
-        ]
-
+        # Create a new user message with tool results
+        new_message = {
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tool_results[0]['tool_use_id'],  # Assuming the tool_use_id is in the tool_results
+                    "content": f"Here is context retrieved by a RAG system: \n\n{preprocessed_context}\n\n."
+                                      f"Respond to the latest user's query using the provided context."
+                                      f"User_input: {user_input}"
+                }
+            ]
+        }
+        # Create a new list with the existing messages and the new message
+        updated_messages = messages + [new_message]
+        self.conversation_history.append(new_message)
         try:
             response = self.client.messages.create(
-                model=model_name,
+                model=self.model_name,
                 max_tokens=8192,
-                system=system_prompt,
-                messages=messages,
+                system=self.system_prompt,
+                messages=updated_messages,
+                tools=self.tools
             )
             content = response.content[0].text
             self.logger.debug("Received response from Anthropic")

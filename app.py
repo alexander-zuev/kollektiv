@@ -29,6 +29,7 @@ def main():
     # Start interaction loop
     while True:
         user_input = input("You: ")
+        # user_input="How to implement prompt caching in Claude API"
         if user_input.lower() in ['exit', 'quit']:
             break
         response = claude_assistant.generate_response(user_input)
