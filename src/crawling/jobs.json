@@ -183,5 +183,29 @@
     "status": "completed",
     "timestamp": "20240915_225417",
     "method": "crawl"
+  },
+  "9718255c-90e1-46c0-8d30-69dcd2018d5a": {
+    "internal_id": "9718255c-90e1-46c0-8d30-69dcd2018d5a",
+    "job_id": "cda13a41-f657-4080-8d34-e333f838bc87",
+    "input_url": "https://supabase.com/docs/guides/auth",
+    "status": "completed",
+    "timestamp": "20240916_234514",
+    "method": "crawl"
+  },
+  "91e270dc-9ed2-4f3c-91f1-2f60c465b48e": {
+    "internal_id": "91e270dc-9ed2-4f3c-91f1-2f60c465b48e",
+    "job_id": "82438c0e-5bc3-4d36-b029-0ea07a3bf79a",
+    "input_url": "https://supabase.com/docs/guides/auth",
+    "status": "completed",
+    "timestamp": "20240916_235029",
+    "method": "crawl"
+  },
+  "2e9e3b7f-4382-4611-badd-a2dc5de4fe8a": {
+    "internal_id": "2e9e3b7f-4382-4611-badd-a2dc5de4fe8a",
+    "job_id": "8ca70aac-e8be-42e3-b857-246fc92742b4",
+    "input_url": "https://supabase.com/docs/guides/auth",
+    "status": "completed",
+    "timestamp": "20240916_235433",
+    "method": "crawl"
   }
 }

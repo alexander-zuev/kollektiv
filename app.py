@@ -15,7 +15,7 @@ def main():
     # let's load some docs
     file_names = [
         "cra_docs_en_20240912_082455-chunked.json",  # Anthropic docs
-        "cra_supabase_docs_20240911_071307-chunked.json",  # Supabase Auth docs
+        "supabase_com_docs_guides_auth_20240916_235100-chunked.json",  # Supabase Auth docs
         "cra_supabase_docs_20240911_071611-chunked.json",  # Supabase AI docs
     ]
     for file_name in file_names:
