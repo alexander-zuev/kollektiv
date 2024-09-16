@@ -302,3 +302,6 @@ logs/*
 !logs/.gitkeep
 
 .mypy_cache/
+
+# my actual project structure
+/scripts/project_structure.txt
