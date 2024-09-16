@@ -89,7 +89,7 @@ To crawl documentation using FireCrawl:
 ```bash
 python src/crawling/crawler.py
 ```
-Example:
+
 Example:
 ```python
 urls_to_crawl = [
@@ -175,7 +175,7 @@ self.base_system_prompt = """
 ## Troubleshooting
 
 - **Crawling Issues:** Ensure your FireCrawl API key is correct and you have sufficient credits.
-- Chunking Errors:** Check the input JSON file format and ensure it matches the expected structure.
+- **Chunking Errors:** Check the input JSON file format and ensure it matches the expected structure.
 - **Embedding Failures:** Verify your OpenAI API key and check for rate limiting issues.
 - **Chat Interface Not Responding:** Make sure all components are initialized correctly and the vector database is
   populated.
