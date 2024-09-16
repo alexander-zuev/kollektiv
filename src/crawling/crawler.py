@@ -181,19 +181,12 @@ class FireCrawler:
 
     @error_handler(logger)
     def _create_file_name(self, url: HttpUrl, method: str) -> str:
-        """Creates a slugified version of url + method for use as a file name"""
+        """Creates a filename based on the bare URL and timestamp"""
         parsed_url = urlparse(url)
-        domain = parsed_url.netloc.split(".")[0]  # take only two parts of the domain
-        path = parsed_url.path.strip("/").split("/")[0]
-
-        # Combine parts and sanitize
-        parts = [method[:3], domain, path] if path else [method[:3], domain]
-        slug = "_".join(parts)
-        slug = re.sub(r"[^\w\-]", "", slug)  # Remove any non-word characters
-
+        bare_url = parsed_url.netloc + parsed_url.path.rstrip("/")
+        bare_url = re.sub(r"[^\w\-]", "_", bare_url)  # Replace non-word chars with underscore
         timestamp = self._get_timestamp()
-
-        return f"{slug}_{timestamp}.json"
+        return f"{bare_url}_{timestamp}.json"
 
     @error_handler(logger)
     def _get_timestamp(self):
@@ -326,10 +319,10 @@ def main():
 
     # Testing crawl_url
     urls_to_crawl = [
-        "https://supabase.com/docs/guides/auth",
+        "https://supabase.com/docs/guides/auth",  # replace this with the url of your favorite library
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=1)
-    crawler.build_example_file("cra_docs_en_20240912_082455.json")
+    crawler.async_crawl_url(urls_to_crawl, page_limit=50)  # define page limit
+    # crawler.build_example_file("cra_docs_en_20240912_082455.json")
 
 
 if __name__ == "__main__":
