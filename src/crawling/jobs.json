@@ -175,5 +175,13 @@
     "status": "completed",
     "timestamp": "20240915_194931",
     "method": "crawl"
+  },
+  "24776100-7d6d-440d-9a44-23bb1a2fc62a": {
+    "internal_id": "24776100-7d6d-440d-9a44-23bb1a2fc62a",
+    "job_id": "8a559f7e-dfdd-4c10-918d-2008cd54851d",
+    "input_url": "https://supabase.com/docs/guides/auth",
+    "status": "completed",
+    "timestamp": "20240915_225417",
+    "method": "crawl"
   }
 }
