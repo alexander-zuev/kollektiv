@@ -68,7 +68,12 @@ class FireCrawler:
                 "limit": page_limit,
                 "maxDepth": 5,
                 "includePaths": [],
-                "scrapeOptions": {"formats": ["markdown"]},
+                "scrapeOptions": {
+                    "formats": [
+                        "markdown",
+                        "html",
+                    ]
+                },
             }
 
             self.logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
@@ -321,7 +326,7 @@ def main():
     urls_to_crawl = [
         "https://supabase.com/docs/guides/auth",  # replace this with the url of your favorite library
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=50)  # define page limit
+    crawler.async_crawl_url(urls_to_crawl, page_limit=3)  # define page limit
     # crawler.build_example_file("cra_docs_en_20240912_082455.json")
 
 

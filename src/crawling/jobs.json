@@ -207,5 +207,13 @@
     "status": "completed",
     "timestamp": "20240916_235433",
     "method": "crawl"
+  },
+  "dfa52557-ed2a-4222-977b-5825a3d0ae32": {
+    "internal_id": "dfa52557-ed2a-4222-977b-5825a3d0ae32",
+    "job_id": "9ddc461a-240f-4659-afbb-3bb23a9a7d28",
+    "input_url": "https://supabase.com/docs/guides/auth",
+    "status": "completed",
+    "timestamp": "20240917_082009",
+    "method": "crawl"
   }
 }
