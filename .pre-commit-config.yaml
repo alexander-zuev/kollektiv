@@ -29,3 +29,11 @@ repos:
     hooks:
     -   id: pyupgrade
         args: [--py312-plus]
+-   repo: local
+    hooks:
+    -   id: pytest-check
+        name: pytest-check
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
