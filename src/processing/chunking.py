@@ -699,7 +699,7 @@ class MarkdownChunkValidator:
 
 # Test usage
 def main():
-    markdown_chunker = MarkdownChunker(input_filename="supabase_com_docs_guides_auth_20240916_235100.json")
+    markdown_chunker = MarkdownChunker(input_filename="docs_llamaindex_ai_en_stable_20240917_090349.json")
     result = markdown_chunker.load_data()
     chunks = markdown_chunker.process_pages(result)
     markdown_chunker.save_chunks(chunks)

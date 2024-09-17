@@ -18,7 +18,6 @@ langchain = "^0.2.15"
 langchain-text-splitters = "^0.2.2"
 google-cloud-aiplatform = "^1.64.0"
 llama-index = "^0.11.3"
-chromadb = "^0.5.5"
 cohere = "^5.9.0"
 firecrawl-py = "^1.2.3"
 pydantic = "^2.9.0"
@@ -26,6 +25,9 @@ pytest = "^8.3.3"
 black = "^24.8.0"
 flake8 = "^7.1.1"
 pre-commit = "^3.8.0"
+chromadb = "^0.5.5"
+protobuf = "3.20.3"
+
 
 [tool.black]
 line-length = 120
@@ -48,6 +50,30 @@ extend-exclude = '''
 [tool.isort]
 profile = "black"
 line_length = 120
+
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+pythonpath = [
+    ".",
+    "src",
+]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass",
+    "except ImportError:",
+]
 
 
 [build-system]
