@@ -61,14 +61,33 @@ class FireCrawler:
 
     @error_handler(logger)
     def async_crawl_url(self, urls: list[HttpUrl], page_limit: int = 25) -> dict[str, Any]:
+        """
+        :param urls: List of URLs to be crawled.
+        :type urls: list[HttpUrl]
+        :param page_limit: Maximum number of pages to be crawled per URL. Defaults to 25.
+        :type page_limit: int
+        :return: A dictionary containing the input URLs and the results of the crawl jobs.
+        :rtype: dict[str, Any]
+        """
         all_results = []
 
         for url in urls:
             params = {
                 "limit": page_limit,
                 "maxDepth": 5,
-                "includePaths": [],
-                "scrapeOptions": {"formats": ["markdown"]},
+                "includePaths": [
+                    "/understanding/*",
+                    "/use_cases/*",
+                    "/examples/*",
+                    "module_guides/*",
+                    "api_reference/*",
+                ],
+                "scrapeOptions": {
+                    "formats": [
+                        "markdown",
+                        "html",
+                    ]
+                },
             }
 
             self.logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
@@ -319,9 +338,9 @@ def main():
 
     # Testing crawl_url
     urls_to_crawl = [
-        "https://supabase.com/docs/guides/auth",  # replace this with the url of your favorite library
+        "https://docs.llamaindex.ai/en/stable",  # replace this with the url of your favorite library
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=50)  # define page limit
+    crawler.async_crawl_url(urls_to_crawl, page_limit=250)  # define page limit
     # crawler.build_example_file("cra_docs_en_20240912_082455.json")
 
 
