@@ -291,17 +291,26 @@ cython_debug/
 #.idea/
 structure.txt
 
-# Parsed docs
-!src/input_processing/data/raw
-!/src/input_processing/data/formatted
+# Ignore data directories
+src/data/raw/*
+src/data/chunks/*
+
+# Keep the directory structure
+!src/data/raw/.gitkeep
+!src/data/chunks/.gitkeep
+
+# Ignore ChromaDB files
+src/vector_storage/chroma/*
+!src/vector_storage/chroma/.gitkeep
 
 # Ignore everything in the logs directory
 logs/*
-
-# But don't ignore the logs directory itself
 !logs/.gitkeep
 
 .mypy_cache/
 
-# my actual project structure
+# ignore my actual project structure
 /scripts/project_structure.txt
+
+# ignore private jobs data
+/src/crawling/jobs.json

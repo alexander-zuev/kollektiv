@@ -1,3 +1,6 @@
-src/document_ingestion/data/**/*.json filter=lfs diff=lfs merge=lfs -text
-*.sqlite3 filter=lfs diff=lfs merge=lfs -text
-*.db filter=lfs diff=lfs merge=lfs -text
+# Update .gitattributes
+src/data/raw/**/*.json filter=lfs diff=lfs merge=lfs -text
+src/data/chunks/**/*.json filter=lfs diff=lfs merge=lfs -text
+src/vector_storage/chroma/**/*.sqlite3 filter=lfs diff=lfs merge=lfs -text
+src/vector_storage/chroma/**/*.bin filter=lfs diff=lfs merge=lfs -text
+src/vector_storage/chroma/**/*.pickle filter=lfs diff=lfs merge=lfs -text
