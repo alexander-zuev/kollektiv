@@ -75,13 +75,8 @@ class FireCrawler:
             params = {
                 "limit": page_limit,
                 "maxDepth": 5,
-                "includePaths": [
-                    "/understanding/*",
-                    "/use_cases/*",
-                    "/examples/*",
-                    "module_guides/*",
-                    "api_reference/*",
-                ],
+                "includePaths": ["/integrations/*", ""],
+                "excludePaths": ["/people/*", "/contributing/*"],
                 "scrapeOptions": {
                     "formats": [
                         "markdown",
@@ -338,9 +333,9 @@ def main():
 
     # Testing crawl_url
     urls_to_crawl = [
-        "https://docs.llamaindex.ai/en/stable",  # replace this with the url of your favorite library
+        "https://python.langchain.com/docs",  # replace this with the url of your favorite library
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=250)  # define page limit
+    crawler.async_crawl_url(urls_to_crawl, page_limit=50)  # define page limit
     # crawler.build_example_file("cra_docs_en_20240912_082455.json")
 
 

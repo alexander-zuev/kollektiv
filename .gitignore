@@ -314,3 +314,6 @@ logs/*
 
 # ignore private jobs data
 /src/crawling/jobs.json
+
+# ignore experimental folder
+/src/experimental
