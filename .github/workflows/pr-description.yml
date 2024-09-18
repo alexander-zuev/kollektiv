@@ -1,24 +1,42 @@
-name: Pull Request Description
+name: Update PR Description
 
 on:
   pull_request:
     types: [opened, synchronize]
 
+permissions:
+  pull-requests: write
+
 jobs:
   update_pr_description:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
       - name: Generate PR Description
         run: |
-          echo "## Changes in this PR:" > pr_body.md
-          echo "" >> pr_body.md
-          git log --format="- %s" origin/${{ github.base_ref }}..origin/${{ github.head_ref }} >> pr_body.md
+          echo "## Automated PR Description" > pr_body.md
+          echo "### Commits in this PR:" >> pr_body.md
+          git log --format="- **%h** %s%n%w(0,2,2)%b" origin/${{ github.base_ref }}..origin/${{ github.head_ref }} | sed '/^\s*$/d' >> pr_body.md
+
+      - name: Read PR Body
+        id: pr_body
+        run: |
+          body=$(cat pr_body.md)
+          body="${body//'%'/'%25'}"
+          body="${body//$'\n'/'%0A'}"
+          body="${body//$'\r'/'%0D'}"
+          echo "content=$body" >> $GITHUB_OUTPUT
+
       - name: Update PR
         uses: tzkhan/pr-update-action@v2
         with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
-          body-path: "pr_body.md"
-          body-if-empty: true
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          base-branch-regex: '.*'
+          head-branch-regex: '.*'
+          body-template: |
+            ${{ steps.pr_body.outputs.content }}
+          body-update-action: "suffix"
+          body-newline-count: 2
