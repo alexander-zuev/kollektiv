@@ -315,5 +315,11 @@ logs/*
 # ignore private jobs data
 /src/crawling/jobs.json
 
+# ignore private internal data
+internal_docs/
+
 # ignore experimental folder
 /src/experimental
+
+# ignore changelog template
+/CHANGELOG_template.md!/roadmap.md
