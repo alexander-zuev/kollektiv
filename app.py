@@ -49,8 +49,10 @@ def main():
         user_input = input("You: ")
         if user_input.lower() in ["exit", "quit"]:
             break
-        response = claude_assistant.generate_response(user_input)
-        print(f"Assistant: {response}")
+        response = claude_assistant.generate_response(user_input, stream=True)
+        print("Assistant: ", end="")
+        for text in response:
+            print(text, end="", flush=True)
 
 
 if __name__ == "__main__":

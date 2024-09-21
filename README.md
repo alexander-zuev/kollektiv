@@ -1,4 +1,4 @@
-# 🚀 RAG Docs - Chat with your docs
+# 🚀 RAG Docs - Chat with web documents
 
 ## 🌟 Overview
 
