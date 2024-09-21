@@ -2,6 +2,8 @@ import uuid
 from typing import Any
 
 import anthropic
+import tiktoken
+from anthropic.types import Message
 
 from src.generation.query_generator import QueryGenerator
 from src.generation.tool_definitions import tool_manager
@@ -12,7 +14,8 @@ from src.utils.logger import setup_logger
 logger = setup_logger("claude_assistant", "claude_assistant.log")
 
 
-class Message:
+class ConversationMessage:
+
     def __init__(self, role: str, content: str | list[dict[str, Any]]):
         self.id = str(uuid.uuid4())
         self.role = role
@@ -26,46 +29,58 @@ class Message:
 
 
 class ConversationHistory:
-    def __init__(self, max_tokens: int = 200000):
+    def __init__(self, max_tokens: int = 200000, tokenizer: str = "cl100k_base"):
         self.max_tokens = max_tokens  # specifically for Sonnet 3.5
-        self.messages: list[Message] = []
-        self.total_input_tokens = 0
-        self.total_output_tokens = 0
+        self.messages: list[ConversationMessage] = []
+        self.total_tokens = 0
+        self.tokenizer = tiktoken.get_encoding(tokenizer)
         self.logger = setup_logger(__name__, "claude_assistant.log")
 
     def add_message(self, role: str, content: str | list[dict[str, Any]]) -> None:
-        message = Message(role, content)
+        message = ConversationMessage(role, content)
         self.messages.append(message)
         self.logger.debug(f"Added message for role={message.role}")
 
-    def update_token_counts(self, input_tokens: int, output_tokens: int) -> None:
-        self.total_input_tokens += input_tokens
-        self.total_output_tokens += output_tokens
+        # estimate tokens for user messages
+        if role == "user":
+            estimated_tokens = self._estimate_tokens(content)
+            if self.total_tokens + estimated_tokens > self.max_tokens:
+                self._prune_history(estimated_tokens)
+            self.total_tokens += estimated_tokens
+
+    def update_token_count(self, input_tokens: int, output_tokens: int) -> None:
+        self.total_tokens = input_tokens + output_tokens
+        if self.total_tokens > self.max_tokens:
+            self._prune_history(0)
+
+    def _estimate_tokens(self, content: str | list[dict[str, Any]]) -> int:
+        if isinstance(content, str):
+            return len(self.tokenizer.encode(content))
+        elif isinstance(content, list):
+            return sum(
+                len(self.tokenizer.encode(item["text"]))
+                for item in content
+                if isinstance(item, dict) and "text" in item
+            )
+        return 0
+
+    def _prune_history(self, new_tokens: int) -> None:
+        while self.total_tokens + new_tokens > self.max_tokens * 0.9 and len(self.messages) > 1:
+            removed_message = self.messages.pop(0)
+            # We don't know the exact token count of the removed message, so we estimate
+            self.total_tokens -= self._estimate_tokens(removed_message.content)
+
+    def remove_last_message(self) -> None:
+        if self.messages:
+            removed_message = self.messages.pop()
+            self.logger.info(f"Removed message: {removed_message.role}")
 
     def get_conversation_history(self, debug: bool = False) -> list[dict[str, Any]]:
         return [msg.to_dict(include_id=debug) for msg in self.messages]
 
-    def get_token_counts(self) -> dict[str, int]:
-        return {
-            "input_tokens": self.total_input_tokens,
-            "output_tokens": self.total_output_tokens,
-            "total_tokens": self.total_input_tokens + self.total_output_tokens,
-        }
-
     def log_conversation_state(self) -> None:
-        self.logger.debug(
-            f"Conversation state: messages={len(self.messages)}, "
-            f"total_input_tokens={self.total_input_tokens}, "
-            f"total_output_tokens={self.total_output_tokens}"
-        )
+        self.logger.debug(f"Conversation state: messages={len(self.messages)}, " f"Total tokens={self.total_tokens}, ")
 
-
-# history = ConversationHistory()
-# history.add_message(role='user', content='Test content')
-# history.add_message(role='assistant', content='Test reply')
-# history.add_message(role='user', content=[{'test': 'test'}])
-#
-# print(history.get_conversation_history())
 
 
 # Client Class
@@ -122,7 +137,7 @@ class ClaudeAssistant:
 
     @error_handler(logger)
     def _init(self):
-        self.client = anthropic.Anthropic(api_key=self.api_key)
+        self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=2)  # default number of re-tries
         self.conversation_history = ConversationHistory()
         self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
 
@@ -154,100 +169,127 @@ class ClaudeAssistant:
         """
         user_input = self.preprocess_user_input(user_input)
         self.conversation_history.add_message(role="user", content=user_input)
-        print(f"DEBUGGING HISTORY: {self.conversation_history.get_conversation_history()}")
+        self.logger.debug(
+            f"Printing conversation history for debugging: {self.conversation_history.get_conversation_history()}"
+        )
 
         try:
-            messages = self.conversation_history.get_conversation_history()
-            response = self.client.messages.create(
-                messages=messages, system=self.system_prompt, max_tokens=8192, model=self.model_name, tools=self.tools
-            )
+            while True:
+                messages = self.conversation_history.get_conversation_history()
+                response = self.client.messages.create(
+                    messages=messages,
+                    system=self.system_prompt,
+                    max_tokens=8192,
+                    model=self.model_name,
+                    tools=self.tools,
+                )
 
-            if response.stop_reason == "tool_use":
-                assistant_message = []
-                for content in response.content:
-                    if content.type == "text":
-                        assistant_message.append({"type": "text", "text": content.text})
-                    elif content.type == "tool_use":
-                        assistant_message.append(
-                            {"type": "tool_use", "id": content.id, "name": content.name, "input": content.input}
-                        )
+                # tool use
+                if response.stop_reason == "tool_use":
+                    assistant_response = self._process_assistant_response(response)  # save the first response
+                    print(f"Assistant: I will use a 🔨tool: {assistant_response}")
 
-                self.conversation_history.add_message(role="assistant", content=assistant_message)
-                print(f"DEBUGGING HISTORY: {self.conversation_history.get_conversation_history()}")
+                    tool_use = next(block for block in response.content if block.type == "tool_use")
 
-                tool_results = []
-                for content in response.content:
-                    if content.type == "text":
-                        print(f"Tool use: {content.text}")
-                    if content.type == "tool_use":
-                        tool_result = self.handle_tool_use(content, user_input)
-                        self.logger.debug(f"Tool result: {tool_result}")
-                        tool_results.append({"type": "tool_result", "tool_use_id": content.id, "content": tool_result})
+                    tool_result = self.handle_tool_use(tool_use.name, tool_use.input, tool_use.id)
+                    self.logger.debug(f"Tool result: {tool_result}")
 
-                augmented_reply = self.get_augmented_response(tool_results)
-                self.conversation_history.add_message(role="assistant", content=augmented_reply)
-                print(f"DEBUGGING HISTORY: {self.conversation_history.get_conversation_history()}")
-
-                return augmented_reply
-
-            # If we're here, it's not a tool use response
-            assistant_response = response.content[0].text
-            self.conversation_history.add_message(role="assistant", content=assistant_response)
-            print(f"DEBUGGING HISTORY: {self.conversation_history.get_conversation_history()}")
-            return assistant_response
+                # not a tool use
+                else:
+                    assistant_response = self._process_assistant_response(response)
+                    return assistant_response
 
         except Exception as e:
             self.logger.error(f"Error generating response: {str(e)}")
+            self.conversation_history.remove_last_message()
             raise Exception(f"An error occurred: {str(e)}") from e
 
     @error_handler(logger)
-    def handle_tool_use(self, tool_use_content: dict[str, Any], user_input: str) -> dict[str, any] | str:
-        tool_name = tool_use_content.name
-        tool_input = tool_use_content.input
+    def _process_assistant_response(self, response: Message) -> str:
+        """
+        Process the assistant's response by saving the message and updating the token count.
+        """
+        self.conversation_history.add_message(role="assistant", content=response.content)
+        self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
+        self.logger.debug(
+            f"Processed assistant response. Updated conversation history: "
+            f"{self.conversation_history.get_conversation_history()}"
+        )
+
+        return response.content[0].text
+
+
+    @error_handler(logger)
+    def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any] | str:
 
         try:
-            # Execute the tool
-            tool_result = self.call_tool(tool_name, tool_input, user_input)
-            return {"content": tool_result}
+            if tool_name == "rag_search":
+                search_results = self.use_rag_search(tool_input=tool_input)
+
+                tool_result = {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "content": f"Here is context retrieved by a RAG system: \n\n{search_results}\n\n."
+                            f"Now please try to answer my original request.",
+                        }
+                    ],
+                }
+
+                # save message to conversation history
+                self.conversation_history.add_message(**tool_result)
+                return tool_result
         except Exception as e:
             self.logger.error(f"Error executing tool {tool_name}: {str(e)}")
             return f"Error: {str(e)}"
 
     @error_handler(logger)
-    def formulate_rag_query(
-        self, user_input: str, recent_conversation_history: list[dict[str, Any]], important_context: str
-    ) -> str:
-        recent_conversation_history = "\n".join(
-            [f"{msg['role']}: {msg['content']}" for msg in recent_conversation_history]
-        )  # TODO:
+    def formulate_rag_query(self, recent_conversation_history: list[dict[str, Any]], important_context: str) -> str:
+        """ "
+        Generates a rag search query based on recent conversation history and important context generated by AI
+        assistant."""
+        self.logger.info(f"Important context: {important_context}")
+
 
         if not recent_conversation_history:
-            recent_conversation_history = "No conversation history yet, this might be the first message."
+            raise ValueError("Recent conversation history is empty")
+
+        if not important_context:
+            self.logger.warning("Important context is empty, proceeding to rag search query formulation without it")
+
+        # extract most recent user query
+        most_recent_user_query = next(
+            (msg["content"] for msg in reversed(recent_conversation_history) if msg["role"] == "user"),
+            "No recent " "user query found.",
+        )
 
         query_generation_prompt = f"""
-        Based on the following conversation context and the user's latest input, formulate the best possible search
-        query for retrieval augmented generation of information from local vector database.
+        Based on the following conversation context and the most recent user query, formulate the best possible search
+        query for searching in the vector database.
 
         When preparing the query please take into account the following:
-        - query will be used to retrieve the documents from a local vector database
-        - type of search used: vector similarity search
+        - The query will be used to retrieve documents from a local vector database
+        - The type of search used is vector similarity search
+        - The most recent user query is especially important
 
         Query requirements:
-        - Do not include any other text in your response, except for the query.
+        - Provide only the formulated query in your response, without any additional text.
 
-        Consider recent conversation history:
+        Recent conversation history:
         {recent_conversation_history}
 
-        Consider user's input itself: {user_input}
+        Important context to consider: {important_context}
+
+        Most recent user query: {most_recent_user_query}
 
         Formulated search query:
         """
 
-        self.logger.debug(f"Printing query generation prompt: {query_generation_prompt}")
-
         system_prompt = (
-            "You are world's best query formulator for a RAG system. You know how to properly formulate search "
-            "queries that are relevant to the user's inquiry and take into account the recent conversation context."
+            "You are an expert query formulator for a RAG system. Your task is to create optimal search "
+            "queries that capture the essence of the user's inquiry while considering the full conversation context."
         )
         messages = [{"role": "user", "content": query_generation_prompt}]
         max_tokens = 150
@@ -259,7 +301,8 @@ class ClaudeAssistant:
             model=self.model_name,
         )
 
-        return response.content[0].text.strip()
+        rag_query = response.content[0].text.strip()
+        return rag_query
 
     @error_handler(logger)
     def get_recent_context(self, n_messages: int = 6) -> list[dict[str, str]]:
@@ -268,15 +311,7 @@ class ClaudeAssistant:
         return [msg.to_dict() for msg in recent_messages]
 
     @error_handler(logger)
-    def call_tool(self, tool_name: str, tool_input: dict[str, Any], user_input: str) -> dict[str, Any]:
-        if tool_name == "rag_search":
-            search_results = self.use_rag_search(user_input, tool_input)
-            return search_results
-        else:
-            raise ValueError(f"Tool {tool_name} not supported")
-
-    @error_handler(logger)
-    def use_rag_search(self, user_input: str, tool_input: dict[str, Any]) -> dict[str, Any]:
+    def use_rag_search(self, tool_input: dict[str, Any]) -> list[str]:
         # Get recent conversation context (last n messages for each role)
         recent_conversation_history = self.get_recent_context()
 
@@ -284,14 +319,21 @@ class ClaudeAssistant:
         important_context = tool_input["important_context"]
 
         # prepare queries for search
-        rag_query = self.formulate_rag_query(user_input, recent_conversation_history, important_context)
+        rag_query = self.formulate_rag_query(recent_conversation_history, important_context)
         self.logger.debug(f"Using this query for RAG search: {rag_query}")
         multiple_queries = self.query_generator.generate_multi_query(rag_query)
         combined_queries = self.query_generator.combine_queries(rag_query, multiple_queries)
 
-        # get search ranked search results
+        # get ranked search results
         results = self.retriever.retrieve(rag_query, combined_queries)
-        return results
+        self.logger.debug(f"Retriever results: {results}")
+
+        # Preprocess the results here
+        preprocessed_results = self.preprocess_ranked_documents(results)
+        self.logger.debug(f"Processed results: {results}")
+
+        return preprocessed_results
+
 
     @error_handler(logger)
     def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
@@ -397,27 +439,26 @@ class ClaudeAssistant:
                 "tool_use_id": tool_results[0]["tool_use_id"],  # Assuming the tool_use_id is in the tool_results
                 "content": f"Here is context retrieved by a RAG system: \n\n{preprocessed_context}\n\n."
                 f"Now please try to answer my original request.",
-                # f"User_input: {user_input}",
             }
         ]
 
         # Create a new list with the existing messages and the new message
-        new_message = Message(role="user", content=new_message_content)
+        new_message = ConversationMessage(role="user", content=new_message_content)
         # updated_messages = messages + [new_message]
-        self.conversation_history.add_message(role=new_message.role, content=new_message.content)  # TODO: to refactor
+        self.conversation_history.add_message(role=new_message.role, content=new_message.content)
         # Retrieve updated conversation history
         updated_messages = self.conversation_history.get_conversation_history()
+
+
         try:
             response = self.client.messages.create(
                 model=self.model_name,
                 max_tokens=8192,
                 system=self.system_prompt,
                 messages=updated_messages,
-                tools=self.tools,
+                tools=self.tools,  # CAN WE DELETE THIS? TODO: to try
             )
-            content = response.content[0].text
+            return response
         except Exception as e:
             self.logger.error(f"Exception while processing Anthropic response: {e}")
             raise Exception(f"An error occurred while processing the response: {e}") from e
-
-        return content
