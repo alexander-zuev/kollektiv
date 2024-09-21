@@ -8,7 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- added pull request template and a basic GitHub Action to automatically append commit messages to PR requests
+- docs:
+    - PR templates
+    - GitHub Action to automatically append commits to PR requests
+    - Changelog
+    - Roadmap
+
 
 ### Changed
 
