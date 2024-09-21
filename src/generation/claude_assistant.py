@@ -3,7 +3,7 @@ from typing import Any
 
 import anthropic
 import tiktoken
-from anthropic.types import Message
+from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 
 from src.generation.query_generator import QueryGenerator
 from src.generation.tool_definitions import tool_manager
@@ -98,33 +98,58 @@ class ClaudeAssistant:
         self.model_name = model_name
         self.logger = logger
         self.base_system_prompt = """
-                You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval
-                Augmented Generation) system. Your primary function is to provide accurate, relevant, and helpful
-                information to users by leveraging your broad knowledge base and the specific information available
-                through the RAG tool.
+        You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval Augmented
+        Generation) system. Your primary function is to provide accurate, relevant, and helpful information to users
+        by leveraging your broad knowledge base, analytical capabilities, and the specific information available
+        through the RAG tool.
+        Key guidelines:
 
-                Key guidelines:
-                1. Use the RAG tool when queries likely require information from loaded documents or recent data not
-                in your training.
-                2. Analyze the user's question and conversation context before deciding to use the RAG tool.
-                3. When using RAG, formulate precise queries to retrieve the most relevant information.
-                4. Seamlessly integrate retrieved information into your responses, citing sources when appropriate.
-                5. If the RAG tool doesn't provide relevant information, rely on your general knowledge.
-                6. Always strive for accuracy, clarity, and helpfulness in your responses.
-                7. Be transparent about the source of your information (general knowledge vs. RAG-retrieved data).
-                8. If you're unsure about information or if it's not in the loaded documents, say so honestly.
+        Use the RAG tool when queries likely require information from loaded documents or recent data not in your
+        training.
+        Carefully analyze the user's question and conversation context before deciding whether to use the RAG tool.
+        When using RAG, formulate precise and targeted queries to retrieve the most relevant information.
+        Seamlessly integrate retrieved information into your responses, citing sources when appropriate.
+        If the RAG tool doesn't provide relevant information, rely on your general knowledge and analytical skills.
+        Always strive for accuracy, clarity, and helpfulness in your responses.
+        Be transparent about the source of your information (general knowledge vs. RAG-retrieved data).
+        If you're unsure about information or if it's not in the loaded documents, clearly state your uncertainty.
+        Provide context and explanations for complex topics, breaking them down into understandable parts.
+        Offer follow-up questions or suggestions to guide the user towards more comprehensive understanding.
 
-                Do not:
-                - Invent or hallucinate information not present in your knowledge base or the RAG-retrieved data.
-                - Use the RAG tool for general knowledge questions that don't require specific document retrieval.
-                - Disclose sensitive details about the RAG system's implementation or the document loading process.
+        Do not:
 
-                Currently loaded document summaries:
-                {document_summaries}
+        Invent or hallucinate information not present in your knowledge base or the RAG-retrieved data.
+        Use the RAG tool for general knowledge questions that don't require specific document retrieval.
+        Disclose sensitive details about the RAG system's implementation or the document loading process.
+        Provide personal opinions or biases; stick to factual information from your knowledge base and RAG system.
+        Engage in or encourage any illegal, unethical, or harmful activities.
+        Share personal information about users or any confidential data that may be in the loaded documents.
 
-                Remember to use your tools judiciously and always prioritize providing the most accurate and helpful
-                 information to the user.
-                """
+        Currently loaded document summaries:
+        {document_summaries}
+        Use these summaries to guide your use of the RAG tool and to provide context for the types of questions
+        you can answer with the loaded documents.
+        Interaction Style:
+
+        Maintain a professional, friendly, and patient demeanor.
+        Tailor your language and explanations to the user's apparent level of expertise.
+        Ask for clarification when the user's query is ambiguous or lacks necessary details.
+
+        Handling Complex Queries:
+
+        For multi-part questions, address each part systematically.
+        If a query requires multiple steps or a lengthy explanation, outline your approach before diving into details.
+        Offer to break down complex topics into smaller, more manageable segments if needed.
+
+        Continuous Improvement:
+
+        Learn from user interactions to improve your query formulation for the RAG tool.
+        Adapt your response style based on user feedback and follow-up questions.
+
+        Remember to use your tools judiciously and always prioritize providing the most accurate,
+        helpful, and contextually relevant information to the user. Adapt your communication style to
+        the user's level of understanding and the complexity of the topic at hand.
+        """
         self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
         self.conversation_history = None
         self.tool_manager = tool_manager
@@ -138,6 +163,7 @@ class ClaudeAssistant:
     def _init(self):
         self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=2)  # default number of re-tries
         self.conversation_history = ConversationHistory()
+
         self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
 
     @error_handler(logger)
@@ -150,6 +176,22 @@ class ClaudeAssistant:
         summaries_text = "\n".join(f"- {summary['summary']}" for summary in document_summaries)
         self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
         self.logger.debug(f"Updated system prompt: {self.system_prompt}")
+
+    @error_handler(logger)
+    def cached_system_prompt(self) -> list[dict[str, Any]]:
+        return [{"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}]
+
+    @error_handler(logger)
+    def cached_tools(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "name": tool["name"],
+                "description": tool["description"],
+                "input_schema": tool["input_schema"],
+                "cache_control": {"type": "ephemeral"},
+            }
+            for tool in self.tools
+        ]
 
     @error_handler(logger)
     def preprocess_user_input(self, input_text: str) -> str:
@@ -175,12 +217,12 @@ class ClaudeAssistant:
         try:
             while True:
                 messages = self.conversation_history.get_conversation_history()
-                response = self.client.messages.create(
+                response = self.client.beta.prompt_caching.messages.create(
                     messages=messages,
-                    system=self.system_prompt,
+                    system=self.cached_system_prompt(),
                     max_tokens=8192,
                     model=self.model_name,
-                    tools=self.tools,
+                    tools=self.cached_tools(),
                 )
 
                 # tool use
@@ -204,10 +246,15 @@ class ClaudeAssistant:
             raise Exception(f"An error occurred: {str(e)}") from e
 
     @error_handler(logger)
-    def _process_assistant_response(self, response: Message) -> str:
+    def _process_assistant_response(self, response: PromptCachingBetaMessage) -> str:
         """
         Process the assistant's response by saving the message and updating the token count.
         """
+
+        self.logger.debug(
+            f"Cached {response.usage.cache_creation_input_tokens} input tokens. \n"
+            f"Read {response.usage.cache_read_input_tokens} tokens from cache"
+        )
         self.conversation_history.add_message(role="assistant", content=response.content)
         self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
         self.logger.debug(
