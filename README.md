@@ -1,9 +1,9 @@
-# 🚀 RAG Docs - Chat with your library docs
+# 🚀 RAG Docs - Chat with your docs
 
 ## 🌟 Overview
 
 RAG Docs is a Retrieval-Augmented Generation (RAG) system designed for one purpose - allow you to chat with your
-favorite library docs easily.
+favorite docs (of libraries, frameworks, tools primarily) easily.
 
 This project aims to allow LLMs to tap into the most up-to-date knowledge in 2 clicks so that you don't have to
 worry about incorrect replies, hallucinations or inaccuracies when working with the best LLMs.

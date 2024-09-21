@@ -1,6 +1,16 @@
+# app.py
+import logging
+
 from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.logger import setup_logger
+from src.utils.logger import set_log_level, setup_logger
 from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, VectorDB
+
+# Define DEBUG flag
+DEBUG = False  # Set to False to switch to INFO level
+
+# Set the global log level based on DEBUG
+if DEBUG:
+    set_log_level(logging.DEBUG)
 
 
 def main():
@@ -12,13 +22,14 @@ def main():
     # vector_db.reset_database()
     claude_assistant = ClaudeAssistant()
 
-    # let's load some docs
+    # Load documents
     file_names = [
-        # "cra_docs_en_20240912_082455-chunked.json",  # Anthropic docs
-        # "supabase_com_docs_guides_auth_20240916_235100-chunked.json",  # Supabase Auth docs
-        # "cra_supabase_docs_20240911_071611-chunked.json",  # Supabase AI docs
-        # "docs_llamaindex_ai_en_stable_20240917_090349-chunked.json"  # LlamaIndex docs
-        "supabase_com_docs_guides_ai_20240917_103658-chunked.json"  # add chunks to the vector db
+        # Uncomment or add file names as needed
+        # "cra_docs_en_20240912_082455-chunked.json",
+        # "supabase_com_docs_guides_auth_20240916_235100-chunked.json",
+        # "cra_supabase_docs_20240911_071611-chunked.json",
+        # "docs_llamaindex_ai_en_stable_20240917_090349-chunked.json"
+        "supabase_com_docs_guides_ai_20240917_103658-chunked.json"
     ]
     for file_name in file_names:
         document_loader = DocumentProcessor(file_name)
@@ -36,7 +47,6 @@ def main():
     # Start interaction loop
     while True:
         user_input = input("You: ")
-        # user_input="How to implement prompt caching in Claude API"
         if user_input.lower() in ["exit", "quit"]:
             break
         response = claude_assistant.generate_response(user_input)

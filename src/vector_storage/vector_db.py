@@ -292,7 +292,6 @@ class ResultRetriever:
             # get expanded search results
             search_results = self.db.query(combined_queries)
             unique_documents = self.db.deduplicate_documents(search_results)
-            logger.debug(f"Debugging ranked documents {unique_documents}")
 
             # rerank the results
             ranked_documents = self.reranker.rerank(user_query, unique_documents)
