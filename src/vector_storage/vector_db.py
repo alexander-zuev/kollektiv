@@ -8,10 +8,16 @@ import chromadb.utils.embedding_functions as embedding_functions
 import cohere
 
 from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, LOG_DIR, OPENAI_API_KEY, PROCESSED_DATA_DIR
+from src.utils.config import (
+    CHROMA_DB_DIR,
+    COHERE_API_KEY,
+    LOG_DIR,
+    OPENAI_API_KEY,
+    PROCESSED_DATA_DIR,
+    VECTOR_STORAGE_DIR,
+)
 from src.utils.decorators import error_handler
 from src.utils.logger import setup_logger
-from utils.config import VECTOR_STORAGE_DIR
 
 # Set up logger
 logger = setup_logger(__name__, os.path.join(LOG_DIR, "app.log"))
