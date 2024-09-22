@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minor CI changes
 
 ## [0.1.0] - 2024-09-15
-Initial release of RAG Docs with the following features:
+Initial release of OmniClaude with the following features:
   - crawling of documentation with FireCrawl
   - custom markdown chunking
   - embedding and storage with ChromaDB
