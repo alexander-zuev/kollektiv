@@ -8,10 +8,13 @@ from src.utils.config import LOG_DIR
 # Initialize colorama
 init(autoreset=True)
 
+# Initialize default log level
+LOG_LEVEL = logging.INFO
+
 
 class ColoredFormatter(logging.Formatter):
     COLORS = {
-        "INFO": Fore.WHITE,  # Regular white for info
+        "INFO": Fore.LIGHTCYAN_EX,  # Regular white for info
         "DEBUG": Fore.BLUE,  # Blue for debugging
         "WARNING": Fore.YELLOW,  # Yellow for warnings
         "ERROR": Fore.RED,  # Red for errors
@@ -40,25 +43,35 @@ class ColoredFormatter(logging.Formatter):
         return f"{color}{emoji} {log_message}{Style.RESET_ALL}"
 
 
-def setup_logger(name: str, log_file: str, level=logging.INFO):
+def setup_logger(name: str, log_file: str, level=logging.DEBUG):
     logger = logging.getLogger(name)
-    logger.setLevel(logging.DEBUG)  # Always set the logger to DEBUG for file logging
+    logger.setLevel(LOG_LEVEL)
+    logger.propagate = False  # Prevent messages from being passed to ancestor loggers
 
-    if not logger.handlers:
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)  # Use the passed level for console output
-        console_handler.setFormatter(
-            ColoredFormatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s")
-        )
-        logger.addHandler(console_handler)
+    # Remove existing handlers to prevent duplicate logs
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
-        # File handler
-        os.makedirs(LOG_DIR, exist_ok=True)
-        file_handler = logging.FileHandler(os.path.join(LOG_DIR, log_file))
-        file_handler.setLevel(logging.DEBUG)  # Always log all levels to file
-        file_handler.setFormatter(logging.Formatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s"))
-        logger.addHandler(file_handler)
+    # Create formatters
+    file_formatter = logging.Formatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s")
+    console_formatter = ColoredFormatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s")
+
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(LOG_LEVEL)
+    console_handler.setFormatter(console_formatter)
+
+    # Ensure LOG_DIR exists
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    # File handler
+    file_handler = logging.FileHandler(os.path.join(LOG_DIR, log_file))
+    file_handler.setLevel(logging.DEBUG)  # Always log all levels to file
+    file_handler.setFormatter(file_formatter)
+
+    # Add handlers to the logger
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
 
     return logger
 

@@ -176,6 +176,7 @@ class ClaudeAssistant:
         the system prompt.
         :return: None
         """
+        self.logger.info(f"Loading {len(document_summaries)} summaries")
         summaries_text = "\n".join(f"- {summary['summary']}" for summary in document_summaries)
         self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
         self.logger.debug(f"Updated system prompt: {self.system_prompt}")
@@ -205,7 +206,7 @@ class ClaudeAssistant:
         return cleaned_input
 
     @error_handler(logger)
-    def get_response(self, user_input: str, stream: bool = True) -> Generator[dict[str, Any], None, None] | str:
+    def get_response(self, user_input: str, stream: bool = True) -> Generator[str, None, None] | str:
         """
         :param stream: controls whether output is streamed or not
         :param user_input: The input string provided by the user to generate a response.
@@ -534,7 +535,5 @@ class ClaudeAssistant:
                 f"Document's relevance score: {relevance_score}: \n" f"Document text: {text}: \n" f"--------\n"
             )
             preprocessed_context.append(formatted_document)
-
-            # self.logger.info(f"Printing pre-chunks preprocessed_context {formatted_document}")
 
         return preprocessed_context

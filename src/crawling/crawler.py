@@ -16,7 +16,7 @@ from src.utils.config import FIRECRAWL_API_KEY, JOB_FILE_DIR, RAW_DATA_DIR, SRC_
 from src.utils.decorators import error_handler
 from src.utils.logger import setup_logger
 
-logger = setup_logger("firecrawler", "firecrawler.log")
+logger = setup_logger(__name__, "app.log")
 
 
 class FireCrawler:
@@ -75,7 +75,7 @@ class FireCrawler:
             params = {
                 "limit": page_limit,
                 "maxDepth": 5,
-                "includePaths": ["/api/*", "/docs/*"],
+                "includePaths": [],
                 "excludePaths": [],
                 "scrapeOptions": {
                     "formats": [
@@ -95,10 +95,13 @@ class FireCrawler:
             self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
 
             # check job status
+            job_failed = False
             self.logger.info("***Polling job status***")
             job_status = self._poll_job_results(crawl_job_id)
             if job_status == "failed":
-                return {"status": "failed", "job_id": crawl_job_id}
+                # return {"status": "failed", "job_id": crawl_job_id}
+                self.logger.warning(f"Job {crawl_job_id} failed. Attempting to retrieve partial results.")
+                job_failed = True
 
             # get all the results
             crawl_results = self._get_all_crawl_results(crawl_job_id)
@@ -108,6 +111,7 @@ class FireCrawler:
 
             # save the results
             crawl_results = {
+                "job_failed": job_failed,
                 "input_url": url,
                 "total_pages": len(crawl_results),
                 "unique_links": unique_links,
@@ -155,8 +159,7 @@ class FireCrawler:
     @error_handler(logger)
     def _get_next_results(self, next_url: HttpUrl) -> tuple[dict[str, Any], str | None]:
         """Retrieves the next batch of the results"""
-        # how to implement re-tries? How to handle them gracefully?
-        max_retries = 3
+        max_retries = 15
         backoff_factor = 2
 
         for attempt in range(max_retries):
@@ -165,6 +168,21 @@ class FireCrawler:
                 url = next_url
                 headers = {"Authorization": f"Bearer {self.api_key}"}
                 response = requests.get(url, headers=headers)
+
+                if response.status_code != 200:
+                    self.logger.warning(f"Received status code {response.status_code} from API.")
+                    if attempt == max_retries - 1:
+                        self.logger.error(f"Failed to fetch results after {max_retries} attempts.")
+                        break
+                    else:
+                        wait_time = backoff_factor**attempt
+                        self.logger.warning(
+                            f"Request failed with status code {response.status_code}. "
+                            f"Retrying in {wait_time} seconds..."
+                        )
+                        time.sleep(wait_time)
+                        continue
+
                 batch_data = response.json()
                 next_url = batch_data.get("next")  # if it's missing -> there are no more pages to crawl
                 return batch_data, next_url
@@ -177,7 +195,9 @@ class FireCrawler:
                     self.logger.warning(f"Request failed. Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
 
-        raise Exception("Failed to fetch results after maximum retries")
+        # raise Exception("Failed to fetch results after maximum retries")
+        self.logger.error("Failed to fetch results after maximum retries or received error responses.")
+        return {"data": []}, None
 
     @error_handler(logger)
     def save_results(self, result: dict[str, Any], method: str) -> None:
@@ -333,9 +353,9 @@ def main():
 
     # Testing crawl_url
     urls_to_crawl = [
-        "https://docs.anthropic.com/en",  # replace this with the url of your favorite library
+        "https://docs.llamaindex.ai/en/stable/examples/evaluation",  # replace this
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=100)  # define page limit
+    crawler.async_crawl_url(urls_to_crawl, page_limit=50)  # define page limit
     # crawler.build_example_file("cra_docs_en_20240912_082455.json")
 
 
