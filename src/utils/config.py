@@ -30,8 +30,13 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 JOB_FILE_DIR = os.path.join(BASE_DIR, "src", "crawling")
 RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "data", "raw")
 PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "data", "chunks")
+CHROMA_DB_DIR = os.path.join(SRC_ROOT, "vector_storage", "chroma")
+VECTOR_STORAGE_DIR = os.path.join(SRC_ROOT, "vector_storage")
+
 
 # Ensure directories exist
 os.makedirs(JOB_FILE_DIR, exist_ok=True)
 os.makedirs(RAW_DATA_DIR, exist_ok=True)
 os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+os.makedirs(CHROMA_DB_DIR, exist_ok=True)
+os.makedirs(VECTOR_STORAGE_DIR, exist_ok=True)

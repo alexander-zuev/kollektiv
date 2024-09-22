@@ -1,6 +1,6 @@
 import json
 import os
-from fileinput import filename
+import time
 from typing import Any
 
 import chromadb
@@ -8,12 +8,13 @@ import chromadb.utils.embedding_functions as embedding_functions
 import cohere
 
 from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.config import COHERE_API_KEY, LOG_DIR, OPENAI_API_KEY, PROCESSED_DATA_DIR
+from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, LOG_DIR, OPENAI_API_KEY, PROCESSED_DATA_DIR
 from src.utils.decorators import error_handler
 from src.utils.logger import setup_logger
+from utils.config import VECTOR_STORAGE_DIR
 
 # Set up logger
-logger = setup_logger("vector_db", os.path.join(LOG_DIR, "vector_db.log"))
+logger = setup_logger(__name__, os.path.join(LOG_DIR, "app.log"))
 
 
 class DocumentProcessor:
@@ -42,12 +43,12 @@ class VectorDB:
         self.embedding_function_name = embedding_function
         self.openai_api_key = openai_api_key
         self.collection_name = "local-collection"
-        self.document_summaries = []
+        self.document_summaries = {}
 
         self._init()
 
     def _init(self):
-        self.client = chromadb.PersistentClient(path="src/vector_storage/chroma")  # using default path for Chroma
+        self.client = chromadb.PersistentClient(path=CHROMA_DB_DIR)  # using default path for Chroma
         self._load_existing_summaries()
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
             api_key=self.openai_api_key, model_name=self.embedding_function_name
@@ -62,10 +63,16 @@ class VectorDB:
 
     @error_handler(logger)
     def _load_existing_summaries(self):
-        summaries_file = os.path.join("src/vector_storage", "document_summaries.json")
+        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         if os.path.exists(summaries_file):
-            with open(summaries_file) as f:
-                self.document_summaries = json.load(f)
+            try:
+                with open(summaries_file) as f:
+                    self.document_summaries = json.load(f)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to load document summaries: {e}")
+                self.document_summaries = {}
+        else:
+            self.document_summaries = {}
 
     def prepare_documents(self, chunks: list[dict]) -> dict[str, list[str]]:
         ids = []
@@ -97,36 +104,46 @@ class VectorDB:
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
     @error_handler(logger)
-    def add_documents(self, json_data: list[dict], claude_assistant: ClaudeAssistant) -> str:
-
+    def add_documents(self, json_data: list[dict], claude_assistant: ClaudeAssistant, file_name: str) -> str | None:
         processed_docs = self.prepare_documents(json_data)
 
         ids = processed_docs["ids"]
         documents = processed_docs["documents"]
         metadatas = processed_docs["metadatas"]
 
-        # check if documents exist
+        # Check which documents are missing
         all_exist, missing_ids = self.check_documents_exist(ids)
 
         if all_exist:
-            logger.info("Chunks with the same IDs already exist in the DB, skipping insertion.")
-            return
-
-        else:  # try to add all documents (handling only simplified case)
-            self.collection.add(
-                ids=ids,
-                documents=documents,
-                metadatas=metadatas,
+            logger.info(
+                f"All documents from {file_name}already loaded. Proceeding to generate or load summary for "
+                f"the "
+                f"entire file."
             )
-            docs_n = len(ids)
-            logger.info(f"Added {docs_n} documents to ChromaDB")
+        else:
+            # Prepare data for missing documents only
+            missing_indices = [ids.index(m_id) for m_id in missing_ids]
+            missing_docs = [documents[i] for i in missing_indices]
+            missing_metas = [metadatas[i] for i in missing_indices]
 
-        # Generate summary for the entire document
-        summary = claude_assistant.generate_document_summary(json_data)
-        self.document_summaries.append(summary)
+            # Add only missing documents
+            self.collection.add(
+                ids=missing_ids,
+                documents=missing_docs,
+                metadatas=missing_metas,
+            )
+            logger.info(f"Added {len(missing_ids)} new documents to ChromaDB.")
 
-        # Update Claude's system prompt with all document summaries
-        claude_assistant.update_system_prompt(self.document_summaries)
+        # Generate summary for the entire file if not already present
+        if file_name in self.document_summaries:
+            summary = self.document_summaries[file_name]
+        else:
+            logger.info("Generating summary for the entire file.")
+            summary = claude_assistant.generate_document_summary(json_data)
+            self.document_summaries[file_name] = summary
+
+        # # Update Claude's system prompt with all document summaries
+        # claude_assistant.update_system_prompt(list(self.document_summaries.values()))
 
         # Save updated summaries
         self._save_summaries()
@@ -134,10 +151,12 @@ class VectorDB:
 
     @error_handler(logger)
     def _save_summaries(self):
-        summaries_file = os.path.join("src/vector_storage", "document_summaries.json")
-        with open(summaries_file, "w") as f:
-            json.dump(self.document_summaries, f, indent=2)
-        logger.info(f"Saved {len(self.document_summaries)} document summaries")
+        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
+        try:
+            with open(summaries_file, "w") as f:
+                json.dump(self.document_summaries, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save document summaries: {e}")
 
     @error_handler(logger)
     def get_document_summaries(self) -> list[str]:
@@ -145,26 +164,22 @@ class VectorDB:
 
     @error_handler(logger)
     def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
-        """Checks, if chunks are already added to the database based on chunk ids"""
-
+        """Checks if chunks are already added to the database based on chunk ids"""
         try:
-            # Get all current document ids from the db
+            # Get existing document ids from the db
             result = self.collection.get(ids=document_ids, include=[])
-
-            # get the existing set of ids
             existing_ids = set(result["ids"])
 
-            # find missing ids
+            # Find missing ids
             missing_ids = list(set(document_ids) - existing_ids)
-
             all_exist = len(missing_ids) == 0
 
-            if not all_exist:
-                logger.warning("Not all chunk IDs exist - reloading the database.")
+            if missing_ids:
+                logger.info(f"{len(missing_ids)} out of {len(document_ids)} documents are new and will be added.")
             return all_exist, missing_ids
 
         except Exception as e:
-            logger.error(f"Error checking document existence {e}")
+            logger.error(f"Error checking document existence: {e}")
             return False, document_ids
 
     @error_handler(logger)
@@ -188,7 +203,12 @@ class VectorDB:
             self.collection_name, embedding_function=self.embedding_function
         )
         self.document_summaries = []
-        logger.info("Database reset")
+        # Delete the summaries file
+        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
+        if os.path.exists(summaries_file):
+            os.remove(summaries_file)
+            logger.info("Document summaries cleared.")
+        logger.info("Database reset.")
 
     def process_results_to_print(self, search_results: dict[str, Any]):
         documents = search_results["documents"][0]
@@ -222,7 +242,7 @@ class Reranker:
 
     def _init(self):
         try:
-            self.client = cohere.Client(os.getenv("COHERE_API_KEY"))
+            self.client = cohere.Client(self.cohere_api_key)
             logger.debug("Successfully initialized Cohere client")
         except Exception as e:
             logger.error(f"Error initializing Cohere client: {e}")
@@ -268,35 +288,39 @@ class Reranker:
             model=self.model_name, query=query, documents=document_texts, return_documents=return_documents
         )
 
-        logger.info(f"Received {len(response.results)} documents from Cohere.")
+        logger.debug(f"Received {len(response.results)} documents from Cohere.")
         # pprint(response.results)
 
         # filter irrelevant results
-        logger.info(f"Filtering out the results with less than {relevance_threshold} relevance " f"score")
+        logger.debug(f"Filtering out the results with less than {relevance_threshold} relevance " f"score")
         relevant_results = self.filter_irrelevant_results(response, relevance_threshold)
-        logger.info(f"{len(relevant_results)} documents remaining after filtering.")
+        logger.info(f"{len(relevant_results)} documents remaining after re-ranking.")
 
         return relevant_results
 
 
 class ResultRetriever:
     def __init__(self, vector_db: VectorDB, reranker: Reranker):
-        self.file_name = filename
         self.db = vector_db
         self.reranker = reranker
 
     def retrieve(self, user_query: str, combined_queries: list[str]):
         """Returns ranked documents based on the user query"""
         try:
+            start_time = time.time()  # Start timing
 
             # get expanded search results
             search_results = self.db.query(combined_queries)
             unique_documents = self.db.deduplicate_documents(search_results)
+            logger.info(f"Search returned {len(unique_documents)} unique chunks")
 
             # rerank the results
             ranked_documents = self.reranker.rerank(user_query, unique_documents)
             logger.debug(f"Debugging ranked documents {ranked_documents}")
 
+            end_time = time.time()  # End timing
+            search_time = end_time - start_time
+            logger.info(f"Search and reranking completed in {search_time:.3f} seconds")
             return ranked_documents
         except Exception as e:
             logger.error(f"Error retrieving documents: {e}")

@@ -1,6 +1,7 @@
-# RAG Docs User Guide
+# OmniClaude User Guide
 
-RAG Docs is a powerful Retrieval-Augmented Generation (RAG) system that allows you to chat with up-to-date library documentation. This guide will walk you through the process of setting up, running, and using the RAG Docs system.
+OmniClaude is a powerful Retrieval-Augmented Generation (RAG) system that allows you to chat with up-to-date library
+documentation. This guide will walk you through the process of setting up, running, and using the OmniClaude system.
 
 ## Table of Contents
 
@@ -20,7 +21,8 @@ RAG Docs is a powerful Retrieval-Augmented Generation (RAG) system that allows y
 
 ## System Overview
 
-RAG Docs consists of several components that work together to provide an interactive chat experience with documentation:
+OmniClaude consists of several components that work together to provide an interactive chat experience with
+documentation:
 
 1. Web Crawler: Uses the FireCrawl API to fetch documentation from specified websites.
 2. Document Processor: Chunks the crawled documents into manageable pieces.
@@ -54,7 +56,8 @@ COHERE_API_KEY="your_cohere_api_key"
 
 ### First-Time Setup
 
-When using RAG Docs for the first time, you'll need to crawl documentation, process it, and set up the vector database. Follow these steps:
+When using OmniClaude for the first time, you'll need to crawl documentation, process it, and set up the vector
+database. Follow these steps:
 
 1. Crawl documentation (see [Crawling Documentation](#crawling-documentation))
 2. Chunk the crawled documents (see [Chunking Documents](#chunking-documents))
@@ -63,7 +66,7 @@ When using RAG Docs for the first time, you'll need to crawl documentation, proc
 
 ### Adding New Documentation
 
-To add new documentation to an existing RAG Docs setup:
+To add new documentation to an existing OmniClaude setup:
 
 1. Crawl the new documentation
 2. Chunk the new documents
@@ -72,7 +75,7 @@ To add new documentation to an existing RAG Docs setup:
 
 ### Chatting with Existing Documentation
 
-If you've already set up RAG Docs with embedded documentation:
+If you've already set up OmniClaude with embedded documentation:
 
 1. Run the chat interface
 2. Start asking questions about the documentation
@@ -182,5 +185,5 @@ self.base_system_prompt = """
 
 For any other issues, check the log files in the `logs` directory for detailed error messages.
 ***
-This user guide provides a comprehensive overview of the RAG Docs system. For further assistance or to report issues,
+This user guide provides a comprehensive overview of the OmniClaude system. For further assistance or to report issues,
 open an issue on the project's GitHub repository.

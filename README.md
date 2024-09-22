@@ -1,8 +1,8 @@
-# 🚀 RAG Docs - Chat with your docs
+# 🚀 OmniClaude - Chat with web documents
 
 ## 🌟 Overview
 
-RAG Docs is a Retrieval-Augmented Generation (RAG) system designed for one purpose - allow you to chat with your
+OmniClaude is a Retrieval-Augmented Generation (RAG) system designed for one purpose - allow you to chat with your
 favorite docs (of libraries, frameworks, tools primarily) easily.
 
 This project aims to allow LLMs to tap into the most up-to-date knowledge in 2 clicks so that you don't have to
@@ -26,7 +26,7 @@ Imagine your LLM could intelligently decide when it needs to check the documenta
 accurate reply?
 
 ## 🎯 Goal
-Meet RAG Docs -> an open-source RAG app that helps you easily:
+Meet OmniClaude -> an open-source RAG app that helps you easily:
 - parse the docs of your favorite libraries
 - efficiently stores and embeds them in a local vector storage
 - sets up an LLM chat which you can rely on
@@ -79,8 +79,12 @@ So do let me know if you are experiencing issues and I'll try to fix them.
    ```
 
 4. **Run the application:**
-   ```
+   ```bash
    poetry run python app.py
+   ```
+   or through a poetry alias:
+   ```bash
+   python app.py
    ```
 
 ## 💡 Usage
