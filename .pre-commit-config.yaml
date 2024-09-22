@@ -37,3 +37,10 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+    - id: update-project-structure
+      name: update project structure
+      entry: python scripts/generate_structure.py
+      language: system
+      pass_filenames: false
+      always_run: true
+      stages: [ commit ]

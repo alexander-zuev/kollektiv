@@ -79,8 +79,12 @@ So do let me know if you are experiencing issues and I'll try to fix them.
    ```
 
 4. **Run the application:**
-   ```
+   ```bash
    poetry run python app.py
+   ```
+   or through a poetry alias:
+   ```bash
+   python app.py
    ```
 
 ## 💡 Usage
