@@ -1,4 +1,4 @@
-# Changelog
+# OmniClaude Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -20,14 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [0.1.3] - XXX
+## [0.1.3] - 2024-09-22
 ### Added
 - Added caching of system prompt and tool definitions
 - Introduced sliding context window into conversation history based on token counts
+- Added streaming of assistant responses
 
 ## Changed
 - Refactored conversation history handling
 - Refactored tool use and response handling
+- Refactored response generation to support both streaming and non-streaming
+- Updated logging
+- Improved vector db loading logic to handle missing chunks better
+- Improved summary generation logic by vector db
 
 
 ## [0.1.2] - 2024-09-21
@@ -36,9 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Introduced sliding context window
 - Refactored tool use and response handling
 
+
 ## [0.1.1] - 2024-09-18
 - Minor fixes, doc updates, basic tests setup
 - Minor CI changes
+
 
 ## [0.1.0] - 2024-09-15
 Initial release of OmniClaude with the following features:
