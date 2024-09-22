@@ -1,110 +1,214 @@
 # Content for item 0
 
 ```markdown
-AI & Vectors
+Loading \[MathJax\]/jax/output/CommonHTML/fonts/TeX/fontdata.js
 
-# IVFFlat indexes
+[Skip to content](https://docs.llamaindex.ai/en/stable/examples/evaluation/guideline_eval/#guideline-evaluator)
 
-* * *
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/run-llama/llama_index/blob/main/docs/docs/examples/evaluation/guideline_eval.ipynb)
 
-IVFFlat is a type of vector index for approximate nearest neighbor search. It is a frequently used index type that can improve performance when querying highly-dimensional vectors, like those representing embeddings.
+# Guideline Evaluator [¶](https://docs.llamaindex.ai/en/stable/examples/evaluation/guideline_eval/\#guideline-evaluator)
 
-## Choosing an index [\#](\#choosing-an-index)
+This notebook shows how to use `GuidelineEvaluator` to evaluate a question answer system given user specified guidelines.
 
-Today `pgvector` supports two types of indexes:
+If you're opening this Notebook on colab, you will probably need to install LlamaIndex 🦙.
 
-- [HNSW](/docs/guides/ai/vector-indexes/hnsw-indexes)
-- [IVFFlat](/docs/guides/ai/vector-indexes/ivf-indexes)
+In \[ \]:
 
-In general we recommend using [HNSW](/docs/guides/ai/vector-indexes/hnsw-indexes) because of its [performance](https://supabase.com/blog/increase-performance-pgvector-hnsw#hnsw-performance-1536-dimensions) and [robustness against changing data](/docs/guides/ai/vector-indexes/hnsw-indexes#when-should-you-create-hnsw-indexes). If you have a special use case that requires IVFFlat instead, keep reading.
+Copied!
 
-## Usage [\#](\#usage)
+```
+%pip install llama-index-llms-openai
 
-The way you create an IVFFlat index depends on the distance operator you are using. `pgvector` includes 3 distance operators:
+```
 
-| Operator | Description | [**Operator class**](https://www.postgresql.org/docs/current/sql-createopclass.html) |
-| --- | --- | --- |
-| `<->` | Euclidean distance | `vector_l2_ops` |
-| `<#>` | negative inner product | `vector_ip_ops` |
-| `<=>` | cosine distance | `vector_cosine_ops` |
+%pip install llama-index-llms-openai
 
-Use the following SQL commands to create an IVFFlat index for the operator(s) used in your queries.
+In \[ \]:
 
-### Euclidean L2 distance ( `vector_l2_ops`) [\#](\#euclidean-l2-distance--vectorl2ops-)
+Copied!
 
-`
-_10
-create index on items using ivfflat (column_name vector_l2_ops) with (lists = 100);
-`
+```
+!pip install llama-index
 
-### Inner product ( `vector_ip_ops`) [\#](\#inner-product--vectoripops-)
+```
 
-`
-_10
-create index on items using ivfflat (column_name vector_ip_ops) with (lists = 100);
-`
+!pip install llama-index
 
-### Cosine distance ( `vector_cosine_ops`) [\#](\#cosine-distance--vectorcosineops-)
+In \[ \]:
 
-`
-_10
-create index on items using ivfflat (column_name vector_cosine_ops) with (lists = 100);
-`
+Copied!
 
-Currently vectors with up to 2,000 dimensions can be indexed.
+```
+from llama_index.core.evaluation import GuidelineEvaluator
+from llama_index.llms.openai import OpenAI
 
-## How does IVFFlat work? [\#](\#how-does-ivfflat-work)
+# Needed for running async functions in Jupyter Notebook
+import nest_asyncio
 
-IVF stands for 'inverted file indexes'. It works by clustering your vectors in order to reduce the similarity search scope. Rather than comparing a vector to every other vector, the vector is only compared against vectors within the same cell cluster (or nearby clusters, depending on your configuration).
+nest_asyncio.apply()
 
-### Inverted lists (cell clusters) [\#](\#inverted-lists-cell-clusters)
+```
 
-When you create the index, you choose the number of inverted lists (cell clusters). Increase this number to speed up queries, but at the expense of recall.
+from llama\_index.core.evaluation import GuidelineEvaluator
+from llama\_index.llms.openai import OpenAI
 
-For example, to create an index with 100 lists on a column that uses the cosine operator:
+\# Needed for running async functions in Jupyter Notebook
+import nest\_asyncio
 
-`
-_10
-create index on items using ivfflat (column_name vector_cosine_ops) with (lists = 100);
-`
+nest\_asyncio.apply()
 
-For more info on the different operators, see [Distance operations](#distance-operators).
+In \[ \]:
 
-For every query, you can set the number of probes (1 by default). The number of probes corresponds to the number of nearby cells to probe for a match. Increase this for better recall at the expense of speed.
+Copied!
 
-To set the number of probes for the duration of the session run:
+```
+GUIDELINES = [\
+    "The response should fully answer the query.",\
+    "The response should avoid being vague or ambiguous.",\
+    (\
+        "The response should be specific and use statistics or numbers when"\
+        " possible."\
+    ),\
+]
 
-`
-_10
-set ivfflat.probes = 10;
-`
+```
 
-To set the number of probes only for the current transaction run:
+GUIDELINES = \[\
+"The response should fully answer the query.",\
+"The response should avoid being vague or ambiguous.",\
+(\
+"The response should be specific and use statistics or numbers when"\
+" possible."\
+),\
+\]
 
-`
-_10
-begin;
-_10
-set local ivfflat.probes = 10;
-_10
-select ...
-_10
-commit;
-`
+In \[ \]:
 
-If the number of probes is the same as the number of lists, exact nearest neighbor search will be performed and the planner won't use the index.
+Copied!
 
-### Approximate nearest neighbor [\#](\#approximate-nearest-neighbor)
+```
+llm = OpenAI(model="gpt-4")
 
-One important note with IVF indexes is that nearest neighbor search is approximate, since exact search on high dimensional data can't be indexed efficiently. This means that similarity results will change (slightly) after you add an index (trading recall for speed).
+evaluators = [\
+    GuidelineEvaluator(llm=llm, guidelines=guideline)\
+    for guideline in GUIDELINES\
+]
 
-## When should you create IVFFlat indexes? [\#](\#when-should-you-create-ivfflat-indexes)
+```
 
-`pgvector` recommends building IVFFlat indexes only after the table has sufficient data, so that the internal IVFFlat cell clusters are based on your data's distribution. Anytime the distribution changes significantly, consider rebuilding indexes.
+llm = OpenAI(model="gpt-4")
 
-## Resources [\#](\#resources)
+evaluators = \[\
+GuidelineEvaluator(llm=llm, guidelines=guideline)\
+for guideline in GUIDELINES\
+\]
 
-Read more about indexing on `pgvector`'s [GitHub page](https://github.com/pgvector/pgvector#indexing).
+In \[ \]:
+
+Copied!
+
+```
+sample_data = {
+    "query": "Tell me about global warming.",
+    "contexts": [\
+        (\
+            "Global warming refers to the long-term increase in Earth's"\
+            " average surface temperature due to human activities such as the"\
+            " burning of fossil fuels and deforestation."\
+        ),\
+        (\
+            "It is a major environmental issue with consequences such as"\
+            " rising sea levels, extreme weather events, and disruptions to"\
+            " ecosystems."\
+        ),\
+        (\
+            "Efforts to combat global warming include reducing carbon"\
+            " emissions, transitioning to renewable energy sources, and"\
+            " promoting sustainable practices."\
+        ),\
+    ],
+    "response": (
+        "Global warming is a critical environmental issue caused by human"
+        " activities that lead to a rise in Earth's temperature. It has"
+        " various adverse effects on the planet."
+    ),
+}
+
+```
+
+sample\_data = {
+"query": "Tell me about global warming.",
+"contexts": \[\
+(\
+"Global warming refers to the long-term increase in Earth's"\
+" average surface temperature due to human activities such as the"\
+" burning of fossil fuels and deforestation."\
+),\
+(\
+"It is a major environmental issue with consequences such as"\
+" rising sea levels, extreme weather events, and disruptions to"\
+" ecosystems."\
+),\
+(\
+"Efforts to combat global warming include reducing carbon"\
+" emissions, transitioning to renewable energy sources, and"\
+" promoting sustainable practices."\
+),\
+\],
+"response": (
+"Global warming is a critical environmental issue caused by human"
+" activities that lead to a rise in Earth's temperature. It has"
+" various adverse effects on the planet."
+),
+}
+
+In \[ \]:
+
+Copied!
+
+```
+for guideline, evaluator in zip(GUIDELINES, evaluators):
+    eval_result = evaluator.evaluate(
+        query=sample_data["query"],
+        contexts=sample_data["contexts"],
+        response=sample_data["response"],
+    )
+    print("=====")
+    print(f"Guideline: {guideline}")
+    print(f"Pass: {eval_result.passing}")
+    print(f"Feedback: {eval_result.feedback}")
+
+```
+
+for guideline, evaluator in zip(GUIDELINES, evaluators):
+eval\_result = evaluator.evaluate(
+query=sample\_data\["query"\],
+contexts=sample\_data\["contexts"\],
+response=sample\_data\["response"\],
+)
+print("=====")
+print(f"Guideline: {guideline}")
+print(f"Pass: {eval\_result.passing}")
+print(f"Feedback: {eval\_result.feedback}")
+
+```
+=====
+Guideline: The response should fully answer the query.
+Pass: False
+Feedback: The response does not fully answer the query. While it does provide a brief overview of global warming, it does not delve into the specifics of the causes, effects, or potential solutions to the problem. The response should be more detailed and comprehensive to fully answer the query.
+=====
+Guideline: The response should avoid being vague or ambiguous.
+Pass: False
+Feedback: The response is too vague and does not provide specific details about global warming. It should include more information about the causes, effects, and potential solutions to global warming.
+=====
+Guideline: The response should be specific and use statistics or numbers when possible.
+Pass: False
+Feedback: The response is too general and lacks specific details or statistics about global warming. It would be more informative if it included data such as the rate at which the Earth's temperature is rising, the main human activities contributing to global warming, or the specific adverse effects on the planet.
+
+```
+
+Back to top
 ```
 
 ----
