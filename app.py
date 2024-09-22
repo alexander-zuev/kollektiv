@@ -1,16 +1,20 @@
 # app.py
 import logging
 
+from colorama import Fore, Style, init
+
 from src.generation.claude_assistant import ClaudeAssistant
 from src.utils.logger import set_log_level, setup_logger
 from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, VectorDB
 
+# Initialize colorama
+init(autoreset=True)
+
 # Define DEBUG flag
 DEBUG = False  # Set to False to switch to INFO level
 
-# Set the global log level based on DEBUG
-if DEBUG:
-    set_log_level(logging.DEBUG)
+# Set the log level based on DEBUG flag
+set_log_level(logging.DEBUG if DEBUG else logging.INFO)
 
 
 def main():
@@ -19,7 +23,7 @@ def main():
 
     # Initialize components
     vector_db = VectorDB()
-    # vector_db.reset_database()
+    # vector_db.reset_database() # TODO: re-factor the setup
     claude_assistant = ClaudeAssistant()
 
     # Load documents
@@ -46,13 +50,25 @@ def main():
 
     # Start interaction loop
     while True:
-        user_input = input("You: ")
+        user_input = input(f"{Fore.GREEN}You:{Style.RESET_ALL} ")
         if user_input.lower() in ["exit", "quit"]:
             break
+
+        print(f"\n{Fore.BLUE}Assistant:{Style.RESET_ALL} ", end="", flush=True)
         response = claude_assistant.generate_response(user_input, stream=True)
-        print("Assistant: ", end="")
+
         for text in response:
-            print(text, end="", flush=True)
+            if text.startswith("\n[Using tool:"):
+                tool_name = text.split(":")[1].strip()[:-1]
+                print(f"\n{Fore.YELLOW}[Using tool: {tool_name}]{Style.RESET_ALL}")
+            else:
+                print(text, end="", flush=True)
+        print()  # Add a newline after the complete response
+
+        # response = claude_assistant.generate_response(user_input, stream=True)
+        # print("Assistant: ", end="")
+        # for text in response:
+        #     print(text, end="", flush=True)
 
 
 if __name__ == "__main__":

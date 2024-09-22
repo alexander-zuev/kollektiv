@@ -2,6 +2,8 @@
 import logging
 import os
 
+from colorama import Fore, Style
+
 from src.utils.config import LOG_DIR
 
 # Initialize default log level
@@ -18,6 +20,20 @@ def set_log_level(level):
     LOG_LEVEL = level
 
 
+class ColoredFormatter(logging.Formatter):
+    COLORS = {
+        "DEBUG": Fore.CYAN,
+        "INFO": Fore.GREEN,
+        "WARNING": Fore.YELLOW,
+        "ERROR": Fore.RED,
+        "CRITICAL": Fore.RED + Style.BRIGHT,
+    }
+
+    def format(self, record):
+        log_message = super().format(record)
+        return f"{self.COLORS.get(record.levelname, '')}{log_message}{Style.RESET_ALL}"
+
+
 def setup_logger(name: str, log_file: str):
     """
     Sets up a logger with the specified name and log file, using the global LOG_LEVEL.
@@ -31,21 +47,22 @@ def setup_logger(name: str, log_file: str):
 
     # Avoid adding multiple handlers if the logger already has them
     if not logger.hasHandlers():
-        # Create formatter
-        formatter = logging.Formatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s")
+        # Create formatters
+        file_formatter = logging.Formatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s")
+        console_formatter = ColoredFormatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s")
 
         # Console handler
         console_handler = logging.StreamHandler()
         console_handler.setLevel(LOG_LEVEL)
-        console_handler.setFormatter(formatter)
+        console_handler.setFormatter(console_formatter)
 
         # Ensure LOG_DIR exists
         os.makedirs(LOG_DIR, exist_ok=True)
 
         # File handler
         file_handler = logging.FileHandler(os.path.join(LOG_DIR, log_file))
-        file_handler.setLevel(LOG_LEVEL)
-        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.DEBUG)  # Always log all levels to file
+        file_handler.setFormatter(file_formatter)
 
         # Add handlers to the logger
         logger.addHandler(console_handler)

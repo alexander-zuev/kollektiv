@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "rag-doc"
-version = "0.1.0"
+name = "rag-docs"
+version = "0.1.2"
 description = ""
 authors = ["AZ <azuev@outlook.com>"]
 readme = "README.md"
@@ -65,6 +65,9 @@ pythonpath = [
 
 [tool.coverage.run]
 source = ["src"]
+
+[tool.poetry.scripts]
+start = "python app.py"
 
 [tool.coverage.report]
 exclude_lines = [

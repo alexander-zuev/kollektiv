@@ -6,6 +6,7 @@ import anthropic
 import tiktoken
 from anthropic.types import Message
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
+from colorama import Fore, Style
 
 from src.generation.query_generator import QueryGenerator
 from src.generation.tool_definitions import tool_manager
@@ -156,6 +157,7 @@ class ClaudeAssistant:
         self.conversation_history = None
         self.tool_manager = tool_manager
         self.tools: list[dict[str, Any]] = []
+        self.extra_headers = {"anthropic-beta": "prompt-caching-2024-07-31"}
         self.retriever = None
         self.query_generator = QueryGenerator()
 
@@ -205,42 +207,66 @@ class ClaudeAssistant:
 
     @error_handler(logger)
     def stream_response(self, user_input: str) -> Generator[str, None, None]:
+        MAX_ITERATIONS = 2
+        iteration = 0
         user_input = self.preprocess_user_input(user_input)
         self.conversation_history.add_message(role="user", content=user_input)
         self.logger.debug(
             f"Printing conversation history for debugging: {self.conversation_history.get_conversation_history()}"
         )
-        messages = self.conversation_history.get_conversation_history()
 
-        try:
-            with self.client.messages.stream(
-                messages=messages,
-                system=self.cached_system_prompt(),
-                max_tokens=8192,
-                model=self.model_name,
-                tools=self.cached_tools(),
-                extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
-            ) as stream:
-                for event in stream:
-                    self.logger.debug(event)
-                    if event.type == "text":
-                        yield event.text
-                    elif event.type == "content_block_stop":
-                        if event.content_block.type == "tool_use":
-                            tool_use = event.content_block
-                            self.logger.info(f"Printing tool_use block: {tool_use}")
+        while iteration < MAX_ITERATIONS:
+            iteration += 1
+            self.logger.debug(f"Stream response iteration {iteration}")
 
-                            tool_result = self.handle_tool_use(tool_use.name, tool_use.input, tool_use.id)
-                            self.logger.debug(f"Tool result: {tool_result}")
-                    elif event.type == "message_stop":
-                        self.logger.debug("===== Stream message ended =====")
+            try:
+                messages = self.conversation_history.get_conversation_history()
+                with self.client.messages.stream(
+                    messages=messages,
+                    system=self.cached_system_prompt(),
+                    max_tokens=8192,
+                    model=self.model_name,
+                    tools=self.cached_tools(),
+                    extra_headers=self.extra_headers,
+                ) as stream:
+                    for event in stream:
+                        self.logger.debug(event)
+                        if event.type == "text":
+                            yield event.text
+                        elif event.type == "content_block_stop":
+                            if event.content_block.type == "tool_use":
+                                self.logger.info(f"Tool use detected: {event.content_block.name}")
+                                yield f"\n{Fore.YELLOW}[🔨Tool use: {event.content_block.name}]{Style.RESET_ALL}\n"
 
-                final_response = stream.get_final_message()
-                self._process_assistant_response(final_response)
-        except Exception as e:
-            self.logger.error(f"Error generating response: {str(e)}")
-            self.conversation_history.remove_last_message()
-            raise Exception(f"An error occurred: {str(e)}") from e
+                                # yield f"\nUsing 🔨tool: {event.content_block.name}\n"
+                                # tool_use = event.content_block
+                                # self.logger.info(f"Printing tool_use block: {tool_use}")
+                                # self.logger.info(f"Tool use detected: {tool_use.name}")
+                                # yield f"\nUsing tool: {tool_use.name}\n"
+                                #
+                                # tool_result = self.handle_tool_use(tool_use.name, tool_use.input, tool_use.id)
+                                # self.logger.debug(f"Tool result: {tool_result}")
+                        elif event.type == "message_stop":
+                            self.logger.debug("===== Stream message ended =====")
+
+                # Get the final message after consuming the entire stream
+                final_message = stream.get_final_message()
+                self._process_assistant_response(final_message)
+
+                # Handle tool use if present in the final message
+                tool_use_block = next((block for block in final_message.content if block.type == "tool_use"), None)
+                if tool_use_block:
+                    tool_result = self.handle_tool_use(tool_use_block.name, tool_use_block.input, tool_use_block.id)
+                    self.logger.debug(f"Tool result: {tool_result}")
+
+                # Only break if no tool was used
+                if not tool_use_block:
+                    break
+
+            except Exception as e:
+                self.logger.error(f"Error generating response: {str(e)}")
+                self.conversation_history.remove_last_message()
+                raise Exception(f"An error occurred: {str(e)}") from e
 
     @error_handler(logger)
     def generate_response(self, user_input: str, stream: bool = True) -> str | Generator[str, None, None]:
@@ -263,7 +289,7 @@ class ClaudeAssistant:
             )
 
             try:
-                while True:
+                while True:  # TODO: implement max_iter to ensure we exit the loop if max tool use is used
                     messages = self.conversation_history.get_conversation_history()
                     response = self.client.beta.prompt_caching.messages.create(
                         messages=messages,
