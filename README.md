@@ -1,4 +1,4 @@
-# 🚀 OmniClaude - Chat with web documents
+# 🚀 OmniClaude - LLMs + Up-to-date knowledge
 
 ## 🌟 Overview
 
