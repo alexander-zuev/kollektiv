@@ -80,7 +80,6 @@ class FireCrawler:
                 "scrapeOptions": {
                     "formats": [
                         "markdown",
-                        "html",
                     ]
                 },
             }
@@ -353,9 +352,9 @@ def main():
 
     # Testing crawl_url
     urls_to_crawl = [
-        "https://docs.llamaindex.ai/en/stable/examples/evaluation",  # replace this
+        "https://docs.llamaindex.ai/en/stable/examples/evaluation/",  # replace this
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=1)  # define page limit
+    crawler.async_crawl_url(urls_to_crawl, page_limit=50)  # define page limit
     # crawler.build_example_file("cra_docs_en_20240912_082455.json")
 
 
