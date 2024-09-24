@@ -14,7 +14,7 @@ def run_terminal_ui(claude_assistant):
             break
 
         stream = False
-        response = claude_assistant.get_response(user_message, stream=False)
+        response = claude_assistant.get_response(user_message, stream=stream)
         print_assistant_message("OmniClaude: ", end="")
         if stream:
             for event in response:
