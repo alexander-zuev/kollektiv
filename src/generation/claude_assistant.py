@@ -233,8 +233,6 @@ class ClaudeAssistant:
         )
 
         while True:
-            # iteration += 1
-            # self.logger.debug(f"Stream response iteration {iteration}")
 
             try:
                 messages = self.conversation_history.get_conversation_history()
@@ -289,7 +287,6 @@ class ClaudeAssistant:
 
         try:
             while True:
-
                 messages = self.conversation_history.get_conversation_history()
                 response = self.client.beta.prompt_caching.messages.create(
                     messages=messages,

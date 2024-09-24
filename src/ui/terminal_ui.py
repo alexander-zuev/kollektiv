@@ -13,11 +13,15 @@ def run_terminal_ui(claude_assistant):
         if user_message.lower() in ["exit", "quit"]:
             break
 
-        response = claude_assistant.get_response(user_message, stream=True)
+        stream = False
+        response = claude_assistant.get_response(user_message, stream=False)
         print_assistant_message("OmniClaude: ", end="")
-        for event in response:
-            if event["type"] == "text":
-                print(event["content"], end="", flush=True)
-            elif event["type"] == "tool_use":
-                print(f"\nUsing {event['tool']} tool 🧰.\n", end="", flush=True)
-        print()  # Add a newline after the complete response
+        if stream:
+            for event in response:
+                if event["type"] == "text":
+                    print(event["content"], end="", flush=True)
+                elif event["type"] == "tool_use":
+                    print(f"\nUsing {event['tool']} tool 🧰.\n", end="", flush=True)
+            print()  # Add a newline after the complete response
+        else:
+            print(response)
