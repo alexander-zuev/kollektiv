@@ -224,17 +224,16 @@ class ClaudeAssistant:
 
     @error_handler(logger)
     def stream_response(self, user_input: str) -> Generator[str, None, None]:
-        MAX_ITERATIONS = 2
-        iteration = 0
+        # iteration = 0
         user_input = self.preprocess_user_input(user_input)
         self.conversation_history.add_message(role="user", content=user_input)
         self.logger.debug(
             f"Printing conversation history for debugging: {self.conversation_history.get_conversation_history()}"
         )
 
-        while iteration < MAX_ITERATIONS:
-            iteration += 1
-            self.logger.debug(f"Stream response iteration {iteration}")
+        while True:
+            # iteration += 1
+            # self.logger.debug(f"Stream response iteration {iteration}")
 
             try:
                 messages = self.conversation_history.get_conversation_history()
@@ -271,9 +270,9 @@ class ClaudeAssistant:
                     tool_result = self.handle_tool_use(tool_use_block.name, tool_use_block.input, tool_use_block.id)
                     self.logger.debug(f"Tool result: {tool_result}")
 
-                # Only break if no tool was used
-                if not tool_use_block:
-                    break
+                # # Only break if no tool was used
+                # if not tool_use_block:
+                #     break
 
             except Exception as e:
                 self.logger.error(f"Error generating response: {str(e)}")
@@ -289,7 +288,8 @@ class ClaudeAssistant:
         )
 
         try:
-            while True:  # TODO: implement max_iter to ensure we exit the loop if max tool use is used
+            while True:
+
                 messages = self.conversation_history.get_conversation_history()
                 response = self.client.beta.prompt_caching.messages.create(
                     messages=messages,
@@ -302,7 +302,7 @@ class ClaudeAssistant:
                 # tool use
                 if response.stop_reason == "tool_use":
                     assistant_response = self._process_assistant_response(response)  # save the first response
-                    print(f"Assistant: Using a 🔨tool: {assistant_response}")  # TODO: Re-factor to assistnat message
+                    print(f"Assistant: Using a 🔨tool: {assistant_response}")
 
                     tool_use = next(block for block in response.content if block.type == "tool_use")
 
@@ -351,7 +351,7 @@ class ClaudeAssistant:
                         {
                             "type": "tool_result",
                             "tool_use_id": tool_use_id,
-                            "content": f"Here is context retrieved by a RAG system: \n\n{search_results}\n\n."
+                            "content": f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
                             f"Now please try to answer my original request.",
                         }
                     ],
