@@ -1,6 +1,11 @@
+from src.utils.logger import setup_logger
 from src.utils.output_formatter import print_assistant_message
+from utils.decorators import base_error_handler
+
+logger = setup_logger(__name__, "app.log")
 
 
+@base_error_handler(logger)
 def run_terminal_ui(claude_assistant):
     print("Welcome to OmniClaude! How can I assist you today?")
     while True:

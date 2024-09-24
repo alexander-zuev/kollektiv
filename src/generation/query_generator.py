@@ -1,8 +1,9 @@
 import anthropic
 
 from src.utils.config import ANTHROPIC_API_KEY
-from src.utils.decorators import error_handler
+from src.utils.decorators import base_error_handler
 from src.utils.logger import setup_logger
+from utils.decorators import anthropic_error_handler
 
 logger = setup_logger(__name__, "query_generator.log")
 
@@ -13,7 +14,8 @@ class QueryGenerator:
         self.model_name = model_name
         self.logger = setup_logger(__name__, "logging.log")
 
-    @error_handler(logger)
+    @base_error_handler(logger)
+    @anthropic_error_handler(logger)
     def generate_multi_query(self, query: str, model: str = None, n_queries: int = 5) -> list[str]:
         prompt = f"""
             You are an AI assistant whose task is to generate multiple queries as part of a RAG system.
@@ -42,7 +44,7 @@ class QueryGenerator:
         content = content.split("\n")
         return content
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def combine_queries(self, user_query: str, generated_queries: list[str]) -> list[str]:
         """
         Combines user query and generated queries into a list, removing any empty queries.

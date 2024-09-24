@@ -16,7 +16,7 @@ from src.utils.config import (
     PROCESSED_DATA_DIR,
     VECTOR_STORAGE_DIR,
 )
-from src.utils.decorators import error_handler
+from src.utils.decorators import base_error_handler
 from src.utils.logger import setup_logger
 
 # Set up logger
@@ -67,7 +67,7 @@ class VectorDB:
             f"{self.collection.count()} documents (chunks)"
         )
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _load_existing_summaries(self):
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         if os.path.exists(summaries_file):
@@ -109,7 +109,7 @@ class VectorDB:
 
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def add_documents(self, json_data: list[dict], claude_assistant: ClaudeAssistant, file_name: str) -> str | None:
         processed_docs = self.prepare_documents(json_data)
 
@@ -155,7 +155,7 @@ class VectorDB:
         self._save_summaries()
         return summary
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _save_summaries(self):
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         try:
@@ -164,11 +164,11 @@ class VectorDB:
         except Exception as e:
             logger.error(f"Failed to save document summaries: {e}")
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def get_document_summaries(self) -> list[str]:
         return list(self.document_summaries.values())
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
         """Checks if chunks are already added to the database based on chunk ids"""
         try:
@@ -188,7 +188,7 @@ class VectorDB:
             logger.error(f"Error checking document existence: {e}")
             return False, document_ids
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def query(self, user_query: str | list[str], n_results: int = 5):
         """
         Handles both a single query and multiple queris
@@ -202,7 +202,7 @@ class VectorDB:
         )
         return search_results
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def reset_database(self):
         self.client.delete_collection(self.collection_name)
         self.collection = self.client.create_collection(

@@ -8,7 +8,7 @@ from typing import Any
 import tiktoken
 
 from src.utils.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
-from src.utils.decorators import error_handler
+from src.utils.decorators import base_error_handler
 from src.utils.logger import setup_logger
 
 logger = setup_logger("chunker", "chunking.log")
@@ -58,7 +58,7 @@ class MarkdownChunker:
         self.code_block_start_pattern = re.compile(r"^(```|~~~)(.*)$")
         self.inline_code_pattern = re.compile(r"`([^`\n]+)`")
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def load_data(self) -> dict[str, Any]:
         """Loads markdown from JSON and prepares for chunking"""
         input_filepath = os.path.join(RAW_DATA_DIR, self.input_filename)
@@ -75,7 +75,7 @@ class MarkdownChunker:
             self.logger.error(f"Invalid JSON in file: {input_filepath}")
             raise
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:
         """Iterates through each page in the loaded data"""
         all_chunks = []
@@ -102,7 +102,7 @@ class MarkdownChunker:
         self.validator.validate(all_chunks)
         return all_chunks
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def remove_boilerplate(self, content: str) -> str:
         """Removes navigation and boilerplate content from markdown."""
         # Use precompiled regex
@@ -111,7 +111,7 @@ class MarkdownChunker:
         cleaned_content = re.sub(r"\n{2,}", "\n\n", cleaned_content)
         return cleaned_content.strip()
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def clean_header_text(self, header_text: str) -> str:
         """Cleans unwanted markdown elements and artifacts from header text."""
         # Remove zero-width spaces
@@ -126,7 +126,7 @@ class MarkdownChunker:
             cleaned_text = ""  # Empty out any shell commands mistaken as headers
         return cleaned_text
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def identify_sections(self, page_content: str, page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
         """Identifies sections in the page content based on headers and preserves markdown structures."""
         sections = []
@@ -199,7 +199,7 @@ class MarkdownChunker:
 
         return sections
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def create_chunks(self, sections: list[dict[str, Any]], page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
         page_chunks = []
         for section in sections:
@@ -234,7 +234,7 @@ class MarkdownChunker:
         self._add_overlap(final_chunks)
         return final_chunks
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _split_section(self, content: str, headers: dict[str, str]) -> list[dict[str, Any]]:  # noqa: C901
         # TODO: refactor this method to reduce complexity
         # Current complexity is necessary for accurate content splitting
@@ -337,7 +337,7 @@ class MarkdownChunker:
 
         return chunks
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _split_code_block(self, code_block_content: str, code_fence: str) -> list[str]:
         """Splits a code block into smaller chunks without breaking code syntax."""
         lines = code_block_content.strip().split("\n")
@@ -371,7 +371,7 @@ class MarkdownChunker:
                 chunks.append(chunk_content.strip())
         return chunks
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _adjust_chunks(self, chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Adjust chunks to meet min and max token constraints by merging or splitting."""
         adjusted_chunks = []
@@ -431,7 +431,7 @@ class MarkdownChunker:
                 final_chunks.append(chunk)
         return final_chunks
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _split_large_chunk(self, chunk: dict[str, Any]) -> list[dict[str, Any]]:
         """Splits a chunk that exceeds 2x max_tokens into smaller chunks."""
         content = chunk["content"]
@@ -457,7 +457,7 @@ class MarkdownChunker:
 
         return chunks
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _merge_headers(self, headers1: dict[str, str], headers2: dict[str, str]) -> dict[str, str]:
         merged = {}
         for level in ["h1", "h2", "h3"]:
@@ -471,7 +471,7 @@ class MarkdownChunker:
                 merged[level] = ""
         return merged
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _add_overlap(
         self, chunks: list[dict[str, Any]], min_overlap_tokens: int = 50, max_overlap_tokens: int = 100
     ) -> None:
@@ -518,7 +518,7 @@ class MarkdownChunker:
         last_n_tokens = tokens[-n:]
         return self.tokenizer.decode(last_n_tokens)
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def save_chunks(self, chunks: list[dict[str, Any]]):
         """Saves chunks to output dir"""
         input_name = os.path.splitext(self.input_filename)[0]  # Remove the extension
@@ -528,18 +528,18 @@ class MarkdownChunker:
             json.dump(chunks, f, indent=2)
         self.logger.info(f"Chunks saved to {output_filepath}")
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _generate_chunk_id(self) -> uuid.UUID:
         """Generates chunk's uuidv4"""
         return uuid.uuid4()
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _calculate_tokens(self, text: str) -> int:
         """Calculates the number of tokens in a given text using tiktoken"""
         token_count = len(self.tokenizer.encode(text))
         return token_count
 
-    @error_handler(logger)
+    @base_error_handler(logger)
     def _create_metadata(self, page_metadata: dict[str, Any], token_count: int) -> dict[str, Any]:
         """Creates metadata dictionary for a chunk"""
         metadata = {
