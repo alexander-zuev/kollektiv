@@ -7,7 +7,6 @@ import tiktoken
 from anthropic.types import Message
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 
-from src.generation.query_generator import QueryGenerator
 from src.generation.tool_definitions import tool_manager
 from src.utils.config import ANTHROPIC_API_KEY
 from src.utils.decorators import anthropic_error_handler, base_error_handler
@@ -158,7 +157,6 @@ class ClaudeAssistant:
         self.tools: list[dict[str, Any]] = []
         self.extra_headers = {"anthropic-beta": "prompt-caching-2024-07-31"}
         self.retriever = None
-        self.query_generator = QueryGenerator()
 
         self._init()
 
@@ -258,24 +256,22 @@ class ClaudeAssistant:
                             if event.content_block.type == "tool_use":
                                 self.logger.debug(f"Tool use detected: {event.content_block.name}")
                                 yield {"type": "tool_use", "tool": event.content_block.name}
-                                # yield f"Using {event.content_block.name} tool"
-
                         elif event.type == "message_stop":
                             self.logger.debug("===== Stream message ended =====")
 
                 # Get the final message after consuming the entire stream
-                final_message = stream.get_final_message()
-                self._process_assistant_response(final_message)
+                assistant_response = stream.get_final_message()
+                self._process_assistant_response(assistant_response)
 
                 # Handle tool use if present in the final message
-                tool_use_block = next((block for block in final_message.content if block.type == "tool_use"), None)
+                tool_use_block = next((block for block in assistant_response.content if block.type == "tool_use"), None)
                 if tool_use_block:
                     tool_result = self.handle_tool_use(tool_use_block.name, tool_use_block.input, tool_use_block.id)
                     self.logger.debug(f"Tool result: {tool_result}")
 
-                # # Only break if no tool was used
-                # if not tool_use_block:
-                #     break
+                # Only break if no tool was used
+                if not tool_use_block:
+                    break
 
             except Exception as e:
                 self.logger.error(f"Error generating response: {str(e)}")
@@ -363,6 +359,10 @@ class ClaudeAssistant:
 
                 # save message to conversation history
                 self.conversation_history.add_message(**tool_result)
+                self.logger.debug(
+                    f"Debugging conversation history after tool use: "
+                    f"{self.conversation_history.get_conversation_history()}"
+                )
                 return tool_result
         except Exception as e:
             self.logger.error(f"Error executing tool {tool_name}: {str(e)}")
@@ -444,8 +444,8 @@ class ClaudeAssistant:
         # prepare queries for search
         rag_query = self.formulate_rag_query(recent_conversation_history, important_context)
         self.logger.debug(f"Using this query for RAG search: {rag_query}")
-        multiple_queries = self.query_generator.generate_multi_query(rag_query)
-        combined_queries = self.query_generator.combine_queries(rag_query, multiple_queries)
+        multiple_queries = self.generate_multi_query(rag_query)
+        combined_queries = self.combine_queries(rag_query, multiple_queries)
 
         # get ranked search results
         results = self.retriever.retrieve(rag_query, combined_queries)
@@ -543,3 +543,41 @@ class ClaudeAssistant:
             preprocessed_context.append(formatted_document)
 
         return preprocessed_context
+
+    @base_error_handler(logger)
+    @anthropic_error_handler(logger)
+    def generate_multi_query(self, query: str, model: str = None, n_queries: int = 5) -> list[str]:
+        prompt = f"""
+            You are an AI assistant whose task is to generate multiple queries as part of a RAG system.
+            You are helping users retrieve relevant information from a vector database.
+            For the given user question, formulate up to {n_queries} related, relevant questions to assist in
+            finding the information.
+
+            Requirements to follow:
+            - Do NOT include any other text in your response except for 3 queries, each on a separate line.
+            - Provide concise, single-topic questions (without compounding sentences) that cover various aspects of
+            the topic.
+            - Ensure each question is complete and directly related to the original inquiry.
+            - List each question on a separate line without numbering.
+            """
+        if model is None:
+            model = self.model_name
+
+        message = self.client.messages.create(
+            model="claude-3-5-sonnet-20240620",
+            max_tokens=1024,
+            system=prompt,
+            messages=[{"role": "user", "content": query}],
+        )
+
+        content = message.content[0].text
+        content = content.split("\n")
+        return content
+
+    @base_error_handler(logger)
+    def combine_queries(self, user_query: str, generated_queries: list[str]) -> list[str]:
+        """
+        Combines user query and generated queries into a list, removing any empty queries.
+        """
+        combined_queries = [query for query in [user_query] + generated_queries if query.strip()]
+        return combined_queries

@@ -122,7 +122,7 @@ class VectorDB:
 
         if all_exist:
             logger.info(
-                f"All documents from {file_name}already loaded. Proceeding to generate or load summary for "
+                f"All documents from {file_name} already loaded. Proceeding to generate or load summary for "
                 f"the "
                 f"entire file."
             )
