@@ -1,15 +1,19 @@
 import logging
 
 from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.logger import setup_logger
+from src.utils.decorators import base_error_handler
+from src.utils.logger import logger
 from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, VectorDB
 
 
 class ComponentInitializer:
     def __init__(self, debug: bool = True):
         self.debug = debug
-        self.logger = setup_logger(__name__, "app.log", level=logging.DEBUG if debug else logging.INFO)
+        self.logger = logger.get_logger(__name__)
+        if debug:
+            logger.set_log_level(logging.DEBUG)
 
+    @base_error_handler(lambda self=None: self.logger)
     def initialize(self):
         self.logger.info("Initializing components...")
         vector_db = VectorDB()
@@ -17,12 +21,11 @@ class ComponentInitializer:
         claude_assistant = ClaudeAssistant()
 
         files_to_load = [
-            # "supabase_com_docs_guides_ai_20240917_103658-chunked.json",
-            # "docs_anthropic_com_en_docs_20240922_174102-chunked.json",
-            # "docs_llamaindex_ai_en_stable_20240917_090349-chunked.json",
-            # "docs_llamaindex_ai_en_stable_examples_20240922_173959-chunked.json",
-            # "langchain-ai_github_io_langgraph_how-tos_20240922_174234-chunked.json",
-            "docs_llamaindex_ai_en_stable_examples_evaluation_20240923_081626-chunked.json"
+            "supabase_com_docs_guides_ai_20240917_103658-chunked.json",
+            "docs_anthropic_com_en_docs_20240922_174102-chunked.json",
+            "docs_llamaindex_ai_en_stable_20240917_090349-chunked.json",
+            "docs_llamaindex_ai_en_stable_examples_20240922_173959-chunked.json",
+            "langchain-ai_github_io_langgraph_how-tos_20240922_174234-chunked.json",
         ]
         for file_name in files_to_load:
             document_loader = DocumentProcessor(file_name)
