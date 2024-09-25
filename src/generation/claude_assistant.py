@@ -160,7 +160,6 @@ class ClaudeAssistant:
 
         self._init()
 
-    @base_error_handler(logger)
     @anthropic_error_handler(logger)
     def _init(self):
         self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=2)  # default number of re-tries
@@ -204,7 +203,6 @@ class ClaudeAssistant:
         cleaned_input = " ".join(cleaned_input.split())
         return cleaned_input
 
-    @base_error_handler(logger)
     @anthropic_error_handler(logger)
     def get_response(self, user_input: str, stream: bool = True) -> Generator[str, None, None] | str:
         """
@@ -222,7 +220,6 @@ class ClaudeAssistant:
             assistant_response = self.not_stream_response(user_input)
             return assistant_response
 
-    @base_error_handler(logger)
     @anthropic_error_handler(logger)
     def stream_response(self, user_input: str) -> Generator[str, None, None]:
         # iteration = 0
@@ -276,7 +273,6 @@ class ClaudeAssistant:
                 self.conversation_history.remove_last_message()
                 raise Exception(f"An error occurred: {str(e)}") from e
 
-    @base_error_handler(logger)
     @anthropic_error_handler(logger)
     def not_stream_response(self, user_input: str) -> str:
         user_input = self.preprocess_user_input(user_input)
@@ -365,7 +361,6 @@ class ClaudeAssistant:
             self.logger.error(f"Error executing tool {tool_name}: {str(e)}")
             return f"Error: {str(e)}"
 
-    @base_error_handler(logger)
     @anthropic_error_handler(logger)
     def formulate_rag_query(self, recent_conversation_history: list[dict[str, Any]], important_context: str) -> str:
         """ "
@@ -454,7 +449,6 @@ class ClaudeAssistant:
 
         return preprocessed_results
 
-    @base_error_handler(logger)
     @anthropic_error_handler(logger)
     def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
         # Aggregate metadata
@@ -541,7 +535,6 @@ class ClaudeAssistant:
 
         return preprocessed_context
 
-    @base_error_handler(logger)
     @anthropic_error_handler(logger)
     def generate_multi_query(self, query: str, model: str = None, n_queries: int = 5) -> list[str]:
         prompt = f"""

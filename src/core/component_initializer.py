@@ -1,6 +1,7 @@
 import logging
 
 from src.generation.claude_assistant import ClaudeAssistant
+from src.utils.decorators import base_error_handler
 from src.utils.logger import setup_logger
 from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, VectorDB
 
@@ -10,6 +11,7 @@ class ComponentInitializer:
         self.debug = debug
         self.logger = setup_logger(__name__, "app.log", level=logging.DEBUG if debug else logging.INFO)
 
+    @base_error_handler(lambda self=None: self.logger)
     def initialize(self):
         self.logger.info("Initializing components...")
         vector_db = VectorDB()

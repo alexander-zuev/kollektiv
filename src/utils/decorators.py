@@ -1,4 +1,5 @@
 import functools
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -22,6 +23,25 @@ def base_error_handler(logger):
         def wrapper(*args, **kwargs) -> Any:
             try:
                 return func(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in {func.__name__}: {str(e)}")
+                raise
+
+        return wrapper
+
+    return decorator
+
+
+def application_level_handler(logger):
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            try:
+                return func(*args, **kwargs)
+            except KeyboardInterrupt:
+                logger.info("User terminated program execution")
+            except SystemExit:
+                logger.info("Exit application")
             except Exception as e:
                 logger.error(f"Error in {func.__name__}: {str(e)}")
                 raise
@@ -67,6 +87,23 @@ def anthropic_error_handler(logger):
             except AnthropicError as e:
                 logger.error(f"Unexpected Anthropic error in {func.__name__}: {str(e)}")
                 raise
+            except Exception as e:
+                logger.error(f"Unexpected error in {func.__name__}: {str(e)}")
+
+        return wrapper
+
+    return decorator
+
+
+def performance_logger(logger):
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            end_time = time.time()
+            logger.debug(f"{func.__name__} took {end_time - start_time:.2f} seconds to execute")
+            return result
 
         return wrapper
 

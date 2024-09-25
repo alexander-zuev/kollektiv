@@ -13,7 +13,7 @@ def run_terminal_ui(claude_assistant):
         if user_message.lower() in ["exit", "quit"]:
             break
 
-        stream = False
+        stream = True
         response = claude_assistant.get_response(user_message, stream=stream)
         print_assistant_message("OmniClaude: ", end="")
         if stream:
