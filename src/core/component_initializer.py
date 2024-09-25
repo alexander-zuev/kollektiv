@@ -1,21 +1,23 @@
-import logging
-
 from src.generation.claude_assistant import ClaudeAssistant
 from src.utils.decorators import base_error_handler
-from src.utils.logger import setup_logger
+from src.utils.logger import get_logger
 from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, VectorDB
+
+logger = get_logger()
 
 
 class ComponentInitializer:
-    def __init__(self, debug: bool = True):
-        self.debug = debug
-        self.logger = setup_logger(__name__, "app.log", level=logging.DEBUG if debug else logging.INFO)
 
-    @base_error_handler(lambda self=None: self.logger)
-    def initialize(self):
-        self.logger.info("Initializing components...")
+    @base_error_handler
+    def initialize(self, reset_db: bool = False):
+        logger.info("Initializing components...")
+
         vector_db = VectorDB()
-        # vector_db.reset_database()
+
+        if reset_db:
+            logger.info("Resetting database...")
+            vector_db.reset_database()
+
         claude_assistant = ClaudeAssistant()
 
         files_to_load = [
@@ -34,5 +36,5 @@ class ComponentInitializer:
         retriever = ResultRetriever(vector_db=vector_db, reranker=reranker)
         claude_assistant.retriever = retriever
 
-        self.logger.info("Components initialized successfully.")
+        logger.info("Components initialized successfully.")
         return claude_assistant

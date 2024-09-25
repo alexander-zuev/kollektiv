@@ -10,9 +10,9 @@ from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 from src.generation.tool_definitions import tool_manager
 from src.utils.config import ANTHROPIC_API_KEY
 from src.utils.decorators import anthropic_error_handler, base_error_handler
-from src.utils.logger import setup_logger
+from src.utils.logger import get_logger
 
-logger = setup_logger("claude_assistant", "claude_assistant.log")
+logger = get_logger()
 
 
 class ConversationMessage:
@@ -35,12 +35,11 @@ class ConversationHistory:
         self.messages: list[ConversationMessage] = []
         self.total_tokens = 0
         self.tokenizer = tiktoken.get_encoding(tokenizer)
-        self.logger = setup_logger(__name__, "claude_assistant.log")
 
     def add_message(self, role: str, content: str | list[dict[str, Any]]) -> None:
         message = ConversationMessage(role, content)
         self.messages.append(message)
-        self.logger.debug(f"Added message for role={message.role}")
+        logger.debug(f"Added message for role={message.role}")
 
         # estimate tokens for user messages
         if role == "user":
@@ -74,13 +73,13 @@ class ConversationHistory:
     def remove_last_message(self) -> None:
         if self.messages:
             removed_message = self.messages.pop()
-            self.logger.info(f"Removed message: {removed_message.role}")
+            logger.info(f"Removed message: {removed_message.role}")
 
     def get_conversation_history(self, debug: bool = False) -> list[dict[str, Any]]:
         return [msg.to_dict(include_id=debug) for msg in self.messages]
 
     def log_conversation_state(self) -> None:
-        self.logger.debug(f"Conversation state: messages={len(self.messages)}, " f"Total tokens={self.total_tokens}, ")
+        logger.debug(f"Conversation state: messages={len(self.messages)}, " f"Total tokens={self.total_tokens}, ")
 
 
 # Client Class
@@ -97,7 +96,6 @@ class ClaudeAssistant:
         self.client = None
         self.api_key = api_key
         self.model_name = model_name
-        self.logger = logger
         self.base_system_prompt = """
         You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval Augmented
         Generation) system. Your primary function is to provide accurate, relevant, and helpful information to users
@@ -160,30 +158,32 @@ class ClaudeAssistant:
 
         self._init()
 
-    @anthropic_error_handler(logger)
+    @anthropic_error_handler
     def _init(self):
         self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=2)  # default number of re-tries
         self.conversation_history = ConversationHistory()
 
         self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
 
-    @base_error_handler(logger)
+        logger.debug("Claude assistant successfully initialized.")
+
+    @base_error_handler
     def update_system_prompt(self, document_summaries: list[dict[str, Any]]):
         """
         :param document_summaries: List of dictionaries containing summary information to be incorporated into
         the system prompt.
         :return: None
         """
-        self.logger.info(f"Loading {len(document_summaries)} summaries")
+        logger.info(f"Loading {len(document_summaries)} summaries")
         summaries_text = "\n".join(f"- {summary['summary']}" for summary in document_summaries)
         self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
-        self.logger.debug(f"Updated system prompt: {self.system_prompt}")
+        logger.debug(f"Updated system prompt: {self.system_prompt}")
 
-    @base_error_handler(logger)
+    @base_error_handler
     def cached_system_prompt(self) -> list[dict[str, Any]]:
         return [{"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}]
 
-    @base_error_handler(logger)
+    @base_error_handler
     def cached_tools(self) -> list[dict[str, Any]]:
         return [
             {
@@ -195,7 +195,7 @@ class ClaudeAssistant:
             for tool in self.tools
         ]
 
-    @base_error_handler(logger)
+    @base_error_handler
     def preprocess_user_input(self, input_text: str) -> str:
         # Remove any leading/trailing whitespace
         cleaned_input = input_text.strip()
@@ -203,7 +203,7 @@ class ClaudeAssistant:
         cleaned_input = " ".join(cleaned_input.split())
         return cleaned_input
 
-    @anthropic_error_handler(logger)
+    @anthropic_error_handler
     def get_response(self, user_input: str, stream: bool = True) -> Generator[str, None, None] | str:
         """
         :param stream: controls whether output is streamed or not
@@ -220,12 +220,12 @@ class ClaudeAssistant:
             assistant_response = self.not_stream_response(user_input)
             return assistant_response
 
-    @anthropic_error_handler(logger)
+    @anthropic_error_handler
     def stream_response(self, user_input: str) -> Generator[str, None, None]:
         # iteration = 0
         user_input = self.preprocess_user_input(user_input)
         self.conversation_history.add_message(role="user", content=user_input)
-        self.logger.debug(
+        logger.debug(
             f"Printing conversation history for debugging: {self.conversation_history.get_conversation_history()}"
         )
 
@@ -242,17 +242,17 @@ class ClaudeAssistant:
                     extra_headers=self.extra_headers,
                 ) as stream:
                     for event in stream:
-                        # self.logger.debug(event) enable for debugging
+                        # logger.debug(event) enable for debugging
                         if event.type == "text":
                             # yield event.text
                             yield {"type": "text", "content": event.text}
 
                         elif event.type == "content_block_stop":
                             if event.content_block.type == "tool_use":
-                                self.logger.debug(f"Tool use detected: {event.content_block.name}")
+                                logger.debug(f"Tool use detected: {event.content_block.name}")
                                 yield {"type": "tool_use", "tool": event.content_block.name}
                         elif event.type == "message_stop":
-                            self.logger.debug("===== Stream message ended =====")
+                            logger.debug("===== Stream message ended =====")
 
                 # Get the final message after consuming the entire stream
                 assistant_response = stream.get_final_message()
@@ -262,22 +262,22 @@ class ClaudeAssistant:
                 tool_use_block = next((block for block in assistant_response.content if block.type == "tool_use"), None)
                 if tool_use_block:
                     tool_result = self.handle_tool_use(tool_use_block.name, tool_use_block.input, tool_use_block.id)
-                    self.logger.debug(f"Tool result: {tool_result}")
+                    logger.debug(f"Tool result: {tool_result}")
 
                 # Only break if no tool was used
                 if not tool_use_block:
                     break
 
             except Exception as e:
-                self.logger.error(f"Error generating response: {str(e)}")
+                logger.error(f"Error generating response: {str(e)}")
                 self.conversation_history.remove_last_message()
                 raise Exception(f"An error occurred: {str(e)}") from e
 
-    @anthropic_error_handler(logger)
+    @anthropic_error_handler
     def not_stream_response(self, user_input: str) -> str:
         user_input = self.preprocess_user_input(user_input)
         self.conversation_history.add_message(role="user", content=user_input)
-        self.logger.debug(
+        logger.debug(
             f"Printing conversation history for debugging: {self.conversation_history.get_conversation_history()}"
         )
 
@@ -300,7 +300,7 @@ class ClaudeAssistant:
                     tool_use = next(block for block in response.content if block.type == "tool_use")
 
                     tool_result = self.handle_tool_use(tool_use.name, tool_use.input, tool_use.id)
-                    self.logger.debug(f"Tool result: {tool_result}")
+                    logger.debug(f"Tool result: {tool_result}")
 
                 # not a tool use
                 else:
@@ -308,30 +308,30 @@ class ClaudeAssistant:
                     return assistant_response
 
         except Exception as e:
-            self.logger.error(f"Error generating response: {str(e)}")
+            logger.error(f"Error generating response: {str(e)}")
             self.conversation_history.remove_last_message()
             raise Exception(f"An error occurred: {str(e)}") from e
 
-    @base_error_handler(logger)
+    @base_error_handler
     def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:
         """
         Process the assistant's response by saving the message and updating the token count.
         """
 
-        self.logger.debug(
+        logger.debug(
             f"Cached {response.usage.cache_creation_input_tokens} input tokens. \n"
             f"Read {response.usage.cache_read_input_tokens} tokens from cache"
         )
         self.conversation_history.add_message(role="assistant", content=response.content)
         self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
-        self.logger.debug(
+        logger.debug(
             f"Processed assistant response. Updated conversation history: "
             f"{self.conversation_history.get_conversation_history()}"
         )
 
         return response.content[0].text
 
-    @base_error_handler(logger)
+    @base_error_handler
     def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any] | str:
 
         try:
@@ -352,27 +352,27 @@ class ClaudeAssistant:
 
                 # save message to conversation history
                 self.conversation_history.add_message(**tool_result)
-                self.logger.debug(
+                logger.debug(
                     f"Debugging conversation history after tool use: "
                     f"{self.conversation_history.get_conversation_history()}"
                 )
                 return tool_result
         except Exception as e:
-            self.logger.error(f"Error executing tool {tool_name}: {str(e)}")
+            logger.error(f"Error executing tool {tool_name}: {str(e)}")
             return f"Error: {str(e)}"
 
-    @anthropic_error_handler(logger)
+    @anthropic_error_handler
     def formulate_rag_query(self, recent_conversation_history: list[dict[str, Any]], important_context: str) -> str:
         """ "
         Generates a rag search query based on recent conversation history and important context generated by AI
         assistant."""
-        self.logger.debug(f"Important context: {important_context}")
+        logger.debug(f"Important context: {important_context}")
 
         if not recent_conversation_history:
             raise ValueError("Recent conversation history is empty")
 
         if not important_context:
-            self.logger.warning("Important context is empty, proceeding to rag search query formulation without it")
+            logger.warning("Important context is empty, proceeding to rag search query formulation without it")
 
         # extract most recent user query
         most_recent_user_query = next(
@@ -419,13 +419,13 @@ class ClaudeAssistant:
         rag_query = response.content[0].text.strip()
         return rag_query
 
-    @base_error_handler(logger)
+    @base_error_handler
     def get_recent_context(self, n_messages: int = 6) -> list[dict[str, str]]:
         """Retrieves last 6 messages (3 user messages + 3 assistant messages)"""
         recent_messages = self.conversation_history.messages[-n_messages:]
         return [msg.to_dict() for msg in recent_messages]
 
-    @base_error_handler(logger)
+    @base_error_handler
     def use_rag_search(self, tool_input: dict[str, Any]) -> list[str]:
         # Get recent conversation context (last n messages for each role)
         recent_conversation_history = self.get_recent_context()
@@ -435,21 +435,21 @@ class ClaudeAssistant:
 
         # prepare queries for search
         rag_query = self.formulate_rag_query(recent_conversation_history, important_context)
-        self.logger.debug(f"Using this query for RAG search: {rag_query}")
+        logger.debug(f"Using this query for RAG search: {rag_query}")
         multiple_queries = self.generate_multi_query(rag_query)
         combined_queries = self.combine_queries(rag_query, multiple_queries)
 
         # get ranked search results
         results = self.retriever.retrieve(rag_query, combined_queries)
-        self.logger.debug(f"Retriever results: {results}")
+        logger.debug(f"Retriever results: {results}")
 
         # Preprocess the results here
         preprocessed_results = self.preprocess_ranked_documents(results)
-        self.logger.debug(f"Processed results: {results}")
+        logger.debug(f"Processed results: {results}")
 
         return preprocessed_results
 
-    @anthropic_error_handler(logger)
+    @anthropic_error_handler
     def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
         # Aggregate metadata
         unique_urls = {chunk["metadata"]["source_url"] for chunk in chunks}
@@ -516,7 +516,7 @@ class ClaudeAssistant:
     def _format_content_samples(self, samples: list[str]) -> str:
         return "\n\n".join(f"Sample {i + 1}:\n{sample}" for i, sample in enumerate(samples))
 
-    @base_error_handler(logger)
+    @base_error_handler
     def preprocess_ranked_documents(self, ranked_documents: dict[str, Any]) -> list[str]:
         """
         Converts ranked documents into a structured string for passing to the Claude API.
@@ -535,7 +535,7 @@ class ClaudeAssistant:
 
         return preprocessed_context
 
-    @anthropic_error_handler(logger)
+    @anthropic_error_handler
     def generate_multi_query(self, query: str, model: str = None, n_queries: int = 5) -> list[str]:
         prompt = f"""
             You are an AI assistant whose task is to generate multiple queries as part of a RAG system.
@@ -564,7 +564,7 @@ class ClaudeAssistant:
         content = content.split("\n")
         return content
 
-    @base_error_handler(logger)
+    @base_error_handler
     def combine_queries(self, user_query: str, generated_queries: list[str]) -> list[str]:
         """
         Combines user query and generated queries into a list, removing any empty queries.
