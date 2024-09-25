@@ -10,9 +10,7 @@ from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 from src.generation.tool_definitions import tool_manager
 from src.utils.config import ANTHROPIC_API_KEY
 from src.utils.decorators import anthropic_error_handler, base_error_handler
-from src.utils.logger import setup_logger
-
-logger = setup_logger("claude_assistant", "claude_assistant.log")
+from src.utils.logger import logger
 
 
 class ConversationMessage:
@@ -35,7 +33,7 @@ class ConversationHistory:
         self.messages: list[ConversationMessage] = []
         self.total_tokens = 0
         self.tokenizer = tiktoken.get_encoding(tokenizer)
-        self.logger = setup_logger(__name__, "claude_assistant.log")
+        self.logger = logger.get_logger(__name__)
 
     def add_message(self, role: str, content: str | list[dict[str, Any]]) -> None:
         message = ConversationMessage(role, content)
@@ -97,7 +95,7 @@ class ClaudeAssistant:
         self.client = None
         self.api_key = api_key
         self.model_name = model_name
-        self.logger = logger
+        self.logger = logger.get_logger(__name__)
         self.base_system_prompt = """
         You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval Augmented
         Generation) system. Your primary function is to provide accurate, relevant, and helpful information to users

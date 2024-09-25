@@ -9,9 +9,7 @@ import tiktoken
 
 from src.utils.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from src.utils.decorators import base_error_handler
-from src.utils.logger import setup_logger
-
-logger = setup_logger("chunker", "chunking.log")
+from src.utils.logger import logger
 
 
 class MarkdownChunker:
@@ -25,7 +23,7 @@ class MarkdownChunker:
         overlap_percentage: float = 0.05,
     ):
         self.output_dir = output_dir
-        self.logger = logger
+        self.logger = logger.get_logger(__name__)
         self.input_filename = input_filename
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         self.max_tokens = max_tokens  # Hard limit

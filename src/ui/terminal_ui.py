@@ -1,8 +1,6 @@
 from src.utils.decorators import base_error_handler
-from src.utils.logger import setup_logger
+from src.utils.logger import logger
 from src.utils.output_formatter import print_assistant_message
-
-logger = setup_logger(__name__, "app.log")
 
 
 @base_error_handler(logger)

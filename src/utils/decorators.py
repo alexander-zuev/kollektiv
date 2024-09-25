@@ -16,8 +16,10 @@ from anthropic import (
     RateLimitError,
 )
 
+from src.utils.logger import logger
 
-def base_error_handler(logger):
+
+def base_error_handler(logger=logger):
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
@@ -32,18 +34,18 @@ def base_error_handler(logger):
     return decorator
 
 
-def application_level_handler(logger):
+def application_level_handler():
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             try:
                 return func(*args, **kwargs)
             except KeyboardInterrupt:
-                logger.info("User terminated program execution")
+                print("\nUser terminated program execution\n")
             except SystemExit:
-                logger.info("Exit application")
+                print("\nExit application\n")
             except Exception as e:
-                logger.error(f"Error in {func.__name__}: {str(e)}")
+                print(f"Error in {func.__name__}: {str(e)}")
                 raise
 
         return wrapper
@@ -51,7 +53,7 @@ def application_level_handler(logger):
     return decorator
 
 
-def anthropic_error_handler(logger):
+def anthropic_error_handler(logger=logger):
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
@@ -95,7 +97,7 @@ def anthropic_error_handler(logger):
     return decorator
 
 
-def performance_logger(logger):
+def performance_logger(logger=logger):
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:

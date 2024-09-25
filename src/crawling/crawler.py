@@ -14,27 +14,25 @@ from requests.exceptions import RequestException
 
 from src.utils.config import FIRECRAWL_API_KEY, JOB_FILE_DIR, RAW_DATA_DIR, SRC_ROOT
 from src.utils.decorators import base_error_handler
-from src.utils.logger import setup_logger
-
-logger = setup_logger(__name__, "app.log")
+from src.utils.logger import logger
 
 
 class FireCrawler:
     def __init__(self, api_key: str, data_dir: str = RAW_DATA_DIR, jobs_dir: str = JOB_FILE_DIR) -> None:
         self.api_key: str = api_key
-        self.logger = logger
+        self.logger = logger.get_logger(__name__)
         self.current_job_id: str
         self.raw_data_dir: str = data_dir
         self.jobs_dir: str = jobs_dir
         self.app = self._initialize_app()
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def _initialize_app(self):
         app = FirecrawlApp(api_key=self.api_key)
         self.logger.info("FireCrawler app initialized successfully.")
         return app
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def map_url(self, url: HttpUrl) -> dict[str, Any] | None:
         """Input a website and get all the urls on the website - extremely fast"""
         self.logger.info(f"Mapping URL: {url}")
@@ -59,7 +57,7 @@ class FireCrawler:
 
         return result
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def async_crawl_url(self, urls: list[HttpUrl], page_limit: int = 25) -> dict[str, Any]:
         """
         :param urls: List of URLs to be crawled.
@@ -124,7 +122,7 @@ class FireCrawler:
             all_results.append(crawl_results)
         return {"input_urls": urls, "results": all_results}
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def _poll_job_results(self, job_id: str, attempts=None) -> str:
         while True:
             response = self.check_job_status(job_id)
@@ -136,7 +134,7 @@ class FireCrawler:
             self.logger.info(f"Job {job_id} status: {job_status}. Retrying in 30 seconds...")
             time.sleep(30)
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def _get_all_crawl_results(self, job_id: str) -> list[dict[str, Any]]:
         """Fetch all results for a given crawl job, handling pagination"""
         next_url = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
@@ -155,7 +153,7 @@ class FireCrawler:
 
         return all_data
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def _get_next_results(self, next_url: HttpUrl) -> tuple[dict[str, Any], str | None]:
         """Retrieves the next batch of the results"""
         max_retries = 15
@@ -198,7 +196,7 @@ class FireCrawler:
         self.logger.error("Failed to fetch results after maximum retries or received error responses.")
         return {"data": []}, None
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def save_results(self, result: dict[str, Any], method: str) -> None:
         """Takes as an input the results of the job, saves it as a json file in the data directory"""
         filename = self._create_file_name(result["input_url"], method)
@@ -212,7 +210,7 @@ class FireCrawler:
 
         self.logger.info(f"Results saved to file: {filepath}")
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def _create_file_name(self, url: HttpUrl, method: str) -> str:
         """Creates a filename based on the bare URL and timestamp"""
         parsed_url = urlparse(url)
@@ -221,12 +219,12 @@ class FireCrawler:
         timestamp = self._get_timestamp()
         return f"{bare_url}_{timestamp}.json"
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def _get_timestamp(self):
         """Returns the current timestamp to be used for saving the results"""
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def create_job(self, job_id: str, method: str, input_url: HttpUrl) -> None:
         """Creates a job, saving information to jobs.json returned by async_crawl_url method."""
         internal_id = str(uuid4())
@@ -264,7 +262,7 @@ class FireCrawler:
             self.logger.error(f"Error saving {job_id}: {e}")
             raise
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def complete_job(self, job_id: str) -> None:
         """Finds a job by external id and updates it's status to "completed"."""
         jobs_path = os.path.join(self.jobs_dir, "jobs.json")
@@ -291,7 +289,7 @@ class FireCrawler:
             self.logger.error(f"Error marking job {job_id} as completed: {e}")
             raise
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def check_job_status(self, job_id: str) -> dict[str, Any]:
         """Polls firecrawl for the job result"""
         response = self.app.check_crawl_status(job_id)
@@ -301,7 +299,7 @@ class FireCrawler:
         )
         return response
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def _extract_unique_links(self, crawl_results: list[dict[str, Any]]) -> list[str]:
         """Extracts unique links in the completed crawl"""
         unique_links = {
@@ -311,7 +309,7 @@ class FireCrawler:
         }
         return list(unique_links)
 
-    @base_error_handler(logger)
+    @base_error_handler(lambda self=None: self.logger)
     def build_example_file(self, filename: str, pages: int = 1) -> None:
         """Extracts n pages into example file to visualize its structure"""
         input_filename = filename
@@ -337,7 +335,7 @@ class FireCrawler:
                     md_file.write(f"```markdown\n{item['markdown']}\n```\n\n")
                     md_file.write("----\n\n")
 
-        logger.info(f"Example Markdown file created: {md_output_filepath}")
+        self.logger.info(f"Example Markdown file created: {md_output_filepath}")
 
 
 # Test usage
@@ -354,7 +352,7 @@ def main():
     urls_to_crawl = [
         "https://docs.llamaindex.ai/en/stable/examples/evaluation/",  # replace this
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=50)  # define page limit
+    crawler.async_crawl_url(urls_to_crawl, page_limit=1)  # define page limit
     # crawler.build_example_file("cra_docs_en_20240912_082455.json")
 
 

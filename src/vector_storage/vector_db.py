@@ -8,19 +8,9 @@ import chromadb.utils.embedding_functions as embedding_functions
 import cohere
 
 from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.config import (
-    CHROMA_DB_DIR,
-    COHERE_API_KEY,
-    LOG_DIR,
-    OPENAI_API_KEY,
-    PROCESSED_DATA_DIR,
-    VECTOR_STORAGE_DIR,
-)
+from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR, VECTOR_STORAGE_DIR
 from src.utils.decorators import base_error_handler
-from src.utils.logger import setup_logger
-
-# Set up logger
-logger = setup_logger(__name__, os.path.join(LOG_DIR, "app.log"))
+from src.utils.logger import logger
 
 
 class DocumentProcessor:
