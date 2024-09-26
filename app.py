@@ -3,21 +3,20 @@ import logging
 from src.core.component_initializer import ComponentInitializer
 from src.ui.terminal_ui import run_terminal_ui
 from src.utils.decorators import application_level_handler
-from src.utils.logger import logger
+from src.utils.logger import configure_logging
 
 
-@application_level_handler()
-def main(debug: bool = False):
-    # Set log level based on debug mode
-    log_level = logging.DEBUG if debug else logging.INFO
-    logger.set_log_level(log_level)
+@application_level_handler
+def main(debug: bool = False, reset_db: bool = False):
+    # Configure logging before importing other modules
+    configure_logging(debug=debug)
 
     # Initialize components
-    initializer = ComponentInitializer(debug=debug)
-    claude_assistant = initializer.initialize()
+    initializer = ComponentInitializer()
+    claude_assistant = initializer.initialize(reset_db=reset_db)
 
     run_terminal_ui(claude_assistant)
 
 
 if __name__ == "__main__":
-    main(debug=False)  # Set debug to False for production
+    main(debug=True, reset_db=True)  # Set debug=True to enable debug logging

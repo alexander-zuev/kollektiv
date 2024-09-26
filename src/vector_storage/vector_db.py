@@ -10,7 +10,9 @@ import cohere
 from src.generation.claude_assistant import ClaudeAssistant
 from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR, VECTOR_STORAGE_DIR
 from src.utils.decorators import base_error_handler
-from src.utils.logger import logger
+from src.utils.logger import get_logger
+
+logger = get_logger()
 
 
 class DocumentProcessor:
@@ -57,7 +59,7 @@ class VectorDB:
             f"{self.collection.count()} documents (chunks)"
         )
 
-    @base_error_handler(logger)
+    @base_error_handler
     def _load_existing_summaries(self):
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         if os.path.exists(summaries_file):
@@ -99,7 +101,7 @@ class VectorDB:
 
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
-    @base_error_handler(logger)
+    @base_error_handler
     def add_documents(self, json_data: list[dict], claude_assistant: ClaudeAssistant, file_name: str) -> str | None:
         processed_docs = self.prepare_documents(json_data)
 
@@ -132,20 +134,18 @@ class VectorDB:
 
         # Generate summary for the entire file if not already present
         if file_name in self.document_summaries:
-            summary = self.document_summaries[file_name]
+            result = self.document_summaries[file_name]
         else:
             logger.info("Generating summary for the entire file.")
-            summary = claude_assistant.generate_document_summary(json_data)
-            self.document_summaries[file_name] = summary
-
-        # # Update Claude's system prompt with all document summaries
-        # claude_assistant.update_system_prompt(list(self.document_summaries.values()))
+            result = claude_assistant.generate_document_summary(json_data)
+            result["filename"] = file_name
+            self.document_summaries[file_name] = result
 
         # Save updated summaries
         self._save_summaries()
-        return summary
+        return result
 
-    @base_error_handler(logger)
+    @base_error_handler
     def _save_summaries(self):
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         try:
@@ -154,11 +154,11 @@ class VectorDB:
         except Exception as e:
             logger.error(f"Failed to save document summaries: {e}")
 
-    @base_error_handler(logger)
+    @base_error_handler
     def get_document_summaries(self) -> list[str]:
         return list(self.document_summaries.values())
 
-    @base_error_handler(logger)
+    @base_error_handler
     def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
         """Checks if chunks are already added to the database based on chunk ids"""
         try:
@@ -178,7 +178,7 @@ class VectorDB:
             logger.error(f"Error checking document existence: {e}")
             return False, document_ids
 
-    @base_error_handler(logger)
+    @base_error_handler
     def query(self, user_query: str | list[str], n_results: int = 5):
         """
         Handles both a single query and multiple queris
@@ -192,13 +192,13 @@ class VectorDB:
         )
         return search_results
 
-    @base_error_handler(logger)
+    @base_error_handler
     def reset_database(self):
         self.client.delete_collection(self.collection_name)
         self.collection = self.client.create_collection(
             self.collection_name, embedding_function=self.embedding_function
         )
-        self.document_summaries = []
+        self.document_summaries = {}
         # Delete the summaries file
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         if os.path.exists(summaries_file):
