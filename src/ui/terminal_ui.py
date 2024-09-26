@@ -10,6 +10,7 @@ def run_terminal_ui(claude_assistant):
     print("Welcome to OmniClaude! How can I assist you today?")
     while True:
         user_message = input("You: ")
+        print()  # new line after user input
         if user_message.lower() in ["exit", "quit"]:
             break
 

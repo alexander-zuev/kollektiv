@@ -12,11 +12,3 @@ def test_app_initialization():
     assert claude_assistant is not None
     assert reranker is not None
     assert retriever is not None
-
-
-# test response
-# test streaming response
-# test streaming tool use
-# test non-streaming tool use
-# test conversation history
-# test tool use conversation history
