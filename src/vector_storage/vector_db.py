@@ -140,9 +140,6 @@ class VectorDB:
             summary = claude_assistant.generate_document_summary(json_data)
             self.document_summaries[file_name] = summary
 
-        # # Update Claude's system prompt with all document summaries
-        # claude_assistant.update_system_prompt(list(self.document_summaries.values()))
-
         # Save updated summaries
         self._save_summaries()
         return summary
@@ -200,7 +197,7 @@ class VectorDB:
         self.collection = self.client.create_collection(
             self.collection_name, embedding_function=self.embedding_function
         )
-        self.document_summaries = []
+        self.document_summaries = {}
         # Delete the summaries file
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         if os.path.exists(summaries_file):
