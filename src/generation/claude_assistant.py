@@ -1,6 +1,10 @@
+import json
 import uuid
 from collections.abc import Generator
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.vector_storage.vector_db import VectorDB  # Import only for type checking
 
 import anthropic
 import tiktoken
@@ -92,7 +96,12 @@ class ClaudeAssistant:
     :param model_name: Name of the language model to be used.
     """
 
-    def __init__(self, api_key: str = ANTHROPIC_API_KEY, model_name: str = "claude-3-5-sonnet-20240620"):
+    def __init__(
+        self,
+        vector_db: "VectorDB",  # Use string literal for type hint
+        api_key: str = ANTHROPIC_API_KEY,
+        model_name: str = "claude-3-5-sonnet-20240620",
+    ):
         self.client = None
         self.api_key = api_key
         self.model_name = model_name
@@ -155,6 +164,7 @@ class ClaudeAssistant:
         self.tools: list[dict[str, Any]] = []
         self.extra_headers = {"anthropic-beta": "prompt-caching-2024-07-31"}
         self.retriever = None
+        self.vector_db = vector_db
 
         self._init()
 
@@ -164,18 +174,22 @@ class ClaudeAssistant:
         self.conversation_history = ConversationHistory()
 
         self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
-
         logger.debug("Claude assistant successfully initialized.")
 
     @base_error_handler
-    def update_system_prompt(self, document_summaries: list[dict[str, Any]]):
+    def _update_system_prompt(self, document_summaries: list[dict[str, Any]]):
         """
         :param document_summaries: List of dictionaries containing summary information to be incorporated into
         the system prompt.
         :return: None
         """
         logger.info(f"Loading {len(document_summaries)} summaries")
-        summaries_text = "\n".join(f"- {summary['summary']}" for summary in document_summaries)
+        summaries_text = "\n\n".join(
+            f"* file: {summary['filename']}:\n"
+            f"* summary: {summary['summary']}\n"
+            f"* keywords: {', '.join(summary['keywords'])}\n"
+            for summary in document_summaries
+        )
         self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
         logger.debug(f"Updated system prompt: {self.system_prompt}")
 
@@ -456,47 +470,89 @@ class ClaudeAssistant:
         unique_titles = {chunk["metadata"]["page_title"] for chunk in chunks}
 
         # Select diverse content samples
-        sample_chunks = self._select_diverse_chunks(chunks, 5)
+        sample_chunks = self._select_diverse_chunks(chunks, 15)
         content_samples = [chunk["data"]["text"][:300] for chunk in sample_chunks]
 
         # Construct the summary prompt
-        summary_prompt = f"""
-        Generate a concise yet informative summary of the following documentation. Focus on key topics, themes, and the
-         overall structure of the content.
+        system_prompt = """
+        You are a Document Analysis AI. Your task is to generate accurate, relevant and concise document summaries and
+        a list of key topics (keywords) based on a subset of chunks shown to you. Always respond in the following JSON
+        format.
+
+        General instructions:
+        1. Provide a 150-200 word summary that captures the essence of the documentation.
+        2. Mention any notable features or key points that stand out.
+        3. If applicable, briefly describe the type of documentation (e.g., API reference, user guide, etc.).
+        4. Do not use phrases like "This documentation covers" or "This summary describes". Start directly
+        with the key information.
+
+        JSON Format:
+        {
+          "summary": "A concise summary of the document",
+          "keywords": ["keyword1", "keyword2", "keyword3", ...]
+        }
+
+        Ensure your entire response is a valid JSON
+        """
+
+        user_message = f"""
+        Analyze the following document and provide a list of keywords (key topics).
 
         Document Metadata:
         - Unique URLs: {len(unique_urls)}
-        - Unique Titles: {len(unique_titles)}
+        - Unique Titles: {unique_titles}
 
         Content Structure:
         {self._summarize_content_structure(chunks)}
 
-        Content Samples:
+        Chunk Samples:
         {self._format_content_samples(content_samples)}
 
-        Instructions:
-        1. Provide a 150-200 word summary that captures the essence of the documentation.
-        2. Highlight the main topics or sections covered.
-        3. Mention any notable features or key points that stand out.
-        4. If applicable, briefly describe the type of documentation (e.g., API reference, user guide, etc.).
-        5. Do not use phrases like "This documentation covers" or "This summary describes". Start directly
-        with the key information.
         """
 
         response = self.client.messages.create(
             model=self.model_name,
-            max_tokens=300,
-            system="You are an expert at summarizing technical documentation concisely and accurately. Your summaries"
-            " capture the essence of the content, making it easy for users to understand the scope and main "
-            "topics of the documentation.",
-            messages=[{"role": "user", "content": summary_prompt}],
+            max_tokens=450,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
         )
 
-        summary = response.content[0].text
+        summary, keywords = self._parse_summary(response)
 
         return {
             "summary": summary,
+            "keywords": keywords,
         }
+
+    @base_error_handler
+    def _parse_summary(self, response: Message):
+        """Takes an Anthropic Message object
+        Returns a dictionary with keys:
+        - summary: generated document summary
+        - keywords: generated list of keywords"""
+
+        content = response.content[0].text
+        logger.debug(f"Attempting to parse the summary json: {content}")
+        try:
+            parsed = json.loads(content)
+            return parsed["summary"], parsed["keywords"]
+        except json.JSONDecodeError:
+            logger.error("Error: Response is not valid JSON")
+            return self._extract_data_from_text(content)
+        except KeyError as e:
+            logger.error(f"Error: JSON does not contain expected keys: {e}")
+            return self._extract_data_from_text(content)
+
+    @base_error_handler
+    def _extract_data_from_text(self, text):
+        # Fallback method to extract data if JSON parsing fails
+        summary = ""
+        keywords = []
+        if "summary:" in text.lower():
+            summary = text.lower().split("summary:")[1].split("keywords:")[0].strip()
+        if "keywords:" in text.lower():
+            keywords = text.lower().split("keywords:")[1].strip().split(",")
+        return summary, [k.strip() for k in keywords]
 
     def _select_diverse_chunks(self, chunks: list[dict[str, Any]], n: int) -> list[dict[str, Any]]:
         step = max(1, len(chunks) // n)

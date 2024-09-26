@@ -134,15 +134,16 @@ class VectorDB:
 
         # Generate summary for the entire file if not already present
         if file_name in self.document_summaries:
-            summary = self.document_summaries[file_name]
+            result = self.document_summaries[file_name]
         else:
             logger.info("Generating summary for the entire file.")
-            summary = claude_assistant.generate_document_summary(json_data)
-            self.document_summaries[file_name] = summary
+            result = claude_assistant.generate_document_summary(json_data)
+            result["filename"] = file_name
+            self.document_summaries[file_name] = result
 
         # Save updated summaries
         self._save_summaries()
-        return summary
+        return result
 
     @base_error_handler
     def _save_summaries(self):

@@ -18,19 +18,21 @@ class ComponentInitializer:
             logger.info("Resetting database...")
             vector_db.reset_database()
 
-        claude_assistant = ClaudeAssistant()
+        claude_assistant = ClaudeAssistant(vector_db=vector_db)
 
         files_to_load = [
-            "supabase_com_docs_guides_ai_20240917_103658-chunked.json",
+            # "supabase_com_docs_guides_ai_20240917_103658-chunked.json",
             "docs_anthropic_com_en_docs_20240922_174102-chunked.json",
-            "docs_llamaindex_ai_en_stable_20240917_090349-chunked.json",
-            "docs_llamaindex_ai_en_stable_examples_20240922_173959-chunked.json",
-            "langchain-ai_github_io_langgraph_how-tos_20240922_174234-chunked.json",
+            # "docs_llamaindex_ai_en_stable_20240917_090349-chunked.json",
+            # "docs_llamaindex_ai_en_stable_examples_20240922_173959-chunked.json",
+            # "langchain-ai_github_io_langgraph_how-tos_20240922_174234-chunked.json",
         ]
         for file_name in files_to_load:
             document_loader = DocumentProcessor(file_name)
             json_data = document_loader.load_json()
             vector_db.add_documents(json_data, claude_assistant, file_name)
+
+        claude_assistant._update_system_prompt(vector_db.get_document_summaries())
 
         reranker = Reranker()
         retriever = ResultRetriever(vector_db=vector_db, reranker=reranker)

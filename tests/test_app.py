@@ -4,7 +4,7 @@ from src.vector_storage.vector_db import Reranker, ResultRetriever, VectorDB
 
 def test_app_initialization():
     vector_db = VectorDB()
-    claude_assistant = ClaudeAssistant()
+    claude_assistant = ClaudeAssistant(vector_db)
     reranker = Reranker()
     retriever = ResultRetriever(vector_db=vector_db, reranker=reranker)
 
@@ -12,3 +12,11 @@ def test_app_initialization():
     assert claude_assistant is not None
     assert reranker is not None
     assert retriever is not None
+
+
+# test response
+# test streaming response
+# test streaming tool use
+# test non-streaming tool use
+# test conversation history
+# test tool use conversation history
