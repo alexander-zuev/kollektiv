@@ -1,0 +1,28 @@
+{
+  "docs_anthropic_com_en_docs_20240922_174102-chunked.json": {
+    "summary": "This documentation covers Anthropic's Claude AI model and its various capabilities. It includes guides on prompt engineering, model selection, and specific use cases like legal summarization and vision tasks. The documentation explains features such as tool use (function calling), embeddings, and prompt caching. It also provides information on model deprecations, security considerations, and best practices for using Claude effectively. The content is structured with detailed sections on topics like reducing latency, mitigating hallucinations, and implementing advanced techniques like chain-of-thought prompting. Overall, it serves as a comprehensive resource for developers and users working with Claude across different applications and scenarios.",
+    "keywords": [
+      "Claude AI",
+      "Prompt engineering",
+      "Tool use",
+      "Embeddings",
+      "Vision tasks",
+      "Legal summarization",
+      "Model selection",
+      "Latency reduction",
+      "Hallucination mitigation",
+      "Security and compliance",
+      "JSON mode",
+      "Chain-of-thought prompting",
+      "Prompt caching",
+      "API integration",
+      "Model deprecation",
+      "Evaluation tools",
+      "Google Sheets add-on",
+      "Voyage AI",
+      "Context window",
+      "Fine-tuning"
+    ],
+    "filename": "docs_anthropic_com_en_docs_20240922_174102-chunked.json"
+  }
+}

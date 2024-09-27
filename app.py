@@ -1,5 +1,3 @@
-import logging
-
 from src.core.component_initializer import ComponentInitializer
 from src.ui.terminal_ui import run_terminal_ui
 from src.utils.decorators import application_level_handler
@@ -19,4 +17,4 @@ def main(debug: bool = False, reset_db: bool = False):
 
 
 if __name__ == "__main__":
-    main(debug=True, reset_db=True)  # Set debug=True to enable debug logging
+    main(debug=True, reset_db=False)  # Set debug=True to enable debug logging
