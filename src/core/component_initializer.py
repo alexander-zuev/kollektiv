@@ -1,4 +1,8 @@
+from os import listdir
+from os.path import isfile, join
+
 from src.generation.claude_assistant import ClaudeAssistant
+from src.utils.config import PROCESSED_DATA_DIR
 from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
 from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, VectorDB
@@ -8,29 +12,41 @@ logger = get_logger()
 
 class ComponentInitializer:
 
+    def __init__(self, reset_db: bool = False, load_all_docs: bool = False, files: list[str] | None = None):
+        self.reset_db = reset_db
+        self.files_dir = PROCESSED_DATA_DIR
+        self.files = files if files is not None else []
+        self.load_all = load_all_docs
+
+    def load_all_docs(self) -> list[str]:
+        """Loads all docs into the system"""
+        return [f for f in listdir(self.files_dir) if isfile(join(self.files_dir, f))]
+
+    def load_selected_docs(self) -> list[str]:
+        """Loads only user-selected docs into the system"""
+        return self.files
+
     @base_error_handler
-    def initialize(self, reset_db: bool = False):
+    def init(self):
         logger.info("Initializing components...")
 
         vector_db = VectorDB()
+        reader = DocumentProcessor()
 
-        if reset_db:
+        if self.reset_db:
             logger.info("Resetting database...")
             vector_db.reset_database()
 
         claude_assistant = ClaudeAssistant(vector_db=vector_db)
 
-        files_to_load = [
-            # "supabase_com_docs_guides_ai_20240917_103658-chunked.json",
-            "docs_anthropic_com_en_docs_20240922_174102-chunked.json",
-            # "docs_llamaindex_ai_en_stable_20240917_090349-chunked.json",
-            # "docs_llamaindex_ai_en_stable_examples_20240922_173959-chunked.json",
-            # "langchain-ai_github_io_langgraph_how-tos_20240922_174234-chunked.json",
-        ]
-        for file_name in files_to_load:
-            document_loader = DocumentProcessor(file_name)
-            json_data = document_loader.load_json()
-            vector_db.add_documents(json_data, claude_assistant, file_name)
+        if self.load_all:
+            docs_to_load = self.load_all_docs()
+        else:
+            docs_to_load = self.load_selected_docs()
+
+        for file in docs_to_load:
+            documents = reader.load_json(file)
+            vector_db.add_documents(documents, claude_assistant, file)
 
         claude_assistant._update_system_prompt(vector_db.get_document_summaries())
 

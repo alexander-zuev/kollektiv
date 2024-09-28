@@ -10,26 +10,26 @@ import cohere
 from src.generation.claude_assistant import ClaudeAssistant
 from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR, VECTOR_STORAGE_DIR
 from src.utils.decorators import base_error_handler
-from src.utils.logger import get_logger
+from src.utils.logger import configure_logging, get_logger
 
 logger = get_logger()
 
 
 class DocumentProcessor:
-    def __init__(self, file_name):
-        self.file_name = file_name
-        self.file_path = os.path.join(PROCESSED_DATA_DIR, file_name)
+    def __init__(self):
+        self.processed_dir = PROCESSED_DATA_DIR
 
-    def load_json(self) -> list[dict]:
+    def load_json(self, filename: str) -> list[dict]:
         try:
-            with open(self.file_path) as f:
+            filepath = os.path.join(self.processed_dir, filename)
+            with open(filepath) as f:
                 data = json.load(f)
             return data
         except FileNotFoundError:
-            logger.error(f"File not found: {self.file_path}")
+            logger.error(f"File not found: {filename}")
             raise
         except json.JSONDecodeError:
-            logger.error(f"Invalid JSON in file: {self.file_path}")
+            logger.error(f"Invalid JSON in file: {filename}")
             raise
 
 
@@ -113,11 +113,7 @@ class VectorDB:
         all_exist, missing_ids = self.check_documents_exist(ids)
 
         if all_exist:
-            logger.info(
-                f"All documents from {file_name} already loaded. Proceeding to generate or load summary for "
-                f"the "
-                f"entire file."
-            )
+            logger.info(f"All documents from {file_name} already loaded.")
         else:
             # Prepare data for missing documents only
             missing_indices = [ids.index(m_id) for m_id in missing_ids]
@@ -135,8 +131,9 @@ class VectorDB:
         # Generate summary for the entire file if not already present
         if file_name in self.document_summaries:
             result = self.document_summaries[file_name]
+            logger.info(f"Loading existing summary for {file_name}.")
         else:
-            logger.info("Generating summary for the entire file.")
+            logger.info(f"Summary for {file_name} not found, generating new one.")
             result = claude_assistant.generate_document_summary(json_data)
             result["filename"] = file_name
             self.document_summaries[file_name] = result
@@ -324,8 +321,15 @@ class ResultRetriever:
 
 
 def main():
+    configure_logging()
     vector_db = VectorDB()
     vector_db.reset_database()
+    claude_assistant = ClaudeAssistant(vector_db=vector_db)
+
+    file = "langchain-ai_github_io_langgraph_20240928_143920-chunked.json"
+    reader = DocumentProcessor()
+    documents = reader.load_json(file)
+    vector_db.add_documents(documents, claude_assistant, file)
 
 
 if __name__ == "__main__":

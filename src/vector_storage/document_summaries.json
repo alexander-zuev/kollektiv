@@ -1,0 +1,28 @@
+{
+  "docs_anthropic_com_en_20240928_135426-chunked.json": {
+    "summary": "This documentation covers a wide range of topics related to Claude, an AI assistant developed by Anthropic. It includes guides on prompt engineering, model capabilities, API usage, and various use cases. Key sections cover text generation, vision capabilities, embeddings, and tools for evaluation and content moderation. The documentation also provides information on model versions, rate limits, and best practices for using Claude effectively. It addresses advanced topics like reducing latency, mitigating hallucinations, and implementing Claude in customer support scenarios. The content is structured with multiple levels of headings, offering both high-level overviews and detailed technical information for developers and users of Claude.",
+    "keywords": [
+      "Claude",
+      "Anthropic",
+      "AI assistant",
+      "prompt engineering",
+      "API",
+      "text generation",
+      "vision",
+      "embeddings",
+      "content moderation",
+      "model versions",
+      "rate limits",
+      "latency reduction",
+      "hallucination mitigation",
+      "customer support",
+      "JSON mode",
+      "tool use",
+      "streaming",
+      "evaluation",
+      "long context prompting",
+      "SDK"
+    ],
+    "filename": "docs_anthropic_com_en_20240928_135426-chunked.json"
+  }
+}

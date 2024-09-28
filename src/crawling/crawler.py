@@ -10,11 +10,12 @@ from uuid import uuid4
 import requests
 from firecrawl import FirecrawlApp
 from pydantic import HttpUrl
-from requests.exceptions import RequestException
+from requests.exceptions import HTTPError, RequestException
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.utils.config import FIRECRAWL_API_KEY, JOB_FILE_DIR, RAW_DATA_DIR, SRC_ROOT
 from src.utils.decorators import base_error_handler
-from src.utils.logger import get_logger
+from src.utils.logger import configure_logging, get_logger
 
 logger = get_logger()
 
@@ -58,6 +59,21 @@ class FireCrawler:
 
         return result
 
+    @staticmethod
+    def is_retryable_error(exception):
+        """Return True if the exception is an HTTPError with a status code we want to retry."""
+        if isinstance(exception, HTTPError):
+            return exception.response.status_code in [429, 500, 502, 503, 504]
+        return False
+
+    @retry(
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(HTTPError),
+        wait=wait_exponential(multiplier=1, min=30, max=300),
+        before_sleep=lambda retry_state: logger.info(
+            f"Retryable error occurred. Retrying in {retry_state.next_action.sleep} seconds..."
+        ),
+    )
     @base_error_handler
     def async_crawl_url(self, urls: list[HttpUrl], page_limit: int = 25) -> dict[str, Any]:
         """
@@ -74,8 +90,8 @@ class FireCrawler:
             params = {
                 "limit": page_limit,
                 "maxDepth": 5,
-                "includePaths": [],
-                "excludePaths": [],
+                "includePaths": ["/tutorials/*", "/how-tos/*", "/concepts/*"],
+                "excludePaths": ["/langgraph/cloud/*"],
                 "scrapeOptions": {
                     "formats": [
                         "markdown",
@@ -84,43 +100,53 @@ class FireCrawler:
             }
 
             logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
-            response = self.app.async_crawl_url(url, params)
+            try:
+                response = self.app.async_crawl_url(url, params)
+                crawl_job_id = response["id"]  # return the id from FireCrawl
+                logger.info(f"Received job ID: {crawl_job_id}")
 
-            crawl_job_id = response["id"]  # return the id from FireCrawl
-            logger.info(f"Received job ID: {crawl_job_id}")
+                # create a job with this id
+                self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
 
-            # create a job with this id
-            self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
+                # check job status
+                job_failed = False
+                logger.info("***Polling job status***")
+                job_status = self._poll_job_results(crawl_job_id)
+                if job_status == "failed":
+                    # return {"status": "failed", "job_id": crawl_job_id}
+                    logger.warning(f"Job {crawl_job_id} failed. Attempting to retrieve partial results.")
+                    job_failed = True
 
-            # check job status
-            job_failed = False
-            logger.info("***Polling job status***")
-            job_status = self._poll_job_results(crawl_job_id)
-            if job_status == "failed":
-                # return {"status": "failed", "job_id": crawl_job_id}
-                logger.warning(f"Job {crawl_job_id} failed. Attempting to retrieve partial results.")
-                job_failed = True
+                # get all the results
+                crawl_results = self._get_all_crawl_results(crawl_job_id)
+                unique_links = self._extract_unique_links(crawl_results)
+                logger.info(f"Job {crawl_job_id} results received.")
+                logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
 
-            # get all the results
-            crawl_results = self._get_all_crawl_results(crawl_job_id)
-            unique_links = self._extract_unique_links(crawl_results)
-            logger.info(f"Job {crawl_job_id} results received.")
-            logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
+                # save the results
+                crawl_results = {
+                    "job_failed": job_failed,
+                    "input_url": url,
+                    "total_pages": len(crawl_results),
+                    "unique_links": unique_links,
+                    "data": crawl_results,
+                }
 
-            # save the results
-            crawl_results = {
-                "job_failed": job_failed,
-                "input_url": url,
-                "total_pages": len(crawl_results),
-                "unique_links": unique_links,
-                "data": crawl_results,
-            }
+                self.save_results(crawl_results, method="crawl")
 
-            self.save_results(crawl_results, method="crawl")
+                # complete the job
+                self.complete_job(crawl_job_id)
+                all_results.append(crawl_results)
 
-            # complete the job
-            self.complete_job(crawl_job_id)
-            all_results.append(crawl_results)
+            except HTTPError as e:
+                logger.warning(f"Received HTTPError while crawling {url}: {e}")
+                if self.is_retryable_error(e):
+                    raise  # raise to the decorator to handle
+                else:
+                    logger.error(f"HTTPError occurred while crawling {url}: {e}")
+                    # Handle other HTTP errors without retrying
+                    continue  # Skip to the next URL
+
         return {"input_urls": urls, "results": all_results}
 
     @base_error_handler
@@ -336,25 +362,19 @@ class FireCrawler:
                     md_file.write(f"```markdown\n{item['markdown']}\n```\n\n")
                     md_file.write("----\n\n")
 
-        self.logger.info(f"Example Markdown file created: {md_output_filepath}")
+        logger.info(f"Example Markdown file created: {md_output_filepath}")
 
 
 # Test usage
 def main():
+    configure_logging(debug=True)
     crawler = FireCrawler(FIRECRAWL_API_KEY)
 
-    # supabase_ai_map = crawler.map_url("https://supabase.com/docs/guides/ai")
-    # print("Map results:")
-    # print(f"Total number of links: {supabase_ai_map['total_links']}")
-    # print("All links:")
-    # print(supabase_ai_map['links'])
-
-    # Testing crawl_url
+    # Crawling documentation
     urls_to_crawl = [
-        "https://docs.llamaindex.ai/en/stable/examples/evaluation/",  # replace this
+        "https://langchain-ai.github.io/langgraph/",  # replace this
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=1)  # define page limit
-    # crawler.build_example_file("cra_docs_en_20240912_082455.json")
+    crawler.async_crawl_url(urls_to_crawl, page_limit=250)
 
 
 if __name__ == "__main__":

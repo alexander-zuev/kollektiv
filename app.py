@@ -1,22 +1,22 @@
-import logging
-
 from src.core.component_initializer import ComponentInitializer
 from src.ui.terminal_ui import run_terminal_ui
-from src.utils.decorators import application_level_handler
+from src.utils.decorators import base_error_handler
 from src.utils.logger import configure_logging
 
 
-@application_level_handler
+@base_error_handler
 def main(debug: bool = False, reset_db: bool = False):
     # Configure logging before importing other modules
     configure_logging(debug=debug)
 
+    docs = ["docs_anthropic_com_en_20240928_135426-chunked.json"]
+
     # Initialize components
-    initializer = ComponentInitializer()
-    claude_assistant = initializer.initialize(reset_db=reset_db)
+    initializer = ComponentInitializer(reset_db=reset_db, load_all_docs=False, files=docs)
+    claude_assistant = initializer.init()
 
     run_terminal_ui(claude_assistant)
 
 
 if __name__ == "__main__":
-    main(debug=True, reset_db=True)  # Set debug=True to enable debug logging
+    main(debug=False, reset_db=False)  # Set debug=True to enable debug logging
