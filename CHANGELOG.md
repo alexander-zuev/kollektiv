@@ -8,14 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- added Anthropic API exception handling
 
 ### Changed
 
 ### Deprecated
 
 ### Removed
+- removed redundant QueryGenerator class
 
 ### Fixed
+- fixed errors in streaming & non-streaming responses
 
 ### Security
 

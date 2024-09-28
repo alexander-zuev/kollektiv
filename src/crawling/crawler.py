@@ -10,43 +10,43 @@ from uuid import uuid4
 import requests
 from firecrawl import FirecrawlApp
 from pydantic import HttpUrl
-from requests.exceptions import RequestException
+from requests.exceptions import HTTPError, RequestException
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.utils.config import FIRECRAWL_API_KEY, JOB_FILE_DIR, RAW_DATA_DIR, SRC_ROOT
-from src.utils.decorators import error_handler
-from src.utils.logger import setup_logger
+from src.utils.decorators import base_error_handler
+from src.utils.logger import configure_logging, get_logger
 
-logger = setup_logger(__name__, "app.log")
+logger = get_logger()
 
 
 class FireCrawler:
     def __init__(self, api_key: str, data_dir: str = RAW_DATA_DIR, jobs_dir: str = JOB_FILE_DIR) -> None:
         self.api_key: str = api_key
-        self.logger = logger
         self.current_job_id: str
         self.raw_data_dir: str = data_dir
         self.jobs_dir: str = jobs_dir
         self.app = self._initialize_app()
 
-    @error_handler(logger)
+    @base_error_handler
     def _initialize_app(self):
         app = FirecrawlApp(api_key=self.api_key)
-        self.logger.info("FireCrawler app initialized successfully.")
+        logger.info("FireCrawler app initialized successfully.")
         return app
 
-    @error_handler(logger)
+    @base_error_handler
     def map_url(self, url: HttpUrl) -> dict[str, Any] | None:
         """Input a website and get all the urls on the website - extremely fast"""
-        self.logger.info(f"Mapping URL: {url}")
+        logger.info(f"Mapping URL: {url}")
 
         site_map = self.app.map_url(url)
-        self.logger.info("Map results received. Attempting to parse the results.")
+        logger.info("Map results received. Attempting to parse the results.")
 
         # extract links and calculate total
         links = site_map
         total_links = len(links)
 
-        self.logger.info(f"Total number of links received: {total_links}")
+        logger.info(f"Total number of links received: {total_links}")
 
         result = {
             "status": "success",
@@ -59,7 +59,22 @@ class FireCrawler:
 
         return result
 
-    @error_handler(logger)
+    @staticmethod
+    def is_retryable_error(exception):
+        """Return True if the exception is an HTTPError with a status code we want to retry."""
+        if isinstance(exception, HTTPError):
+            return exception.response.status_code in [429, 500, 502, 503, 504]
+        return False
+
+    @retry(
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type(HTTPError),
+        wait=wait_exponential(multiplier=1, min=30, max=300),
+        before_sleep=lambda retry_state: logger.info(
+            f"Retryable error occurred. Retrying in {retry_state.next_action.sleep} seconds..."
+        ),
+    )
+    @base_error_handler
     def async_crawl_url(self, urls: list[HttpUrl], page_limit: int = 25) -> dict[str, Any]:
         """
         :param urls: List of URLs to be crawled.
@@ -75,57 +90,66 @@ class FireCrawler:
             params = {
                 "limit": page_limit,
                 "maxDepth": 5,
-                "includePaths": [],
-                "excludePaths": [],
+                "includePaths": ["/tutorials/*", "/how-tos/*", "/concepts/*"],
+                "excludePaths": ["/langgraph/cloud/*"],
                 "scrapeOptions": {
                     "formats": [
                         "markdown",
-                        "html",
                     ]
                 },
             }
 
-            self.logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
-            response = self.app.async_crawl_url(url, params)
+            logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
+            try:
+                response = self.app.async_crawl_url(url, params)
+                crawl_job_id = response["id"]  # return the id from FireCrawl
+                logger.info(f"Received job ID: {crawl_job_id}")
 
-            crawl_job_id = response["id"]  # return the id from FireCrawl
-            self.logger.info(f"Received job ID: {crawl_job_id}")
+                # create a job with this id
+                self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
 
-            # create a job with this id
-            self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
+                # check job status
+                job_failed = False
+                logger.info("***Polling job status***")
+                job_status = self._poll_job_results(crawl_job_id)
+                if job_status == "failed":
+                    # return {"status": "failed", "job_id": crawl_job_id}
+                    logger.warning(f"Job {crawl_job_id} failed. Attempting to retrieve partial results.")
+                    job_failed = True
 
-            # check job status
-            job_failed = False
-            self.logger.info("***Polling job status***")
-            job_status = self._poll_job_results(crawl_job_id)
-            if job_status == "failed":
-                # return {"status": "failed", "job_id": crawl_job_id}
-                self.logger.warning(f"Job {crawl_job_id} failed. Attempting to retrieve partial results.")
-                job_failed = True
+                # get all the results
+                crawl_results = self._get_all_crawl_results(crawl_job_id)
+                unique_links = self._extract_unique_links(crawl_results)
+                logger.info(f"Job {crawl_job_id} results received.")
+                logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
 
-            # get all the results
-            crawl_results = self._get_all_crawl_results(crawl_job_id)
-            unique_links = self._extract_unique_links(crawl_results)
-            self.logger.info(f"Job {crawl_job_id} results received.")
-            self.logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
+                # save the results
+                crawl_results = {
+                    "job_failed": job_failed,
+                    "input_url": url,
+                    "total_pages": len(crawl_results),
+                    "unique_links": unique_links,
+                    "data": crawl_results,
+                }
 
-            # save the results
-            crawl_results = {
-                "job_failed": job_failed,
-                "input_url": url,
-                "total_pages": len(crawl_results),
-                "unique_links": unique_links,
-                "data": crawl_results,
-            }
+                self.save_results(crawl_results, method="crawl")
 
-            self.save_results(crawl_results, method="crawl")
+                # complete the job
+                self.complete_job(crawl_job_id)
+                all_results.append(crawl_results)
 
-            # complete the job
-            self.complete_job(crawl_job_id)
-            all_results.append(crawl_results)
+            except HTTPError as e:
+                logger.warning(f"Received HTTPError while crawling {url}: {e}")
+                if self.is_retryable_error(e):
+                    raise  # raise to the decorator to handle
+                else:
+                    logger.error(f"HTTPError occurred while crawling {url}: {e}")
+                    # Handle other HTTP errors without retrying
+                    continue  # Skip to the next URL
+
         return {"input_urls": urls, "results": all_results}
 
-    @error_handler(logger)
+    @base_error_handler
     def _poll_job_results(self, job_id: str, attempts=None) -> str:
         while True:
             response = self.check_job_status(job_id)
@@ -134,29 +158,29 @@ class FireCrawler:
             if job_status in ["completed", "failed"]:
                 return job_status
 
-            self.logger.info(f"Job {job_id} status: {job_status}. Retrying in 30 seconds...")
+            logger.info(f"Job {job_id} status: {job_status}. Retrying in 30 seconds...")
             time.sleep(30)
 
-    @error_handler(logger)
+    @base_error_handler
     def _get_all_crawl_results(self, job_id: str) -> list[dict[str, Any]]:
         """Fetch all results for a given crawl job, handling pagination"""
         next_url = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
         all_data = []
 
         while next_url:
-            self.logger.info("Accumulating job results.")
+            logger.info("Accumulating job results.")
             batch_data, next_url = self._get_next_results(next_url)
 
             # process the first (or only) batch of data
             all_data.extend(batch_data["data"])
 
             if not next_url:
-                self.logger.info("No more pages to fetch.")
+                logger.info("No more pages to fetch.")
                 break  # exit if no more pages to fetch
 
         return all_data
 
-    @error_handler(logger)
+    @base_error_handler
     def _get_next_results(self, next_url: HttpUrl) -> tuple[dict[str, Any], str | None]:
         """Retrieves the next batch of the results"""
         max_retries = 15
@@ -164,19 +188,19 @@ class FireCrawler:
 
         for attempt in range(max_retries):
             try:
-                self.logger.info(f"Trying to fetch the batch results for {next_url}")
+                logger.info(f"Trying to fetch the batch results for {next_url}")
                 url = next_url
                 headers = {"Authorization": f"Bearer {self.api_key}"}
                 response = requests.get(url, headers=headers)
 
                 if response.status_code != 200:
-                    self.logger.warning(f"Received status code {response.status_code} from API.")
+                    logger.warning(f"Received status code {response.status_code} from API.")
                     if attempt == max_retries - 1:
-                        self.logger.error(f"Failed to fetch results after {max_retries} attempts.")
+                        logger.error(f"Failed to fetch results after {max_retries} attempts.")
                         break
                     else:
                         wait_time = backoff_factor**attempt
-                        self.logger.warning(
+                        logger.warning(
                             f"Request failed with status code {response.status_code}. "
                             f"Retrying in {wait_time} seconds..."
                         )
@@ -188,18 +212,18 @@ class FireCrawler:
                 return batch_data, next_url
             except RequestException as e:
                 if attempt == max_retries - 1:
-                    self.logger.error(f"Failed to fetch results after {max_retries} attempts: {str(e)}")
+                    logger.error(f"Failed to fetch results after {max_retries} attempts: {str(e)}")
                     raise
                 else:
                     wait_time = backoff_factor**attempt
-                    self.logger.warning(f"Request failed. Retrying in {wait_time} seconds...")
+                    logger.warning(f"Request failed. Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
 
         # raise Exception("Failed to fetch results after maximum retries")
-        self.logger.error("Failed to fetch results after maximum retries or received error responses.")
+        logger.error("Failed to fetch results after maximum retries or received error responses.")
         return {"data": []}, None
 
-    @error_handler(logger)
+    @base_error_handler
     def save_results(self, result: dict[str, Any], method: str) -> None:
         """Takes as an input the results of the job, saves it as a json file in the data directory"""
         filename = self._create_file_name(result["input_url"], method)
@@ -211,9 +235,9 @@ class FireCrawler:
         # build an example file
         self.build_example_file(filename)
 
-        self.logger.info(f"Results saved to file: {filepath}")
+        logger.info(f"Results saved to file: {filepath}")
 
-    @error_handler(logger)
+    @base_error_handler
     def _create_file_name(self, url: HttpUrl, method: str) -> str:
         """Creates a filename based on the bare URL and timestamp"""
         parsed_url = urlparse(url)
@@ -222,12 +246,12 @@ class FireCrawler:
         timestamp = self._get_timestamp()
         return f"{bare_url}_{timestamp}.json"
 
-    @error_handler(logger)
+    @base_error_handler
     def _get_timestamp(self):
         """Returns the current timestamp to be used for saving the results"""
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    @error_handler(logger)
+    @base_error_handler
     def create_job(self, job_id: str, method: str, input_url: HttpUrl) -> None:
         """Creates a job, saving information to jobs.json returned by async_crawl_url method."""
         internal_id = str(uuid4())
@@ -260,12 +284,12 @@ class FireCrawler:
             # update current job id
             self.current_job_id = internal_id
 
-            self.logger.info(f"Created a job with firecrawl id: {job_id} and internal_id: {internal_id}")
+            logger.info(f"Created a job with firecrawl id: {job_id} and internal_id: {internal_id}")
         except OSError as e:
-            self.logger.error(f"Error saving {job_id}: {e}")
+            logger.error(f"Error saving {job_id}: {e}")
             raise
 
-    @error_handler(logger)
+    @base_error_handler
     def complete_job(self, job_id: str) -> None:
         """Finds a job by external id and updates it's status to "completed"."""
         jobs_path = os.path.join(self.jobs_dir, "jobs.json")
@@ -287,22 +311,22 @@ class FireCrawler:
             with open(jobs_path, "w") as f:
                 json.dump(jobs, f, indent=2)
 
-            self.logger.info(f"Job {job_id} marked as completed.")
+            logger.info(f"Job {job_id} marked as completed.")
         except OSError as e:
-            self.logger.error(f"Error marking job {job_id} as completed: {e}")
+            logger.error(f"Error marking job {job_id} as completed: {e}")
             raise
 
-    @error_handler(logger)
+    @base_error_handler
     def check_job_status(self, job_id: str) -> dict[str, Any]:
         """Polls firecrawl for the job result"""
         response = self.app.check_crawl_status(job_id)
-        self.logger.info(
+        logger.info(
             f"Job {job_id} status: {response['status']}."
             f" Completed: {response.get('completed', 'N/A')}/{response.get('total', 'N/A')}"
         )
         return response
 
-    @error_handler(logger)
+    @base_error_handler
     def _extract_unique_links(self, crawl_results: list[dict[str, Any]]) -> list[str]:
         """Extracts unique links in the completed crawl"""
         unique_links = {
@@ -312,7 +336,7 @@ class FireCrawler:
         }
         return list(unique_links)
 
-    @error_handler(logger)
+    @base_error_handler
     def build_example_file(self, filename: str, pages: int = 1) -> None:
         """Extracts n pages into example file to visualize its structure"""
         input_filename = filename
@@ -343,20 +367,14 @@ class FireCrawler:
 
 # Test usage
 def main():
+    configure_logging(debug=True)
     crawler = FireCrawler(FIRECRAWL_API_KEY)
 
-    # supabase_ai_map = crawler.map_url("https://supabase.com/docs/guides/ai")
-    # print("Map results:")
-    # print(f"Total number of links: {supabase_ai_map['total_links']}")
-    # print("All links:")
-    # print(supabase_ai_map['links'])
-
-    # Testing crawl_url
+    # Crawling documentation
     urls_to_crawl = [
-        "https://docs.llamaindex.ai/en/stable/examples/evaluation",  # replace this
+        "https://langchain-ai.github.io/langgraph/",  # replace this
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=1)  # define page limit
-    # crawler.build_example_file("cra_docs_en_20240912_082455.json")
+    crawler.async_crawl_url(urls_to_crawl, page_limit=250)
 
 
 if __name__ == "__main__":

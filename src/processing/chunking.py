@@ -8,10 +8,10 @@ from typing import Any
 import tiktoken
 
 from src.utils.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
-from src.utils.decorators import error_handler
-from src.utils.logger import setup_logger
+from src.utils.decorators import base_error_handler
+from src.utils.logger import configure_logging, get_logger
 
-logger = setup_logger("chunker", "chunking.log")
+logger = get_logger()
 
 
 class MarkdownChunker:
@@ -23,9 +23,9 @@ class MarkdownChunker:
         soft_token_limit: int = 800,
         min_chunk_size: int = 100,
         overlap_percentage: float = 0.05,
+        save: bool = False,
     ):
         self.output_dir = output_dir
-        self.logger = logger
         self.input_filename = input_filename
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         self.max_tokens = max_tokens  # Hard limit
@@ -34,11 +34,11 @@ class MarkdownChunker:
         self.overlap_percentage = overlap_percentage  # 5% overlap
         # Initialize the validator
         self.validator = MarkdownChunkValidator(
-            logger=self.logger,
             min_chunk_size=self.min_chunk_size,
             max_tokens=self.max_tokens,
             output_dir=self.output_dir,
             input_filename=self.input_filename,
+            save=save,
         )
 
         # Precompile regex patterns for performance
@@ -58,7 +58,7 @@ class MarkdownChunker:
         self.code_block_start_pattern = re.compile(r"^(```|~~~)(.*)$")
         self.inline_code_pattern = re.compile(r"`([^`\n]+)`")
 
-    @error_handler(logger)
+    @base_error_handler
     def load_data(self) -> dict[str, Any]:
         """Loads markdown from JSON and prepares for chunking"""
         input_filepath = os.path.join(RAW_DATA_DIR, self.input_filename)
@@ -66,16 +66,16 @@ class MarkdownChunker:
         try:
             with open(input_filepath, encoding="utf-8") as f:
                 doc = json.load(f)
-            self.logger.info(f"{self.input_filename} loaded")
+            logger.info(f"{self.input_filename} loaded")
             return doc
         except FileNotFoundError:
-            self.logger.error(f"File not found: {input_filepath}")
+            logger.error(f"File not found: {input_filepath}")
             raise
         except json.JSONDecodeError:
-            self.logger.error(f"Invalid JSON in file: {input_filepath}")
+            logger.error(f"Invalid JSON in file: {input_filepath}")
             raise
 
-    @error_handler(logger)
+    @base_error_handler
     def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:
         """Iterates through each page in the loaded data"""
         all_chunks = []
@@ -102,7 +102,7 @@ class MarkdownChunker:
         self.validator.validate(all_chunks)
         return all_chunks
 
-    @error_handler(logger)
+    @base_error_handler
     def remove_boilerplate(self, content: str) -> str:
         """Removes navigation and boilerplate content from markdown."""
         # Use precompiled regex
@@ -111,7 +111,7 @@ class MarkdownChunker:
         cleaned_content = re.sub(r"\n{2,}", "\n\n", cleaned_content)
         return cleaned_content.strip()
 
-    @error_handler(logger)
+    @base_error_handler
     def clean_header_text(self, header_text: str) -> str:
         """Cleans unwanted markdown elements and artifacts from header text."""
         # Remove zero-width spaces
@@ -126,7 +126,7 @@ class MarkdownChunker:
             cleaned_text = ""  # Empty out any shell commands mistaken as headers
         return cleaned_text
 
-    @error_handler(logger)
+    @base_error_handler
     def identify_sections(self, page_content: str, page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
         """Identifies sections in the page content based on headers and preserves markdown structures."""
         sections = []
@@ -199,7 +199,7 @@ class MarkdownChunker:
 
         return sections
 
-    @error_handler(logger)
+    @base_error_handler
     def create_chunks(self, sections: list[dict[str, Any]], page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
         page_chunks = []
         for section in sections:
@@ -234,7 +234,7 @@ class MarkdownChunker:
         self._add_overlap(final_chunks)
         return final_chunks
 
-    @error_handler(logger)
+    @base_error_handler
     def _split_section(self, content: str, headers: dict[str, str]) -> list[dict[str, Any]]:  # noqa: C901
         # TODO: refactor this method to reduce complexity
         # Current complexity is necessary for accurate content splitting
@@ -337,7 +337,7 @@ class MarkdownChunker:
 
         return chunks
 
-    @error_handler(logger)
+    @base_error_handler
     def _split_code_block(self, code_block_content: str, code_fence: str) -> list[str]:
         """Splits a code block into smaller chunks without breaking code syntax."""
         lines = code_block_content.strip().split("\n")
@@ -371,7 +371,7 @@ class MarkdownChunker:
                 chunks.append(chunk_content.strip())
         return chunks
 
-    @error_handler(logger)
+    @base_error_handler
     def _adjust_chunks(self, chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Adjust chunks to meet min and max token constraints by merging or splitting."""
         adjusted_chunks = []
@@ -431,7 +431,7 @@ class MarkdownChunker:
                 final_chunks.append(chunk)
         return final_chunks
 
-    @error_handler(logger)
+    @base_error_handler
     def _split_large_chunk(self, chunk: dict[str, Any]) -> list[dict[str, Any]]:
         """Splits a chunk that exceeds 2x max_tokens into smaller chunks."""
         content = chunk["content"]
@@ -457,7 +457,7 @@ class MarkdownChunker:
 
         return chunks
 
-    @error_handler(logger)
+    @base_error_handler
     def _merge_headers(self, headers1: dict[str, str], headers2: dict[str, str]) -> dict[str, str]:
         merged = {}
         for level in ["h1", "h2", "h3"]:
@@ -471,7 +471,7 @@ class MarkdownChunker:
                 merged[level] = ""
         return merged
 
-    @error_handler(logger)
+    @base_error_handler
     def _add_overlap(
         self, chunks: list[dict[str, Any]], min_overlap_tokens: int = 50, max_overlap_tokens: int = 100
     ) -> None:
@@ -518,7 +518,7 @@ class MarkdownChunker:
         last_n_tokens = tokens[-n:]
         return self.tokenizer.decode(last_n_tokens)
 
-    @error_handler(logger)
+    @base_error_handler
     def save_chunks(self, chunks: list[dict[str, Any]]):
         """Saves chunks to output dir"""
         input_name = os.path.splitext(self.input_filename)[0]  # Remove the extension
@@ -526,20 +526,20 @@ class MarkdownChunker:
         output_filepath = os.path.join(self.output_dir, output_filename)
         with open(output_filepath, "w", encoding="utf-8") as f:
             json.dump(chunks, f, indent=2)
-        self.logger.info(f"Chunks saved to {output_filepath}")
+        logger.info(f"Chunks saved to {output_filepath}")
 
-    @error_handler(logger)
+    @base_error_handler
     def _generate_chunk_id(self) -> uuid.UUID:
         """Generates chunk's uuidv4"""
         return uuid.uuid4()
 
-    @error_handler(logger)
+    @base_error_handler
     def _calculate_tokens(self, text: str) -> int:
         """Calculates the number of tokens in a given text using tiktoken"""
         token_count = len(self.tokenizer.encode(text))
         return token_count
 
-    @error_handler(logger)
+    @base_error_handler
     def _create_metadata(self, page_metadata: dict[str, Any], token_count: int) -> dict[str, Any]:
         """Creates metadata dictionary for a chunk"""
         metadata = {
@@ -551,12 +551,12 @@ class MarkdownChunker:
 
 
 class MarkdownChunkValidator:
-    def __init__(self, logger, min_chunk_size, max_tokens, output_dir, input_filename):
-        self.logger = logger
+    def __init__(self, min_chunk_size, max_tokens, output_dir, input_filename, save: bool = False):
         self.min_chunk_size = min_chunk_size
         self.max_tokens = max_tokens
         self.output_dir = output_dir
         self.input_filename = input_filename
+        self.save = save
         # Validation-related attributes
         self.validation_errors = []
         self.total_chunks = 0
@@ -583,7 +583,7 @@ class MarkdownChunkValidator:
 
     def validate(self, chunks):
         self.validate_duplicates(chunks)
-        self.find_incorrect_chunks(chunks)
+        self.find_incorrect_chunks(chunks, save=self.save)
         self.log_summary()
 
     def validate_duplicates(self, chunks: list[dict[str, Any]]) -> None:
@@ -595,7 +595,7 @@ class MarkdownChunkValidator:
             if text in unique_chunks:
                 self.duplicates_removed += 1
                 # Log the duplicate chunk removal
-                self.logger.warning(f"Duplicate chunk found and removed: {chunk['chunk_id']}")
+                logger.warning(f"Duplicate chunk found and removed: {chunk['chunk_id']}")
                 continue
             else:
                 unique_chunks[text] = True
@@ -609,10 +609,10 @@ class MarkdownChunkValidator:
     def log_summary(self):
         """Logs a concise summary of the chunking process"""
         # Total chunks
-        self.logger.info(f"Total chunks created: {self.total_chunks}")
+        logger.info(f"Total chunks created: {self.total_chunks}")
 
         # Duplicate chunks removed
-        self.logger.info(f"Duplicate chunks removed: {self.duplicates_removed}")
+        logger.info(f"Duplicate chunks removed: {self.duplicates_removed}")
 
         # Chunk statistics
         if self.chunk_token_counts:
@@ -621,12 +621,12 @@ class MarkdownChunkValidator:
             max_tokens = max(self.chunk_token_counts)
             p25 = statistics.quantiles(self.chunk_token_counts, n=4)[0]
             p75 = statistics.quantiles(self.chunk_token_counts, n=4)[2]
-            self.logger.info(
+            logger.info(
                 f"Chunk token statistics - Median: {median_tokens}, Min: {min_tokens}, "
                 f"Max: {max_tokens}, 25th percentile: {p25}, 75th percentile: {p75}"
             )
         else:
-            self.logger.warning("No chunks to calculate statistics.")
+            logger.warning("No chunks to calculate statistics.")
 
         # Headers summary
         headers_info = []
@@ -635,7 +635,7 @@ class MarkdownChunkValidator:
             preserved = len(self.headings_preserved.get(level, set()))
             percentage = (preserved / total * 100) if total > 0 else 0
             headers_info.append(f"{level.upper()} preserved: {preserved}/{total} ({percentage:.2f}%)")
-        self.logger.info("Headers summary - " + ", ".join(headers_info))
+        logger.info("Headers summary - " + ", ".join(headers_info))
 
         # Validation errors summary
         if self.validation_errors:
@@ -643,20 +643,20 @@ class MarkdownChunkValidator:
             for error in self.validation_errors:
                 error_counts[error] = error_counts.get(error, 0) + 1
             total_errors = sum(error_counts.values())
-            self.logger.warning(f"Validation issues encountered: {total_errors} issues found.")
+            logger.warning(f"Validation issues encountered: {total_errors} issues found.")
             for error, count in error_counts.items():
-                self.logger.warning(f"Validation error: {error!r} occurred {count} times.")
+                logger.warning(f"Validation error: {error!r} occurred {count} times.")
         else:
-            self.logger.info("No validation issues encountered.")
+            logger.info("No validation issues encountered.")
 
         # Incorrect chunks summary
         incorrect_chunks_info = (
             f"Incorrect chunks - Too small: {self.incorrect_counts.get('too_small', 0)}, "
             f"Too large: {self.incorrect_counts.get('too_large', 0)}"
         )
-        self.logger.info(incorrect_chunks_info)
+        logger.info(incorrect_chunks_info)
 
-    def find_incorrect_chunks(self, chunks: list[dict[str, Any]]) -> None:
+    def find_incorrect_chunks(self, chunks: list[dict[str, Any]], save: bool = False) -> None:
         """Finds chunks below min_chunk_size or above 2x max_tokens and saves to JSON."""
         incorrect = {
             "too_small": [
@@ -685,34 +685,36 @@ class MarkdownChunkValidator:
         self.incorrect_counts = {"too_small": len(incorrect["too_small"]), "too_large": len(incorrect["too_large"])}
 
         if any(incorrect.values()):
-            base_name = os.path.splitext(self.input_filename)[0]
-            output_filename = f"{base_name}-incorrect-chunks.json"
-            output_filepath = os.path.join(self.output_dir, output_filename)
 
-            with open(output_filepath, "w", encoding="utf-8") as f:
-                json.dump(incorrect, f, indent=2, ensure_ascii=False)
-
-            self.logger.info(f"Incorrect chunks saved to {output_filepath}")
+            if save:
+                base_name = os.path.splitext(self.input_filename)[0]
+                output_filename = f"{base_name}-incorrect-chunks.json"
+                output_filepath = os.path.join(self.output_dir, output_filename)
+                with open(output_filepath, "w", encoding="utf-8") as f:
+                    json.dump(incorrect, f, indent=2, ensure_ascii=False)
+                logger.info(f"Incorrect chunks saved to {output_filepath}")
+            else:
+                pass
         else:
-            self.logger.info("No incorrect chunks found.")
+            logger.info("No incorrect chunks found.")
 
 
 # Test usage
 def main():
-    files_to_chunk = [
-        "docs_anthropic_com_en_docs_20240922_174102.json",
-        "docs_llamaindex_ai_en_stable_20240917_090349.json",
-        "docs_llamaindex_ai_en_stable_examples_20240922_173959.json",
-        "langchain-ai_github_io_langgraph_how-tos_20240922_174234.json",
-        "python_langchain_com_v0_2_docs_how_to_20240922_172828.json",
-        "supabase_com_docs_guides_ai_20240917_103658.json",
-    ]
+    configure_logging(debug=True)
+
+    files_to_chunk = []
+    chunks_dir = RAW_DATA_DIR
+    for filename in os.listdir(chunks_dir):
+        if os.path.isfile(os.path.join(chunks_dir, filename)):
+            files_to_chunk.append(filename)
 
     for file in files_to_chunk:
-        markdown_chunker = MarkdownChunker(input_filename=file)  # replace
+        markdown_chunker = MarkdownChunker(input_filename=file, save=False)  # save incorrect chunks or not
         result = markdown_chunker.load_data()
         chunks = markdown_chunker.process_pages(result)
         markdown_chunker.save_chunks(chunks)
+        logger.info("Chunking job for " + file + " complete!")
 
 
 if __name__ == "__main__":

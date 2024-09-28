@@ -31,7 +31,7 @@ Meet OmniClaude -> an open-source RAG app that helps you easily:
 - efficiently stores and embeds them in a local vector storage
 - sets up an LLM chat which you can rely on
 
-**Note** this is v.0.1.0 and reliability of the system can be characterized as following:
+**Note** this is v.0.1.* and reliability of the system can be characterized as following:
 - in 50% of the times it works every time!
 
 So do let me know if you are experiencing issues and I'll try to fix them.
@@ -139,26 +139,20 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 ## ❤️‍🩹 Current Limitations
 - Only terminal UI (no Chainlit for now)
+- Image data not supported - ONLY text-based embeddings.
 - No automatic re-indexing of documents
 - Basic chat flow supported
   - Either RAG tool is used or not
     - if a tool is used -> retrieves up to 5 most relevant documents (after re-ranking)
 
 ## 🛣️ Roadmap
-
-- [ ] Implement user interface (chainlit)
-- [ ] Allow user to save a URL / parse URL and sub-pages based on commands (a-ka Cursor style)
-- [ ] Improve tool decision-making
-- [ ] Streaming support
-- [ ] Implement a basic search evaluation suite
+For a brief roadmap please check out [project wiki page](https://github.com/Twist333d/omni-claude/wiki).
 
 ## 📈 Performance Metrics
 No eval suite is built yet (but will be added very soon)
-
 - Average query processing time: [TBD]
 - Retrieval accuracy (e.g., NDCG@5): [TBD]
 - Response coherence (based on LLM evaluation): [TBD]
-
 
 ## 📜 License
 
@@ -174,7 +168,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-For any questions or issues, please [open an issue](https://github.com/yourusername/rag-4-docs/issues) or contact our support team at support@rag4docs.com.
+For any questions or issues, please [open an issue](https://github.com/yourusername/omni-claude/issues)
 
 ---
 

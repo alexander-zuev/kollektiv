@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 
 from colorama import Fore, Style, init
 
@@ -8,75 +9,87 @@ from src.utils.config import LOG_DIR
 # Initialize colorama
 init(autoreset=True)
 
-# Initialize default log level
-LOG_LEVEL = logging.INFO
-
 
 class ColoredFormatter(logging.Formatter):
     COLORS = {
-        "INFO": Fore.LIGHTCYAN_EX,  # Regular white for info
-        "DEBUG": Fore.BLUE,  # Blue for debugging
-        "WARNING": Fore.YELLOW,  # Yellow for warnings
-        "ERROR": Fore.RED,  # Red for errors
-        "CRITICAL": Fore.MAGENTA + Style.BRIGHT,  # Magenta and bright for critical issues
+        logging.DEBUG: Fore.BLUE,
+        logging.INFO: Fore.LIGHTCYAN_EX,
+        logging.WARNING: Fore.LIGHTYELLOW_EX,
+        logging.ERROR: Fore.RED,
+        logging.CRITICAL: Fore.MAGENTA + Style.BRIGHT,
     }
 
     EMOJIS = {
-        "INFO": "ℹ️",  # Information
-        "DEBUG": "🐞",  # Debugging
-        "WARNING": "⚠️",  # Warning
-        "ERROR": "❌",  # Error
-        "CRITICAL": "❗",  # Critical
+        logging.DEBUG: "🐞",  # Debug
+        logging.INFO: "ℹ️",  # Info
+        logging.WARNING: "⚠️",  # Warning
+        logging.ERROR: "❌",  # Error
+        logging.CRITICAL: "🔥",  # Critical
     }
 
     def format(self, record):
         # Get the original log message
         log_message = super().format(record)
 
-        # Get the color based on the log level
-        color = self.COLORS.get(record.levelname, "")
+        # Get the color and emoji based on the log level
+        color = self.COLORS.get(record.levelno, "")
+        emoji = self.EMOJIS.get(record.levelno, "")
 
-        # Get the emoji based on the log level
-        emoji = self.EMOJIS.get(record.levelname, "")
+        # Construct the final log message with emoji before the log level
+        log_message = f"{emoji} {record.levelname} - {log_message}"
 
-        # Construct the final log message with emoji and color
-        return f"{color}{emoji} {log_message}{Style.RESET_ALL}"
+        return f"{color}{log_message}{Style.RESET_ALL}"
 
 
-def setup_logger(name: str, log_file: str, level=logging.DEBUG):
-    logger = logging.getLogger(name)
-    logger.setLevel(LOG_LEVEL)
-    logger.propagate = False  # Prevent messages from being passed to ancestor loggers
+def configure_logging(debug=False, log_file="app.log"):
+    """
+    Configures the logging system.
 
-    # Remove existing handlers to prevent duplicate logs
-    if logger.hasHandlers():
-        logger.handlers.clear()
+    Parameters:
+    - debug (bool): If True, sets the logging level to DEBUG.
+    - log_file (str): The name of the log file.
+    """
+    log_level = logging.DEBUG if debug else logging.INFO
+    app_logger = logging.getLogger("omni-claude")
+    app_logger.setLevel(log_level)
 
-    # Create formatters
-    file_formatter = logging.Formatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s")
-    console_formatter = ColoredFormatter("[%(asctime)s - %(name)s:%(lineno)d - %(levelname)s] %(message)s")
+    # Remove existing handlers to prevent duplication
+    if app_logger.handlers:
+        app_logger.handlers.clear()
 
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(LOG_LEVEL)
+    # Console handler with colored output
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(log_level)
+    console_formatter = ColoredFormatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")
     console_handler.setFormatter(console_formatter)
 
-    # Ensure LOG_DIR exists
-    os.makedirs(LOG_DIR, exist_ok=True)
-
     # File handler
-    file_handler = logging.FileHandler(os.path.join(LOG_DIR, log_file))
-    file_handler.setLevel(logging.DEBUG)  # Always log all levels to file
+    log_file_path = os.path.join(LOG_DIR, log_file)
+    file_handler = logging.FileHandler(log_file_path)
+    file_handler.setLevel(logging.DEBUG)  # Log all levels to the file
+    file_formatter = logging.Formatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")
     file_handler.setFormatter(file_formatter)
 
-    # Add handlers to the logger
-    logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+    # Add handlers to the app logger
+    app_logger.addHandler(console_handler)
+    app_logger.addHandler(file_handler)
 
-    return logger
+    app_logger.propagate = False
 
 
-def set_log_level(logger, level: int):
-    for handler in logger.handlers:
-        if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
-            handler.setLevel(level)
+def get_logger():
+    """
+    Retrieves a logger with the 'omni-claude' prefix based on the caller's module.
+    """
+    import inspect
+
+    frame = inspect.currentframe()
+    try:
+        # Get the frame of the caller
+        caller_frame = frame.f_back
+        module = inspect.getmodule(caller_frame)
+        module_name = module.__name__ if module else "omni-claude"
+    finally:
+        del frame  # Prevent reference cycles
+
+    return logging.getLogger(f"omni-claude.{module_name}")

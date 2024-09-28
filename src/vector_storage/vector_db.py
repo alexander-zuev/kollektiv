@@ -8,36 +8,28 @@ import chromadb.utils.embedding_functions as embedding_functions
 import cohere
 
 from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.config import (
-    CHROMA_DB_DIR,
-    COHERE_API_KEY,
-    LOG_DIR,
-    OPENAI_API_KEY,
-    PROCESSED_DATA_DIR,
-    VECTOR_STORAGE_DIR,
-)
-from src.utils.decorators import error_handler
-from src.utils.logger import setup_logger
+from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR, VECTOR_STORAGE_DIR
+from src.utils.decorators import base_error_handler
+from src.utils.logger import configure_logging, get_logger
 
-# Set up logger
-logger = setup_logger(__name__, os.path.join(LOG_DIR, "app.log"))
+logger = get_logger()
 
 
 class DocumentProcessor:
-    def __init__(self, file_name):
-        self.file_name = file_name
-        self.file_path = os.path.join(PROCESSED_DATA_DIR, file_name)
+    def __init__(self):
+        self.processed_dir = PROCESSED_DATA_DIR
 
-    def load_json(self) -> list[dict]:
+    def load_json(self, filename: str) -> list[dict]:
         try:
-            with open(self.file_path) as f:
+            filepath = os.path.join(self.processed_dir, filename)
+            with open(filepath) as f:
                 data = json.load(f)
             return data
         except FileNotFoundError:
-            logger.error(f"File not found: {self.file_path}")
+            logger.error(f"File not found: {filename}")
             raise
         except json.JSONDecodeError:
-            logger.error(f"Invalid JSON in file: {self.file_path}")
+            logger.error(f"Invalid JSON in file: {filename}")
             raise
 
 
@@ -67,7 +59,7 @@ class VectorDB:
             f"{self.collection.count()} documents (chunks)"
         )
 
-    @error_handler(logger)
+    @base_error_handler
     def _load_existing_summaries(self):
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         if os.path.exists(summaries_file):
@@ -109,7 +101,7 @@ class VectorDB:
 
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
-    @error_handler(logger)
+    @base_error_handler
     def add_documents(self, json_data: list[dict], claude_assistant: ClaudeAssistant, file_name: str) -> str | None:
         processed_docs = self.prepare_documents(json_data)
 
@@ -121,11 +113,7 @@ class VectorDB:
         all_exist, missing_ids = self.check_documents_exist(ids)
 
         if all_exist:
-            logger.info(
-                f"All documents from {file_name}already loaded. Proceeding to generate or load summary for "
-                f"the "
-                f"entire file."
-            )
+            logger.info(f"All documents from {file_name} already loaded.")
         else:
             # Prepare data for missing documents only
             missing_indices = [ids.index(m_id) for m_id in missing_ids]
@@ -142,20 +130,19 @@ class VectorDB:
 
         # Generate summary for the entire file if not already present
         if file_name in self.document_summaries:
-            summary = self.document_summaries[file_name]
+            result = self.document_summaries[file_name]
+            logger.info(f"Loading existing summary for {file_name}.")
         else:
-            logger.info("Generating summary for the entire file.")
-            summary = claude_assistant.generate_document_summary(json_data)
-            self.document_summaries[file_name] = summary
-
-        # # Update Claude's system prompt with all document summaries
-        # claude_assistant.update_system_prompt(list(self.document_summaries.values()))
+            logger.info(f"Summary for {file_name} not found, generating new one.")
+            result = claude_assistant.generate_document_summary(json_data)
+            result["filename"] = file_name
+            self.document_summaries[file_name] = result
 
         # Save updated summaries
         self._save_summaries()
-        return summary
+        return result
 
-    @error_handler(logger)
+    @base_error_handler
     def _save_summaries(self):
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         try:
@@ -164,11 +151,11 @@ class VectorDB:
         except Exception as e:
             logger.error(f"Failed to save document summaries: {e}")
 
-    @error_handler(logger)
+    @base_error_handler
     def get_document_summaries(self) -> list[str]:
         return list(self.document_summaries.values())
 
-    @error_handler(logger)
+    @base_error_handler
     def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
         """Checks if chunks are already added to the database based on chunk ids"""
         try:
@@ -188,7 +175,7 @@ class VectorDB:
             logger.error(f"Error checking document existence: {e}")
             return False, document_ids
 
-    @error_handler(logger)
+    @base_error_handler
     def query(self, user_query: str | list[str], n_results: int = 5):
         """
         Handles both a single query and multiple queris
@@ -202,13 +189,13 @@ class VectorDB:
         )
         return search_results
 
-    @error_handler(logger)
+    @base_error_handler
     def reset_database(self):
         self.client.delete_collection(self.collection_name)
         self.collection = self.client.create_collection(
             self.collection_name, embedding_function=self.embedding_function
         )
-        self.document_summaries = []
+        self.document_summaries = {}
         # Delete the summaries file
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         if os.path.exists(summaries_file):
@@ -334,8 +321,15 @@ class ResultRetriever:
 
 
 def main():
+    configure_logging()
     vector_db = VectorDB()
     vector_db.reset_database()
+    claude_assistant = ClaudeAssistant(vector_db=vector_db)
+
+    file = "langchain-ai_github_io_langgraph_20240928_143920-chunked.json"
+    reader = DocumentProcessor()
+    documents = reader.load_json(file)
+    vector_db.add_documents(documents, claude_assistant, file)
 
 
 if __name__ == "__main__":
