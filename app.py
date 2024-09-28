@@ -9,14 +9,14 @@ def main(debug: bool = False, reset_db: bool = False):
     # Configure logging before importing other modules
     configure_logging(debug=debug)
 
-    docs = ["docs_anthropic_com_en_20240928_135426-chunked.json"]
+    # docs = ["docs_anthropic_com_en_20240928_135426-chunked.json"]
 
     # Initialize components
-    initializer = ComponentInitializer(reset_db=reset_db, load_all_docs=False, files=docs)
+    initializer = ComponentInitializer(reset_db=reset_db, load_all_docs=True, files=[])
     claude_assistant = initializer.init()
 
     run_terminal_ui(claude_assistant)
 
 
 if __name__ == "__main__":
-    main(debug=False, reset_db=False)  # Set debug=True to enable debug logging
+    main(debug=False, reset_db=False)

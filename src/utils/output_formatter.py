@@ -3,7 +3,7 @@ from colorama import Fore, Style, init
 # Initialize colorama
 init(autoreset=True)
 
-ASSISTANT_COLOR = Fore.MAGENTA
+ASSISTANT_COLOR = Fore.LIGHTBLUE_EX
 USER_COLOR = Fore.GREEN
 
 

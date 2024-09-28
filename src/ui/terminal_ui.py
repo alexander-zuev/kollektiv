@@ -23,8 +23,11 @@ def run_terminal_ui(claude_assistant):
                 if event["type"] == "text":
                     print(event["content"], end="", flush=True)
                 elif event["type"] == "tool_use":
-                    print_assistant_stream(f"\nUsing {event['tool']} tool 🧰.\n")
-                    # print(f"\nUsing {event['tool']} tool 🧰.\n", end="", flush=True)
+                    if event["tool"] == "rag_search":
+                        tool_name = "RAG Search"
+                        print_assistant_stream(f"\n\n🛠️ Using {tool_name} tool.\n")
+                    else:
+                        print_assistant_stream(f"\n\n🛠️ Using {event['tool']} tool.\n")
             print()  # Add a newline after the complete response
         else:
             print(response)
