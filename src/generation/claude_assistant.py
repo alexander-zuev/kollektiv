@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import uuid
 from collections.abc import Generator
@@ -98,7 +100,7 @@ class ClaudeAssistant:
 
     def __init__(
         self,
-        vector_db: "VectorDB",  # Use string literal for type hint
+        vector_db: VectorDB,
         api_key: str = ANTHROPIC_API_KEY,
         model_name: str = "claude-3-5-sonnet-20240620",
     ):
@@ -218,7 +220,7 @@ class ClaudeAssistant:
         return cleaned_input
 
     @anthropic_error_handler
-    def get_response(self, user_input: str, stream: bool = True) -> Generator[str, None, None] | str:
+    def get_response(self, user_input: str, stream: bool = True) -> Generator[str] | str:
         """
         :param stream: controls whether output is streamed or not
         :param user_input: The input string provided by the user to generate a response.
@@ -235,7 +237,7 @@ class ClaudeAssistant:
             return assistant_response
 
     @anthropic_error_handler
-    def stream_response(self, user_input: str) -> Generator[str, None, None]:
+    def stream_response(self, user_input: str) -> Generator[str]:
         # iteration = 0
         user_input = self.preprocess_user_input(user_input)
         self.conversation_history.add_message(role="user", content=user_input)

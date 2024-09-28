@@ -90,49 +90,45 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 ## 💡 Usage
 
 1. **Crawl Documentation:**
-   To crawl documentation using FireCrawl you need to provide
-   - base url - list of base urls to crawl
-   - max_pages - the maximum number of pages that will be crawled
-   - optional include/exclude tags - important in case you want precise control over the content
 
-   ```python
-   from src.crawling.crawler import FireCrawler
-
-   crawler = FireCrawler(FIRECRAWL_API_KEY)
-   urls_to_crawl = ["https://docs.yourlibrary.com"] # a list of base urls to crawl
-   crawler.async_crawl_url(urls_to_crawl, page_limit=100)
-   ```
+   Update the root url you want to parse. For example:
+     ```python
+     urls_to_crawl = ["https://docs.anthropic.com/en/docs/"]
+     ```
+      Ensure you include the url patterns of sub-pages you want to parse and exclude url patterns of sub-pages you
+         don't want to parse:
+     ```python
+      "includePaths": ["/tutorials/*", "/how-tos/*", "/concepts/*"],
+      "excludePaths": ["/community/*"],
+     ```
+      Set the maximum number of pages you want to crawl:
+      ```python
+       crawler.async_crawl_url(urls_to_crawl, page_limit=250)
+      ```
 
 2. **Chunk FireCrawl parsed docs:**
-   Next step is to prepare chunks based on parsed markdown content from FireCrawl
+
+   Next step is to chunk all the parsed documents
    ```python
-   from src.chunking.chunker import MarkdownChunker
-
-
-   # Assuming your crawled file is named 'cra_docs_yourlibrary_com_20241026_123456.json'
-   chunker = MarkdownChunker(input_filename="cra_docs_yourlibrary_com_20241026_123456.json")
-   result = chunker.load_data()
-   chunks = chunker.process_pages(result)
-   chunker.save_chunks(chunks)
+   poetry run python -m src.processing.chunking
    ```
 
-3. **Initialize application:**
-   Finally, you can initialize the db, embed and store the downloaded documents and chat with them.
-   ```python
-    #
-    file_names = [
-        "your-crawled-and-chunked-docs-1.json",
-        "your-crawled-and-chunked-docs-2.json",
-        "your-crawled-and-chunked-docs-3.json",
-    ]
-    for file_name in file_names:
-        document_loader = DocumentProcessor(file_name)
-        json_data = document_loader.load_json()
-        vector_db.add_documents(json_data, claude_assistant)
-   ```
+3. **Configure basic parameters:**
 
+   Set up the following parameters in the `app.py`:
+   1. Whether to load only specified or all processed chunks in`PROCESSED_DATA_DIR`
+   ```python
+    docs = ["docs_anthropic_com_en_20240928_135426-chunked.json"]
+    initializer = ComponentInitializer(reset_db=reset_db, load_all_docs=True, files=[])
+   ```
+   2. Whether to reset the database, which will clear all the data in local ChromaDB - use with caution. Defaults to
+      false.
+   ```python
+   if __name__ == "__main__":
+    main(debug=False, reset_db=False)
+   ```
 4. **Chat with documentation:**
-   Don't forget to replace dummy filenames in the app.py with the files you've crawled to chat with them
+   You can run application via the following command:
    ```python
    python app.py
    ```

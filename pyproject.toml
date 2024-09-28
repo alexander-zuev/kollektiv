@@ -5,6 +5,7 @@ description = ""
 authors = ["AZ <azuev@outlook.com>"]
 readme = "README.md"
 package-mode = false
+packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -62,7 +63,9 @@ pythonpath = [
 source = ["src"]
 
 [tool.poetry.scripts]
-start = "python app.py"
+omni-claude = "python app.py"
+chunker = "python src/processing/chunking.py"
+
 
 [tool.coverage.report]
 exclude_lines = [
