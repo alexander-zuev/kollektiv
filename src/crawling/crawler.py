@@ -95,7 +95,8 @@ class FireCrawler:
                 "scrapeOptions": {
                     "formats": [
                         "markdown",
-                    ]
+                    ],
+                    "excludeTags": ["img"],  # remove images as OmniClaude doesn't support multi-modal embeddings
                 },
             }
 

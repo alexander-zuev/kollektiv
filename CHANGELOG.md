@@ -8,11 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- added Anthropic API exception handling
+- (WIP) added basic eval suite to measure retrieval and end-to-end accuracy
 
 ### Changed
 
 ### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [0.1.4] - 2024-09-28
+
+### Added
+- added Anthropic API exception handling
+
+### Changed
+- updated pre-processing of chunker to remove images due to lack of multi-modal embeddings support
 
 ### Removed
 - removed redundant QueryGenerator class
@@ -20,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - fixed errors in streaming & non-streaming responses
 
-### Security
+
 
 ## [0.1.3] - 2024-09-22
 ### Added

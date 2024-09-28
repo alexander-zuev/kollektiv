@@ -76,12 +76,35 @@ class MarkdownChunker:
             raise
 
     @base_error_handler
+    def remove_images(self, content: str) -> str:
+        """Removes all types of images from the content."""
+        # Remove HTML img tags (in case any slipped through from FireCrawl)
+        content = re.sub(r"<img[^>]+>", "", content)
+
+        # Remove Markdown image syntax
+        content = re.sub(r"!\[.*?\]\(.*?\)", "", content)
+
+        # Remove reference-style images
+        content = re.sub(r"^\[.*?\]:\s*http.*$", "", content, flags=re.MULTILINE)
+
+        # Remove base64 encoded images
+        content = re.sub(r"!\[.*?\]\(data:image/[^;]+;base64,[^\)]+\)", "", content)
+
+        # Remove any remaining image links that might not have been caught
+        content = re.sub(
+            r"\[.*?\]:\s*\S*\.(png|jpg|jpeg|gif|svg|webp)", "", content, flags=re.MULTILINE | re.IGNORECASE
+        )
+
+        return content
+
+    @base_error_handler
     def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:
         """Iterates through each page in the loaded data"""
         all_chunks = []
         for _index, page in enumerate(json_input["data"]):
             page_content = page["markdown"]
             page_content = self.remove_boilerplate(page_content)
+            page_content = self.remove_images(page_content)  # Add this line
             page_metadata = page["metadata"]
 
             sections = self.identify_sections(page_content, page_metadata)
@@ -565,7 +588,7 @@ class MarkdownChunkValidator:
         self.headings_preserved = {"h1": set(), "h2": set(), "h3": set()}
         self.total_headings = {"h1": set(), "h2": set(), "h3": set()}
         self.incorrect_counts = {"too_small": 0, "too_large": 0}
-        self.duplicates_removed = 0  # New attribute to track duplicates removed
+        self.duplicates_removed = 0
 
     def increment_total_headings(self, level, heading_text):
         self.total_headings[level].add(heading_text.strip())
@@ -595,7 +618,6 @@ class MarkdownChunkValidator:
             if text in unique_chunks:
                 self.duplicates_removed += 1
                 # Log the duplicate chunk removal
-                logger.warning(f"Duplicate chunk found and removed: {chunk['chunk_id']}")
                 continue
             else:
                 unique_chunks[text] = True
@@ -612,7 +634,7 @@ class MarkdownChunkValidator:
         logger.info(f"Total chunks created: {self.total_chunks}")
 
         # Duplicate chunks removed
-        logger.info(f"Duplicate chunks removed: {self.duplicates_removed}")
+        logger.warning(f"Duplicate chunks removed: {self.duplicates_removed}")
 
         # Chunk statistics
         if self.chunk_token_counts:
@@ -644,8 +666,6 @@ class MarkdownChunkValidator:
                 error_counts[error] = error_counts.get(error, 0) + 1
             total_errors = sum(error_counts.values())
             logger.warning(f"Validation issues encountered: {total_errors} issues found.")
-            for error, count in error_counts.items():
-                logger.warning(f"Validation error: {error!r} occurred {count} times.")
         else:
             logger.info("No validation issues encountered.")
 

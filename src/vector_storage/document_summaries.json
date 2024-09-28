@@ -24,5 +24,51 @@
       "SDK"
     ],
     "filename": "docs_anthropic_com_en_20240928_135426-chunked.json"
+  },
+  "langchain-ai_github_io_langgraph_20240928_143920-chunked.json": {
+    "summary": "This documentation covers LangGraph, a framework for building stateful, multi-step applications with language models. It includes tutorials and how-to guides on various topics like streaming, persistence, human-in-the-loop processes, and agent architectures. Key features include the ability to create custom agents, manage conversation history, add memory and runtime configuration, and visualize execution graphs. The framework supports integration with tools, multi-agent systems, and complex workflows like reflexion, self-RAG, and adaptive retrieval. It also provides options for streaming outputs, handling errors, and customizing state management.",
+    "keywords": [
+      "LangGraph",
+      "Agents",
+      "Streaming",
+      "Persistence",
+      "Human-in-the-loop",
+      "State management",
+      "Multi-agent systems",
+      "Tool integration",
+      "Reflexion",
+      "Self-RAG",
+      "Adaptive retrieval",
+      "Conversation history",
+      "Runtime configuration",
+      "Graph visualization",
+      "Error handling",
+      "Customization"
+    ],
+    "filename": "langchain-ai_github_io_langgraph_20240928_143920-chunked.json"
+  },
+  "langchain-ai_github_io_langgraph_20240928_210913-chunked.json": {
+    "summary": "LangGraph is a framework for building stateful, multi-agent applications using large language models (LLMs). It provides tools and utilities for creating complex conversational agents, managing state, streaming outputs, and implementing various agent architectures. Key features include the ability to create custom agents, manage conversation history, add persistence and memory, implement human-in-the-loop processes, and visualize agent workflows. LangGraph supports multiple streaming modes, allows for the creation of subgraphs and parallel execution branches, and offers integration with LangChain for additional functionality. The framework is designed to be flexible, allowing developers to build sophisticated AI applications with features like adaptive retrieval-augmented generation (RAG), multi-agent collaboration, and complex reasoning patterns.",
+    "keywords": [
+      "LangGraph",
+      "Stateful Applications",
+      "Multi-agent Systems",
+      "Large Language Models",
+      "Conversational Agents",
+      "State Management",
+      "Streaming",
+      "Agent Architectures",
+      "Human-in-the-loop",
+      "Visualization",
+      "Persistence",
+      "Memory",
+      "Subgraphs",
+      "Parallel Execution",
+      "LangChain Integration",
+      "Retrieval-Augmented Generation",
+      "Collaboration",
+      "Reasoning Patterns"
+    ],
+    "filename": "langchain-ai_github_io_langgraph_20240928_210913-chunked.json"
   }
 }
