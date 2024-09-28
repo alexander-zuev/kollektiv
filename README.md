@@ -139,6 +139,7 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 ## ❤️‍🩹 Current Limitations
 - Only terminal UI (no Chainlit for now)
+- Image data not supported - ONLY text-based embeddings.
 - No automatic re-indexing of documents
 - Basic chat flow supported
   - Either RAG tool is used or not

@@ -47,7 +47,7 @@ def application_level_handler(func: Callable) -> Callable:
             logger.info("User terminated program execution")
             sys.exit(0)
         except SystemExit:
-            logger.info("System exit called")
+            logger.info("\nSystem exit called")
             sys.exit(0)
         except Exception as e:
             logger.error(f"Error in {func.__name__}: {str(e)}")

@@ -9,7 +9,7 @@ import tiktoken
 
 from src.utils.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from src.utils.decorators import base_error_handler
-from src.utils.logger import get_logger
+from src.utils.logger import configure_logging, get_logger
 
 logger = get_logger()
 
@@ -23,6 +23,7 @@ class MarkdownChunker:
         soft_token_limit: int = 800,
         min_chunk_size: int = 100,
         overlap_percentage: float = 0.05,
+        save: bool = False,
     ):
         self.output_dir = output_dir
         self.input_filename = input_filename
@@ -37,6 +38,7 @@ class MarkdownChunker:
             max_tokens=self.max_tokens,
             output_dir=self.output_dir,
             input_filename=self.input_filename,
+            save=save,
         )
 
         # Precompile regex patterns for performance
@@ -549,11 +551,12 @@ class MarkdownChunker:
 
 
 class MarkdownChunkValidator:
-    def __init__(self, min_chunk_size, max_tokens, output_dir, input_filename):
+    def __init__(self, min_chunk_size, max_tokens, output_dir, input_filename, save: bool = False):
         self.min_chunk_size = min_chunk_size
         self.max_tokens = max_tokens
         self.output_dir = output_dir
         self.input_filename = input_filename
+        self.save = save
         # Validation-related attributes
         self.validation_errors = []
         self.total_chunks = 0
@@ -580,7 +583,7 @@ class MarkdownChunkValidator:
 
     def validate(self, chunks):
         self.validate_duplicates(chunks)
-        self.find_incorrect_chunks(chunks)
+        self.find_incorrect_chunks(chunks, save=self.save)
         self.log_summary()
 
     def validate_duplicates(self, chunks: list[dict[str, Any]]) -> None:
@@ -653,7 +656,7 @@ class MarkdownChunkValidator:
         )
         logger.info(incorrect_chunks_info)
 
-    def find_incorrect_chunks(self, chunks: list[dict[str, Any]]) -> None:
+    def find_incorrect_chunks(self, chunks: list[dict[str, Any]], save: bool = False) -> None:
         """Finds chunks below min_chunk_size or above 2x max_tokens and saves to JSON."""
         incorrect = {
             "too_small": [
@@ -682,35 +685,36 @@ class MarkdownChunkValidator:
         self.incorrect_counts = {"too_small": len(incorrect["too_small"]), "too_large": len(incorrect["too_large"])}
 
         if any(incorrect.values()):
-            base_name = os.path.splitext(self.input_filename)[0]
-            output_filename = f"{base_name}-incorrect-chunks.json"
-            output_filepath = os.path.join(self.output_dir, output_filename)
 
-            with open(output_filepath, "w", encoding="utf-8") as f:
-                json.dump(incorrect, f, indent=2, ensure_ascii=False)
-
-            logger.info(f"Incorrect chunks saved to {output_filepath}")
+            if save:
+                base_name = os.path.splitext(self.input_filename)[0]
+                output_filename = f"{base_name}-incorrect-chunks.json"
+                output_filepath = os.path.join(self.output_dir, output_filename)
+                with open(output_filepath, "w", encoding="utf-8") as f:
+                    json.dump(incorrect, f, indent=2, ensure_ascii=False)
+                logger.info(f"Incorrect chunks saved to {output_filepath}")
+            else:
+                pass
         else:
             logger.info("No incorrect chunks found.")
 
 
 # Test usage
 def main():
-    files_to_chunk = [
-        # "docs_anthropic_com_en_docs_20240922_174102.json",
-        # "docs_llamaindex_ai_en_stable_20240917_090349.json",
-        # "docs_llamaindex_ai_en_stable_examples_20240922_173959.json",
-        # "langchain-ai_github_io_langgraph_how-tos_20240922_174234.json",
-        # "python_langchain_com_v0_2_docs_how_to_20240922_172828.json",
-        # "supabase_com_docs_guides_ai_20240917_103658.json",
-        "docs_llamaindex_ai_en_stable_examples_evaluation_20240923_081626.json"
-    ]
+    configure_logging(debug=True)
+
+    files_to_chunk = []
+    chunks_dir = RAW_DATA_DIR
+    for filename in os.listdir(chunks_dir):
+        if os.path.isfile(os.path.join(chunks_dir, filename)):
+            files_to_chunk.append(filename)
 
     for file in files_to_chunk:
-        markdown_chunker = MarkdownChunker(input_filename=file)  # replace
+        markdown_chunker = MarkdownChunker(input_filename=file, save=False)  # save incorrect chunks or not
         result = markdown_chunker.load_data()
         chunks = markdown_chunker.process_pages(result)
         markdown_chunker.save_chunks(chunks)
+        logger.info("Chunking job for " + file + " complete!")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,5 @@ def test_vector_db_initialization():
 
 
 def test_document_processor_initialization():
-    processor = DocumentProcessor("test_file.json")
+    processor = DocumentProcessor()
     assert processor is not None
-    assert processor.file_name == "test_file.json"
