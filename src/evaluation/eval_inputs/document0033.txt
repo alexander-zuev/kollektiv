@@ -1,0 +1,31 @@
+[Anthropic home page![light logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/light.svg)![dark logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/dark.svg)](/)
+
+English
+
+Search...
+
+Ctrl K
+
+Search
+
+Navigation
+
+Use cases
+
+Guides to common use cases
+
+[Welcome](/en/home) [User Guides](/en/docs/welcome) [API Reference](/en/api/getting-started) [Prompt Library](/en/prompt-library/library) [Release Notes](/en/release-notes/overview) [Developer Newsletter](/en/developer-newsletter/overview)
+
+Claude is designed to excel in a variety of tasks. Explore these in-depth production guides to learn how to build common use cases with Claude.
+
+[**Ticket routing** \\
+\\
+Best practices for using Claude to classify and route customer support tickets at scale.](/en/docs/about-claude/use-case-guides/ticket-routing) [**Customer support agent** \\
+\\
+Build intelligent, context-aware chatbots with Claude to enhance customer support interactions.](/en/docs/about-claude/use-case-guides/customer-support-chat) [**Content moderation** \\
+\\
+Techniques and best practices for using Claude to perform content filtering and general content moderation.](/en/docs/about-claude/use-case-guides/content-moderation) [**Legal summarization** \\
+\\
+Summarize legal documents using Claude to extract key information and expedite research.](/en/docs/about-claude/use-case-guides/legal-summarization)
+
+[Intro to Claude](/en/docs/intro-to-claude) [Ticket routing](/en/docs/about-claude/use-case-guides/ticket-routing)

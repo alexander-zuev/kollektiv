@@ -114,9 +114,10 @@ After crawling, you need to chunk the documents:
 python src/chunking/chunking.py
 ```
 Example
+
 ```python
 markdown_chunker = MarkdownChunker(input_filename="cra_docs_yourlibrary_com_20240526_123456.json")
-result = markdown_chunker.load_data()
+result = markdown_chunker.get_documents()
 chunks = markdown_chunker.process_pages(result)
 markdown_chunker.save_chunks(chunks)
 ```

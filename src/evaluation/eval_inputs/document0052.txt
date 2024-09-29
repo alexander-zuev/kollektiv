@@ -1,0 +1,115 @@
+[Anthropic home page![light logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/light.svg)![dark logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/dark.svg)](/)
+
+English
+
+Search...
+
+Ctrl K
+
+Search
+
+Navigation
+
+Text Completions
+
+Streaming Text Completions
+
+[Welcome](/en/home) [User Guides](/en/docs/welcome) [API Reference](/en/api/getting-started) [Prompt Library](/en/prompt-library/library) [Release Notes](/en/release-notes/overview) [Developer Newsletter](/en/developer-newsletter/overview)
+
+**Legacy API**
+
+The Text Completions API is a legacy API. Future models and features will require use of the [Messages API](/en/api/messages), and we recommend [migrating](/en/api/migrating-from-text-completions-to-messages) as soon as possible.
+
+When creating a Text Completion, you can set `"stream": true` to incrementally stream the response using [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent%5Fevents/Using%5Fserver-sent%5Fevents) (SSE). If you are using our [client libraries](/en/api/client-sdks), parsing these events will be handled for you automatically. However, if you are building a direct API integration, you will need to handle these events yourself.
+
+## [​](\#example)  Example
+
+Request
+
+Copy
+
+```bash
+curl https://api.anthropic.com/v1/complete \
+     --header "anthropic-version: 2023-06-01" \
+     --header "content-type: application/json" \
+     --header "x-api-key: $ANTHROPIC_API_KEY" \
+     --data '
+{
+  "model": "claude-2",
+  "prompt": "\n\nHuman: Hello, world!\n\nAssistant:",
+  "max_tokens_to_sample": 256,
+  "stream": true
+}
+'
+
+```
+
+Response
+
+Copy
+
+```json
+event: completion
+data: {"type": "completion", "completion": " Hello", "stop_reason": null, "model": "claude-2.0"}
+
+event: completion
+data: {"type": "completion", "completion": "!", "stop_reason": null, "model": "claude-2.0"}
+
+event: ping
+data: {"type": "ping"}
+
+event: completion
+data: {"type": "completion", "completion": " My", "stop_reason": null, "model": "claude-2.0"}
+
+event: completion
+data: {"type": "completion", "completion": " name", "stop_reason": null, "model": "claude-2.0"}
+
+event: completion
+data: {"type": "completion", "completion": " is", "stop_reason": null, "model": "claude-2.0"}
+
+event: completion
+data: {"type": "completion", "completion": " Claude", "stop_reason": null, "model": "claude-2.0"}
+
+event: completion
+data: {"type": "completion", "completion": ".", "stop_reason": null, "model": "claude-2.0"}
+
+event: completion
+data: {"type": "completion", "completion": "", "stop_reason": "stop_sequence", "model": "claude-2.0"}
+
+```
+
+## [​](\#events)  Events
+
+Each event includes a named event type and associated JSON data.
+
+Event types: `completion`, `ping`, `error`.
+
+### [​](\#error-event-types)  Error event types
+
+We may occasionally send [errors](/en/api/errors) in the event stream. For example, during periods of high usage, you may receive an `overloaded_error`, which would normally correspond to an HTTP 529 in a non-streaming context:
+
+Example error
+
+Copy
+
+```json
+event: completion
+data: {"completion": " Hello", "stop_reason": null, "model": "claude-2.0"}
+
+event: error
+data: {"error": {"type": "overloaded_error", "message": "Overloaded"}}
+
+```
+
+## [​](\#older-api-versions)  Older API versions
+
+If you are using an [API version](/en/api/versioning) prior to `2023-06-01`, the response shape will be different. See [versioning](/en/api/versioning) for details.
+
+[Create a Text Completion](/en/api/complete) [Prompt validation](/en/api/prompt-validation)
+
+On this page
+
+- [Example](#example)
+- [Events](#events)
+- [Error event types](#error-event-types)
+- [Older API versions](#older-api-versions)

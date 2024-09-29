@@ -1,0 +1,32 @@
+[Anthropic home page![light logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/light.svg)![dark logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/dark.svg)](/)
+
+English
+
+Search...
+
+Ctrl K
+
+Search
+
+Navigation
+
+Using the API
+
+IP addresses
+
+[Welcome](/en/home) [User Guides](/en/docs/welcome) [API Reference](/en/api/getting-started) [Prompt Library](/en/prompt-library/library) [Release Notes](/en/release-notes/overview) [Developer Newsletter](/en/developer-newsletter/overview)
+
+#### [​](\#ipv4)  IPv4
+
+`160.79.104.0/23`
+
+#### [​](\#ipv6)  IPv6
+
+`2607:6bc0::/48`
+
+[Getting started](/en/api/getting-started) [Versions](/en/api/versioning)
+
+On this page
+
+- [IPv4](#ipv4)
+- [IPv6](#ipv6)

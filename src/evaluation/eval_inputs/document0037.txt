@@ -1,0 +1,25 @@
+[Anthropic home page![light logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/light.svg)![dark logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/dark.svg)](/)
+
+English
+
+Search...
+
+Ctrl K
+
+Search
+
+Navigation
+
+Using the API
+
+Getting help
+
+[Welcome](/en/home) [User Guides](/en/docs/welcome) [API Reference](/en/api/getting-started) [Prompt Library](/en/prompt-library/library) [Release Notes](/en/release-notes/overview) [Developer Newsletter](/en/developer-newsletter/overview)
+
+We monitor the following inboxes:
+
+- [sales@anthropic.com](mailto:sales@anthropic.com) to commence a paid commercial partnership with us
+- [privacy@anthropic.com](mailto:privacy@anthropic.com) to exercise your data access, portability, deletion, or correction rights per our [Privacy Policy](https://www.anthropic.com/privacy)
+- [usersafety@anthropic.com](mailto:usersafety@anthropic.com) to report any erroneous, biased, or even offensive responses from Claude, so we can continue to learn and make improvements to ensure our model is safe, fair and beneficial to all
+
+[Supported regions](/en/api/supported-regions) [Create a Message](/en/api/messages)
