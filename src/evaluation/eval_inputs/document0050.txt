@@ -1,0 +1,89 @@
+[Anthropic home page![light logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/light.svg)![dark logo](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/logo/dark.svg)](/)
+
+English
+
+Search...
+
+Ctrl K
+
+Search
+
+Navigation
+
+Get started
+
+Welcome to Claude
+
+[Welcome](/en/home) [User Guides](/en/docs/welcome) [API Reference](/en/api/getting-started) [Prompt Library](/en/prompt-library/library) [Release Notes](/en/release-notes/overview) [Developer Newsletter](/en/developer-newsletter/overview)
+
+Introducing Claude 3.5 Sonnet, our most intelligent model yet. Read more in our [blog post](http://www.anthropic.com/news/claude-3-5-sonnet).
+
+Looking to chat with Claude? Visit [claude.ai](http://www.claude.ai)!
+
+## [​](\#get-started)  Get started
+
+If you’re new to Claude, start here to learn the essentials and make your first API call.
+
+[**Intro to Claude** \\
+\\
+Explore Claude’s capabilities and development flow.](/en/docs/intro-to-claude) [**Quickstart** \\
+\\
+Learn how to make your first API call in minutes.](/en/docs/quickstart) [**Prompt Library** \\
+\\
+Explore example prompts for inspiration.](/en/prompt-library/library)
+
+* * *
+
+## [​](\#models)  Models
+
+Claude consists of a family of large language models that enable you to balance intelligence, speed, and cost.
+
+![](https://mintlify.s3-us-west-1.amazonaws.com/anthropic/images/3-5-sonnet-curve.png)
+
+[Compare our state-of-the-art models.](/en/docs/about-claude/models)
+
+* * *
+
+## [​](\#develop-with-claude)  Develop with Claude
+
+Anthropic has best-in-class developer tools to build scalable applications with Claude.
+
+[**Developer Console** \\
+\\
+Enjoy easier, more powerful prompting in your browser with the Workbench and prompt generator tool.](https://console.anthropic.com) [**API Reference** \\
+\\
+Explore, implement, and scale with the Anthropic API and SDKs.](/en/api/getting-started) [**Anthropic Cookbook** \\
+\\
+Learn with interactive Jupyter notebooks that demonstrate uploading PDFs, embeddings, and more.](https://github.com/anthropics/anthropic-cookbook)
+
+* * *
+
+## [​](\#key-capabilities)  Key capabilities
+
+Claude can assist with many tasks that involve text, code, and images.
+
+[**Text and code generation** \\
+\\
+Summarize text, answer questions, extract data, translate text, and explain and generate code.](/en/docs/build-with-claude/text-generation) [**Vision** \\
+\\
+Process and analyze visual input and generate text and code from images.](/en/docs/build-with-claude/vision)
+
+* * *
+
+## [​](\#support)  Support
+
+[**Help Center** \\
+\\
+Find answers to frequently asked account and billing questions.](https://support.anthropic.com/en/) [**Service Status** \\
+\\
+Check the status of Anthropic services.](https://www.anthropic.com/status)
+
+[Initial setup](/en/docs/initial-setup)
+
+On this page
+
+- [Get started](#get-started)
+- [Models](#models)
+- [Develop with Claude](#develop-with-claude)
+- [Key capabilities](#key-capabilities)
+- [Support](#support)
