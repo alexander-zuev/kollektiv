@@ -145,10 +145,15 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 For a brief roadmap please check out [project wiki page](https://github.com/Twist333d/omni-claude/wiki).
 
 ## 📈 Performance Metrics
-No eval suite is built yet (but will be added very soon)
-- Average query processing time: [TBD]
-- Retrieval accuracy (e.g., NDCG@5): [TBD]
-- Response coherence (based on LLM evaluation): [TBD]
+Evaluation is currently done using `ragas` library. There are 2 key parts assessed:
+1. End-to-end generation
+   - Faithfulness
+   - Answer relevancy
+   - Answer correctness
+2. Retriever (TBD)
+   - Context recall
+   - Context precision
+
 
 ## 📜 License
 
