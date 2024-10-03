@@ -8,6 +8,7 @@ from typing import Any
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
 import cohere
+from cohere import RerankResponse
 
 from src.generation.claude_assistant import ClaudeAssistant
 from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR, VECTOR_STORAGE_DIR
@@ -237,7 +238,7 @@ class Reranker:
 
     def _init(self):
         try:
-            self.client = cohere.Client(self.cohere_api_key)
+            self.client = cohere.ClientV2(api_key=self.cohere_api_key)
             logger.debug("Successfully initialized Cohere client")
         except Exception as e:
             logger.error(f"Error initializing Cohere client: {e}")
@@ -251,7 +252,67 @@ class Reranker:
         document_texts = [chunk["text"] for chunk in unique_documents.values()]
         return document_texts
 
-    def filter_irrelevant_results(self, response: dict[str, Any], relevance_threshold: float = 0.1) -> (dict)[str, Any]:
+    def rerank(self, query: str, documents: dict[str, Any], return_documents=True) -> RerankResponse:
+        """
+        Use Cohere rerank API to score and rank documents based on the query.
+        Excludes irrelevant documents.
+        :return: list of documents with relevance scores
+        """
+        # extract list of documents
+        document_texts = self.extract_documents_list(documents)
+
+        # get indexed results
+        response = self.client.rerank(
+            model=self.model_name, query=query, documents=document_texts, return_documents=return_documents
+        )
+        logger.debug(f"Printing cohere response: {response}")
+
+        logger.debug(f"Received {len(response.results)} documents from Cohere.")
+
+        # filter irrelevant results
+        # logger.debug(f"Filtering out the results with less than {relevance_threshold} relevance " f"score")
+        # relevant_results = self.filter_irrelevant_results(response, relevance_threshold)
+        # logger.debug(f"{len(relevant_results)} documents remaining after re-ranking.")
+
+        return response
+
+
+class ResultRetriever:
+    def __init__(self, vector_db: VectorDB, reranker: Reranker):
+        self.db = vector_db
+        self.reranker = reranker
+
+    @base_error_handler
+    def retrieve(self, user_query: str, combined_queries: list[str], top_n: int = None):
+        """Returns ranked documents based on the user query:
+        top_n: The number of most relevant documents or indices to return, defaults to the length of the documents"""
+
+        start_time = time.time()  # Start timing
+
+        # get expanded search results
+        search_results = self.db.query(combined_queries)
+        unique_documents = self.db.deduplicate_documents(search_results)
+        logger.info(f"Search returned {len(unique_documents)} unique chunks")
+
+        # rerank the results
+        ranked_documents = self.reranker.rerank(user_query, unique_documents)
+
+        # filter irrelevnat results
+        filtered_results = self.filter_irrelevant_results(ranked_documents, relevance_threshold=0.1)
+
+        # limit the number of returned chunks
+        limited_results = self.limit_results(filtered_results, top_n=top_n)
+
+        # calculate time
+        end_time = time.time()  # End timing
+        search_time = end_time - start_time
+        logger.info(f"Search and reranking completed in {search_time:.3f} seconds")
+
+        return limited_results
+
+    def filter_irrelevant_results(
+        self, response: RerankResponse, relevance_threshold: float = 0.1
+    ) -> dict[int, dict[str, int | float | str]]:
         """Filters out irrelevant result from Cohere reranking"""
         relevant_results = {}
 
@@ -269,57 +330,24 @@ class Reranker:
 
         return relevant_results
 
-    def rerank(self, query: str, documents: dict[str, Any], relevance_threshold: float = 0.1, return_documents=True):
-        """
-        Use Cohere rerank API to score and rank documents based on the query.
-        Excludes irrelevant documents.
-        :return: list of documents with relevance scores
-        """
-        # extract list of documents
-        document_texts = self.extract_documents_list(documents)
+    def limit_results(self, ranked_documents: dict[str, Any], top_n: int = None) -> dict[str, Any]:
+        """Takes re-ranked documents and returns n results"""
 
-        # get indexed results
-        response = self.client.rerank(
-            model=self.model_name, query=query, documents=document_texts, return_documents=return_documents
-        )
+        if top_n is not None and top_n < len(ranked_documents):
+            # Sort the items by relevance score in descending order
+            sorted_items = sorted(ranked_documents.items(), key=lambda x: x[1]["relevance_score"], reverse=True)
 
-        logger.debug(f"Received {len(response.results)} documents from Cohere.")
-        # pprint(response.results)
+            # Take the top N items and reconstruct the dictionary
+            limited_results = dict(sorted_items[:top_n])
 
-        # filter irrelevant results
-        logger.debug(f"Filtering out the results with less than {relevance_threshold} relevance " f"score")
-        relevant_results = self.filter_irrelevant_results(response, relevance_threshold)
-        logger.info(f"{len(relevant_results)} documents remaining after re-ranking.")
+            logger.info(
+                f"Returning {len(limited_results)} most relevant results (out of total {len(ranked_documents)} "
+                f"results "
+            )
+            return limited_results
 
-        return relevant_results
-
-
-class ResultRetriever:
-    def __init__(self, vector_db: VectorDB, reranker: Reranker):
-        self.db = vector_db
-        self.reranker = reranker
-
-    def retrieve(self, user_query: str, combined_queries: list[str]):
-        """Returns ranked documents based on the user query"""
-        try:
-            start_time = time.time()  # Start timing
-
-            # get expanded search results
-            search_results = self.db.query(combined_queries)
-            unique_documents = self.db.deduplicate_documents(search_results)
-            logger.info(f"Search returned {len(unique_documents)} unique chunks")
-
-            # rerank the results
-            ranked_documents = self.reranker.rerank(user_query, unique_documents)
-            logger.debug(f"Debugging ranked documents {ranked_documents}")
-
-            end_time = time.time()  # End timing
-            search_time = end_time - start_time
-            logger.info(f"Search and reranking completed in {search_time:.3f} seconds")
-            return ranked_documents
-        except Exception as e:
-            logger.error(f"Error retrieving documents: {e}")
-            raise
+        logger.info(f"Returning all {len(ranked_documents)} results")
+        return ranked_documents
 
 
 def main():
