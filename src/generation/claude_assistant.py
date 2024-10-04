@@ -456,7 +456,7 @@ class ClaudeAssistant:
         combined_queries = self.combine_queries(rag_query, multiple_queries)
 
         # get ranked search results
-        results = self.retriever.retrieve(rag_query, combined_queries)
+        results = self.retriever.retrieve(user_query=rag_query, combined_queries=combined_queries, top_n=3)
         logger.debug(f"Retriever results: {results}")
 
         # Preprocess the results here
