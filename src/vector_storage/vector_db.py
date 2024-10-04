@@ -179,14 +179,11 @@ class VectorDB:
             return False, document_ids
 
     @base_error_handler
-    def query(self, user_query: str | list[str], n_results: int = 5):
+    def query(self, user_query: str | list[str], n_results: int = 10):
         """
-        Handles both a single query and multiple queris
+        Handles both a single query and multiple queries
         """
-        if isinstance(user_query, str):
-            query_texts = [user_query]
-        if isinstance(user_query, list):
-            query_texts = user_query
+        query_texts = [user_query] if isinstance(user_query, str) else user_query
         search_results = self.collection.query(
             query_texts=query_texts, n_results=n_results, include=["documents", "distances", "embeddings"]
         )
@@ -265,7 +262,6 @@ class Reranker:
         response = self.client.rerank(
             model=self.model_name, query=query, documents=document_texts, return_documents=return_documents
         )
-        logger.debug(f"Printing cohere response: {response}")
 
         logger.debug(f"Received {len(response.results)} documents from Cohere.")
 
@@ -341,7 +337,7 @@ class ResultRetriever:
             limited_results = dict(sorted_items[:top_n])
 
             logger.info(
-                f"Returning {len(limited_results)} most relevant results (out of total {len(ranked_documents)} "
+                f"Returning {len(limited_results)} most relevant results (out of total {len(ranked_documents)})."
                 f"results "
             )
             return limited_results
