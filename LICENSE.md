@@ -1,16 +1,4 @@
-OmniClaude Modified Apache License
-
-IMPORTANT NOTICE: This license is the Apache License, Version 2.0, with an additional condition restricting commercial use. The full text of the Apache License 2.0 follows this notice.
-
-ADDITIONAL CONDITION: Commercial Use Restriction
-
-Notwithstanding any other provision of this License, you are not permitted to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of OmniClaude (the "Work") in whole or in part, directly or indirectly, or to create Derivative Works for any commercial purposes without the express written permission of the copyright owner. Commercial purposes include, but are not limited to, using the Work to provide commercial products or services, incorporating the Work into a commercial product or service, or using the Work for any activity that generates income.
-
-For commercial use rights, please contact azuev@outlook.com.
-
-The remainder of this file consists of the original Apache License 2.0:
-
-                                 Apache License
+                                Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
 
@@ -187,25 +175,19 @@ The remainder of this file consists of the original Apache License 2.0:
 
    END OF TERMS AND CONDITIONS
 
-By using, copying, modifying, or distributing OmniClaude, you agree to be bound by the terms of this license,
-including the Additional Condition restricting commercial use.
 
------------
+-----------------
 
-Copyright 2024 Alexander Zuev
+   Copyright [2024] [Alexander Zuev]
 
-Licensed under the Apache License, Version 2.0 (the "License") with Additional Condition;
-you may not use this file except in compliance with the License and the Additional Condition.
-You may obtain a copy of the License at
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+       http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-Additional Condition: Commercial use of OmniClaude, in whole or in part, directly or indirectly,
-is prohibited without express written permission from the copyright owner.
-For commercial use rights, please contact azuev@outlook.com.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
