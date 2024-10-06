@@ -23,6 +23,9 @@ COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 # GitHub Personal access token
 GITHUB_TOKEN = os.getenv("GITHUB_ACCESS_TOKEN")
 
+# Weave Project Name
+WEAVE_PROJECT_NAME = os.getenv("WEAVE_PROJECT_NAME")
+
 # File Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 SRC_ROOT = os.path.join(BASE_DIR, "src")

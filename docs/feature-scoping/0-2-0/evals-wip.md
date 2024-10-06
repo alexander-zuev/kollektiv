@@ -19,46 +19,86 @@ Performance of a RAG system is typically measured by:
 - end-to-end performance (i.e. how good does the overall system perform?)
 - retrieval performance (i.e. how relevant are retrieved results?)
 
-### Requirements
-- Eval suite should allow efficient recreation of new evaluation datasets, given that chunks can frequently change.
-  Irrespective of chunks, the input data will not change (at least until I add multi-modal capabilities)
-- Ideal setup is to:
-  - Generate 30-50 (TBD) questions per set of documents using a large-context LLM (Gemini Flash, for example)
-  - Generate detailed answers to these questions based on actual content, again using a large-context LLM
-  - Iterate over chunks (can be very expensive) to create a list of 'correct chunks' for a given dataset.
-- How to ensure efficiency?
-  - Batch APIs (if available). At least OpenAI has one as well as Gemini.
-  - Random sampling of documents? For example, generate questions for a random set of documents (never for chunks
-    within different documents):
-    - if documents size is 'small' -> use full content
-    - if documents size is more than a threshold -> use statistically significant / meaningful percentage of documents
-  - Proxies? Headers could be used as proxies to efficiently find relevant chunks although not ideal one.
-  - Reduce evaluation dataset size - the goal is to demonstrate overall approach that can be scaled, if necessary
-- Always track costs and display running costs of eval suite for:
-  - Generation
-  - Evaluation
-- The goal is to build a small but highly representative evaluation dataset and leverage LLM judges to
-evaluate different components of the RAG system.
+### Goals & Target State
+- **Comprehensive evaluation**
+  - All relevant parts of the RAG application should be assessed - retrieval and generation.
+- **Actionable insights**
+  - Evaluation should provide actionable insights on weak areas, bottlenecks of the system
+- **Efficiency**
+  - Ensure evaluation is cost-effective and time-efficient, allowing for frequent evaluations
+  - Potentially break down evaluation into tiers (quick & dirty vs long & clean)
+- **Scalability**
+  - Design the evaluation suite to accommodate changes in the system (e.g., different chunking strategies,
+  retrieval methods) without excessive overhead.
+- **Reproducibility and versioning**
+  - Maintain versioned datasets and results to track progress over time.
+- **Visibility and reporting**
+  - Allow for an easy visual representation of the end to end results
+
 
 #### Implementation options
 Option 1. Custom evaluation class (requires more time)
 Option 2. Evaluation library (start with this)
 
-### Current setup
+### Target state
 
-1. [X] Using `ragas` library to measure both retrieval and generation metrics:
-  - Generation:
-    - Faithfulness
-    - Answer relevancy
-    - Answer correctness
-  - Retrieval
-    - Context recall
-    - Context precision
-2. [] Efficient re-use:
-   - Refactor the pipeline to run in one click
-3. [] Versioning and storages
-4. [] Visualization and reporting of results
-5. [] Costs calculation and visualization
+1. [X] Generate questions, ground truth and contexts answers using `ragas` library
+2. [] Generate answers and store contexts using my own retriever
+   - It should be easy to drop in and replace a retriever
+3. [X] Upload datasets to Weave
+   - Versioning and storage
+3. [] Run evaluation suite on the dataset
+4. [] Implement evaluation pipeline over a dataset
+   - Retrieve dataset from Weave
+5. [] Analyze the results and identify key areas for improvement
+6. [] Costs calculation and visualization
+   - Store costs of generating the dataset
+
+### Logical View
+
+**DataLoader class:**
+- Centralizes all I/O operations
+- Specifically, used to load documents for initial dataset generator
+Attributes:
+- filepath: str file to load from the raw directory
+Methods:
+- save/load json - saves or loads json files
+- save/load dataset - saves or loads dataset from Weave
+
+**DatasetGenerator class:**
+- Used to generate a new dataset based on a set of documents
+- Dataset generation is sequential, no support for parallel processing
+Attributes
+- n_questions: int - controls the amount of questions to generate for a given set of raw documents
+- main_llm: str - main llm that generates answers and questions. Should it be the same as the retriever on not?
+- critic_llm: str - critic llm that does what?
+- embedding_model: str - embedding model that is used by dataset generator and evaluator
+
+**Evaluator class:**
+- Manages end-to-end evaluation on a given dataset
+- Calculates the metrics and metadata
+- Stores the metrics
+Attributes:
+- ?
+Methods:
+- evaluate_ragas - conducts ragas-based evaluation
+- evaluate_custom - conducts own end to end evaluation
+
+#### Process View
+Dataset generation (one-time):
+- User selects the document over which to create the dataset
+- User optionally selects the number of questions to generate
+- User optionally selects the main model, critic model, embedding model
+- User runs a single method `create_new_dataset` that creates a dataset in the predetermined location and saves it
+
+Run evaluation pipeline (one-time / regular):
+- User selects the dataset
+- User defines a set of metrics to calculate
+- User runs the `evaluate` method which calculates a set of metrics and saves the results
+
+
+
+#### Metrics
 
 **Faithfulness**
 - Measures factual consistency of the generated answer against the given context. The generated answer is
@@ -157,7 +197,9 @@ End to end evaluation was much more detailed and consisted in assessing:
 - coverage - how many of the claims in the gold answer are included in the generated answer (a-la recall)
 
 ### Weights & Biases Course
-[Link](https://www.wandb.courses/courses/take/rag-in-production/lessons/55179976-evaluation-basics)
+[Course Link](https://www.wandb.courses/courses/take/rag-in-production/lessons/55179976-evaluation-basics)
+
+[MS Build Weave Demo](https://www.youtube.com/watch?v=v5Qm7-OimBs)
 
 Different types of evaluations:
 - direct - measure such aspects of toxicity, etc. etc.
@@ -174,6 +216,7 @@ responses generated with the system.
 
 **End-to-End Evaluation:**
 - Usually about comparing an LLM response against some ground truth data.
+
 **Component Evaluation:**
 - RAG systems consist of multiple components, such as:
   - retrieval
@@ -189,24 +232,26 @@ coherence, or informativeness.
 [Notebook](https://github.com/wandb/edu/blob/main/rag-advanced/notebooks/Chapter02.ipynb)
 
 **How eval dataset was created**
-[Part 1](https://wandb.ai/wandbot/wandbot-eval/reports/How-to-Evaluate-an-LLM-Part-1-Building-an-Evaluation-Dataset-for
--our-LLM-System--Vmlldzo1NTAwNTcy)
+[Part 1](https://wandb.ai/wandbot/wandbot-eval/reports/How-to-Evaluate-an-LLM-Part-1-Building-an-Evaluation-Dataset-for-our-LLM-System--Vmlldzo1NTAwNTcy)
 [Part 2](https://wandb.ai/wandbot/wandbot-eval/reports/How-to-Evaluate-an-LLM-Part-2-Manual-Evaluation-of-Wandbot-our-LLM-Powered-Docs-Assistant--Vmlldzo1NzU4NTM3)
 
 Before doing any evals, they used 'rigorous eyeballing' based evaluation.
 
 So to recap, how W&B built their eval set:
-- production data from users of their Wandbot that is a QA bot over their own doc (very similar to what I am
-  building actually)
-- they extracted 100+ queries from real users that they manually annotated answers for
-- they assessed accuracy of bot replies using domain experts
-- E2E accuracy of 66% was achieved
+- used real data from users' interaction with their wandbot
+- built a golden set of 132 questions
+- generated answers to this questions using wandbot
+- stored the retrieved context (chunks, with some metadata)
+- used manual evaluation (annotation) to determine accuracy of the results
+- categorized each response into - correct, incorrect, unsure
+- This is essentially measuring E2E accuracy of the results
+- Achieved E2E accuracy of 66%, using manual review
 
 **End to end evaluation without ground truth:**
 - Using a powerful LLM it's actually feasible to assess accuracy without ground truth:
-  - Generate a list of questions
-  - Retrieve chunks
+  - Generate a list of questions (query)
   - Generate the response
+  - Store retrieved chunks and metadata
   - Use LLM-as-a-judge to assess it
 
 ### LlamaIndex

@@ -22,4 +22,4 @@ def main(debug: bool = False, reset_db: bool = False):
 
 
 if __name__ == "__main__":
-    main(debug=False, reset_db=False)
+    main(debug=True, reset_db=False)
