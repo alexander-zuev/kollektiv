@@ -37,6 +37,10 @@ PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "data", "chunks")
 CHROMA_DB_DIR = os.path.join(SRC_ROOT, "vector_storage", "chroma")
 VECTOR_STORAGE_DIR = os.path.join(SRC_ROOT, "vector_storage")
 
+# Evaluation config
+JUDGE_LLM_MODEL = "gpt-4o-mini"
+EMBEDDING_MODEL = "text-embedding-3-small"
+
 
 # Ensure directories exist
 os.makedirs(JOB_FILE_DIR, exist_ok=True)

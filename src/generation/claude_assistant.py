@@ -171,6 +171,7 @@ class ClaudeAssistant:
         self.extra_headers = {"anthropic-beta": "prompt-caching-2024-07-31"}
         self.retriever = None
         self.vector_db = vector_db
+        self.retrieved_contexts = []
 
         self._init()
 
@@ -468,6 +469,7 @@ class ClaudeAssistant:
 
         # Preprocess the results here
         preprocessed_results = self.preprocess_ranked_documents(results)
+        self.retrieved_contexts = preprocessed_results  # Store the contexts for evals
         logger.debug(f"Processed results: {results}")
 
         return preprocessed_results
@@ -621,7 +623,7 @@ class ClaudeAssistant:
             model = self.model_name
 
         message = self.client.messages.create(
-            model="claude-3-5-sonnet-20240620",
+            model=model,
             max_tokens=1024,
             system=prompt,
             messages=[{"role": "user", "content": query}],
@@ -638,3 +640,16 @@ class ClaudeAssistant:
         """
         combined_queries = [query for query in [user_query] + generated_queries if query.strip()]
         return combined_queries
+
+    @anthropic_error_handler
+    @weave.op()
+    def predict_for_evaluation(self, user_input: str) -> dict:
+        self.conversation_history = ConversationHistory()
+        self.retrieved_contexts = []  # Clear previous contexts
+        answer = self.get_response(user_input, stream=False)
+        contexts = self.retrieved_contexts
+
+        return {
+            "answer": answer,
+            "contexts": contexts,
+        }

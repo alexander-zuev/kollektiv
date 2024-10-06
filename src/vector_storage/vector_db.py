@@ -8,6 +8,7 @@ from typing import Any
 import chromadb
 import chromadb.utils.embedding_functions as embedding_functions
 import cohere
+import weave
 from cohere import RerankResponse
 
 from src.generation.claude_assistant import ClaudeAssistant
@@ -279,6 +280,7 @@ class ResultRetriever:
         self.reranker = reranker
 
     @base_error_handler
+    @weave.op()
     def retrieve(self, user_query: str, combined_queries: list[str], top_n: int = None):
         """Returns ranked documents based on the user query:
         top_n: The number of most relevant documents or indices to return, defaults to the length of the documents"""
@@ -337,8 +339,8 @@ class ResultRetriever:
             limited_results = dict(sorted_items[:top_n])
 
             logger.info(
-                f"Returning {len(limited_results)} most relevant results (out of total {len(ranked_documents)})."
-                f"results "
+                f"Returning {len(limited_results)} most relevant results (out of total {len(ranked_documents)} "
+                f"results)."
             )
             return limited_results
 

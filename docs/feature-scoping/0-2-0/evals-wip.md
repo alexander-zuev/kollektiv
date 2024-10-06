@@ -43,8 +43,10 @@ Option 2. Evaluation library (start with this)
 ### Target state
 
 1. [X] Generate questions, ground truth and contexts answers using `ragas` library
-2. [] Generate answers and store contexts using my own retriever
-   - It should be easy to drop in and replace a retriever
+2. [X] Generate answers and store contexts using my own retriever
+   - [X] Generate answers
+   - [] Retrieve contexts
+   - [] Make it easy to replace retrievers
 3. [X] Upload datasets to Weave
    - Versioning and storage
 3. [] Run evaluation suite on the dataset
