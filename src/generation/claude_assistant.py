@@ -5,18 +5,26 @@ import uuid
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Any
 
+from src.utils.config import MAIN_MODEL
+
 if TYPE_CHECKING:
     from src.vector_storage.vector_db import VectorDB  # Import only for type checking
 
 import anthropic
 import tiktoken
+import weave
 from anthropic.types import Message
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
+from pydantic import Field
+from weave import Model
 
 from src.generation.tool_definitions import tool_manager
-from src.utils.config import ANTHROPIC_API_KEY
+from src.utils.config import ANTHROPIC_API_KEY, WEAVE_PROJECT_NAME
 from src.utils.decorators import anthropic_error_handler, base_error_handler
 from src.utils.logger import get_logger
+
+weave.init(WEAVE_PROJECT_NAME)
+
 
 logger = get_logger()
 
@@ -88,87 +96,159 @@ class ConversationHistory:
         logger.debug(f"Conversation state: messages={len(self.messages)}, " f"Total tokens={self.total_tokens}, ")
 
 
+# TODO: refactor to properly define Class and Instance varibales
 # Client Class
-class ClaudeAssistant:
+class ClaudeAssistant(Model):
     """
-    ClaudeAssistant is an AI assistant class with a focus on providing accurate, relevant, and helpful information
-    utilizing a Retrieval Augmented Generation (RAG) system.
+    ClaudeAssistant is a model representing an advanced AI assistant with access to various tools, including a
+    powerful Retrieval Augmented Generation (RAG) system.
 
-    :param api_key: API key used for authenticating with the Claude API service.
-    :param model_name: Name of the language model to be used.
+    Attributes:
+        client: Optional instance of anthropic.Anthropic initialized with the API key.
+        api_key: The API key for accessing Anthropics services.
+        model_name: The name of the AI model being used.
+        base_system_prompt: The default prompt containing detailed usage guidelines and constraints for the assistant.
+        system_prompt: The current system prompt, potentially modified with operational context.
+        tool_manager: Manager of available tools.
+        tools: A list of tools available for the assistant.
+        extra_headers: Headers for optional requests.
+        retriever: Optional retriever for document searching.
+        vector_db: Vector Database used in conjunction with the RAG system.
+
+    Methods:
+        __init__: Initializes the ClaudeAssistant instance with the provided vector database, API key, and model name.
+        _init: Initializes the client, conversation history, and retrieves all tools through the tool manager.
+        _update_system_prompt: Updates the system prompt with a list of document summaries.
+
+    Initialization:
+        - Sets up the client, vector database, API key, and model name.
+        - Initializes conversation history.
+        - Optionally sets base system prompt and system prompt.
+        - Initializes tool manager and retriever if not already set.
+
+    Error Handling:
+        - Initialization and system prompt update methods utilize specific error handlers to manage exceptions
+        gracefully.
     """
+
+    client: anthropic.Anthropic | None = None
+    vector_db: VectorDB
+    api_key: str = Field(default=ANTHROPIC_API_KEY)
+    model_name: str = Field(default=MAIN_MODEL)
+    base_system_prompt: str = Field(default="")
+    system_prompt: str = Field(default="")
+    conversation_history: ConversationHistory | None = None
+    retrieved_contexts: list[str] = Field(default_factory=list)
+    tool_manager: Any = Field(default_factory=lambda: tool_manager)
+    tools: list[dict[str, Any]] = Field(default_factory=list)
+    extra_headers: dict[str, str] = Field(default_factory=lambda: {"anthropic-beta": "prompt-caching-2024-07-31"})
+    retriever: Any | None = None
 
     def __init__(
         self,
         vector_db: VectorDB,
-        api_key: str = ANTHROPIC_API_KEY,
-        model_name: str = "claude-3-5-sonnet-20240620",
+        api_key: str = None,
+        model_name: str = None,
     ):
-        self.client = None
-        self.api_key = api_key
-        self.model_name = model_name
-        self.base_system_prompt = """
-        You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval Augmented
-        Generation) system. Your primary function is to provide accurate, relevant, and helpful information to users
-        by leveraging your broad knowledge base, analytical capabilities, and the specific information available
-        through the RAG tool.
-        Key guidelines:
+        # Initialize fields via super().__init__()
+        super().__init__(
+            client=None,
+            vector_db=vector_db,
+            api_key=api_key or ANTHROPIC_API_KEY,
+            model_name=model_name or MAIN_MODEL,
+            base_system_prompt="""
+                    You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval
+                    Augmented Generation) system. Your primary function is to provide accurate, relevant, and helpful
+                    information to users by leveraging your broad knowledge base, analytical capabilities,
+                    and the specific information available
+                    through the RAG tool.
+                    Key guidelines:
 
-        Use the RAG tool when queries likely require information from loaded documents or recent data not in your
-        training.
-        Carefully analyze the user's question and conversation context before deciding whether to use the RAG tool.
-        When using RAG, formulate precise and targeted queries to retrieve the most relevant information.
-        Seamlessly integrate retrieved information into your responses, citing sources when appropriate.
-        If the RAG tool doesn't provide relevant information, rely on your general knowledge and analytical skills.
-        Always strive for accuracy, clarity, and helpfulness in your responses.
-        Be transparent about the source of your information (general knowledge vs. RAG-retrieved data).
-        If you're unsure about information or if it's not in the loaded documents, clearly state your uncertainty.
-        Provide context and explanations for complex topics, breaking them down into understandable parts.
-        Offer follow-up questions or suggestions to guide the user towards more comprehensive understanding.
+                    Use the RAG tool when queries likely require information from loaded documents or recent data not
+                    in your training.
+                    Carefully analyze the user's question and conversation context before deciding whether to use the
+                    RAG tool.
+                    When using RAG, formulate precise and targeted queries to retrieve the most relevant information.
+                    Seamlessly integrate retrieved information into your responses, citing sources when appropriate.
+                    If the RAG tool doesn't provide relevant information, rely on your general knowledge and analytical
+                    skills.
+                    Always strive for accuracy, clarity, and helpfulness in your responses.
+                    Be transparent about the source of your information (general knowledge vs. RAG-retrieved data).
+                    If you're unsure about information or if it's not in the loaded documents, clearly state your
+                     uncertainty.
+                    Provide context and explanations for complex topics, breaking them down into understandable parts.
+                    Offer follow-up questions or suggestions to guide the user towards more comprehensive understanding.
 
-        Do not:
+                    Do not:
 
-        Invent or hallucinate information not present in your knowledge base or the RAG-retrieved data.
-        Use the RAG tool for general knowledge questions that don't require specific document retrieval.
-        Disclose sensitive details about the RAG system's implementation or the document loading process.
-        Provide personal opinions or biases; stick to factual information from your knowledge base and RAG system.
-        Engage in or encourage any illegal, unethical, or harmful activities.
-        Share personal information about users or any confidential data that may be in the loaded documents.
+                    Invent or hallucinate information not present in your knowledge base or the RAG-retrieved data.
+                    Use the RAG tool for general knowledge questions that don't require specific document retrieval.
+                    Disclose sensitive details about the RAG system's implementation or the document loading process.
+                    Provide personal opinions or biases; stick to factual information from your knowledge base and
+                    RAG system.
+                    Engage in or encourage any illegal, unethical, or harmful activities.
+                    Share personal information about users or any confidential data that may be in the loaded documents.
 
-        Currently loaded document summaries:
-        {document_summaries}
-        Use these summaries to guide your use of the RAG tool and to provide context for the types of questions
-        you can answer with the loaded documents.
-        Interaction Style:
+                    Currently loaded document summaries:
+                    {document_summaries}
+                    Use these summaries to guide your use of the RAG tool and to provide context for the types of
+                     questions
+                    you can answer with the loaded documents.
+                    Interaction Style:
 
-        Maintain a professional, friendly, and patient demeanor.
-        Tailor your language and explanations to the user's apparent level of expertise.
-        Ask for clarification when the user's query is ambiguous or lacks necessary details.
+                    Maintain a professional, friendly, and patient demeanor.
+                    Tailor your language and explanations to the user's apparent level of expertise.
+                    Ask for clarification when the user's query is ambiguous or lacks necessary details.
 
-        Handling Complex Queries:
+                    Handling Complex Queries:
 
-        For multi-part questions, address each part systematically.
-        If a query requires multiple steps or a lengthy explanation, outline your approach before diving into details.
-        Offer to break down complex topics into smaller, more manageable segments if needed.
+                    For multi-part questions, address each part systematically.
+                    If a query requires multiple steps or a lengthy explanation, outline your approach before diving
+                    into details.
+                    Offer to break down complex topics into smaller, more manageable segments if needed.
 
-        Continuous Improvement:
+                    Continuous Improvement:
 
-        Learn from user interactions to improve your query formulation for the RAG tool.
-        Adapt your response style based on user feedback and follow-up questions.
+                    Learn from user interactions to improve your query formulation for the RAG tool.
+                    Adapt your response style based on user feedback and follow-up questions.
 
-        Remember to use your tools judiciously and always prioritize providing the most accurate,
-        helpful, and contextually relevant information to the user. Adapt your communication style to
-        the user's level of understanding and the complexity of the topic at hand.
-        """
+                    Remember to use your tools judiciously and always prioritize providing the most accurate,
+                    helpful, and contextually relevant information to the user. Adapt your communication style to
+                    the user's level of understanding and the complexity of the topic at hand.
+                    """,
+            system_prompt="",  # Will format below
+            conversation_history=None,  # Will initialize in _init()
+            retrieved_contexts=[],
+            tool_manager=tool_manager,
+            tools=[],
+            extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
+            retriever=None,
+        )
+        # Set the formatted system prompt
         self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
-        self.conversation_history = None
-        self.tool_manager = tool_manager
-        self.tools: list[dict[str, Any]] = []
-        self.extra_headers = {"anthropic-beta": "prompt-caching-2024-07-31"}
-        self.retriever = None
-        self.vector_db = vector_db
-
+        # Initialize client and conversation history
         self._init()
+
+    # def __init__(
+    #         self,
+    #         vector_db: VectorDB,
+    #         api_key: str = None,
+    #         model_name: str = None,
+    # ):
+    #     super().__init__()
+    #     self.client: Optional[anthropic.Anthropic] = None
+    #     self.vector_db: VectorDB = vector_db
+    #     self.api_key: str = api_key or ANTHROPIC_API_KEY
+    #     self.model_name: str = model_name or MAIN_MODEL
+    #
+    #     self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
+    #     self.conversation_history: ConversationHistory() = None
+    #     self.retrieved_contexts: list[str] = []
+    #     self.tool_manager = tool_manager
+    #     self.tools: list[dict[str, Any]] = []
+    #     self.extra_headers = {"anthropic-beta": "prompt-caching-2024-07-31"}
+    #     self.retriever = None
+    #     self._init()
 
     @anthropic_error_handler
     def _init(self):
@@ -237,6 +317,7 @@ class ClaudeAssistant:
             return assistant_response
 
     @anthropic_error_handler
+    @weave.op()
     def stream_response(self, user_input: str) -> Generator[str]:
         # iteration = 0
         user_input = self.preprocess_user_input(user_input)
@@ -290,6 +371,7 @@ class ClaudeAssistant:
                 raise Exception(f"An error occurred: {str(e)}") from e
 
     @anthropic_error_handler
+    @weave.op()
     def not_stream_response(self, user_input: str) -> str:
         user_input = self.preprocess_user_input(user_input)
         self.conversation_history.add_message(role="user", content=user_input)
@@ -378,6 +460,7 @@ class ClaudeAssistant:
             return f"Error: {str(e)}"
 
     @anthropic_error_handler
+    @weave.op()
     def formulate_rag_query(self, recent_conversation_history: list[dict[str, Any]], important_context: str) -> str:
         """ "
         Generates a rag search query based on recent conversation history and important context generated by AI
@@ -456,16 +539,18 @@ class ClaudeAssistant:
         combined_queries = self.combine_queries(rag_query, multiple_queries)
 
         # get ranked search results
-        results = self.retriever.retrieve(rag_query, combined_queries)
+        results = self.retriever.retrieve(user_query=rag_query, combined_queries=combined_queries, top_n=3)
         logger.debug(f"Retriever results: {results}")
 
         # Preprocess the results here
         preprocessed_results = self.preprocess_ranked_documents(results)
+        self.retrieved_contexts = preprocessed_results  # Store the contexts for evals
         logger.debug(f"Processed results: {results}")
 
         return preprocessed_results
 
     @anthropic_error_handler
+    @weave.op()
     def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
         # Aggregate metadata
         unique_urls = {chunk["metadata"]["source_url"] for chunk in chunks}
@@ -594,6 +679,7 @@ class ClaudeAssistant:
         return preprocessed_context
 
     @anthropic_error_handler
+    @weave.op()
     def generate_multi_query(self, query: str, model: str = None, n_queries: int = 5) -> list[str]:
         prompt = f"""
             You are an AI assistant whose task is to generate multiple queries as part of a RAG system.
@@ -612,7 +698,7 @@ class ClaudeAssistant:
             model = self.model_name
 
         message = self.client.messages.create(
-            model="claude-3-5-sonnet-20240620",
+            model=model,
             max_tokens=1024,
             system=prompt,
             messages=[{"role": "user", "content": query}],
@@ -629,3 +715,30 @@ class ClaudeAssistant:
         """
         combined_queries = [query for query in [user_query] + generated_queries if query.strip()]
         return combined_queries
+
+    @anthropic_error_handler
+    @weave.op()
+    async def predict(self, user_input: str) -> dict:
+
+        self.reset_conversation()  # reset history and context for each prediction
+
+        answer = self.get_response(user_input, stream=False)
+        contexts = self.retrieved_contexts
+
+        logger.info(f"Printing answer: {answer}\n\n " f"Based on the following contexts {contexts[0][:250]}")
+
+        return {
+            "answer": answer,
+            "contexts": contexts,
+        }
+
+    def reset_conversation(self):
+        self.conversation_history = ConversationHistory()
+        self.retrieved_contexts = []
+
+
+# Import after the class definition
+from src.vector_storage.vector_db import VectorDB
+
+# Rebuild the model to resolve forward references
+ClaudeAssistant.model_rebuild()

@@ -23,15 +23,26 @@ COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 # GitHub Personal access token
 GITHUB_TOKEN = os.getenv("GITHUB_ACCESS_TOKEN")
 
+# Weave Project Name
+WEAVE_PROJECT_NAME = os.getenv("WEAVE_PROJECT_NAME")
+
 # File Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 SRC_ROOT = os.path.join(BASE_DIR, "src")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
+EVAL_DIR = os.path.join(BASE_DIR, "src", "evaluation")
 JOB_FILE_DIR = os.path.join(BASE_DIR, "src", "crawling")
 RAW_DATA_DIR = os.path.join(BASE_DIR, "src", "data", "raw")
 PROCESSED_DATA_DIR = os.path.join(BASE_DIR, "src", "data", "chunks")
 CHROMA_DB_DIR = os.path.join(SRC_ROOT, "vector_storage", "chroma")
 VECTOR_STORAGE_DIR = os.path.join(SRC_ROOT, "vector_storage")
+
+# LLM config
+MAIN_MODEL = "claude-3-5-sonnet-20240620"
+
+# Evaluation config
+JUDGE_LLM_MODEL = "gpt-4o-mini"
+EMBEDDING_MODEL = "text-embedding-3-small"
 
 
 # Ensure directories exist

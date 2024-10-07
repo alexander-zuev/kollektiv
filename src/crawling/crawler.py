@@ -90,8 +90,8 @@ class FireCrawler:
             params = {
                 "limit": page_limit,
                 "maxDepth": 5,
-                "includePaths": ["/tutorials/*", "/how-tos/*", "/concepts/*"],
-                "excludePaths": ["/langgraph/cloud/*"],
+                "includePaths": ["/stable/*"],
+                "excludePaths": [],
                 "scrapeOptions": {
                     "formats": [
                         "markdown",
@@ -373,9 +373,9 @@ def main():
 
     # Crawling documentation
     urls_to_crawl = [
-        "https://langchain-ai.github.io/langgraph/",  # replace this
+        "https://docs.ragas.io/en",  # replace this
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=250)
+    crawler.async_crawl_url(urls_to_crawl, page_limit=50)
 
 
 if __name__ == "__main__":

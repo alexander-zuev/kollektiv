@@ -145,14 +145,26 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 For a brief roadmap please check out [project wiki page](https://github.com/Twist333d/omni-claude/wiki).
 
 ## 📈 Performance Metrics
-No eval suite is built yet (but will be added very soon)
-- Average query processing time: [TBD]
-- Retrieval accuracy (e.g., NDCG@5): [TBD]
-- Response coherence (based on LLM evaluation): [TBD]
+Evaluation is currently done using `ragas` library. There are 2 key parts assessed:
+1. End-to-end generation
+   - Faithfulness
+   - Answer relevancy
+   - Answer correctness
+2. Retriever (TBD)
+   - Context recall
+   - Context precision
+
 
 ## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+OmniClaude is licensed under a modified version of the Apache License 2.0. While it allows for free use, modification,
+and distribution for non-commercial purposes, any commercial use requires explicit permission from the copyright owner.
+
+- For non-commercial use: You are free to use, modify, and distribute this software under the terms of the Apache License 2.0.
+- For commercial use: Please contact azuev@outlook.com to obtain a commercial license.
+
+See the [LICENSE](LICENSE.md) file for the full license text and additional conditions.
 
 ## 🙏 Acknowledgements
 
