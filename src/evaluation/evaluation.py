@@ -6,7 +6,6 @@ from pprint import pprint
 
 import weave
 from datasets import Dataset
-from dotenv import load_dotenv
 from langchain_community.document_loaders import JSONLoader
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -22,22 +21,35 @@ from weave import Model
 from weave.trace import weave_client
 
 from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.config import EVAL_DIR, JUDGE_LLM_MODEL, RAW_DATA_DIR, WEAVE_PROJECT_NAME
+from src.utils.config import (
+    ANTHROPIC_API_KEY,
+    EMBEDDING_MODEL,
+    EVAL_DIR,
+    JUDGE_LLM_MODEL,
+    MAIN_MODEL,
+    RAW_DATA_DIR,
+    WEAVE_PROJECT_NAME,
+)
 from src.utils.decorators import anthropic_error_handler, base_error_handler
 from src.utils.logger import configure_logging, get_logger
 from src.vector_storage.vector_db import Reranker, ResultRetriever, VectorDB
-from utils.config import EMBEDDING_MODEL
 
 logger = get_logger()
 
 
 class DataLoader:
+    """
+
+    Class responsible for loading and saving datasets from and to JSON files.
+    Includes methods to fetch documents, save datasets, and load datasets.
+    """
+
     def __init__(self):
         self.dataset_path = EVAL_DIR
         self.dataset_filename: str = "eval_dataset.json"
 
     @base_error_handler
-    def get_documents(self, filename: str):
+    async def get_documents(self, filename: str):
         filepath = os.path.join(RAW_DATA_DIR, filename)
         loader = JSONLoader(
             file_path=filepath,
@@ -76,7 +88,7 @@ class DataLoader:
             raise
 
     @base_error_handler
-    def load_json(self, filename: str = None) -> Dataset | None:
+    async def load_json(self, filename: str = None) -> Dataset | None:
         """Loads the dataset from json file"""
         if filename:
             self.dataset_filename = filename
@@ -102,6 +114,23 @@ class DataLoader:
 
 
 class DatasetGenerator:
+    """
+    Class responsible for generating datasets using various language models and embeddings.
+
+    :param generator_llm: Name of the language model used for generating datasets.
+    :type generator_llm: str, optional
+    :param critic_llm: Name of the language model used for critiquing datasets.
+    :type critic_llm: str, optional
+    :param embedding_model: Name of the embedding model used for datasets.
+    :type embedding_model: str, optional
+    :param dataset_path: Path where the dataset will be stored.
+    :type dataset_path: str, optional
+    :param claude_assistant: Instance of ClaudeAssistant for additional functionalities.
+    :type claude_assistant: ClaudeAssistant, optional
+    :param loader: Instance of DataLoader for loading data.
+    :type loader: DataLoader, optional
+    """
+
     def __init__(
         self,
         generator_llm: str = "gpt-4o",
@@ -127,7 +156,7 @@ class DatasetGenerator:
         self.weave_dataset_name: str = None
 
     @base_error_handler
-    def generate_dataset(self, documents: Sequence[Document], **kwargs) -> TestDataset:
+    async def generate_dataset(self, documents: Sequence[Document], **kwargs) -> TestDataset:
         test_dataset = self.generator.generate_with_langchain_docs(
             documents=documents, **kwargs, distributions={simple: 0.25, reasoning: 0.25, multi_context: 0.5}
         )
@@ -153,6 +182,21 @@ class DatasetGenerator:
 
 
 class WeaveManager:
+    """
+    WeaveManager class provides an interface for interacting with Weave for dataset operations.
+
+    Methods
+    -------
+    __init__(project_name: str = WEAVE_PROJECT_NAME)
+        Initializes the WeaveManager with the given project name.
+
+    upload_dataset(dataset: Dataset, name: str) -> str
+        Uploads the given HuggingFace dataset to Weave and returns the name of the uploaded dataset.
+
+    retrieve_dataset(name: str) -> weave_client.ObjectRef
+        Retrieves a dataset from Weave using the given dataset name and returns a reference to the dataset.
+    """
+
     def __init__(
         self,
         project_name: str = WEAVE_PROJECT_NAME,
@@ -189,12 +233,51 @@ class WeaveManager:
 
 
 class Evaluator:
+    """
+    Evaluator is a class designed to evaluate machine learning model outputs.
+    It utilizes several sub-models and assistants to generate a comprehensive evaluation
+    based on defined metrics such as faithfulness, answer relevancy, and correctness.
+
+    Attributes:
+        model_name (str): The primary language model used for evaluation.
+        embedding_model_name (str): The model used for generating embeddings.
+        llm (OpenAI): The main language model instance.
+        embeddings (OpenAIEmbedding): The embedding model instance.
+        omni_claude_model (OmniClaudeModel): The model for omniscient Claude assistance.
+        judge_llm_model (str): The model used for judging the outputs.
+        main_model (str): The primary model used by Claude assistant.
+        anthropic_api_key (str): API key for accessing Anthropic services.
+
+    Methods:
+        evaluate_row(question: str, ground_truth: str, model_output: dict) -> dict[str, float]:
+            Evaluates a single question-answer pair using specified metrics and models.
+
+            Args:
+                question (str): The question being evaluated.
+                ground_truth (str): The correct answer for the question.
+                model_output (dict): The output from the model being evaluated, including answer and contexts.
+
+            Returns:
+                dict[str, float]: A dictionary containing evaluation scores for different metrics.
+
+        run_weave_evaluation(eval_dataset: Dataset | weave_client.ObjectRef) -> dict:
+            Executes the evaluation process on a given dataset.
+
+            Args:
+                eval_dataset (Dataset | weave_client.ObjectRef): The dataset to be evaluated.
+
+            Returns:
+                dict: A dictionary containing the results of the evaluation.
+    """
+
     def __init__(
         self,
         model: str = "gpt-4o",
         embedding_model: str = EMBEDDING_MODEL,
         claude_assistant: ClaudeAssistant = None,
         judge_llm_model: str = JUDGE_LLM_MODEL,
+        anthropic_api_key: str = ANTHROPIC_API_KEY,
+        claude_assistant_model: str = MAIN_MODEL,
     ):
         self.model_name = model
         self.embedding_model_name = embedding_model
@@ -202,6 +285,8 @@ class Evaluator:
         self.embeddings = OpenAIEmbedding(model=embedding_model)
         self.omni_claude_model = OmniClaudeModel(claude_assistant=claude_assistant)
         self.judge_llm_model = judge_llm_model
+        self.main_model = claude_assistant_model
+        self.anthropic_api_key = anthropic_api_key
 
     @weave.op()
     async def evaluate_row(self, question: str, ground_truth: str, model_output: dict) -> dict[str, float]:
@@ -239,8 +324,10 @@ class Evaluator:
             "context_precision": result["context_precision"],
         }
 
-    async def run_weave_evaluation(self, eval_dataset: Dataset | weave_client.ObjectRef):
-        model = self.omni_claude_model
+    async def run_weave_evaluation(self, eval_dataset: Dataset | weave_client.ObjectRef) -> dict:
+        logger.info("Running evaluation...")
+
+        model = ClaudeAssistant(vector_db=VectorDB(), api_key=self.anthropic_api_key, model_name=self.main_model)
 
         if isinstance(eval_dataset, Dataset):
             eval_dataset = eval_dataset.to_list()
@@ -253,6 +340,7 @@ class Evaluator:
         return results
 
 
+# TODO: deprecate this class, it should be using ClaudeAssistant
 class OmniClaudeModel(Model):
     claude_assistant: ClaudeAssistant
 
@@ -262,7 +350,27 @@ class OmniClaudeModel(Model):
 
 
 class EvalManager:
-    """Orchestrates the pipeline end to end"""
+    """
+    class EvalManager:
+        Manages the evaluation pipeline by coordinating various components such as loaders, generators,
+        retrievers, and evaluators.
+
+        Methods:
+            __init__:
+                Initializes the EvalManager with optional custom instances of dependencies.
+
+            run_pipeline:
+                Runs evaluation pipeline with pre-determined parameters.
+
+                Parameters:
+                    generate_new_dataset (bool): Flag to generate a new dataset.
+                    num_questions (int): Number of questions for dataset generation.
+                    input_filename (str): Filename for input documents.
+                    weave_dataset_name (str): Name of the dataset to retrieve from Weave.
+
+                Returns:
+                    results: Evaluation results.
+    """
 
     def __init__(
         self,
@@ -298,8 +406,8 @@ class EvalManager:
         if generate_new_dataset:
             logger.info("Generating new dataset...")
             # Generate and upload new dataset
-            docs = self.loader.get_documents(filename=input_filename)
-            dataset = self.generator.generate_dataset(documents=docs, test_size=num_questions)
+            docs = await self.loader.get_documents(filename=input_filename)
+            dataset = await self.generator.generate_dataset(documents=docs, test_size=num_questions)
 
             for row in dataset:
                 logger.debug(f"Question: {row['question']}")
@@ -308,6 +416,7 @@ class EvalManager:
             await self.weave_manager.upload_dataset(dataset, name="anthropic_dataset")
 
         # Retrieve dataset from Weave
+        logger.info(f"Getting a dataset from Weave with name: {weave_dataset_name}")
         dataset = await self.weave_manager.retrieve_dataset(name=weave_dataset_name)
         logger.debug(f"First row of the dataset {dataset.rows[0]}")
 
@@ -317,9 +426,7 @@ class EvalManager:
 
 
 async def main():
-    configure_logging()
-
-    load_dotenv()
+    configure_logging(debug=True)
 
     filename = "docs_anthropic_com_en_20240928_135426.json"
 
@@ -327,7 +434,7 @@ async def main():
 
     # Run the pipeline
     results = await pipeline_manager.run_pipeline(
-        generate_new_dataset=True,
+        generate_new_dataset=False,
         input_filename=filename,
         num_questions=10,
         weave_dataset_name="anthropic_dataset",
