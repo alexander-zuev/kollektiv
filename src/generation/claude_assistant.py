@@ -1,27 +1,29 @@
+# TODO: decouple from vector db
+# TODO: update documentation of each module
+# TODO: update the instantation
+# TODO: update mocks
+
 from __future__ import annotations
 
 import json
 import uuid
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
-
-from src.utils.config import MAIN_MODEL
-
-if TYPE_CHECKING:
-    from src.vector_storage.vector_db import VectorDB  # Import only for type checking
+from typing import  Any
 
 import anthropic
 import tiktoken
 import weave
 from anthropic.types import Message
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from weave import Model
 
 from src.generation.tool_definitions import tool_manager
-from src.utils.config import ANTHROPIC_API_KEY, WEAVE_PROJECT_NAME
+from src.utils.config import ANTHROPIC_API_KEY, MAIN_MODEL, WEAVE_PROJECT_NAME
 from src.utils.decorators import anthropic_error_handler, base_error_handler
 from src.utils.logger import get_logger
+
+
 
 weave.init(WEAVE_PROJECT_NAME)
 
@@ -144,6 +146,8 @@ class ClaudeAssistant(Model):
     extra_headers: dict[str, str] = Field(default_factory=lambda: {"anthropic-beta": "prompt-caching-2024-07-31"})
     retriever: Any | None = None
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     def __init__(
         self,
         vector_db: VectorDB,
@@ -228,27 +232,6 @@ class ClaudeAssistant(Model):
         self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
         # Initialize client and conversation history
         self._init()
-
-    # def __init__(
-    #         self,
-    #         vector_db: VectorDB,
-    #         api_key: str = None,
-    #         model_name: str = None,
-    # ):
-    #     super().__init__()
-    #     self.client: Optional[anthropic.Anthropic] = None
-    #     self.vector_db: VectorDB = vector_db
-    #     self.api_key: str = api_key or ANTHROPIC_API_KEY
-    #     self.model_name: str = model_name or MAIN_MODEL
-    #
-    #     self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
-    #     self.conversation_history: ConversationHistory() = None
-    #     self.retrieved_contexts: list[str] = []
-    #     self.tool_manager = tool_manager
-    #     self.tools: list[dict[str, Any]] = []
-    #     self.extra_headers = {"anthropic-beta": "prompt-caching-2024-07-31"}
-    #     self.retriever = None
-    #     self._init()
 
     @anthropic_error_handler
     def _init(self):

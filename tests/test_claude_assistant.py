@@ -4,12 +4,13 @@ import pytest
 from anthropic.types.beta.prompt_caching import PromptCachingBetaUsage
 
 from src.generation.claude_assistant import ClaudeAssistant
+from vector_storage.vector_db import VectorDB
 
 
 @pytest.fixture
 def mock_vector_db():
     """Fixture to mock the vector database dependency."""
-    return Mock()
+    return MagicMock(spec=VectorDB)
 
 
 @pytest.fixture
