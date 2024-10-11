@@ -17,7 +17,6 @@ from ragas.metrics import answer_correctness, answer_relevancy, context_precisio
 from ragas.testset.evolutions import multi_context, reasoning, simple
 from ragas.testset.generator import TestDataset, TestsetGenerator
 from weave import Dataset as WeaveDataset
-from weave import Model
 from weave.trace import weave_client
 
 from src.generation.claude_assistant import ClaudeAssistant
@@ -243,7 +242,7 @@ class Evaluator:
         embedding_model_name (str): The model used for generating embeddings.
         llm (OpenAI): The main language model instance.
         embeddings (OpenAIEmbedding): The embedding model instance.
-        omni_claude_model (OmniClaudeModel): The model for omniscient Claude assistance.
+        model (OmniClaudeModel): The model for omniscient Claude assistance.
         judge_llm_model (str): The model used for judging the outputs.
         main_model (str): The primary model used by Claude assistant.
         anthropic_api_key (str): API key for accessing Anthropic services.
@@ -283,15 +282,18 @@ class Evaluator:
         self.embedding_model_name = embedding_model
         self.llm = OpenAI(model=model)
         self.embeddings = OpenAIEmbedding(model=embedding_model)
-        self.omni_claude_model = OmniClaudeModel(claude_assistant=claude_assistant)
+        self.claude_assistant = claude_assistant
         self.judge_llm_model = judge_llm_model
         self.main_model = claude_assistant_model
         self.anthropic_api_key = anthropic_api_key
 
     @weave.op()
     async def evaluate_row(self, question: str, ground_truth: str, model_output: dict) -> dict[str, float]:
+        if model_output is None:
+            logger.warning(f"Model output is None for the question: {question[:50]}...")
 
-        answer, contexts = model_output["answer"], model_output["contexts"]
+        answer = model_output.get("answer", "")
+        contexts = model_output.get("contexts", [])
 
         # prepare data for RAGAS
         data = {
@@ -319,15 +321,12 @@ class Evaluator:
         return {
             "faithfulness": result["faithfulness"],
             "answer_relevancy": result["answer_relevancy"],
-            "answer_correctness": result["answer_correctness"],
             "context_recall": result["context_recall"],
             "context_precision": result["context_precision"],
         }
 
     async def run_weave_evaluation(self, eval_dataset: Dataset | weave_client.ObjectRef) -> dict:
         logger.info("Running evaluation...")
-
-        model = ClaudeAssistant(vector_db=VectorDB(), api_key=self.anthropic_api_key, model_name=self.main_model)
 
         if isinstance(eval_dataset, Dataset):
             eval_dataset = eval_dataset.to_list()
@@ -336,17 +335,8 @@ class Evaluator:
             dataset=eval_dataset,
             scorers=[self.evaluate_row],
         )
-        results = await evaluation.evaluate(model=model)
+        results = await evaluation.evaluate(model=self.claude_assistant)
         return results
-
-
-# TODO: deprecate this class, it should be using ClaudeAssistant
-class OmniClaudeModel(Model):
-    claude_assistant: ClaudeAssistant
-
-    @weave.op()
-    def predict(self, question: str) -> dict:
-        return self.claude_assistant.predict_for_evaluation(question)
 
 
 class EvalManager:
@@ -436,9 +426,10 @@ async def main():
     results = await pipeline_manager.run_pipeline(
         generate_new_dataset=False,
         input_filename=filename,
-        num_questions=10,
+        num_questions=15,
         weave_dataset_name="anthropic_dataset",
     )
+    await asyncio.sleep(0)  # Give a chance for any lingering tasks to complete
 
     print("Evaluation Results:")
     pprint(results)
@@ -446,7 +437,14 @@ async def main():
 
 #
 if __name__ == "__main__":
-    asyncio.run(main())
+
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main())
+    finally:
+        pending = asyncio.all_tasks(loop=loop)
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.close()
 
 
 #

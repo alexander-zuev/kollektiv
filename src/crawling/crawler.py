@@ -90,7 +90,7 @@ class FireCrawler:
             params = {
                 "limit": page_limit,
                 "maxDepth": 5,
-                "includePaths": ["/stable/*"],
+                "includePaths": [],
                 "excludePaths": [],
                 "scrapeOptions": {
                     "formats": [
@@ -373,7 +373,7 @@ def main():
 
     # Crawling documentation
     urls_to_crawl = [
-        "https://docs.ragas.io/en",  # replace this
+        "https://weave-docs.wandb.ai/",  # replace this
     ]
     crawler.async_crawl_url(urls_to_crawl, page_limit=50)
 
