@@ -1,14 +1,8 @@
-# TODO: decouple from vector db
-# TODO: update documentation of each module
-# TODO: update the instantation
-# TODO: update mocks
-
 from __future__ import annotations
 
-import json
 import uuid
 from collections.abc import Generator
-from typing import  Any
+from typing import Any
 
 import anthropic
 import tiktoken
@@ -22,8 +16,7 @@ from src.generation.tool_definitions import tool_manager
 from src.utils.config import ANTHROPIC_API_KEY, MAIN_MODEL, WEAVE_PROJECT_NAME
 from src.utils.decorators import anthropic_error_handler, base_error_handler
 from src.utils.logger import get_logger
-
-
+from src.vector_storage.vector_db import VectorDB
 
 weave.init(WEAVE_PROJECT_NAME)
 
@@ -98,7 +91,6 @@ class ConversationHistory:
         logger.debug(f"Conversation state: messages={len(self.messages)}, " f"Total tokens={self.total_tokens}, ")
 
 
-# TODO: refactor to properly define Class and Instance varibales
 # Client Class
 class ClaudeAssistant(Model):
     """
@@ -242,7 +234,7 @@ class ClaudeAssistant(Model):
         logger.debug("Claude assistant successfully initialized.")
 
     @base_error_handler
-    def _update_system_prompt(self, document_summaries: list[dict[str, Any]]):
+    def update_system_prompt(self, document_summaries: list[dict[str, Any]]):
         """
         :param document_summaries: List of dictionaries containing summary information to be incorporated into
         the system prompt.
@@ -532,115 +524,115 @@ class ClaudeAssistant(Model):
 
         return preprocessed_results
 
-    @anthropic_error_handler
-    @weave.op()
-    def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
-        # Aggregate metadata
-        unique_urls = {chunk["metadata"]["source_url"] for chunk in chunks}
-        unique_titles = {chunk["metadata"]["page_title"] for chunk in chunks}
+    # @anthropic_error_handler
+    # @weave.op()
+    # def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
+    #     # Aggregate metadata
+    #     unique_urls = {chunk["metadata"]["source_url"] for chunk in chunks}
+    #     unique_titles = {chunk["metadata"]["page_title"] for chunk in chunks}
+    #
+    #     # Select diverse content samples
+    #     sample_chunks = self._select_diverse_chunks(chunks, 15)
+    #     content_samples = [chunk["data"]["text"][:300] for chunk in sample_chunks]
+    #
+    #     # Construct the summary prompt
+    #     system_prompt = """
+    #     You are a Document Analysis AI. Your task is to generate accurate, relevant and concise document summaries and
+    #     a list of key topics (keywords) based on a subset of chunks shown to you. Always respond in the following JSON
+    #     format.
+    #
+    #     General instructions:
+    #     1. Provide a 150-200 word summary that captures the essence of the documentation.
+    #     2. Mention any notable features or key points that stand out.
+    #     3. If applicable, briefly describe the type of documentation (e.g., API reference, user guide, etc.).
+    #     4. Do not use phrases like "This documentation covers" or "This summary describes". Start directly
+    #     with the key information.
+    #
+    #     JSON Format:
+    #     {
+    #       "summary": "A concise summary of the document",
+    #       "keywords": ["keyword1", "keyword2", "keyword3", ...]
+    #     }
+    #
+    #     Ensure your entire response is a valid JSON
+    #     """
+    #
+    #     user_message = f"""
+    #     Analyze the following document and provide a list of keywords (key topics).
+    #
+    #     Document Metadata:
+    #     - Unique URLs: {len(unique_urls)}
+    #     - Unique Titles: {unique_titles}
+    #
+    #     Content Structure:
+    #     {self._summarize_content_structure(chunks)}
+    #
+    #     Chunk Samples:
+    #     {self._format_content_samples(content_samples)}
+    #
+    #     """
+    #
+    #     response = self.client.messages.create(
+    #         model=self.model_name,
+    #         max_tokens=450,
+    #         system=system_prompt,
+    #         messages=[{"role": "user", "content": user_message}],
+    #     )
+    #
+    #     summary, keywords = self._parse_summary(response)
+    #
+    #     return {
+    #         "summary": summary,
+    #         "keywords": keywords,
+    #     }
 
-        # Select diverse content samples
-        sample_chunks = self._select_diverse_chunks(chunks, 15)
-        content_samples = [chunk["data"]["text"][:300] for chunk in sample_chunks]
+    # @base_error_handler
+    # def _parse_summary(self, response: Message):
+    #     """Takes an Anthropic Message object
+    #     Returns a dictionary with keys:
+    #     - summary: generated document summary
+    #     - keywords: generated list of keywords"""
+    #
+    #     content = response.content[0].text
+    #     logger.debug(f"Attempting to parse the summary json: {content}")
+    #     try:
+    #         parsed = json.loads(content)
+    #         return parsed["summary"], parsed["keywords"]
+    #     except json.JSONDecodeError:
+    #         logger.error("Error: Response is not valid JSON")
+    #         return self._extract_data_from_text(content)
+    #     except KeyError as e:
+    #         logger.error(f"Error: JSON does not contain expected keys: {e}")
+    #         return self._extract_data_from_text(content)
 
-        # Construct the summary prompt
-        system_prompt = """
-        You are a Document Analysis AI. Your task is to generate accurate, relevant and concise document summaries and
-        a list of key topics (keywords) based on a subset of chunks shown to you. Always respond in the following JSON
-        format.
-
-        General instructions:
-        1. Provide a 150-200 word summary that captures the essence of the documentation.
-        2. Mention any notable features or key points that stand out.
-        3. If applicable, briefly describe the type of documentation (e.g., API reference, user guide, etc.).
-        4. Do not use phrases like "This documentation covers" or "This summary describes". Start directly
-        with the key information.
-
-        JSON Format:
-        {
-          "summary": "A concise summary of the document",
-          "keywords": ["keyword1", "keyword2", "keyword3", ...]
-        }
-
-        Ensure your entire response is a valid JSON
-        """
-
-        user_message = f"""
-        Analyze the following document and provide a list of keywords (key topics).
-
-        Document Metadata:
-        - Unique URLs: {len(unique_urls)}
-        - Unique Titles: {unique_titles}
-
-        Content Structure:
-        {self._summarize_content_structure(chunks)}
-
-        Chunk Samples:
-        {self._format_content_samples(content_samples)}
-
-        """
-
-        response = self.client.messages.create(
-            model=self.model_name,
-            max_tokens=450,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-
-        summary, keywords = self._parse_summary(response)
-
-        return {
-            "summary": summary,
-            "keywords": keywords,
-        }
-
-    @base_error_handler
-    def _parse_summary(self, response: Message):
-        """Takes an Anthropic Message object
-        Returns a dictionary with keys:
-        - summary: generated document summary
-        - keywords: generated list of keywords"""
-
-        content = response.content[0].text
-        logger.debug(f"Attempting to parse the summary json: {content}")
-        try:
-            parsed = json.loads(content)
-            return parsed["summary"], parsed["keywords"]
-        except json.JSONDecodeError:
-            logger.error("Error: Response is not valid JSON")
-            return self._extract_data_from_text(content)
-        except KeyError as e:
-            logger.error(f"Error: JSON does not contain expected keys: {e}")
-            return self._extract_data_from_text(content)
-
-    @base_error_handler
-    def _extract_data_from_text(self, text):
-        # Fallback method to extract data if JSON parsing fails
-        summary = ""
-        keywords = []
-        if "summary:" in text.lower():
-            summary = text.lower().split("summary:")[1].split("keywords:")[0].strip()
-        if "keywords:" in text.lower():
-            keywords = text.lower().split("keywords:")[1].strip().split(",")
-        return summary, [k.strip() for k in keywords]
-
-    def _select_diverse_chunks(self, chunks: list[dict[str, Any]], n: int) -> list[dict[str, Any]]:
-        step = max(1, len(chunks) // n)
-        return chunks[::step][:n]
-
-    def _summarize_content_structure(self, chunks: list[dict[str, Any]]) -> str:
-        # Analyze the structure based on headers
-        header_structure = {}
-        for chunk in chunks:
-            headers = chunk["data"]["headers"]
-            for level, header in headers.items():
-                if header:
-                    header_structure.setdefault(level, set()).add(header)
-
-        return "\n".join([f"{level}: {', '.join(headers)}" for level, headers in header_structure.items()])
-
-    def _format_content_samples(self, samples: list[str]) -> str:
-        return "\n\n".join(f"Sample {i + 1}:\n{sample}" for i, sample in enumerate(samples))
+    # @base_error_handler
+    # def _extract_data_from_text(self, text):
+    #     # Fallback method to extract data if JSON parsing fails
+    #     summary = ""
+    #     keywords = []
+    #     if "summary:" in text.lower():
+    #         summary = text.lower().split("summary:")[1].split("keywords:")[0].strip()
+    #     if "keywords:" in text.lower():
+    #         keywords = text.lower().split("keywords:")[1].strip().split(",")
+    #     return summary, [k.strip() for k in keywords]
+    #
+    # def _select_diverse_chunks(self, chunks: list[dict[str, Any]], n: int) -> list[dict[str, Any]]:
+    #     step = max(1, len(chunks) // n)
+    #     return chunks[::step][:n]
+    #
+    # def _summarize_content_structure(self, chunks: list[dict[str, Any]]) -> str:
+    #     # Analyze the structure based on headers
+    #     header_structure = {}
+    #     for chunk in chunks:
+    #         headers = chunk["data"]["headers"]
+    #         for level, header in headers.items():
+    #             if header:
+    #                 header_structure.setdefault(level, set()).add(header)
+    #
+    #     return "\n".join([f"{level}: {', '.join(headers)}" for level, headers in header_structure.items()])
+    #
+    # def _format_content_samples(self, samples: list[str]) -> str:
+    #     return "\n\n".join(f"Sample {i + 1}:\n{sample}" for i, sample in enumerate(samples))
 
     @base_error_handler
     def preprocess_ranked_documents(self, ranked_documents: dict[str, Any]) -> list[str]:
@@ -718,10 +710,3 @@ class ClaudeAssistant(Model):
     def reset_conversation(self):
         self.conversation_history = ConversationHistory()
         self.retrieved_contexts = []
-
-
-# Import after the class definition
-from src.vector_storage.vector_db import VectorDB
-
-# Rebuild the model to resolve forward references
-ClaudeAssistant.model_rebuild()

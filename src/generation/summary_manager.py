@@ -6,9 +6,9 @@ import anthropic
 import weave
 from anthropic.types import Message
 
-from utils.config import ANTHROPIC_API_KEY, MAIN_MODEL, VECTOR_STORAGE_DIR, WEAVE_PROJECT_NAME
-from utils.decorators import anthropic_error_handler, base_error_handler
-from utils.logger import get_logger
+from src.utils.config import ANTHROPIC_API_KEY, MAIN_MODEL, VECTOR_STORAGE_DIR, WEAVE_PROJECT_NAME
+from src.utils.decorators import anthropic_error_handler, base_error_handler
+from src.utils.logger import get_logger
 
 logger = get_logger()
 
@@ -18,13 +18,14 @@ MAX_RETRIES = 2
 class SummaryManager:
     """Support class that manages document summaries that are loaded into the vector database"""
 
-    def __init__(self, client: anthropic.Anthropic, model_name: str = MAIN_MODEL):
+    def __init__(self, model_name: str = MAIN_MODEL):
         weave.init(project_name=WEAVE_PROJECT_NAME)
         self.summaries = self.load_summaries()
         self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, max_retries=MAX_RETRIES)
         self.model_name = model_name
 
     @anthropic_error_handler
+    @weave.op()
     def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
         """Generates a document summary and keywords based on provided chunks.
 
@@ -209,7 +210,7 @@ class SummaryManager:
         summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
         try:
             with open(summaries_file, "w") as f:
-                json.dump(self.document_summaries, f, indent=2)
+                json.dump(self.summaries, f, indent=2)
                 logger.info(f"Successfully saved new document summary to {summaries_file}")
         except Exception as e:
             logger.error(f"Failed to save document summaries: {e}")
@@ -217,7 +218,7 @@ class SummaryManager:
     @base_error_handler
     def get_all_summaries(self) -> list[str]:
         """Returns a list of all document summaries."""
-        return list(self.document_summaries.values())
+        return list(self.summaries.values())
 
     @base_error_handler
     def clear_summaries(self):
