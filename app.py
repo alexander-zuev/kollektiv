@@ -12,6 +12,7 @@ def main(debug: bool = False, reset_db: bool = False):
     docs = [
         "docs_anthropic_com_en_20240928_135426-chunked.json",
         "langchain-ai_github_io_langgraph_20240928_210913-chunked.json",
+        "alpaca_markets_sdks_python_api_reference_data_stock_live_html_20241013_203517-chunked.json",
     ]
 
     # Initialize components

@@ -49,5 +49,21 @@
       "Proprietary LLMs"
     ],
     "filename": "langchain-ai_github_io_langgraph_20240928_210913-chunked.json"
+  },
+  "alpaca_markets_sdks_python_api_reference_data_stock_live_html_20241013_203517-chunked.json": {
+    "summary": "This documentation covers real-time data functionality in the Alpaca-py library. It describes various subscription methods for accessing live market data, including stock data streams, daily bars, and trading status updates. The API allows users to subscribe to specific symbols or all available data using '*'. The documentation provides details on callback functions for handling incoming data, which are typically coroutine functions expecting specific data types or dictionaries. The structure suggests this is part of an API reference, likely for developers integrating real-time market data into their trading applications or analysis tools.",
+    "keywords": [
+      "Alpaca-py",
+      "Real-time data",
+      "Stock data stream",
+      "Daily bars",
+      "Trading status",
+      "Subscription methods",
+      "Callback functions",
+      "Coroutines",
+      "Ticker symbols",
+      "Market data"
+    ],
+    "filename": "alpaca_markets_sdks_python_api_reference_data_stock_live_html_20241013_203517-chunked.json"
   }
 }

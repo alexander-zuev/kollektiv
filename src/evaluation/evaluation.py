@@ -295,6 +295,9 @@ class Evaluator:
         answer = model_output.get("answer", "")
         contexts = model_output.get("contexts", [])
 
+        if not contexts:
+            logger.warning(f"No contexts found for question: {question[:50]}...")
+
         # prepare data for RAGAS
         data = {
             "question": [question],
@@ -416,7 +419,7 @@ class EvalManager:
 
 
 async def main():
-    configure_logging(debug=True)
+    configure_logging(debug=False)  # Debug mode is OFF
 
     filename = "docs_anthropic_com_en_20240928_135426.json"
 
@@ -437,14 +440,4 @@ async def main():
 
 #
 if __name__ == "__main__":
-
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(main())
-    finally:
-        pending = asyncio.all_tasks(loop=loop)
-        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        loop.close()
-
-
-#
+    asyncio.run(main())

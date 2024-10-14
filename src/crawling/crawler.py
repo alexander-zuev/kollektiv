@@ -373,7 +373,7 @@ def main():
 
     # Crawling documentation
     urls_to_crawl = [
-        "https://weave-docs.wandb.ai/",  # replace this
+        "https://alpaca.markets/sdks/python/api_reference/data/stock/live.html",  # replace this
     ]
     crawler.async_crawl_url(urls_to_crawl, page_limit=50)
 

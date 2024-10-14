@@ -593,7 +593,11 @@ class ClaudeAssistant(Model):
         answer = self.get_response(question, stream=False)
         contexts = self.retrieved_contexts
 
-        logger.info(f"Printing answer: {answer}\n\n " f"Based on the following contexts {contexts[0][:250]}")
+        if contexts and len(contexts) > 0:
+            context_snippet = contexts[0][:250]
+            logger.info(f"Printing answer: {answer}\n\n " f"Based on the following contexts {context_snippet}")
+        else:
+            logger.warning("No contexts retrieved for the given model output")
 
         return {
             "answer": answer,
