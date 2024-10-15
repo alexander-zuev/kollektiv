@@ -41,7 +41,7 @@ VECTOR_STORAGE_DIR = os.path.join(SRC_ROOT, "vector_storage")
 MAIN_MODEL = "claude-3-5-sonnet-20240620"
 
 # Evaluation config
-JUDGE_LLM_MODEL = "gpt-4o-mini"
+EVALUATOR_MODEL_NAME = "gpt-4o-mini"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 

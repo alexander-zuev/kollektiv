@@ -1,3 +1,8 @@
+# TODO: Add a CLI to crawler
+# TODO: Improve the process flow
+# TODO: Properly handle errors
+# TODO: Allow users to retrieve the job results
+
 import json
 import os
 import re
@@ -373,7 +378,7 @@ def main():
 
     # Crawling documentation
     urls_to_crawl = [
-        "https://alpaca.markets/sdks/python/api_reference/data/stock/live.html",  # replace this
+        "https://docs.ragas.io/en/stable/",  # replace this
     ]
     crawler.async_crawl_url(urls_to_crawl, page_limit=50)
 

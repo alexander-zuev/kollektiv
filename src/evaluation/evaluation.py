@@ -1,21 +1,38 @@
+# TODO: refactor and separate the dataset generation from evaluation
+# TODO: Implement CLI to manage evaluation and dataset generation
+# TODO: Upgrade to the new metrics impot
+
 import asyncio
 import json
 import os.path
 from collections.abc import Sequence
 from pprint import pprint
+from typing import Dict, List, Optional
 
 import weave
 from datasets import Dataset
+from distlib.markers import Evaluator
 from langchain_community.document_loaders import JSONLoader
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-from ragas import evaluate
+from ragas import EvaluationDataset, SingleTurnSample, evaluate
 from ragas.cost import get_token_usage_for_openai
-from ragas.metrics import answer_correctness, answer_relevancy, context_precision, context_recall, faithfulness
-from ragas.testset.evolutions import multi_context, reasoning, simple
-from ragas.testset.generator import TestDataset, TestsetGenerator
+from ragas.llms import LangchainLLMWrapper
+from ragas.metrics import (
+    AnswerCorrectness,
+    AnswerRelevancy,
+    ContextRecall,
+    Faithfulness,
+    answer_correctness,
+    answer_relevancy,
+    context_precision,
+    context_recall,
+    faithfulness,
+)
+from ragas.testset import Testset, TestsetGenerator, TestsetSample
+from ragas.testset.synthesizers import default_query_distribution
 from weave import Dataset as WeaveDataset
 from weave.trace import weave_client
 
@@ -24,7 +41,7 @@ from src.utils.config import (
     ANTHROPIC_API_KEY,
     EMBEDDING_MODEL,
     EVAL_DIR,
-    JUDGE_LLM_MODEL,
+    EVALUATOR_MODEL_NAME,
     MAIN_MODEL,
     RAW_DATA_DIR,
     WEAVE_PROJECT_NAME,
@@ -38,17 +55,48 @@ logger = get_logger()
 
 class DataLoader:
     """
+    Represents a data loader responsible for loading and saving datasets.
 
-    Class responsible for loading and saving datasets from and to JSON files.
-    Includes methods to fetch documents, save datasets, and load datasets.
+    class DataLoader:
+        def __init__(self) -> None:
+            Initializes the DataLoader with default dataset path and filename.
+
+        @base_error_handler
+        def get_documents(self, filename: str) -> list[Document]:
+            Loads documents from a JSON file.
+
+            :param filename: Name of the JSON file to load documents from.
+            :return: List of Document objects loaded from the file.
+
+        def metadata_func(self, record: dict, metadata: dict) -> dict:
+            Extracts basic metadata from a record and updates a metadata dictionary.
+
+            :param record: Dictionary containing the record with metadata.
+            :param metadata: Dictionary to update with extracted metadata.
+            :return: Updated metadata dictionary.
+
+        @base_error_handler
+        def save_dataset(self, dataset: Dataset, filename: Optional[str] = None) -> str:
+            Saves the given dataset to a JSON file.
+
+            :param dataset: Dataset object to save.
+            :param filename: Optional; Name of the file to save the dataset to. If not provided, uses the default dataset filename.
+            :return: Path to the saved dataset file.
+
+        @base_error_handler
+        def load_json(self, filename: str = None) -> Dataset | None:
+            Loads the dataset from a JSON file.
+
+            :param filename: Optional; Name of the file to load the dataset from. If not provided, uses the default dataset filename.
+            :return: Loaded Dataset object if successful, otherwise None.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.dataset_path = EVAL_DIR
         self.dataset_filename: str = "eval_dataset.json"
 
     @base_error_handler
-    async def get_documents(self, filename: str):
+    def get_documents(self, filename: str) -> list[Document]:
         filepath = os.path.join(RAW_DATA_DIR, filename)
         loader = JSONLoader(
             file_path=filepath,
@@ -69,7 +117,7 @@ class DataLoader:
         return metadata
 
     @base_error_handler
-    def save_dataset(self, dataset: Dataset, filename: str = None) -> str:
+    def save_dataset(self, dataset: Dataset, filename: str | None = None) -> str:
         """Saves the given object to json file"""
         if filename != self.dataset_filename:
             self.dataset_filename = filename
@@ -87,7 +135,7 @@ class DataLoader:
             raise
 
     @base_error_handler
-    async def load_json(self, filename: str = None) -> Dataset | None:
+    def load_json(self, filename: str = None) -> Dataset | None:
         """Loads the dataset from json file"""
         if filename:
             self.dataset_filename = filename
@@ -116,8 +164,8 @@ class DatasetGenerator:
     """
     Class responsible for generating datasets using various language models and embeddings.
 
-    :param generator_llm: Name of the language model used for generating datasets.
-    :type generator_llm: str, optional
+    :param model_name: Name of the language model used for generating datasets.
+    :type model_name: str, optional
     :param critic_llm: Name of the language model used for critiquing datasets.
     :type critic_llm: str, optional
     :param embedding_model: Name of the embedding model used for datasets.
@@ -132,52 +180,81 @@ class DatasetGenerator:
 
     def __init__(
         self,
-        generator_llm: str = "gpt-4o",
-        critic_llm: str = "gpt-4o",
-        embedding_model: str = "text-embedding-3-small",
+        model_name: str = "gpt-4o",
         dataset_path: str = EVAL_DIR,
         claude_assistant: ClaudeAssistant = None,
         loader: DataLoader = None,
-    ):
-        self.generator_llm = OpenAI(model=generator_llm)
-        self.critic_llm = OpenAI(model=critic_llm)
-        self.embeddings = OpenAIEmbedding(model=embedding_model)
-        self.generator = TestsetGenerator.from_llama_index(
-            self.generator_llm,
-            self.critic_llm,
-            self.embeddings,
-        )
+        weave_manager: WeaveManager = None,
+    ) -> None:
+        self.generator_llm = LangchainLLMWrapper(ChatOpenAI(model=model_name))
+        self.generator = TestsetGenerator(llm=self.generator_llm)
         self.dataset_path = dataset_path
         self.claude_assistant = claude_assistant
-        self.dataset: TestDataset = None
+        self.dataset: Testset | None = None
         self.dataset_filename: str = "eval_dataset.json"
         self.loader = loader or DataLoader()
-        self.weave_dataset_name: str = None
+        self.weave_dataset_name: str = "anthropic_dataset"
 
     @base_error_handler
-    async def generate_dataset(self, documents: Sequence[Document], **kwargs) -> TestDataset:
-        test_dataset = self.generator.generate_with_langchain_docs(
-            documents=documents, **kwargs, distributions={simple: 0.25, reasoning: 0.25, multi_context: 0.5}
-        )
-        dataset = self.convert_to_dataset(test_dataset)
-        self.dataset = dataset
-        return dataset
+    def generate_dataset(self, documents: Sequence[Document], testset_size: int, **kwargs) -> EvaluationDataset:
+        """
+        :param documents: A sequence of Document objects to generate the dataset from.
+        :type documents: Sequence[Document]
+        :param testset_size: The size of the test dataset to be generated.
+        :type testset_size: int
+        :param kwargs: Additional keyword arguments to pass to the generator.
+        :type kwargs: dict
+        :return: The generated Dataset object.
+        :rtype: Dataset
+        """
+        query_distribution = default_query_distribution(self.generator.llm)
 
+        test_dataset = self.generator.generate_with_langchain_docs(
+            documents=documents,
+            testset_size=testset_size,
+            query_distribution=query_distribution,
+            **kwargs,
+        )
+
+        # dataset = self.convert_to_dataset(test_dataset)
+        # self.dataset = dataset
+        evaluation_dataset = test_dataset.to_evaluation_dataset()
+        return evaluation_dataset
+
+    # TODO: Deprecate and remove this method
     @anthropic_error_handler
-    def convert_to_dataset(self, test_dataset: TestDataset) -> Dataset:
+    def convert_to_dataset(self, test_dataset: Testset) -> EvaluationDataset:
         """Takes synthetic dataset from Ragas and converts to HF Dataset"""
         if not test_dataset:
             raise ValueError("Dataset not generated, generate the dataset first!")
 
-        data = {
-            "question": [row.question for row in test_dataset.test_data],
-            "contexts": [row.contexts for row in test_dataset.test_data],
-            "ground_truth": [row.ground_truth for row in test_dataset.test_data],
-        }
+        samples = []
+        for sample in test_dataset.samples:
+            samples.append(
+                SingleTurnSample(
+                    user_input=sample.question,
+                    response="",  # This will be filled during evaluation
+                    retrieved_contexts=sample.contexts,
+                    reference=sample.ground_truth,
+                )
+            )
+        return EvaluationDataset(samples=samples)
 
-        dataset = Dataset.from_dict(data)
-        self.dataset = dataset
-        return self.dataset
+        #
+        # data = {
+        #     "user_input": [],
+        #     "contexts": [],
+        #     "ground_truth": []
+        # }
+        #
+        # for row in test_dataset.samples:
+        #     data["user_input"].append(row.user_input)
+        #     data["contexts"].append(row.reference_contexts)
+        #     data["ground_truth"].append(row.reference)
+        #
+        # dataset = Dataset.from_dict(data)
+        # self.dataset = dataset
+        # return self.dataset
 
 
 class WeaveManager:
@@ -233,40 +310,9 @@ class WeaveManager:
 
 class Evaluator:
     """
-    Evaluator is a class designed to evaluate machine learning model outputs.
-    It utilizes several sub-models and assistants to generate a comprehensive evaluation
-    based on defined metrics such as faithfulness, answer relevancy, and correctness.
+    Evaluator class for evaluating model-generated outputs against ground truth answers.
 
-    Attributes:
-        model_name (str): The primary language model used for evaluation.
-        embedding_model_name (str): The model used for generating embeddings.
-        llm (OpenAI): The main language model instance.
-        embeddings (OpenAIEmbedding): The embedding model instance.
-        model (OmniClaudeModel): The model for omniscient Claude assistance.
-        judge_llm_model (str): The model used for judging the outputs.
-        main_model (str): The primary model used by Claude assistant.
-        anthropic_api_key (str): API key for accessing Anthropic services.
-
-    Methods:
-        evaluate_row(question: str, ground_truth: str, model_output: dict) -> dict[str, float]:
-            Evaluates a single question-answer pair using specified metrics and models.
-
-            Args:
-                question (str): The question being evaluated.
-                ground_truth (str): The correct answer for the question.
-                model_output (dict): The output from the model being evaluated, including answer and contexts.
-
-            Returns:
-                dict[str, float]: A dictionary containing evaluation scores for different metrics.
-
-        run_weave_evaluation(eval_dataset: Dataset | weave_client.ObjectRef) -> dict:
-            Executes the evaluation process on a given dataset.
-
-            Args:
-                eval_dataset (Dataset | weave_client.ObjectRef): The dataset to be evaluated.
-
-            Returns:
-                dict: A dictionary containing the results of the evaluation.
+    This class provides methods for evaluating model outputs in terms of several metrics such as faithfulness, answer relevancy, answer correctness, context recall, and context precision. It integrates with various models and datasets to perform comprehensive evaluations.
     """
 
     def __init__(
@@ -274,7 +320,7 @@ class Evaluator:
         model: str = "gpt-4o",
         embedding_model: str = EMBEDDING_MODEL,
         claude_assistant: ClaudeAssistant = None,
-        judge_llm_model: str = JUDGE_LLM_MODEL,
+        evaluator_model_name: str = EVALUATOR_MODEL_NAME,
         anthropic_api_key: str = ANTHROPIC_API_KEY,
         claude_assistant_model: str = MAIN_MODEL,
     ):
@@ -283,34 +329,73 @@ class Evaluator:
         self.llm = OpenAI(model=model)
         self.embeddings = OpenAIEmbedding(model=embedding_model)
         self.claude_assistant = claude_assistant
-        self.judge_llm_model = judge_llm_model
+        self.evaluator_model_name = evaluator_model_name
+        self.evaluator_llm = LangchainLLMWrapper(ChatOpenAI(model=evaluator_model_name))
         self.main_model = claude_assistant_model
         self.anthropic_api_key = anthropic_api_key
+        self.metrics = self._initialize_metrics()
+
+    def _initialize_metrics(self):
+        return {
+            "faithfulness": Faithfulness(llm=self.evaluator_llm),
+            "answer_relevancy": AnswerRelevancy(llm=self.evaluator_llm),
+            "answer_correctness": AnswerCorrectness(llm=self.evaluator_llm),
+            "context_recall": ContextRecall(llm=self.evaluator_llm),
+            "context_precision": ContextRecall(llm=self.evaluator_llm),
+        }
 
     @weave.op()
-    async def evaluate_row(self, question: str, ground_truth: str, model_output: dict) -> dict[str, float]:
+    async def evaluate_row(self, question: str, ground_truth: str, model_output: dict) -> dict[str, list[float]]:
+        """
+        Evaluate a model's output for a given question and ground truth by computing various metrics.
+
+        This method utilizes a dataset containing the question, ground truth, the answer from the model's output,
+        and the retrieved contexts to evaluate the performance of the model. It computes several metrics including
+        faithfulness, answer relevancy, answer correctness, context recall, and context precision using
+        specified evaluation tools.
+
+        :param question: The question posed to the model.
+        :type question: str
+        :param ground_truth: The expected ground truth answer for the question.
+        :type ground_truth: str
+        :param model_output: The model's output containing the answer and retrieved contexts.
+        :type model_output: dict
+        :return: A dictionary with evaluation metric scores.
+        :rtype: dict[str, list[float]]
+        :raises ValueError: If the model output is None or does not contain necessary keys.
+        :raises RuntimeError: If there is an issue with initializing the metrics or models.
+        """
         if model_output is None:
             logger.warning(f"Model output is None for the question: {question[:50]}...")
 
-        answer = model_output.get("answer", "")
-        contexts = model_output.get("contexts", [])
+        sample = SingleTurnSample(
+            user_input=question,
+            reference=ground_truth,
+            response=model_output.get("answer", ""),
+            retrieved_contexts=model_output.get("contexts", []),
+        )
 
-        if not contexts:
-            logger.warning(f"No contexts found for question: {question[:50]}...")
+        # answer = model_output.get("answer", "")
+        # contexts = model_output.get("contexts", [])
+
+        # if not contexts:
+        #     logger.warning(f"No contexts found for question: {question[:50]}...")
 
         # prepare data for RAGAS
-        data = {
-            "question": [question],
-            "ground_truth": [ground_truth],
-            "answer": [answer],
-            "retrieved_contexts": [contexts],
-        }
+        # data = {
+        #     "question": [question],
+        #     "ground_truth": [ground_truth],
+        #     "answer": [answer],
+        #     "retrieved_contexts": [contexts],
+        # }
 
         dataset = Dataset.from_dict(data)
 
+        # initialize metrics
+
         metrics = [faithfulness, answer_relevancy, answer_correctness, context_recall, context_precision]
 
-        judge_model = ChatOpenAI(model=self.judge_llm_model)
+        judge_model = ChatOpenAI(model=self.evaluator_model_name)
         embeddings_model = OpenAIEmbeddings(model=self.embedding_model_name)
 
         result = evaluate(
@@ -345,24 +430,30 @@ class Evaluator:
 class EvalManager:
     """
     class EvalManager:
-        Manages the evaluation pipeline by coordinating various components such as loaders, generators,
-        retrievers, and evaluators.
+        Initializes an instance of the EvalManager with optional components.
 
-        Methods:
-            __init__:
-                Initializes the EvalManager with optional custom instances of dependencies.
+        Parameters:
+            loader (DataLoader): An instance of DataLoader, defaults to a new DataLoader instance if not provided.
+            weave_manager (WeaveManager): An instance of WeaveManager, defaults to a new WeaveManager instance if not provided.
+            vector_db (VectorDB): An instance of VectorDB, defaults to a new VectorDB instance if not provided.
+            claude_assistant (ClaudeAssistant): An instance of ClaudeAssistant, defaults to a new ClaudeAssistant instance if not provided.
+            retriever (ResultRetriever): An instance of ResultRetriever, defaults to a new ResultRetriever instance if not provided.
+            reranker (Reranker): An instance of Reranker, defaults to a new Reranker instance if not provided.
+            generator (DatasetGenerator): An instance of DatasetGenerator, defaults to a new DatasetGenerator instance if not provided.
+            evaluator (Evaluator): An instance of Evaluator, defaults to a new Evaluator instance if not provided.
 
-            run_pipeline:
-                Runs evaluation pipeline with pre-determined parameters.
+    @base_error_handler
+    async def run_pipeline:
+        Runs evaluation pipeline with pre-determined parameters.
 
-                Parameters:
-                    generate_new_dataset (bool): Flag to generate a new dataset.
-                    num_questions (int): Number of questions for dataset generation.
-                    input_filename (str): Filename for input documents.
-                    weave_dataset_name (str): Name of the dataset to retrieve from Weave.
+        Parameters:
+            generate_new_dataset (bool): Indicates whether to generate a new dataset. Defaults to False.
+            num_questions (int): Number of questions for test size in the dataset. Defaults to 5.
+            input_filename (str): Name of the input file containing documents. Defaults to "docs_anthropic_com_en_20240928_135426.json".
+            weave_dataset_name (str): Name of the dataset in Weave to be used. Defaults to "anthropic_dataset".
 
-                Returns:
-                    results: Evaluation results.
+        Returns:
+            results: The results of the evaluation after running the pipeline.
     """
 
     def __init__(
@@ -390,7 +481,7 @@ class EvalManager:
     async def run_pipeline(
         self,
         generate_new_dataset: bool = False,
-        num_questions: int = 5,
+        testsize: int = 5,
         input_filename: str = "docs_anthropic_com_en_20240928_135426.json",
         weave_dataset_name: str = "anthropic_dataset",
     ):
@@ -399,8 +490,8 @@ class EvalManager:
         if generate_new_dataset:
             logger.info("Generating new dataset...")
             # Generate and upload new dataset
-            docs = await self.loader.get_documents(filename=input_filename)
-            dataset = await self.generator.generate_dataset(documents=docs, test_size=num_questions)
+            docs = self.loader.get_documents(filename=input_filename)
+            dataset = self.generator.generate_dataset(documents=docs, testset_size=testsize)
 
             for row in dataset:
                 logger.debug(f"Question: {row['question']}")
@@ -423,13 +514,19 @@ async def main():
 
     filename = "docs_anthropic_com_en_20240928_135426.json"
 
+    # Initialize dataset generator and evaluation manager
+
+    # Generate a new dataset or not
+
+    # Run evaluation pipeline on a given dataset
+
     pipeline_manager = EvalManager()
 
     # Run the pipeline
     results = await pipeline_manager.run_pipeline(
-        generate_new_dataset=False,
+        generate_new_dataset=True,
         input_filename=filename,
-        num_questions=15,
+        testsize=1,
         weave_dataset_name="anthropic_dataset",
     )
     await asyncio.sleep(0)  # Give a chance for any lingering tasks to complete
@@ -438,6 +535,25 @@ async def main():
     pprint(results)
 
 
+def new_ragas():
+    configure_logging(debug=True)  # Debug mode is OFF
+    dataset_generator = DatasetGenerator()
+    weave_manager = WeaveManager()
+
+    filename = "docs_anthropic_com_en_20240928_135426.json"
+    testsize = 5
+
+    logger.info("Generating new dataset...")
+    # Generate and upload new dataset
+    docs = dataset_generator.loader.get_documents(filename=filename)
+    dataset = dataset_generator.generate_dataset(documents=docs, testset_size=testsize)
+    print(dataset)
+
+    # Upload the dataset
+    weave_manager.upload_dataset(dataset, name="anthropic_dataset_v0.2")
+
+
 #
 if __name__ == "__main__":
-    asyncio.run(main())
+    # asyncio.run(main())
+    new_ragas()
