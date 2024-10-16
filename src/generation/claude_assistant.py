@@ -1,27 +1,22 @@
 from __future__ import annotations
 
-import json
 import uuid
 from collections.abc import Generator
-from typing import TYPE_CHECKING, Any
-
-from src.utils.config import MAIN_MODEL
-
-if TYPE_CHECKING:
-    from src.vector_storage.vector_db import VectorDB  # Import only for type checking
+from typing import Any
 
 import anthropic
 import tiktoken
 import weave
 from anthropic.types import Message
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
-from pydantic import Field
+from pydantic import ConfigDict, Field
 from weave import Model
 
 from src.generation.tool_definitions import tool_manager
-from src.utils.config import ANTHROPIC_API_KEY, WEAVE_PROJECT_NAME
+from src.utils.config import ANTHROPIC_API_KEY, MAIN_MODEL, WEAVE_PROJECT_NAME
 from src.utils.decorators import anthropic_error_handler, base_error_handler
 from src.utils.logger import get_logger
+from src.vector_storage.vector_db import VectorDB
 
 weave.init(WEAVE_PROJECT_NAME)
 
@@ -96,7 +91,6 @@ class ConversationHistory:
         logger.debug(f"Conversation state: messages={len(self.messages)}, " f"Total tokens={self.total_tokens}, ")
 
 
-# TODO: refactor to properly define Class and Instance varibales
 # Client Class
 class ClaudeAssistant(Model):
     """
@@ -143,6 +137,8 @@ class ClaudeAssistant(Model):
     tools: list[dict[str, Any]] = Field(default_factory=list)
     extra_headers: dict[str, str] = Field(default_factory=lambda: {"anthropic-beta": "prompt-caching-2024-07-31"})
     retriever: Any | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __init__(
         self,
@@ -229,27 +225,6 @@ class ClaudeAssistant(Model):
         # Initialize client and conversation history
         self._init()
 
-    # def __init__(
-    #         self,
-    #         vector_db: VectorDB,
-    #         api_key: str = None,
-    #         model_name: str = None,
-    # ):
-    #     super().__init__()
-    #     self.client: Optional[anthropic.Anthropic] = None
-    #     self.vector_db: VectorDB = vector_db
-    #     self.api_key: str = api_key or ANTHROPIC_API_KEY
-    #     self.model_name: str = model_name or MAIN_MODEL
-    #
-    #     self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
-    #     self.conversation_history: ConversationHistory() = None
-    #     self.retrieved_contexts: list[str] = []
-    #     self.tool_manager = tool_manager
-    #     self.tools: list[dict[str, Any]] = []
-    #     self.extra_headers = {"anthropic-beta": "prompt-caching-2024-07-31"}
-    #     self.retriever = None
-    #     self._init()
-
     @anthropic_error_handler
     def _init(self):
         self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=2)  # default number of re-tries
@@ -259,7 +234,7 @@ class ClaudeAssistant(Model):
         logger.debug("Claude assistant successfully initialized.")
 
     @base_error_handler
-    def _update_system_prompt(self, document_summaries: list[dict[str, Any]]):
+    def update_system_prompt(self, document_summaries: list[dict[str, Any]]):
         """
         :param document_summaries: List of dictionaries containing summary information to be incorporated into
         the system prompt.
@@ -549,116 +524,6 @@ class ClaudeAssistant(Model):
 
         return preprocessed_results
 
-    @anthropic_error_handler
-    @weave.op()
-    def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
-        # Aggregate metadata
-        unique_urls = {chunk["metadata"]["source_url"] for chunk in chunks}
-        unique_titles = {chunk["metadata"]["page_title"] for chunk in chunks}
-
-        # Select diverse content samples
-        sample_chunks = self._select_diverse_chunks(chunks, 15)
-        content_samples = [chunk["data"]["text"][:300] for chunk in sample_chunks]
-
-        # Construct the summary prompt
-        system_prompt = """
-        You are a Document Analysis AI. Your task is to generate accurate, relevant and concise document summaries and
-        a list of key topics (keywords) based on a subset of chunks shown to you. Always respond in the following JSON
-        format.
-
-        General instructions:
-        1. Provide a 150-200 word summary that captures the essence of the documentation.
-        2. Mention any notable features or key points that stand out.
-        3. If applicable, briefly describe the type of documentation (e.g., API reference, user guide, etc.).
-        4. Do not use phrases like "This documentation covers" or "This summary describes". Start directly
-        with the key information.
-
-        JSON Format:
-        {
-          "summary": "A concise summary of the document",
-          "keywords": ["keyword1", "keyword2", "keyword3", ...]
-        }
-
-        Ensure your entire response is a valid JSON
-        """
-
-        user_message = f"""
-        Analyze the following document and provide a list of keywords (key topics).
-
-        Document Metadata:
-        - Unique URLs: {len(unique_urls)}
-        - Unique Titles: {unique_titles}
-
-        Content Structure:
-        {self._summarize_content_structure(chunks)}
-
-        Chunk Samples:
-        {self._format_content_samples(content_samples)}
-
-        """
-
-        response = self.client.messages.create(
-            model=self.model_name,
-            max_tokens=450,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_message}],
-        )
-
-        summary, keywords = self._parse_summary(response)
-
-        return {
-            "summary": summary,
-            "keywords": keywords,
-        }
-
-    @base_error_handler
-    def _parse_summary(self, response: Message):
-        """Takes an Anthropic Message object
-        Returns a dictionary with keys:
-        - summary: generated document summary
-        - keywords: generated list of keywords"""
-
-        content = response.content[0].text
-        logger.debug(f"Attempting to parse the summary json: {content}")
-        try:
-            parsed = json.loads(content)
-            return parsed["summary"], parsed["keywords"]
-        except json.JSONDecodeError:
-            logger.error("Error: Response is not valid JSON")
-            return self._extract_data_from_text(content)
-        except KeyError as e:
-            logger.error(f"Error: JSON does not contain expected keys: {e}")
-            return self._extract_data_from_text(content)
-
-    @base_error_handler
-    def _extract_data_from_text(self, text):
-        # Fallback method to extract data if JSON parsing fails
-        summary = ""
-        keywords = []
-        if "summary:" in text.lower():
-            summary = text.lower().split("summary:")[1].split("keywords:")[0].strip()
-        if "keywords:" in text.lower():
-            keywords = text.lower().split("keywords:")[1].strip().split(",")
-        return summary, [k.strip() for k in keywords]
-
-    def _select_diverse_chunks(self, chunks: list[dict[str, Any]], n: int) -> list[dict[str, Any]]:
-        step = max(1, len(chunks) // n)
-        return chunks[::step][:n]
-
-    def _summarize_content_structure(self, chunks: list[dict[str, Any]]) -> str:
-        # Analyze the structure based on headers
-        header_structure = {}
-        for chunk in chunks:
-            headers = chunk["data"]["headers"]
-            for level, header in headers.items():
-                if header:
-                    header_structure.setdefault(level, set()).add(header)
-
-        return "\n".join([f"{level}: {', '.join(headers)}" for level, headers in header_structure.items()])
-
-    def _format_content_samples(self, samples: list[str]) -> str:
-        return "\n\n".join(f"Sample {i + 1}:\n{sample}" for i, sample in enumerate(samples))
-
     @base_error_handler
     def preprocess_ranked_documents(self, ranked_documents: dict[str, Any]) -> list[str]:
         """
@@ -718,14 +583,21 @@ class ClaudeAssistant(Model):
 
     @anthropic_error_handler
     @weave.op()
-    async def predict(self, user_input: str) -> dict:
+    async def predict(self, question: str) -> dict:
+        """Should match the keys in the Dataset that is passed for evaluation"""
+        logger.debug(f"Predict method called with row: {question}")
+        # user_input = row.get('question', '')
 
         self.reset_conversation()  # reset history and context for each prediction
 
-        answer = self.get_response(user_input, stream=False)
+        answer = self.get_response(question, stream=False)
         contexts = self.retrieved_contexts
 
-        logger.info(f"Printing answer: {answer}\n\n " f"Based on the following contexts {contexts[0][:250]}")
+        if contexts and len(contexts) > 0:
+            context_snippet = contexts[0][:250]
+            logger.info(f"Printing answer: {answer}\n\n " f"Based on the following contexts {context_snippet}")
+        else:
+            logger.warning("No contexts retrieved for the given model output")
 
         return {
             "answer": answer,
@@ -735,10 +607,3 @@ class ClaudeAssistant(Model):
     def reset_conversation(self):
         self.conversation_history = ConversationHistory()
         self.retrieved_contexts = []
-
-
-# Import after the class definition
-from src.vector_storage.vector_db import VectorDB
-
-# Rebuild the model to resolve forward references
-ClaudeAssistant.model_rebuild()

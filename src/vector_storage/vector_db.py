@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from abc import ABC, abstractmethod
 from typing import Any
 
 import chromadb
@@ -11,8 +12,8 @@ import cohere
 import weave
 from cohere import RerankResponse
 
-from src.generation.claude_assistant import ClaudeAssistant
-from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR, VECTOR_STORAGE_DIR
+from src.generation.summary_manager import SummaryManager
+from src.utils.config import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR
 from src.utils.decorators import base_error_handler
 from src.utils.logger import configure_logging, get_logger
 
@@ -37,21 +38,50 @@ class DocumentProcessor:
             raise
 
 
-class VectorDB:
-    def __init__(self, embedding_function: str = "text-embedding-3-small", openai_api_key: str = OPENAI_API_KEY):
+class VectorDBInterface(ABC):
+    @abstractmethod
+    def prepare_documents(self, chunks: list[dict[str, Any]]) -> dict[str, list[str]]:
+        pass
+
+    @abstractmethod
+    def add_documents(self, processed_docs: dict[str, list[str]]) -> None:
+        pass
+
+    @abstractmethod
+    def query(self, user_query: str | list[str], n_results: int = 10) -> dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def reset_database(self) -> None:
+        pass
+
+    @abstractmethod
+    def deduplicate_documents(self, search_results: dict[str, Any]) -> dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
+        pass
+
+
+class VectorDB(VectorDBInterface):
+    def __init__(
+        self,
+        embedding_function: str = "text-embedding-3-small",
+        openai_api_key: str = OPENAI_API_KEY,
+    ):
         self.embedding_function = None
         self.client = None
         self.collection = None
         self.embedding_function_name = embedding_function
         self.openai_api_key = openai_api_key
         self.collection_name = "local-collection"
-        self.document_summaries = {}
+        self.summary_manager = SummaryManager()
 
         self._init()
 
     def _init(self):
         self.client = chromadb.PersistentClient(path=CHROMA_DB_DIR)  # using default path for Chroma
-        self._load_existing_summaries()
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
             api_key=self.openai_api_key, model_name=self.embedding_function_name
         )
@@ -62,19 +92,6 @@ class VectorDB:
             f"Successfully initialized ChromaDb with collection: {self.collection_name}\n with "
             f"{self.collection.count()} documents (chunks)"
         )
-
-    @base_error_handler
-    def _load_existing_summaries(self):
-        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
-        if os.path.exists(summaries_file):
-            try:
-                with open(summaries_file) as f:
-                    self.document_summaries = json.load(f)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to load document summaries: {e}")
-                self.document_summaries = {}
-        else:
-            self.document_summaries = {}
 
     def prepare_documents(self, chunks: list[dict]) -> dict[str, list[str]]:
         ids = []
@@ -106,7 +123,7 @@ class VectorDB:
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
     @base_error_handler
-    def add_documents(self, json_data: list[dict], claude_assistant: ClaudeAssistant, file_name: str) -> str | None:
+    def add_documents(self, json_data: list[dict], file_name: str) -> None:
         processed_docs = self.prepare_documents(json_data)
 
         ids = processed_docs["ids"]
@@ -133,31 +150,7 @@ class VectorDB:
             logger.info(f"Added {len(missing_ids)} new documents to ChromaDB.")
 
         # Generate summary for the entire file if not already present
-        if file_name in self.document_summaries:
-            result = self.document_summaries[file_name]
-            logger.info(f"Loading existing summary for {file_name}.")
-        else:
-            logger.info(f"Summary for {file_name} not found, generating new one.")
-            result = claude_assistant.generate_document_summary(json_data)
-            result["filename"] = file_name
-            self.document_summaries[file_name] = result
-
-        # Save updated summaries
-        self._save_summaries()
-        return result
-
-    @base_error_handler
-    def _save_summaries(self):
-        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
-        try:
-            with open(summaries_file, "w") as f:
-                json.dump(self.document_summaries, f, indent=2)
-        except Exception as e:
-            logger.error(f"Failed to save document summaries: {e}")
-
-    @base_error_handler
-    def get_document_summaries(self) -> list[str]:
-        return list(self.document_summaries.values())
+        self.summary_manager.process_file(data=json_data, file_name=file_name)
 
     @base_error_handler
     def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
@@ -192,17 +185,17 @@ class VectorDB:
 
     @base_error_handler
     def reset_database(self):
+        # Delete collection
         self.client.delete_collection(self.collection_name)
+
         self.collection = self.client.create_collection(
             self.collection_name, embedding_function=self.embedding_function
         )
-        self.document_summaries = {}
+
         # Delete the summaries file
-        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
-        if os.path.exists(summaries_file):
-            os.remove(summaries_file)
-            logger.info("Document summaries cleared.")
-        logger.info("Database reset.")
+        self.summary_manager.clear_summaries()
+
+        logger.info("Database reset successfully. ")
 
     def process_results_to_print(self, search_results: dict[str, Any]):
         documents = search_results["documents"][0]
@@ -352,12 +345,11 @@ def main():
     configure_logging()
     vector_db = VectorDB()
     vector_db.reset_database()
-    claude_assistant = ClaudeAssistant(vector_db=vector_db)
 
     file = "langchain-ai_github_io_langgraph_20240928_143920-chunked.json"
     reader = DocumentProcessor()
     documents = reader.load_json(file)
-    vector_db.add_documents(documents, claude_assistant, file)
+    vector_db.add_documents(documents, file)
 
 
 if __name__ == "__main__":

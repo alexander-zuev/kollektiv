@@ -3,39 +3,15 @@
 ```markdown
 
 
-# Introduction [¶](\#introduction)
+[Skip to content](https://docs.ragas.io/en/stable/howtos/customizations/testgenerator/#customizing-test-data-generation)
 
-Ragas is a framework that helps you evaluate your Retrieval Augmented Generation (RAG) pipelines. RAG denotes a class of LLM applications that use external data to augment the LLM’s context. There are existing tools and frameworks that help you build these pipelines but evaluating it and quantifying your pipeline performance can be hard. This is where Ragas (RAG Assessment) comes in.
+Customizing Test Data Generation
+================================
 
-🚀 Get Started
+Synthetic test generation can save a lot of time and effort in creating test datasets for evaluating AI applications. We are working on adding more support to customized test set generation. If you have any specific requirements or would like to collaborate on this, please [talk to us](https://cal.com/shahul-ragas/30min)
+.
 
-Learn the basics and become familiar with the Ragas metrics and how to evaluate
-RAG pipelines with it, how to generate synthetic testsets to run evaluations
-against and setting up online monitoring for your RAG apps.
-
-[🚀 Get Started](getstarted/index.html#get-started)
-
-📚 Core Concepts
-
-The high-level explanations for building a better understand about the
-important topics such as how to think about metrics-driven development, how the Ragas metrics work under the hood and synthetic dataset generation.
-
-[📚 Core Concepts](concepts/index.html#core-concepts)
-
-🛠️ How-to Guides
-
-Practical guides to help you achieve a specific goals. Take a look at these
-guides to learn how to use Ragas to solve real-world problems.
-
-[🛠️ How-to Guides](howtos/index.html#how-to-guides)
-
-📖 References
-
-Technical descriptions of how Ragas classes and methods work.
-
-[📖 References](references/index.html#references)
-
-[🚀 Get Started](getstarted/index.html)
+Back to top
 ```
 
 ----
