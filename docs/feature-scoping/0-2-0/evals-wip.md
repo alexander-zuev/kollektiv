@@ -49,8 +49,8 @@ Option 2. Evaluation library (start with this)
    - [] Make it easy to replace retrievers
 3. [X] Upload datasets to Weave
    - Versioning and storage
-3. [] Run evaluation suite on the dataset
-4. [] Implement evaluation pipeline over a dataset
+3. [X] Run evaluation suite on the dataset
+4. [X] Implement evaluation pipeline over a dataset
    - Retrieve dataset from Weave
 5. [] Analyze the results and identify key areas for improvement
 6. [] Costs calculation and visualization
@@ -80,8 +80,6 @@ Attributes
 - Manages end-to-end evaluation on a given dataset
 - Calculates the metrics and metadata
 - Stores the metrics
-Attributes:
-- ?
 Methods:
 - evaluate_ragas - conducts ragas-based evaluation
 - evaluate_custom - conducts own end to end evaluation
@@ -97,7 +95,6 @@ Run evaluation pipeline (one-time / regular):
 - User selects the dataset
 - User defines a set of metrics to calculate
 - User runs the `evaluate` method which calculates a set of metrics and saves the results
-
 
 
 #### Metrics

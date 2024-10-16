@@ -4,12 +4,13 @@ import pytest
 from anthropic.types.beta.prompt_caching import PromptCachingBetaUsage
 
 from src.generation.claude_assistant import ClaudeAssistant
+from src.vector_storage.vector_db import VectorDB
 
 
 @pytest.fixture
 def mock_vector_db():
     """Fixture to mock the vector database dependency."""
-    return Mock()
+    return MagicMock(spec=VectorDB)
 
 
 @pytest.fixture
@@ -22,18 +23,17 @@ def claude_assistant(mock_vector_db):
     - tiktoken.get_encoding: Mocked encoding function.
     """
     with patch("anthropic.Anthropic") as mock_anthropic, patch("tiktoken.get_encoding") as mock_encoding:
-        # Configure the mocked Anthropics client
         mock_client = Mock()
         mock_anthropic.return_value = mock_client
 
-        # Configure the mocked tokenizer
         mock_tokenizer = Mock()
-        mock_tokenizer.encode.side_effect = lambda x: list(range(len(x)))  # Simple tokenization
+        mock_tokenizer.encode.side_effect = lambda x: list(range(len(x)))
         mock_encoding.return_value = mock_tokenizer
 
-        # Instantiate ClaudeAssistant with the mocked vector_db
-        assistant = ClaudeAssistant(vector_db=mock_vector_db)
-        # Ensure the client is the mocked client
+        # Create a real VectorDB instance instead of a mock
+        real_vector_db = VectorDB()
+
+        assistant = ClaudeAssistant(vector_db=real_vector_db)
         assistant.client = mock_client
         return assistant
 

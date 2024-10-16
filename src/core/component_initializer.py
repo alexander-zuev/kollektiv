@@ -5,7 +5,7 @@ from src.generation.claude_assistant import ClaudeAssistant
 from src.utils.config import PROCESSED_DATA_DIR
 from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
-from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, VectorDB
+from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, SummaryManager, VectorDB
 
 logger = get_logger()
 
@@ -37,6 +37,8 @@ class ComponentInitializer:
             logger.info("Resetting database...")
             vector_db.reset_database()
 
+        summary_manager = SummaryManager()
+
         claude_assistant = ClaudeAssistant(vector_db=vector_db)
 
         if self.load_all:
@@ -46,9 +48,9 @@ class ComponentInitializer:
 
         for file in docs_to_load:
             documents = reader.load_json(file)
-            vector_db.add_documents(documents, claude_assistant, file)
+            vector_db.add_documents(documents, file)
 
-        claude_assistant._update_system_prompt(vector_db.get_document_summaries())
+        claude_assistant.update_system_prompt(summary_manager.get_all_summaries())
 
         reranker = Reranker()
         retriever = ResultRetriever(vector_db=vector_db, reranker=reranker)
