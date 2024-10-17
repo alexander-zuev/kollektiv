@@ -12,7 +12,7 @@ def main(debug: bool = False, reset_db: bool = False):
     docs = [
         "docs_anthropic_com_en_20240928_135426-chunked.json",
         "langchain-ai_github_io_langgraph_20240928_210913-chunked.json",
-        "docs_ragas_io_en_stable_20241015_112520-chunked.json",
+        # "docs_ragas_io_en_stable_20241015_112520-chunked.json",
     ]
 
     # Initialize components
