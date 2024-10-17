@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+# TODO: refactor to exlcude unnecessary implementation details
+
 
 def generate_project_structure(root_dir, output_file, ignore_dirs=None, ignore_files=None):
     if ignore_dirs is None:
