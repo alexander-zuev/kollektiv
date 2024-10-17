@@ -1,13 +1,8 @@
-# TODO: refactor and separate the dataset generation from evaluation
-# TODO: Implement CLI to manage evaluation and dataset generation
-# TODO: Upgrade to the new metrics impot
-
 import asyncio
 import json
 import os.path
 from collections.abc import Sequence
 from pprint import pprint
-from typing import Optional
 
 import weave
 from datasets import Dataset
@@ -20,11 +15,11 @@ from ragas import EvaluationDataset, SingleTurnSample, evaluate
 from ragas.cost import get_token_usage_for_openai
 from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import AnswerCorrectness, AnswerRelevancy, ContextRecall, Faithfulness
+from ragas.run_config import RunConfig
 from ragas.testset import Testset, TestsetGenerator
 from ragas.testset.synthesizers import default_query_distribution
 from weave import Dataset as WeaveDataset
 from weave.trace import weave_client
-from ragas.run_config import RunConfig
 
 from src.generation.claude_assistant import ClaudeAssistant
 from src.utils.config import (
@@ -140,6 +135,7 @@ class DataLoader:
             raise
 
 
+# TODO: Testset generation fails after migration to 0.2.0
 class DatasetGenerator:
     """
     :class:`DatasetGenerator`
@@ -156,10 +152,10 @@ class DatasetGenerator:
 
     def __init__(
         self,
+        run_config: RunConfig,
         model_name: str = "gpt-4o",
         dataset_path: str = EVAL_DIR,
         loader: DataLoader = None,
-        run_config: RunConfig = RunConfig() ,
     ) -> None:
         self.generator_llm = LangchainLLMWrapper(ChatOpenAI(model=model_name))
         self.generator = TestsetGenerator(llm=self.generator_llm)
@@ -167,7 +163,7 @@ class DatasetGenerator:
         self.dataset: Testset | None = None
         self.loader = loader or DataLoader()
         self.weave_dataset_name: str = "anthropic_dataset"
-        self.run_config = run_config
+        self.run_config = run_config or RunConfig()
 
     @base_error_handler
     def generate_dataset(self, documents: Sequence[Document], testset_size: int, **kwargs) -> EvaluationDataset:
@@ -191,6 +187,7 @@ class DatasetGenerator:
         return evaluation_dataset
 
 
+# TODO: evaluation run is not refactored to ragas 0.2.0
 class Evaluator:
     """
     Evaluator class for evaluating model-generated outputs against ground truth answers.
@@ -230,79 +227,52 @@ class Evaluator:
         }
 
     @weave.op()
-    async def evaluate_row(self, question: str, ground_truth: str, model_output: dict) -> dict[str, list[float]]:
+    async def evaluate_row(self, question: str, ground_truth: str, model_output: dict) -> dict[str, float]:
         """
         Evaluate a model's output for a given question and ground truth by computing various metrics.
 
         This method utilizes a dataset containing the question, ground truth, the answer from the model's output,
         and the retrieved contexts to evaluate the performance of the model. It computes several metrics including
         faithfulness, answer relevancy, answer correctness, context recall, and context precision using
-        specified evaluation tools.
+        specified evaluation tools."""
 
-        :param question: The question posed to the model.
-        :type question: str
-        :param ground_truth: The expected ground truth answer for the question.
-        :type ground_truth: str
-        :param model_output: The model's output containing the answer and retrieved contexts.
-        :type model_output: dict
-        :return: A dictionary with evaluation metric scores.
-        :rtype: dict[str, list[float]]
-        :raises ValueError: If the model output is None or does not contain necessary keys.
-        :raises RuntimeError: If there is an issue with initializing the metrics or models.
-        """
         if model_output is None:
             logger.warning(f"Model output is None for the question: {question[:50]}...")
 
-        # sample = SingleTurnSample(
-        #     user_input=question,
-        #     reference=ground_truth,
-        #     response=model_output.get("answer", ""),
-        #     retrieved_contexts=model_output.get("contexts", []),
-        # )
-        #
-        # # answer = model_output.get("answer", "")
-        # # contexts = model_output.get("contexts", [])
-        #
-        # # if not contexts:
-        # #     logger.warning(f"No contexts found for question: {question[:50]}...")
-        #
-        # # prepare data for RAGAS
-        # # data = {
-        # #     "question": [question],
-        # #     "ground_truth": [ground_truth],
-        # #     "answer": [answer],
-        # #     "retrieved_contexts": [contexts],
-        # # }
-        #
-        # dataset = Dataset.from_dict(data)
-        #
-        # # initialize metrics
-        #
-        # metrics = [faithfulness, answer_relevancy, answer_correctness, context_recall, context_precision]
-        #
-        # judge_model = ChatOpenAI(model=self.evaluator_model_name)
-        # embeddings_model = OpenAIEmbeddings(model=self.embedding_model_name)
-        #
-        # result = evaluate(
-        #     dataset=dataset,
-        #     metrics=metrics,
-        #     llm=judge_model,
-        #     embeddings=embeddings_model,
-        #     token_usage_parser=get_token_usage_for_openai,
-        # )
-        #
-        # return {
-        #     "faithfulness": result["faithfulness"],
-        #     "answer_relevancy": result["answer_relevancy"],
-        #     "context_recall": result["context_recall"],
-        #     "context_precision": result["context_precision"],
-        # }
+        sample = SingleTurnSample(
+            user_input=question,
+            reference=ground_truth,
+            response=model_output.get("answer", ""),
+            retrieved_contexts=model_output.get("contexts", []),
+        )
 
-    async def run_weave_evaluation(self, eval_dataset: Dataset | weave_client.ObjectRef) -> dict:
+        # Create a dataset
+        eval_dataset = EvaluationDataset(samples=[sample])
+
+        # Initialize metrics
+        metrics = list(self.metrics.values())
+
+        # Create embedding model
+        embeddings_model = OpenAIEmbeddings(model=self.embedding_model_name)
+
+        result = evaluate(
+            dataset=eval_dataset,
+            metrics=metrics,
+            embeddings=embeddings_model,
+            llm=self.evaluator_llm,
+            token_usage_parser=get_token_usage_for_openai,
+        )
+
+        # TODO: implement support for token usage counting
+        # tokens = result.total_tokens()
+
+        # Extract scores
+        scores = result.scores[0]
+
+        return {metric: float(score) for metric, score in scores.items()}
+
+    async def run_weave_evaluation(self, eval_dataset: weave_client.ObjectRef) -> dict:
         logger.info("Running evaluation...")
-
-        if isinstance(eval_dataset, Dataset):
-            eval_dataset = eval_dataset.to_list()
 
         evaluation = weave.Evaluation(
             dataset=eval_dataset,
@@ -313,10 +283,6 @@ class Evaluator:
 
 
 class WeaveManager:
-    """
-    class WeaveManager:
-
-    """
 
     def __init__(
         self,
@@ -325,7 +291,6 @@ class WeaveManager:
         self.project_name = project_name
         weave.init(project_name)
 
-    # TODO: refactor to the new evaluation dataset
     def upload_dataset(self, dataset: EvaluationDataset, dataset_name: str) -> str:
         """Uploads dataset to Weave"""
         # Access the list[BaseSample]
