@@ -4260,13 +4260,13 @@ files = [
 
 [[package]]
 name = "ragas"
-version = "0.2.0"
+version = "0.2.1"
 description = ""
 optional = false
 python-versions = "*"
 files = [
-    {file = "ragas-0.2.0-py3-none-any.whl", hash = "sha256:2c64b76492e7d39fc4c3c68e6548d43d4f9f872e22a07b337e530d16b8a41cb1"},
-    {file = "ragas-0.2.0.tar.gz", hash = "sha256:99e5b162cf56ec0a32f2bb7b3facd91090d7d0c3d24f0198f56c1633ba0e17db"},
+    {file = "ragas-0.2.1-py3-none-any.whl", hash = "sha256:05364c121dc02ea3f23bf413b6f3fcf6d757a490969ca219eafaf28df8d26f8b"},
+    {file = "ragas-0.2.1.tar.gz", hash = "sha256:7c377af9d83442403c660ee47c6b23ffd8902166d151b388d7f26b769a9b1bf7"},
 ]
 
 [package.dependencies]
