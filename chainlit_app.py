@@ -34,7 +34,8 @@ def setup_chainlit():
 
 
 # Initialize the assistant when the Chainlit app starts
-claude_assistant = setup_chainlit()
+assistant = setup_chainlit()
+
 
 @cl.on_chat_start
 async def on_chat_start():
@@ -50,19 +51,10 @@ async def on_chat_start():
     Raises:
         Exception: If there is an issue with sending messages.
     """
-    await cl.Message(
-        content="Hello! I'm your AI assistant, knowledgeable about Anthropic and LangChain. How can I help you today?"
-    ).send()
-
-    # Optionally, you can send a message about the loaded documents
     # TODO: send a first message to let user know which documents it has access to.
-    # loaded_docs = ", ".join([
-    #     "Anthropic documentation",
-    #     "LangChain LangGraph documentation"
-    # ])
-    # await cl.Message(
-    #     content=f"I have information about the following documentation: {loaded_docs}. Feel free to ask me anything related to these topics!"
-    # ).send()
+    await cl.Message(content="Hello! I'm OmniClaude, sync any web content and and let's chat!").send()
+
+
 
 @cl.on_message
 async def handle_message(message: cl.Message):
@@ -78,22 +70,29 @@ async def handle_message(message: cl.Message):
     Raises:
         RuntimeError: If the assistant instance is not initialized.
     """
-    if claude_assistant is None:
+    if assistant is None:
         logger.error("Assistant instance is not initialized.")
         await cl.Message(content="Error: Assistant is not initialized.").send()
         return
 
-    msg = cl.Message(content="")
-    # await msg.send() # sends an empty message
+    response = assistant.get_response(user_input=message.content, stream=True)
 
-    stream = True
-    response = claude_assistant.get_response(user_input=message.content, stream=stream)
+    current_message = cl.Message(content="")
+    await current_message.send()
+
+    tool_used = False
 
     for event in response:
         if event["type"] == "text":
-            await msg.stream_token(event["content"])
+            if tool_used:
+                # If a tool was used, start a new message for the assistant's response
+                current_message = cl.Message(content="")
+                await current_message.send()
+                tool_used = False
+            await current_message.stream_token(event["content"])
         elif event["type"] == "tool_use":
             tool_name = event.get("tool", "Unknown tool")
             await cl.Message(content=f"🛠️ Using {tool_name} tool.").send()
+            tool_used = True
 
-    await msg.update()
+    await current_message.update()
