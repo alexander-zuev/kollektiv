@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - (WIP) added basic eval suite to measure retrieval and end-to-end accuracy
+- Added chainlit UI that allows users:
+  - sync web content on demand (using FireCrawl)
+  - chat with the loaded web content
 
 ### Changed
 
