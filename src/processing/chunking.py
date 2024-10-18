@@ -15,6 +15,30 @@ logger = get_logger()
 
 
 class MarkdownChunker:
+    """Processes markdown data, removes boilerplate, images, and validates chunks.
+
+    Args:
+        input_filename (str): The name of the input markdown file.
+        output_dir (str): The directory to save processed data. Defaults to PROCESSED_DATA_DIR.
+        max_tokens (int): Maximum tokens per chunk. Defaults to 1000.
+        soft_token_limit (int): Soft limit for tokens per chunk, aiming to avoid splitting phrases. Defaults to 800.
+        min_chunk_size (int): Minimum size of each chunk in tokens. Defaults to 100.
+        overlap_percentage (float): Percentage of token overlap between chunks. Defaults to 0.05.
+        save (bool): Whether or not to save the processed chunks. Defaults to False.
+
+    Methods:
+        load_data: Loads markdown from JSON and prepares for chunking.
+        remove_images: Removes all types of images from the content.
+        process_pages: Iterates through each page in the loaded data.
+        remove_boilerplate: Removes navigation and boilerplate content from markdown.
+        clean_header_text: Cleans unwanted markdown elements and artifacts from header text.
+        identify_sections: Identifies sections in the page content based on headers and preserves markdown structures.
+
+    Raises:
+        FileNotFoundError: If the input file is not found.
+        json.JSONDecodeError: If there is an issue decoding the JSON file.
+    """
+
     def __init__(
         self,
         input_filename: str,
@@ -574,6 +598,17 @@ class MarkdownChunker:
 
 
 class MarkdownChunkValidator:
+    """
+    Validates and processes chunks of Markdown data.
+
+    Args:
+        min_chunk_size (int): Minimum size for a valid chunk.
+        max_tokens (int): Maximum allowable tokens per chunk.
+        output_dir (str): Directory to save output files.
+        input_filename (str): Input file name for reference.
+        save (bool): Flag to indicate whether to save incorrect chunks to a file.
+    """
+
     def __init__(self, min_chunk_size, max_tokens, output_dir, input_filename, save: bool = False):
         self.min_chunk_size = min_chunk_size
         self.max_tokens = max_tokens
@@ -721,6 +756,19 @@ class MarkdownChunkValidator:
 
 # Test usage
 def main():
+    """
+    Initialize logging settings, identify and process markdown files into chunks.
+
+    Args:
+        debug (bool, optional): Configure logging in debug mode. Defaults to True.
+
+    Returns:
+        None
+
+    Raises:
+        FileNotFoundError: If the specified chunks directory does not exist.
+        IOError: If there is an error processing the markdown files.
+    """
     configure_logging(debug=True)
 
     files_to_chunk = []

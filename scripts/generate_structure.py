@@ -3,6 +3,21 @@ from pathlib import Path
 
 
 def generate_project_structure(root_dir, output_file, ignore_dirs=None, ignore_files=None):
+    """
+    Generate a text representation of the directory structure.
+
+    Args:
+        root_dir (str): The root directory path to analyze.
+        output_file (str): The file where the directory structure should be saved.
+        ignore_dirs (set, optional): A set of directory names to ignore. Defaults to commonly ignored directories.
+        ignore_files (set, optional): A set of file names to ignore. Defaults to an empty set.
+
+    Returns:
+        None.
+
+    Raises:
+        IOError: If there is an error opening or writing to the output file.
+    """
     if ignore_dirs is None:
         ignore_dirs = {"__pycache__", "venv", "env", ".idea", ".pytest_cache", ".git"}
     if ignore_files is None:

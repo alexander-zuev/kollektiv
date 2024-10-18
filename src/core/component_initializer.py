@@ -11,23 +11,64 @@ logger = get_logger()
 
 
 class ComponentInitializer:
+    """
+    Handles the initialization of components for document processing and system setup.
+
+    Args:
+        reset_db (bool): Determines whether to reset the database during initialization. Defaults to False.
+        load_all_docs (bool): Flag to load all documents or only user-selected ones. Defaults to False.
+        files (list[str] | None): List of selected file names to load. Defaults to None.
+
+    Methods:
+        load_all_docs: Loads all docs into the system.
+        load_selected_docs: Loads only user-selected docs into the system.
+        init: Initializes all components, including database, document processor, and assistant.
+
+    Returns:
+        ClaudeAssistant: The initialized assistant with components ready for interaction.
+
+    Raises:
+        Any exceptions raised within the @base_error_handler decorator.
+    """
 
     def __init__(self, reset_db: bool = False, load_all_docs: bool = False, files: list[str] | None = None):
         self.reset_db = reset_db
-        self.files_dir = PROCESSED_DATA_DIR
+        self.chunked_docs_dir = PROCESSED_DATA_DIR
         self.files = files if files is not None else []
         self.load_all = load_all_docs
 
     def load_all_docs(self) -> list[str]:
-        """Loads all docs into the system"""
-        return [f for f in listdir(self.files_dir) if isfile(join(self.files_dir, f))]
+        """
+        Load all documents from the directory specified by `self.chunked_docs_dir`.
+
+        Returns:
+            list[str]: A list of filenames found in the directory.
+        """
+        return [f for f in listdir(self.chunked_docs_dir) if isfile(join(self.chunked_docs_dir, f))]
 
     def load_selected_docs(self) -> list[str]:
-        """Loads only user-selected docs into the system"""
+        """
+        Loads a list of selected documents.
+
+        Returns:
+            list[str]: A list of file names representing the selected documents.
+        """
         return self.files
 
     @base_error_handler
     def init(self):
+        """
+        Initializes the components and sets up the ClaudeAssistant.
+
+        Args:
+            self: An instance of the class containing the initialization method.
+
+        Returns:
+            ClaudeAssistant: An instance of ClaudeAssistant configured with initialized components.
+
+        Raises:
+            Exception: If there is an error during component initialization.
+        """
         logger.info("Initializing components...")
 
         vector_db = VectorDB()

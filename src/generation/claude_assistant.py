@@ -25,6 +25,19 @@ logger = get_logger()
 
 
 class ConversationMessage:
+    """
+    Represent a conversation message with an ID, role, and content.
+
+    Args:
+        role (str): The role of the message sender (e.g., 'user', 'system').
+        content (str | list[dict[str, Any]]): The content of the message, which can be a string or a list of dictionaries.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
 
     def __init__(self, role: str, content: str | list[dict[str, Any]]):
         self.id = str(uuid.uuid4())
@@ -39,6 +52,17 @@ class ConversationMessage:
 
 
 class ConversationHistory:
+    """
+    Manage the history of a conversation, including token counts and message handling.
+
+    Args:
+        max_tokens (int): Maximum number of tokens allowed in the conversation history (default is 200000).
+        tokenizer (str): The tokenizer encoding to use (default is "cl100k_base").
+
+    class ConversationHistory:
+        def __init__(self, max_tokens: int = 200000, tokenizer: str = "cl100k_base"):
+    """
+
     def __init__(self, max_tokens: int = 200000, tokenizer: str = "cl100k_base"):
         self.max_tokens = max_tokens  # specifically for Sonnet 3.5
         self.messages: list[ConversationMessage] = []
@@ -94,35 +118,36 @@ class ConversationHistory:
 # Client Class
 class ClaudeAssistant(Model):
     """
-    ClaudeAssistant is a model representing an advanced AI assistant with access to various tools, including a
-    powerful Retrieval Augmented Generation (RAG) system.
+    Define the ClaudeAssistant class for interacting with the Anthropoc API and managing conversational history.
+
+    Args:
+        vector_db (VectorDB): An instance of VectorDB for handling vector database operations.
+        api_key (str, optional): API key for authenticating with the Anthropoc service. Defaults to None.
+        model_name (str, optional): Name of the model to use for generating responses. Defaults to None.
 
     Attributes:
-        client: Optional instance of anthropic.Anthropic initialized with the API key.
-        api_key: The API key for accessing Anthropics services.
-        model_name: The name of the AI model being used.
-        base_system_prompt: The default prompt containing detailed usage guidelines and constraints for the assistant.
-        system_prompt: The current system prompt, potentially modified with operational context.
-        tool_manager: Manager of available tools.
-        tools: A list of tools available for the assistant.
-        extra_headers: Headers for optional requests.
-        retriever: Optional retriever for document searching.
-        vector_db: Vector Database used in conjunction with the RAG system.
+        client (anthropic.Anthropic | None): Instance for handling API interactions.
+        vector_db (VectorDB): Instance for handling vector database operations.
+        api_key (str): API key for the Anthropoc service.
+        model_name (str): Name of the model to use for generating responses.
+        base_system_prompt (str): Base prompt template for the system.
+        system_prompt (str): Current system prompt.
+        conversation_history (ConversationHistory | None): History of the conversation.
+        retrieved_contexts (list[str]): List of retrieved contexts.
+        tool_manager (Any): Manager for handling tools.
+        tools (list[dict[str, Any]]): List of available tools.
+        extra_headers (dict[str, str]): Extra headers for API requests.
+        retriever (Any | None): Instance for handling data retrieval.
 
     Methods:
-        __init__: Initializes the ClaudeAssistant instance with the provided vector database, API key, and model name.
-        _init: Initializes the client, conversation history, and retrieves all tools through the tool manager.
-        _update_system_prompt: Updates the system prompt with a list of document summaries.
-
-    Initialization:
-        - Sets up the client, vector database, API key, and model name.
-        - Initializes conversation history.
-        - Optionally sets base system prompt and system prompt.
-        - Initializes tool manager and retriever if not already set.
-
-    Error Handling:
-        - Initialization and system prompt update methods utilize specific error handlers to manage exceptions
-        gracefully.
+        __init__(self, vector_db, api_key=None, model_name=None): Initialize the assistant with the given parameters.
+        _init(self): Initialize the Anthropoc client and conversation history.
+        update_system_prompt(self, document_summaries): Update the system prompt with document summaries.
+        cached_system_prompt(self): Get the cached system prompt.
+        cached_tools(self): Get the cached tools.
+        preprocess_user_input(self, input_text): Preprocess user input text.
+        get_response(self, user_input, stream=True): Generate a response based on user input.
+        stream_response(self, user_input): Stream responses as they are generated.
     """
 
     client: anthropic.Anthropic | None = None

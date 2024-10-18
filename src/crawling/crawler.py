@@ -26,6 +26,15 @@ logger = get_logger()
 
 
 class FireCrawler:
+    """
+    FireCrawler class for mapping and crawling URLs using the Firecrawl API.
+
+    Args:
+        api_key (str): The API key for authenticating with the Firecrawl service.
+        data_dir (str): The directory where raw data is stored. Default is RAW_DATA_DIR.
+        jobs_dir (str): The directory where job files are stored. Default is JOB_FILE_DIR.
+    """
+
     def __init__(self, api_key: str, data_dir: str = RAW_DATA_DIR, jobs_dir: str = JOB_FILE_DIR) -> None:
         self.api_key: str = api_key
         self.current_job_id: str
@@ -41,7 +50,19 @@ class FireCrawler:
 
     @base_error_handler
     def map_url(self, url: HttpUrl) -> dict[str, Any] | None:
-        """Input a website and get all the urls on the website - extremely fast"""
+        """
+        Map the given URL and return structured results.
+
+        Args:
+            url (HttpUrl): The URL to be mapped.
+
+        Returns:
+            dict[str, Any] | None: A dictionary containing the status, input URL, total number of links, and the list
+            of links. Returns None if mapping fails.
+
+        Raises:
+            Any exceptions that the mapping function or save_results method might raise.
+        """
         logger.info(f"Mapping URL: {url}")
 
         site_map = self.app.map_url(url)
@@ -82,12 +103,17 @@ class FireCrawler:
     @base_error_handler
     def async_crawl_url(self, urls: list[HttpUrl], page_limit: int = 25) -> dict[str, Any]:
         """
-        :param urls: List of URLs to be crawled.
-        :type urls: list[HttpUrl]
-        :param page_limit: Maximum number of pages to be crawled per URL. Defaults to 25.
-        :type page_limit: int
-        :return: A dictionary containing the input URLs and the results of the crawl jobs.
-        :rtype: dict[str, Any]
+        Crawl multiple URLs asynchronously and retrieve results.
+
+        Args:
+            urls (list[HttpUrl]): A list of URLs to crawl.
+            page_limit (int): The maximum number of pages to crawl for each URL. Default is 25.
+
+        Returns:
+            dict: A dictionary containing the input URLs and the corresponding crawl results.
+
+        Raises:
+            HTTPError: If an HTTP error occurs and is determined to be retryable.
         """
         all_results = []
 
@@ -169,7 +195,18 @@ class FireCrawler:
 
     @base_error_handler
     def _get_all_crawl_results(self, job_id: str) -> list[dict[str, Any]]:
-        """Fetch all results for a given crawl job, handling pagination"""
+        """
+        Accumulate all crawling results for a given job ID.
+
+        Args:
+            job_id (str): The unique identifier of the crawling job.
+
+        Returns:
+            list[dict[str, Any]]: A list of dictionaries containing the accumulated crawl results.
+
+        Raises:
+            SomeSpecificException: Description of the exception if applicable.
+        """
         next_url = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
         all_data = []
 
@@ -188,7 +225,20 @@ class FireCrawler:
 
     @base_error_handler
     def _get_next_results(self, next_url: HttpUrl) -> tuple[dict[str, Any], str | None]:
-        """Retrieves the next batch of the results"""
+        """
+        Fetch the next batch of results from the given URL with retries.
+
+        Args:
+            next_url (HttpUrl): The URL to fetch the next batch of results from.
+
+        Returns:
+            tuple[dict[str, Any], str | None]: A tuple containing the batch data as a dictionary and the next URL as a
+            string or None.
+
+        Raises:
+            RequestException: If an error occurs while making the HTTP request and the maximum number of retries is
+            reached.
+        """
         max_retries = 15
         backoff_factor = 2
 
@@ -231,7 +281,19 @@ class FireCrawler:
 
     @base_error_handler
     def save_results(self, result: dict[str, Any], method: str) -> None:
-        """Takes as an input the results of the job, saves it as a json file in the data directory"""
+        """
+        Save results to a JSON file and build an example file.
+
+        Args:
+            result (dict[str, Any]): The result data to save.
+            method (str): The method used to generate the result.
+
+        Returns:
+            None
+
+        Raises:
+            OSError: If there is an issue writing to the file.
+        """
         filename = self._create_file_name(result["input_url"], method)
         filepath = os.path.join(self.raw_data_dir, filename)
 
@@ -245,7 +307,19 @@ class FireCrawler:
 
     @base_error_handler
     def _create_file_name(self, url: HttpUrl, method: str) -> str:
-        """Creates a filename based on the bare URL and timestamp"""
+        """
+        Generate a file name based on the URL and HTTP method.
+
+        Args:
+            url (HttpUrl): The URL to be parsed.
+            method (str): The HTTP method used (e.g., 'GET', 'POST').
+
+        Returns:
+            str: A file name string derived from the URL and current timestamp.
+
+        Raises:
+            ValueError: If the URL is invalid.
+        """
         parsed_url = urlparse(url)
         bare_url = parsed_url.netloc + parsed_url.path.rstrip("/")
         bare_url = re.sub(r"[^\w\-]", "_", bare_url)  # Replace non-word chars with underscore
@@ -254,12 +328,27 @@ class FireCrawler:
 
     @base_error_handler
     def _get_timestamp(self):
-        """Returns the current timestamp to be used for saving the results"""
+        """
+        Generate a timestamp string in the format YYYYMMDD_HHMMSS.
+
+        Returns:
+            str: The current timestamp in the format YYYYMMDD_HHMMSS.
+        """
         return datetime.now().strftime("%Y%m%d_%H%M%S")
 
     @base_error_handler
     def create_job(self, job_id: str, method: str, input_url: HttpUrl) -> None:
-        """Creates a job, saving information to jobs.json returned by async_crawl_url method."""
+        """
+        Create a new job with the given parameters and save it to disk.
+
+        Args:
+            job_id (str): The unique identifier for the job.
+            method (str): The method to be used for the job.
+            input_url (HttpUrl): The URL associated with the job.
+
+        Raises:
+            OSError: If there is an error saving the job information to disk.
+        """
         internal_id = str(uuid4())
         path = os.path.join(self.jobs_dir, "jobs.json")  # path should be src/crawling
 
@@ -297,7 +386,16 @@ class FireCrawler:
 
     @base_error_handler
     def complete_job(self, job_id: str) -> None:
-        """Finds a job by external id and updates it's status to "completed"."""
+        """
+        Mark a job with the given ID as completed.
+
+        Args:
+            job_id (str): The ID of the job to be marked as completed.
+
+        Raises:
+            ValueError: If no job with the specified job_id is found.
+            OSError: If there is an error in reading or writing the jobs file.
+        """
         jobs_path = os.path.join(self.jobs_dir, "jobs.json")
 
         try:
@@ -324,7 +422,18 @@ class FireCrawler:
 
     @base_error_handler
     def check_job_status(self, job_id: str) -> dict[str, Any]:
-        """Polls firecrawl for the job result"""
+        """
+        Check the status of a job.
+
+        Args:
+            job_id (str): The unique identifier of the job.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the job status and other related information.
+
+        Raises:
+            KeyError: If the response does not contain the required status information.
+        """
         response = self.app.check_crawl_status(job_id)
         logger.info(
             f"Job {job_id} status: {response['status']}."
@@ -334,7 +443,18 @@ class FireCrawler:
 
     @base_error_handler
     def _extract_unique_links(self, crawl_results: list[dict[str, Any]]) -> list[str]:
-        """Extracts unique links in the completed crawl"""
+        """
+        Extract unique source URLs from crawl results.
+
+        Args:
+            crawl_results (list[dict[str, Any]]): A list of dictionaries containing crawl results.
+
+        Returns:
+            list[str]: A list of unique source URLs extracted from the crawl results.
+
+        Raises:
+            KeyError: If the 'metadata' or 'sourceURL' key is missing in any of the dictionaries.
+        """
         unique_links = {
             item["metadata"]["sourceURL"]
             for item in crawl_results
@@ -344,7 +464,19 @@ class FireCrawler:
 
     @base_error_handler
     def build_example_file(self, filename: str, pages: int = 1) -> None:
-        """Extracts n pages into example file to visualize its structure"""
+        """
+        Build an example Markdown file from input JSON.
+
+        Args:
+            filename (str): The name of the input JSON file.
+            pages (int, optional): The number of pages to include in the output Markdown file. Defaults to 1.
+
+        Raises:
+            FileNotFoundError: If the input JSON file does not exist.
+            json.JSONDecodeError: If the input file is not a valid JSON.
+            OSError: If there is an error in writing the output file.
+
+        """
         input_filename = filename
         input_filepath = os.path.join(self.raw_data_dir, input_filename)
 
@@ -373,6 +505,19 @@ class FireCrawler:
 
 # Test usage
 def main():
+    """
+    Configure logging and initiate a web crawler to asynchronously crawl specified URLs with a page limit.
+
+    Args:
+        debug (bool): Optional; If True, sets logging to debug level. Defaults to True.
+        FIRECRAWL_API_KEY (str): API key required to initialize the FireCrawler instance.
+
+    Returns:
+        None
+
+    Raises:
+        Various exceptions related to logging or web crawling could be raised.
+    """
     configure_logging(debug=True)
     crawler = FireCrawler(FIRECRAWL_API_KEY)
 

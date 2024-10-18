@@ -31,6 +31,7 @@ weave = "^0.51.12"
 wandb = "^0.18.3"
 ragas = "^0.2.0"
 chainlit = "^1.2.0"
+flake8-docstrings = "^1.7.0"
 
 
 [tool.black]

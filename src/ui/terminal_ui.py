@@ -7,6 +7,18 @@ logger = get_logger()
 
 @application_level_handler
 def run_terminal_ui(claude_assistant):
+    """
+    Runs the terminal-based user interface for the OmniClaude assistant.
+
+    Args:
+        claude_assistant: An instance of the ClaudeAssistant class that handles user queries and generates responses.
+
+    Returns:
+        None
+
+    Raises:
+        Exception: If there is an error getting the response from ClaudeAssistant.
+    """
     print_welcome_message("Welcome to OmniClaude! How can I assist you today?")
     while True:
         print()  # new line before user input

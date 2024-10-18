@@ -16,7 +16,7 @@ MAX_RETRIES = 2
 
 
 class SummaryManager:
-    """Support class that manages document summaries that are loaded into the vector database"""
+    """Manages document summaries and keyword extraction from text data."""
 
     def __init__(self, model_name: str = MAIN_MODEL):
         weave.init(project_name=WEAVE_PROJECT_NAME)
