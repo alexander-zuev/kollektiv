@@ -1,7 +1,7 @@
-# OmniClaude User Guide
+# Kollektiv User Guide
 
-OmniClaude is a powerful Retrieval-Augmented Generation (RAG) system that allows you to chat with up-to-date library
-documentation. This guide will walk you through the process of setting up, running, and using the OmniClaude system.
+Kollektiv is a powerful Retrieval-Augmented Generation (RAG) system that allows you to chat with up-to-date library
+documentation. This guide will walk you through the process of setting up, running, and using the Kollektiv system.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ documentation. This guide will walk you through the process of setting up, runni
 
 ## System Overview
 
-OmniClaude consists of several components that work together to provide an interactive chat experience with
+Kollektiv consists of several components that work together to provide an interactive chat experience with
 documentation:
 
 1. Web Crawler: Uses the FireCrawl API to fetch documentation from specified websites.
@@ -56,7 +56,7 @@ COHERE_API_KEY="your_cohere_api_key"
 
 ### First-Time Setup
 
-When using OmniClaude for the first time, you'll need to crawl documentation, process it, and set up the vector
+When using Kollektiv for the first time, you'll need to crawl documentation, process it, and set up the vector
 database. Follow these steps:
 
 1. Crawl documentation (see [Crawling Documentation](#crawling-documentation))
@@ -66,7 +66,7 @@ database. Follow these steps:
 
 ### Adding New Documentation
 
-To add new documentation to an existing OmniClaude setup:
+To add new documentation to an existing Kollektiv setup:
 
 1. Crawl the new documentation
 2. Chunk the new documents
@@ -75,7 +75,7 @@ To add new documentation to an existing OmniClaude setup:
 
 ### Chatting with Existing Documentation
 
-If you've already set up OmniClaude with embedded documentation:
+If you've already set up Kollektiv with embedded documentation:
 
 1. Run the chat interface
 2. Start asking questions about the documentation
@@ -186,5 +186,5 @@ self.base_system_prompt = """
 
 For any other issues, check the log files in the `logs` directory for detailed error messages.
 ***
-This user guide provides a comprehensive overview of the OmniClaude system. For further assistance or to report issues,
+This user guide provides a comprehensive overview of the Kollektiv system. For further assistance or to report issues,
 open an issue on the project's GitHub repository.
