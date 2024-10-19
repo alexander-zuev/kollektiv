@@ -9,18 +9,24 @@ from src.vector_storage.vector_db import VectorDB
 
 @pytest.fixture
 def mock_vector_db():
-    """Fixture to mock the vector database dependency."""
+    """Create a mock object for VectorDB.
+
+    Returns:
+        MagicMock: A mock object that mimics the behavior of VectorDB.
+    """
     return MagicMock(spec=VectorDB)
 
 
 @pytest.fixture
 def claude_assistant(mock_vector_db):
     """
-    Fixture to create an instance of ClaudeAssistant with mocked dependencies.
+    Set up a ClaudeAssistant instance with mocked dependencies.
 
-    Patches:
-    - anthropic.Anthropic: Mocked to prevent actual API calls.
-    - tiktoken.get_encoding: Mocked encoding function.
+    Args:
+        mock_vector_db: A mock of the VectorDB class used for testing.
+
+    Returns:
+        ClaudeAssistant: An instance of ClaudeAssistant with dependencies mocked.
     """
     with patch("anthropic.Anthropic") as mock_anthropic, patch("tiktoken.get_encoding") as mock_encoding:
         mock_client = Mock()
@@ -40,7 +46,16 @@ def claude_assistant(mock_vector_db):
 
 def test_streaming_response(claude_assistant):
     """
-    Test the stream_response method to ensure it correctly handles streaming responses.
+    Test the streaming response from the Claude assistant.
+
+    Args:
+        claude_assistant: An instance of the ClaudeAssistant to be tested.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the response does not match the expected output.
     """
     # Create a MagicMock stream object with iterable mock messages
     mock_stream = MagicMock()
@@ -81,7 +96,16 @@ def test_streaming_response(claude_assistant):
 
 def test_non_streaming_response(claude_assistant):
     """
-    Test the not_stream_response method to ensure it correctly handles non-streaming responses.
+    Test the non-streaming response of the Claude Assistant.
+
+    Args:
+        claude_assistant: An instance of the Claude Assistant containing the tested method.
+
+    Returns:
+        None. The function performs assertions to validate the behavior.
+
+    Raises:
+        AssertionError: If any of the assertions fail.
     """
     # Create a mock response object
     mock_response = Mock(
@@ -116,7 +140,16 @@ def test_non_streaming_response(claude_assistant):
 
 def test_conversation_history_handling(claude_assistant):
     """
-    Test the conversation history management within the assistant.
+    Test the handling and retrieval of conversation history for the assistant.
+
+    Args:
+        claude_assistant: An instance of the assistant with conversation history functionality.
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the conversation history does not meet the expected conditions.
     """
     # Add messages to the conversation history
     claude_assistant.conversation_history.add_message("user", "Hello")

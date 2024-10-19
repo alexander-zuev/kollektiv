@@ -3,12 +3,12 @@ from typing import Any
 
 class Tool:
     """
-    Represent a tool with a name, description, and input schema.
+    Define a tool with a name, description, and input schema.
 
     Args:
         name (str): The name of the tool.
         description (str): A brief description of the tool.
-        input_schema (dict[str, Any]): A dictionary representing the input schema of the tool.
+        input_schema (dict[str, Any]): The input schema of the tool.
     """
 
     def __init__(self, name: str, description: str, input_schema: dict[str, Any]):
@@ -17,6 +17,13 @@ class Tool:
         self.input_schema = input_schema
 
     def to_dict(self) -> dict[str, Any]:
+        """
+        Convert the object's attributes to a dictionary.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the object's attributes.
+
+        """
         return {"name": self.name, "description": self.description, "input_schema": self.input_schema}
 
 
@@ -28,19 +35,50 @@ class ToolManager:
         None
 
     Attributes:
-        tools (dict[str, Any]): A dictionary storing tools with their name as the key.
+        tools (Dict[str, Any]): A dictionary to store tools by their names.
     """
 
     def __init__(self):
         self.tools: dict[str, Any] = {}
 
     def add_tool(self, tool: Tool):
+        """
+        Add a tool to the tools collection.
+
+        Args:
+            tool (Tool): The tool instance to be added to the collection.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If a tool with the same name already exists in the collection.
+        """
         self.tools[tool.name] = tool
 
     def get_tool(self, name: str) -> Tool:
+        """
+        Retrieve a tool by its name from the tools dictionary.
+
+        Args:
+            name (str): The name of the tool to retrieve.
+
+        Returns:
+            Tool: The tool associated with the given name.
+
+        Raises:
+            KeyError: If no tool exists with the provided name.
+        """
         return self.tools[name]
 
     def get_all_tools(self) -> list[dict[str, Any]]:
+        """
+        Retrieve all tools as a list of dictionaries.
+
+        Returns:
+            list[dict[str, Any]]: A list where each item is a dictionary representation of a tool.
+
+        """
         return [tool.to_dict() for tool in self.tools.values()]
 
 

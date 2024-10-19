@@ -170,7 +170,7 @@ See the [LICENSE](LICENSE.md) file for the full license text and additional cond
 
 The project has been renamed from **OmniClaude** to **Kollektiv** to:
 - avoid confusion / unintended copyright infringement of Anthropic
-- emphasize the goal to become a tool to enhance collaboration through simplifying access to knowledge 
+- emphasize the goal to become a tool to enhance collaboration through simplifying access to knowledge
 - overall cool name (isn't it?)
 
 If you have any questions regarding the renaming, feel free to reach out.

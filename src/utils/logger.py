@@ -11,6 +11,19 @@ init(autoreset=True)
 
 
 class ColoredFormatter(logging.Formatter):
+    """
+    Enhance log messages with colors and emojis based on their severity levels.
+
+    Args:
+        logging (module): A logging module instance for handling logs.
+
+    Returns:
+        None
+
+    Raises:
+        KeyError: If a log level is not found in COLORS or EMOJIS dictionaries.
+    """
+
     COLORS = {
         logging.DEBUG: Fore.BLUE,
         logging.INFO: Fore.LIGHTCYAN_EX,
@@ -28,6 +41,19 @@ class ColoredFormatter(logging.Formatter):
     }
 
     def format(self, record):
+        """
+        Format the log record with emoji and color based on log level.
+
+        Args:
+            record (LogRecord): The log record to format.
+
+        Returns:
+            str: The formatted log message including color and emoji.
+
+        Raises:
+            KeyError: If a log level key does not exist in COLORS or EMOJIS.
+
+        """
         # Get the original log message
         log_message = super().format(record)
 
@@ -43,11 +69,17 @@ class ColoredFormatter(logging.Formatter):
 
 def configure_logging(debug=False, log_file="app.log"):
     """
-    Configures the logging system.
+    Configure the application's logging system.
 
-    Parameters:
-    - debug (bool): If True, sets the logging level to DEBUG.
-    - log_file (str): The name of the log file.
+    Args:
+        debug (bool): Whether to set the logging level to debug. Defaults to False.
+        log_file (str): The name of the file to log to. Defaults to "app.log".
+
+    Returns:
+        None
+
+    Raises:
+        Exception: Any exception that logging handlers or the file system might raise.
     """
     log_level = logging.DEBUG if debug else logging.INFO
     app_logger = logging.getLogger("kollektiv")
@@ -79,7 +111,16 @@ def configure_logging(debug=False, log_file="app.log"):
 
 def get_logger():
     """
-    Retrieves a logger with the 'kollektiv' prefix based on the caller's module.
+    Retrieve a logger named after the calling module.
+
+    Args:
+        None
+
+    Returns:
+        logging.Logger: A logger specifically named for the module calling the function.
+
+    Raises:
+        None
     """
     import inspect
 
