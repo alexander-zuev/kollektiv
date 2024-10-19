@@ -84,7 +84,19 @@ class MarkdownChunker:
 
     @base_error_handler
     def load_data(self) -> dict[str, Any]:
-        """Loads markdown from JSON and prepares for chunking"""
+        """
+        Load data from a JSON file and return as a dictionary.
+
+        Args:
+            None
+
+        Returns:
+            dict[str, Any]: The JSON content parsed as a dictionary.
+
+        Raises:
+            FileNotFoundError: If the JSON file is not found.
+            json.JSONDecodeError: If the JSON file has invalid content.
+        """
         input_filepath = os.path.join(RAW_DATA_DIR, self.input_filename)
 
         try:
@@ -101,7 +113,18 @@ class MarkdownChunker:
 
     @base_error_handler
     def remove_images(self, content: str) -> str:
-        """Removes all types of images from the content."""
+        """
+        Remove various forms of image links and tags from a given content string.
+
+        Args:
+            content (str): The text content possibly containing image links and tags.
+
+        Returns:
+            str: The content with all image links and tags removed.
+
+        Raises:
+            Exception: Raised if there are any issues during the execution of the function.
+        """
         # Remove HTML img tags (in case any slipped through from FireCrawl)
         content = re.sub(r"<img[^>]+>", "", content)
 
@@ -123,7 +146,19 @@ class MarkdownChunker:
 
     @base_error_handler
     def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:
-        """Iterates through each page in the loaded data"""
+        """
+        Process pages from JSON input and generate data chunks.
+
+        Args:
+            json_input (dict[str, Any]): The input JSON containing page data and metadata.
+
+        Returns:
+            list[dict[str, Any]]: A list of processed data chunks.
+
+        Raises:
+            KeyError: If the JSON input does not contain the required keys.
+            ValueError: If there is an issue with the page content processing.
+        """
         all_chunks = []
         for _index, page in enumerate(json_input["data"]):
             page_content = page["markdown"]
@@ -151,7 +186,18 @@ class MarkdownChunker:
 
     @base_error_handler
     def remove_boilerplate(self, content: str) -> str:
-        """Removes navigation and boilerplate content from markdown."""
+        """
+        Remove boilerplate text from the given content.
+
+        Args:
+            content (str): The content from which to remove the boilerplate text.
+
+        Returns:
+            str: The content with the boilerplate text removed and extra newlines cleaned up.
+
+        Raises:
+            AssertionError: If content is not of type str.
+        """
         # Use precompiled regex
         cleaned_content = self.boilerplate_regex.sub("", content)
         # Remove any extra newlines left after removing boilerplate
@@ -160,7 +206,18 @@ class MarkdownChunker:
 
     @base_error_handler
     def clean_header_text(self, header_text: str) -> str:
-        """Cleans unwanted markdown elements and artifacts from header text."""
+        """
+        Clean header text by removing specific markdown and zero-width spaces.
+
+        Args:
+            header_text (str): The text to be cleaned.
+
+        Returns:
+            str: The cleaned header text.
+
+        Raises:
+            ValueError: If `header_text` is not a string.
+        """
         # Remove zero-width spaces
         cleaned_text = header_text.replace("\u200b", "")
         # Remove markdown links but keep the link text
@@ -175,7 +232,19 @@ class MarkdownChunker:
 
     @base_error_handler
     def identify_sections(self, page_content: str, page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
-        """Identifies sections in the page content based on headers and preserves markdown structures."""
+        """
+        Identify the sections and headers in the provided page content.
+
+        Args:
+            page_content (str): The content of the page to be analyzed.
+            page_metadata (dict[str, Any]): Metadata of the page provided as a dictionary.
+
+        Returns:
+            list[dict[str, Any]]: A list of sections, each represented as a dictionary with headers and content.
+
+        Raises:
+            ValueError: If an unclosed code block is detected.
+        """
         sections = []
         in_code_block = False
         code_fence = ""
@@ -248,6 +317,20 @@ class MarkdownChunker:
 
     @base_error_handler
     def create_chunks(self, sections: list[dict[str, Any]], page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
+        """
+        Create chunks from sections and adjust them according to page metadata.
+
+        Args:
+            sections (list[dict[str, Any]]): List of sections, where each section is a dictionary with "content" and
+            "headers".
+            page_metadata (dict[str, Any]): Metadata related to the page, used to enrich chunk metadata.
+
+        Returns:
+            list[dict[str, Any]]: A list of adjusted and enriched chunks with ids, metadata, and data.
+
+        Raises:
+            CustomException: If validation or adjustment fails during the chunk creation process.
+        """
         page_chunks = []
         for section in sections:
             section_chunks = self._split_section(section["content"], section["headers"])
@@ -283,6 +366,19 @@ class MarkdownChunker:
 
     @base_error_handler
     def _split_section(self, content: str, headers: dict[str, str]) -> list[dict[str, Any]]:  # noqa: C901
+        """
+        Split the content into sections based on headers and code blocks.
+
+        Args:
+            content (str): The content to be split.
+            headers (dict[str, str]): The headers associated with each content chunk.
+
+        Returns:
+            list[dict[str, Any]]: A list of dictionaries, each containing 'headers' and 'content'.
+
+        Raises:
+            ValidationError: If an unclosed code block is detected.
+        """
         # TODO: refactor this method to reduce complexity
         # Current complexity is necessary for accurate content splitting
         chunks = []
@@ -386,7 +482,19 @@ class MarkdownChunker:
 
     @base_error_handler
     def _split_code_block(self, code_block_content: str, code_fence: str) -> list[str]:
-        """Splits a code block into smaller chunks without breaking code syntax."""
+        """
+        Split a code block into smaller chunks based on token count.
+
+        Args:
+            code_block_content (str): The content of the code block to be split.
+            code_fence (str): The code fence delimiter used to format the code block.
+
+        Returns:
+            list[str]: A list of code block chunks.
+
+        Raises:
+            None
+        """
         lines = code_block_content.strip().split("\n")
         chunks = []
         current_chunk_lines = []
@@ -420,7 +528,20 @@ class MarkdownChunker:
 
     @base_error_handler
     def _adjust_chunks(self, chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Adjust chunks to meet min and max token constraints by merging or splitting."""
+        """
+        Adjust chunks to be within the specified token limits.
+
+        Adjusts the size of the given text chunks by merging small chunks and splitting large ones.
+
+        Args:
+            chunks: A list of dictionaries, where each dictionary contains headers and content.
+
+        Returns:
+            A list of dictionaries representing the adjusted chunks.
+
+        Raises:
+            ValueError: If a chunk cannot be adjusted to meet the token requirements.
+        """
         adjusted_chunks = []
         i = 0
         while i < len(chunks):
@@ -480,7 +601,22 @@ class MarkdownChunker:
 
     @base_error_handler
     def _split_large_chunk(self, chunk: dict[str, Any]) -> list[dict[str, Any]]:
-        """Splits a chunk that exceeds 2x max_tokens into smaller chunks."""
+        """
+        Split a large text chunk into smaller chunks.
+
+        Args:
+            chunk (dict[str, Any]): A dictionary containing 'content' and 'headers' keys.
+                                    'content' is the text to split, and 'headers' are additional metadata.
+
+        Returns:
+            list[dict[str, Any]]: A list of dictionaries where each dictionary contains a portion of the original
+            content
+                                  and a copy of the headers.
+
+        Raises:
+            KeyError: If 'content' or 'headers' keys are not found in the chunk dictionary.
+            Any other exceptions raised by self._calculate_tokens method.
+        """
         content = chunk["content"]
         headers = chunk["headers"]
         lines = content.split("\n")
@@ -506,6 +642,16 @@ class MarkdownChunker:
 
     @base_error_handler
     def _merge_headers(self, headers1: dict[str, str], headers2: dict[str, str]) -> dict[str, str]:
+        """
+        Merge two headers dictionaries by levels.
+
+        Args:
+            headers1 (dict[str, str]): The first headers dictionary.
+            headers2 (dict[str, str]): The second headers dictionary.
+
+        Returns:
+            dict[str, str]: The merged headers dictionary with levels "h1", "h2", and "h3".
+        """
         merged = {}
         for level in ["h1", "h2", "h3"]:
             header1 = headers1.get(level, "").strip()
@@ -522,6 +668,20 @@ class MarkdownChunker:
     def _add_overlap(
         self, chunks: list[dict[str, Any]], min_overlap_tokens: int = 50, max_overlap_tokens: int = 100
     ) -> None:
+        """
+        Add overlap to chunks of text based on specified token limits.
+
+        Args:
+            chunks (list[dict[str, Any]]): List of text chunks with metadata.
+            min_overlap_tokens (int): Minimum number of tokens for the overlap.
+            max_overlap_tokens (int): Maximum number of tokens for the overlap.
+
+        Returns:
+            None.
+
+        Raises:
+            ValidationError: If adding overlap exceeds the maximum allowed tokens.
+        """
         for i in range(1, len(chunks)):
             prev_chunk = chunks[i - 1]
             curr_chunk = chunks[i]
@@ -550,7 +710,15 @@ class MarkdownChunker:
             curr_chunk["metadata"]["token_count"] += additional_tokens
 
     def _split_long_line(self, line: str) -> list[str]:
-        """Splits a long line into smaller chunks not exceeding 2 * max_tokens."""
+        """
+        Split a long line of text into smaller chunks based on token limits.
+
+        Args:
+            line (str): The line of text to be split.
+
+        Returns:
+            list[str]: A list containing the smaller chunks of text.
+        """
         tokens = self.tokenizer.encode(line)
         max_tokens_per_chunk = 2 * self.max_tokens
         chunks = []
@@ -561,13 +729,34 @@ class MarkdownChunker:
         return chunks
 
     def _get_last_n_tokens(self, text: str, n: int) -> str:
+        """
+        Get the last n tokens from the given text.
+
+        Args:
+            text (str): The text to tokenize.
+            n (int): The number of tokens to retrieve from the end of the text.
+
+        Returns:
+            str: The decoded string of the last n tokens.
+
+        Raises:
+            ValueError: If n is greater than the number of tokens in the text.
+        """
         tokens = self.tokenizer.encode(text)
         last_n_tokens = tokens[-n:]
         return self.tokenizer.decode(last_n_tokens)
 
     @base_error_handler
     def save_chunks(self, chunks: list[dict[str, Any]]):
-        """Saves chunks to output dir"""
+        """
+        Save the given chunks to a JSON file.
+
+        Args:
+            chunks (list of dict): A list of dictionaries containing chunk data.
+
+        Raises:
+            Exception: If an error occurs while saving the chunks to the file.
+        """
         input_name = os.path.splitext(self.input_filename)[0]  # Remove the extension
         output_filename = f"{input_name}-chunked.json"
         output_filepath = os.path.join(self.output_dir, output_filename)
@@ -577,18 +766,47 @@ class MarkdownChunker:
 
     @base_error_handler
     def _generate_chunk_id(self) -> uuid.UUID:
-        """Generates chunk's uuidv4"""
+        """
+        Generate a new UUID for chunk identification.
+
+        Returns:
+            uuid.UUID: A new unique identifier for the chunk.
+
+        """
         return uuid.uuid4()
 
     @base_error_handler
     def _calculate_tokens(self, text: str) -> int:
-        """Calculates the number of tokens in a given text using tiktoken"""
+        """
+        Calculate the number of tokens in a given text.
+
+        Args:
+            text (str): The input text to be tokenized.
+
+        Returns:
+            int: The number of tokens in the input text.
+
+        Raises:
+            TokenizationError: If there is an error during tokenization.
+        """
         token_count = len(self.tokenizer.encode(text))
         return token_count
 
     @base_error_handler
     def _create_metadata(self, page_metadata: dict[str, Any], token_count: int) -> dict[str, Any]:
-        """Creates metadata dictionary for a chunk"""
+        """
+        Create metadata dictionary for a page.
+
+        Args:
+            page_metadata (dict[str, Any]): Metadata extracted from a page.
+            token_count (int): Number of tokens in the page content.
+
+        Returns:
+            dict[str, Any]: A dictionary containing the token count, source URL, and page title.
+
+        Raises:
+            None
+        """
         metadata = {
             "token_count": token_count,
             "source_url": page_metadata.get("sourceURL", ""),
@@ -626,26 +844,100 @@ class MarkdownChunkValidator:
         self.duplicates_removed = 0
 
     def increment_total_headings(self, level, heading_text):
+        """
+        Add a heading text to the total_headings dictionary under the specified level.
+
+        Args:
+            level (int): The level of the heading.
+            heading_text (str): The text of the heading to add.
+
+        Returns:
+            None
+
+        Raises:
+            KeyError: If the specified level does not exist in the total_headings dictionary.
+        """
         self.total_headings[level].add(heading_text.strip())
 
     def add_preserved_heading(self, level, heading_text):
+        """
+        Add a heading to the preserved headings list at the specified level.
+
+        Args:
+            level (int): The level at which the heading should be preserved.
+            heading_text (str): The text of the heading to preserve.
+
+        Returns:
+            None
+
+        Raises:
+            KeyError: If the specified level does not exist in headings_preserved.
+        """
         self.headings_preserved[level].add(heading_text.strip())
 
     def add_chunk(self, token_count):
+        """
+        Add a chunk of tokens and update the tracking attributes.
+
+        Args:
+            token_count (int): The number of tokens in the new chunk.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         self.total_chunks += 1
         self.total_tokens += token_count
         self.chunk_token_counts.append(token_count)
 
     def add_validation_error(self, error_message):
+        """
+        Add a validation error message to the validation errors list.
+
+        Args:
+            error_message (str): The error message to be added.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If error_message is not a string.
+        """
         self.validation_errors.append(error_message)
 
     def validate(self, chunks):
+        """
+        Validates the given chunks by checking for duplicates and finding incorrect chunks.
+
+        Args:
+            chunks: A list of data chunks to be validated.
+
+        Returns:
+            None
+
+        Raises:
+            ValidationError: If duplicates or incorrect chunks are found.
+        """
         self.validate_duplicates(chunks)
         self.find_incorrect_chunks(chunks, save=self.save)
         self.log_summary()
 
     def validate_duplicates(self, chunks: list[dict[str, Any]]) -> None:
-        """Removes duplicate chunks and updates counts."""
+        """
+        Validate and remove duplicate chunks based on the text content.
+
+        Args:
+            chunks (list[dict[str, Any]]): The list of chunks where each chunk is a dictionary
+                containing text data under the "data" key.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         unique_chunks = {}
         cleaned_chunks = []
         for chunk in chunks:
@@ -664,7 +956,18 @@ class MarkdownChunkValidator:
         self.total_chunks = len(chunks)
 
     def log_summary(self):
-        """Logs a concise summary of the chunking process"""
+        """
+        Log a summary of chunk creation, statistics, headers, validation errors, and incorrect chunks.
+
+        Args:
+            self: An instance of the class containing chunk and heading info, validation errors, etc.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         # Total chunks
         logger.info(f"Total chunks created: {self.total_chunks}")
 
@@ -712,7 +1015,19 @@ class MarkdownChunkValidator:
         logger.info(incorrect_chunks_info)
 
     def find_incorrect_chunks(self, chunks: list[dict[str, Any]], save: bool = False) -> None:
-        """Finds chunks below min_chunk_size or above 2x max_tokens and saves to JSON."""
+        """
+        Identify chunks that are too small or too large and optionally save them to a file.
+
+        Args:
+            chunks (list[dict[str, Any]]): List of chunk dictionaries containing metadata and data for each chunk.
+            save (bool, optional): If True, save the incorrect chunks to a file. Defaults to False.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         incorrect = {
             "too_small": [
                 {

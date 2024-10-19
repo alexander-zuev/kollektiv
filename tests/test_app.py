@@ -3,6 +3,12 @@ from src.vector_storage.vector_db import Reranker, ResultRetriever, VectorDB
 
 
 def test_app_initialization():
+    """
+    Test the initialization of application components.
+
+    Ensures that instances of VectorDB, ClaudeAssistant, Reranker, and ResultRetriever
+    are successfully created and are not None.
+    """
     vector_db = VectorDB()
     claude_assistant = ClaudeAssistant(vector_db)
     reranker = Reranker()

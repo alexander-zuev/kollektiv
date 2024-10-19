@@ -21,6 +21,19 @@ from src.utils.logger import get_logger
 
 
 def base_error_handler(func: Callable) -> Callable:
+    """
+    Return a decorator that wraps a function with error handling and logging.
+
+    Args:
+        func (Callable): The function to be wrapped with error handling.
+
+    Returns:
+        Callable: The wrapped function with error handling.
+
+    Raises:
+        Exception: Re-raises the original exception after logging the error.
+    """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs) -> Any:
         # Access the logger
@@ -36,6 +49,8 @@ def base_error_handler(func: Callable) -> Callable:
 
 
 def application_level_handler(func: Callable) -> Callable:
+    """Retrieve the application logger."""
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs) -> Any:
         # Access the logger
@@ -57,6 +72,28 @@ def application_level_handler(func: Callable) -> Callable:
 
 
 def anthropic_error_handler(func: Callable) -> Callable:
+    """
+    Apply error handling for various exceptions encountered in Anthropic API calls.
+
+    Args:
+        func (Callable): The function to be wrapped with error handling.
+
+    Returns:
+        Callable: A wrapper function that includes error handling.
+
+    Raises:
+        AuthenticationError: If authentication fails.
+        BadRequestError: If the request is invalid.
+        PermissionDeniedError: If permission is denied.
+        NotFoundError: If the resource is not found.
+        RateLimitError: If the rate limit is exceeded.
+        APIConnectionError: For API connection issues, including timeout errors.
+        InternalServerError: If there's an internal server error.
+        APIError: For unexpected API errors.
+        AnthropicError: For unexpected Anthropic-specific errors.
+        Exception: For any other unexpected errors.
+    """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs) -> Any:
         # Access the logger
@@ -102,6 +139,16 @@ def anthropic_error_handler(func: Callable) -> Callable:
 
 
 def performance_logger(func: Callable) -> Callable:
+    """
+    Decorate a function to log its execution time.
+
+    Args:
+        func (Callable): The function to be decorated.
+
+    Returns:
+        Callable: The wrapped function with logging of execution time.
+    """
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs) -> Any:
         # Access the logger

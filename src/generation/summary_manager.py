@@ -16,7 +16,22 @@ MAX_RETRIES = 2
 
 
 class SummaryManager:
-    """Manages document summaries and keyword extraction from text data."""
+    """
+    Manages document summaries, including generation, storage, and retrieval.
+
+    Methods:
+        generate_document_summary: Generates a document summary and keywords.
+        _select_diverse_chunks: Selects a diverse subset of chunks.
+        _summarize_content_structure: Summarizes the content structure based on headers.
+        _format_content_samples: Formats content samples for display.
+        _parse_summary: Parses the summary and keywords from an Anthropic Message.
+        _extract_data_from_text: Extracts summary and keywords from text if JSON parsing fails.
+        load_summaries: Loads document summaries from a JSON file.
+        save_summaries: Saves the document summaries to a JSON file.
+        get_all_summaries: Returns a list of all document summaries.
+        clear_summaries: Clears the document summaries and removes the summaries file.
+        process_file: Processes the file and generates or loads its summary.
+    """
 
     def __init__(self, model_name: str = MAIN_MODEL):
         weave.init(project_name=WEAVE_PROJECT_NAME)
@@ -232,6 +247,19 @@ class SummaryManager:
 
     @base_error_handler
     def process_file(self, data: list[dict], file_name: str):
+        """
+        Process the file and generate or load its summary.
+
+        Args:
+            data (list[dict]): The list of data dictionaries to be processed.
+            file_name (str): The name of the file to process.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         if file_name in self.summaries:
             result = self.summaries[file_name]
             logger.info(f"Loading existing summary for {file_name}.")
