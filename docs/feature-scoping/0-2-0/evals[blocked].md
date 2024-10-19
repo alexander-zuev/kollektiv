@@ -1,6 +1,6 @@
 # Retrieval Augmented Generation Evaluation
 
-Currently, OmniClaude doesn't have any measurement setup on the quality of RAG retrieval. There is a need to set up a
+Currently, Kollektiv doesn't have any measurement setup on the quality of RAG retrieval. There is a need to set up a
 proper evaluation suite.
 
 This is necessary to enable the following:
@@ -171,7 +171,7 @@ Evaluation dataset consisted of 100 samples with the following structure:
    2. MRR ranges from 0 to 1, where 1 is perfect (correct answer always first).
    3. It only considers the rank of the first correct result for each query.
 
-Overall, OmniClaude also favors recall over precision because:
+Overall, Kollektiv also favors recall over precision because:
 - false positives are not so critical because LLM can filter out irrelevant content itself
 - false negative is much more critical because the necessary chunk is not returned. For a RAG system, maximizing
   recall should be more important.

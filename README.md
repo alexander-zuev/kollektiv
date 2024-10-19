@@ -1,8 +1,8 @@
-# 🚀 OmniClaude - LLMs + Up-to-date knowledge
+# 🚀 Kollektiv - LLMs + Up-to-date knowledge
 
 ## 🌟 Overview
 
-OmniClaude is a Retrieval-Augmented Generation (RAG) system designed for one purpose - allow you to chat with your
+Kollektiv is a Retrieval-Augmented Generation (RAG) system designed for one purpose - allow you to chat with your
 favorite docs (of libraries, frameworks, tools primarily) easily.
 
 This project aims to allow LLMs to tap into the most up-to-date knowledge in 2 clicks so that you don't have to
@@ -26,7 +26,7 @@ Imagine your LLM could intelligently decide when it needs to check the documenta
 accurate reply?
 
 ## 🎯 Goal
-Meet OmniClaude -> an open-source RAG app that helps you easily:
+Meet Kollektiv -> an open-source RAG app that helps you easily:
 - parse the docs of your favorite libraries
 - efficiently stores and embeds them in a local vector storage
 - sets up an LLM chat which you can rely on
@@ -60,7 +60,7 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 1. **Clone the repository:**
    ```
-   git clone https://github.com/Twist333d/rag-docs.git
+   git clone https://github.com/Twist333d/kollektiv.git
    cd rag-docs
    ```
 
@@ -142,7 +142,7 @@ So do let me know if you are experiencing issues and I'll try to fix them.
     - if a tool is used -> retrieves up to 5 most relevant documents (after re-ranking)
 
 ## 🛣️ Roadmap
-For a brief roadmap please check out [project wiki page](https://github.com/Twist333d/omni-claude/wiki).
+For a brief roadmap please check out [project wiki page](https://github.com/Twist333d/kollektiv/wiki).
 
 ## 📈 Performance Metrics
 Evaluation is currently done using `ragas` library. There are 2 key parts assessed:
@@ -158,13 +158,22 @@ Evaluation is currently done using `ragas` library. There are 2 key parts assess
 ## 📜 License
 
 
-OmniClaude is licensed under a modified version of the Apache License 2.0. While it allows for free use, modification,
+Kollektiv is licensed under a modified version of the Apache License 2.0. While it allows for free use, modification,
 and distribution for non-commercial purposes, any commercial use requires explicit permission from the copyright owner.
 
 - For non-commercial use: You are free to use, modify, and distribute this software under the terms of the Apache License 2.0.
 - For commercial use: Please contact azuev@outlook.com to obtain a commercial license.
 
 See the [LICENSE](LICENSE.md) file for the full license text and additional conditions.
+
+## Project Renaming Notice
+
+The project has been renamed from **OmniClaude** to **Kollektiv** to:
+- avoid confusion / unintended copyright infringement of Anthropic
+- emphasize the goal to become a tool to enhance collaboration through simplifying access to knowledge 
+- overall cool name (isn't it?)
+
+If you have any questions regarding the renaming, feel free to reach out.
 
 ## 🙏 Acknowledgements
 
@@ -176,7 +185,7 @@ See the [LICENSE](LICENSE.md) file for the full license text and additional cond
 
 ## 📞 Support
 
-For any questions or issues, please [open an issue](https://github.com/yourusername/omni-claude/issues)
+For any questions or issues, please [open an issue](https://github.com/Twist333d/kollektiv/issues)
 
 ---
 

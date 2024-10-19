@@ -1,4 +1,4 @@
-# OmniClaude Changelog
+# Kollektiv Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -9,8 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - (WIP) added basic eval suite to measure retrieval and end-to-end accuracy
+- Added chainlit UI that allows users:
+  - sync web content on demand (using FireCrawl)
+  - chat with the loaded web content
 
 ### Changed
+- **Kollektiv** is born - the project was renamed in order to exclude confusion with regards to Anthropic's Claude
+  family of models.
 
 ### Deprecated
 
@@ -64,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ## [0.1.0] - 2024-09-15
-Initial release of OmniClaude with the following features:
+Initial release of Kollektiv (called OmniClaude back then) with the following features:
   - crawling of documentation with FireCrawl
   - custom markdown chunking
   - embedding and storage with ChromaDB

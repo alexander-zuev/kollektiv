@@ -2,6 +2,10 @@
 max-line-length = 120
 extend-ignore = E203, E266, W503
 max-complexity = 18
-select = B,C,E,F,W,T4,B9
+select = B,C,E,F,W,T4,B9,D
 per-file-ignores =
-    __init__.py:F401
+    __init__.py:F401,D100,D104,D107,D212
+
+# flake8-docstrings configuration
+docstring-convention = google
+ignore = D100, D212, D107

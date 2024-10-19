@@ -2,6 +2,15 @@ from typing import Any
 
 
 class Tool:
+    """
+    Represent a tool with a name, description, and input schema.
+
+    Args:
+        name (str): The name of the tool.
+        description (str): A brief description of the tool.
+        input_schema (dict[str, Any]): A dictionary representing the input schema of the tool.
+    """
+
     def __init__(self, name: str, description: str, input_schema: dict[str, Any]):
         self.name = name
         self.description = description
@@ -12,6 +21,16 @@ class Tool:
 
 
 class ToolManager:
+    """
+    Manage a collection of tools.
+
+    Args:
+        None
+
+    Attributes:
+        tools (dict[str, Any]): A dictionary storing tools with their name as the key.
+    """
+
     def __init__(self):
         self.tools: dict[str, Any] = {}
 
@@ -73,32 +92,6 @@ rag_search_tool = Tool(
         Remember to use this tool judiciously and always prioritize providing accurate, helpful, and contextually
         relevant information to the user.
         """,
-    # description="""
-    # 1. What this tool does?
-    # 2. When this tool should be used?
-    # 3. You need to verify or expand on information related to the documents in the database.
-    # 3. When this tool should NOT be used?
-    # 4. What each parameter means?
-    # 5. Important caveats and limitations
-    #
-    # Retrieves relevant information from a local document database using RAG (Retrieval Augmented Generation).
-    #
-    # When to use this tool:
-    #
-    #
-    # How to use this tool effectively:
-    # 1. Start by analyzing and understanding the conversation context
-    # 2. Then analyze the most recent user request
-    # 3. Then define what is the most important context that should be taken into account by the LLM assistant that is
-    # formulating the actual search query. Keep in mind that the search query is going to be used for RAG search,
-    # based on vector similarity.
-    #
-    # How this tool results are going to be used:
-    # - You call the tool_use, if necessary
-    # - Another method is formulating the best rag query based on your input, recent conversation history
-    # - RAG search and retrieval is performed
-    #
-    # """,
     input_schema={
         "type": "object",
         "properties": {
