@@ -54,10 +54,10 @@ edit_message = true
 
 [UI]
 # Name of the assistant.
-name = "OmniClaude"
+name = "Kollektiv"
 
 # Description of the assistant. This is used for HTML tags.
-description = "OmniClaude lets you sync web content on demand and chat with it via Chainlit UI"
+description = "Kollektiv lets you sync web content on demand and chat with it via Chainlit UI"
 
 # Large size content are by default collapsed for a cleaner ui
 default_collapse_content = true
@@ -66,7 +66,7 @@ default_collapse_content = true
 cot = "full"
 
 # Link to your github repo. This will add a github button in the UI's header.
-github = "https://github.com/Twist333d/omni-claude"
+github = "https://github.com/Twist333d/kollektiv.git"
 
 # Specify a CSS file that can be used to customize the user interface.
 # The CSS file can be served from the public directory or via an external link.

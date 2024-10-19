@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "omni-claude"
-version = "0.1.2"
+name = "kollektiv"
+version = "0.1.4"
 description = ""
 authors = ["AZ <azuev@outlook.com>"]
 readme = "README.md"
@@ -69,7 +69,7 @@ pythonpath = [
 source = ["src"]
 
 [tool.poetry.scripts]
-omni-claude = "python app.py"
+kollektiv = "python app.py"
 chunker = "python src/processing/chunking.py"
 
 
