@@ -30,7 +30,8 @@ class ConversationMessage:
 
     Args:
         role (str): The role of the message sender (e.g., 'user', 'system').
-        content (str | list[dict[str, Any]]): The content of the message, which can be a string or a list of dictionaries.
+        content (str | list[dict[str, Any]]): The content of the message, which can be a string or a list of
+        dictionaries.
 
     Returns:
         None
@@ -45,6 +46,16 @@ class ConversationMessage:
         self.content = content
 
     def to_dict(self, include_id: bool = False) -> dict[str, Any]:
+        """
+        Convert the message object to a dictionary.
+
+        Args:
+            include_id (bool): Whether to include the ID of the message in the dictionary.
+
+        Returns:
+            dict[str, Any]: A dictionary representation of the message with keys "role" and "content".
+                            Optionally includes "id" if `include_id` is True.
+        """
         message_dict = {"role": self.role, "content": self.content}
         if include_id:
             message_dict["id"] = self.id
@@ -70,6 +81,21 @@ class ConversationHistory:
         self.tokenizer = tiktoken.get_encoding(tokenizer)
 
     def add_message(self, role: str, content: str | list[dict[str, Any]]) -> None:
+        """
+        Add a message to the conversation and adjust for token limits.
+
+        Args:
+            role (str): The role of the sender, e.g., 'user', 'system', or 'assistant'.
+            content (str or list[dict[str, Any]]): The content of the message, which can be a string or a list of
+            dictionaries.
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If the role is not recognized.
+            MemoryError: If the total tokens exceed the maximum allowed even after pruning.
+        """
         message = ConversationMessage(role, content)
         self.messages.append(message)
         logger.debug(f"Added message for role={message.role}")
@@ -82,6 +108,19 @@ class ConversationHistory:
             self.total_tokens += estimated_tokens
 
     def update_token_count(self, input_tokens: int, output_tokens: int) -> None:
+        """
+        Update the total token count and prune history if maximum is exceeded.
+
+        Args:
+            input_tokens (int): The number of input tokens.
+            output_tokens (int): The number of output tokens.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         self.total_tokens = input_tokens + output_tokens
         if self.total_tokens > self.max_tokens:
             self._prune_history(0)
@@ -104,50 +143,75 @@ class ConversationHistory:
             self.total_tokens -= self._estimate_tokens(removed_message.content)
 
     def remove_last_message(self) -> None:
+        """
+        Remove the last message from the messages list and log its role.
+
+        Args:
+            self: The instance of the class containing the messages list.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         if self.messages:
             removed_message = self.messages.pop()
             logger.info(f"Removed message: {removed_message.role}")
 
     def get_conversation_history(self, debug: bool = False) -> list[dict[str, Any]]:
+        """
+        Retrieve the conversation history.
+
+        Args:
+            debug (bool): If True, include message IDs in the output.
+
+        Returns:
+            list[dict[str, Any]]: A list of dictionaries representing the messages.
+
+        Raises:
+            None
+        """
         return [msg.to_dict(include_id=debug) for msg in self.messages]
 
     def log_conversation_state(self) -> None:
+        """
+        Log the current state of the conversation.
+
+        Args:
+            self: Instance of the class containing the current conversation state.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         logger.debug(f"Conversation state: messages={len(self.messages)}, " f"Total tokens={self.total_tokens}, ")
 
 
 # Client Class
 class ClaudeAssistant(Model):
     """
-    Define the ClaudeAssistant class for interacting with the Anthropoc API and managing conversational history.
+    Define the ClaudeAssistant class for managing AI assistant functionalities with various tools and configurations.
 
     Args:
-        vector_db (VectorDB): An instance of VectorDB for handling vector database operations.
-        api_key (str, optional): API key for authenticating with the Anthropoc service. Defaults to None.
-        model_name (str, optional): Name of the model to use for generating responses. Defaults to None.
+        vector_db (VectorDB): The vector database instance for retrieving contextual information.
+        api_key (str, optional): The API key for the Anthropic client. Defaults to ANTHROPIC_API_KEY.
+        model_name (str, optional): The name of the model to use. Defaults to MAIN_MODEL.
 
-    Attributes:
-        client (anthropic.Anthropic | None): Instance for handling API interactions.
-        vector_db (VectorDB): Instance for handling vector database operations.
-        api_key (str): API key for the Anthropoc service.
-        model_name (str): Name of the model to use for generating responses.
-        base_system_prompt (str): Base prompt template for the system.
-        system_prompt (str): Current system prompt.
-        conversation_history (ConversationHistory | None): History of the conversation.
-        retrieved_contexts (list[str]): List of retrieved contexts.
-        tool_manager (Any): Manager for handling tools.
-        tools (list[dict[str, Any]]): List of available tools.
-        extra_headers (dict[str, str]): Extra headers for API requests.
-        retriever (Any | None): Instance for handling data retrieval.
+    Raises:
+        anthropic.exceptions.AnthropicError: If there's an error initializing the Anthropic client.
 
     Methods:
-        __init__(self, vector_db, api_key=None, model_name=None): Initialize the assistant with the given parameters.
-        _init(self): Initialize the Anthropoc client and conversation history.
-        update_system_prompt(self, document_summaries): Update the system prompt with document summaries.
-        cached_system_prompt(self): Get the cached system prompt.
-        cached_tools(self): Get the cached tools.
-        preprocess_user_input(self, input_text): Preprocess user input text.
-        get_response(self, user_input, stream=True): Generate a response based on user input.
-        stream_response(self, user_input): Stream responses as they are generated.
+        _init: Initialize the assistant's client and tools.
+        update_system_prompt: Update the system prompt with document summaries.
+        cached_system_prompt: Get the cached system prompt as a list.
+        cached_tools: Get the cached tools as a list.
+        preprocess_user_input: Preprocess the user input to remove whitespace and newlines.
+        get_response: Generate a response based on user input, either as a stream or a single string.
+        stream_response: Handle the streaming response from the assistant and manage conversation flow.
+
     """
 
     client: anthropic.Anthropic | None = None
@@ -261,9 +325,15 @@ class ClaudeAssistant(Model):
     @base_error_handler
     def update_system_prompt(self, document_summaries: list[dict[str, Any]]):
         """
-        :param document_summaries: List of dictionaries containing summary information to be incorporated into
-        the system prompt.
-        :return: None
+        Update the system prompt with document summaries.
+
+        Args:
+            document_summaries (list[dict[str, Any]]): A list of dictionaries where each dictionary
+                contains 'filename', 'summary', and 'keywords' keys.
+
+        Raises:
+            KeyError: If any of the dictionaries in document_summaries does not contain the required keys.
+            Exception: For other unexpected errors.
         """
         logger.info(f"Loading {len(document_summaries)} summaries")
         summaries_text = "\n\n".join(
@@ -277,10 +347,33 @@ class ClaudeAssistant(Model):
 
     @base_error_handler
     def cached_system_prompt(self) -> list[dict[str, Any]]:
+        """
+        Retrieve the cached system prompt.
+
+        Args:
+            self: Instance of the class containing the system prompt.
+
+        Returns:
+            list[dict[str, Any]]: A list with a single dictionary containing the system prompt and its cache control
+            type.
+        """
         return [{"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}]
 
     @base_error_handler
     def cached_tools(self) -> list[dict[str, Any]]:
+        """
+        Return a list of cached tools with specific attributes.
+
+        Args:
+            None
+
+        Returns:
+            list[dict[str, Any]]: A list of dictionaries where each dictionary represents a cached tool with `name`,
+            `description`, `input_schema`, and `cache_control` fields.
+
+        Raises:
+            None
+        """
         return [
             {
                 "name": tool["name"],
@@ -293,6 +386,15 @@ class ClaudeAssistant(Model):
 
     @base_error_handler
     def preprocess_user_input(self, input_text: str) -> str:
+        """
+        Preprocess user input by removing whitespace and replacing newlines.
+
+        Args:
+            input_text (str): The user input text to preprocess.
+
+        Returns:
+            str: The preprocessed user input with no leading/trailing whitespace and newlines replaced by spaces.
+        """
         # Remove any leading/trailing whitespace
         cleaned_input = input_text.strip()
         # Replace newlines with spaces
@@ -302,17 +404,18 @@ class ClaudeAssistant(Model):
     @anthropic_error_handler
     def get_response(self, user_input: str, stream: bool = True) -> Generator[str] | str:
         """
-        Generate a response based on user input, either as a stream or a single string.
+        Get the response from the assistant.
 
         Args:
-            user_input (str): The user's input string.
-            stream (bool): Whether to stream the response or not. Defaults to True.
+            user_input (str): The input provided by the user.
+            stream (bool): Indicator whether to stream the response. Defaults to True.
 
         Returns:
-            Generator[str] | str: A generator yielding the response in parts if streaming,
-            or a single string with the entire response if not streaming.
-        """
+            Generator[str] | str: Stream of responses if streaming is enabled, otherwise a single response.
 
+        Raises:
+            anthropic_error_handler: Handles any exceptions during the response generation.
+        """
         if stream:
             assistant_response_stream = self.stream_response(user_input)
             return assistant_response_stream
@@ -322,19 +425,18 @@ class ClaudeAssistant(Model):
             return assistant_response
 
     @anthropic_error_handler
-    @weave.op()
     def stream_response(self, user_input: str) -> Generator[str]:
         """
-        Handle the streaming response from the assistant and manage the conversation flow.
+        Stream responses from a conversation, handle tool use, and process assistant replies.
 
         Args:
-            user_input (str): The input string provided by the user.
+            user_input (str): The input provided by the user.
 
-        Yields:
-            dict: A dictionary containing the type of event and the related content.
+        Returns:
+            Generator[dict]: A generator yielding dictionaries with 'type' and content keys.
 
         Raises:
-            Exception: If there is any error while generating the response.
+            Exception: If an error occurs while generating the response.
         """
         # iteration = 0
         user_input = self.preprocess_user_input(user_input)
@@ -388,19 +490,18 @@ class ClaudeAssistant(Model):
                 raise Exception(f"An error occurred: {str(e)}") from e
 
     @anthropic_error_handler
-    @weave.op()
     def not_stream_response(self, user_input: str) -> str:
         """
-        Generate a response based on user input while handling potential tool uses and errors.
+        Process user input and generate an assistant response without streaming.
 
         Args:
-            user_input (str): The input message from the user.
+            user_input (str): The input string from the user.
 
         Returns:
-            str: The response generated by the assistant.
+            str: The assistant's response.
 
         Raises:
-            Exception: If an error occurs during response generation.
+            Exception: If an error occurs during processing or response generation.
         """
         user_input = self.preprocess_user_input(user_input)
         self.conversation_history.add_message(role="user", content=user_input)
@@ -442,9 +543,17 @@ class ClaudeAssistant(Model):
     @base_error_handler
     def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:
         """
-        Process the assistant's response by saving the message and updating the token count.
-        """
+        Process the assistant's response and update the conversation history.
 
+        Args:
+            response (PromptCachingBetaMessage | Message): The response object from the assistant.
+
+        Returns:
+            str: The text content of the assistant's response.
+
+        Raises:
+            Exception: Any exception that can be raised by the base_error_handler.
+        """
         logger.debug(
             f"Cached {response.usage.cache_creation_input_tokens} input tokens. \n"
             f"Read {response.usage.cache_read_input_tokens} tokens from cache"
@@ -460,7 +569,21 @@ class ClaudeAssistant(Model):
 
     @base_error_handler
     def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any] | str:
+        """
+        Handle tool use for specified tools.
 
+        Args:
+            tool_name (str): The name of the tool to be used.
+            tool_input (dict[str, Any]): The input parameters required by the tool.
+            tool_use_id (str): The unique identifier for this specific tool use.
+
+        Returns:
+            dict[str, Any] | str: A dictionary containing the tool result if successful, otherwise a string with an
+            error message.
+
+        Raises:
+            Exception: If there is any error while executing the tool.
+        """
         try:
             if tool_name == "rag_search":
                 search_results = self.use_rag_search(tool_input=tool_input)
@@ -491,9 +614,19 @@ class ClaudeAssistant(Model):
     @anthropic_error_handler
     @weave.op()
     def formulate_rag_query(self, recent_conversation_history: list[dict[str, Any]], important_context: str) -> str:
-        """ "
-        Generates a rag search query based on recent conversation history and important context generated by AI
-        assistant."""
+        """
+        Formulate a RAG search query based on recent conversation history and important context.
+
+        Args:
+            recent_conversation_history (list[dict[str, Any]]): A list of conversation history dictionaries.
+            important_context (str): A string containing important contextual information.
+
+        Returns:
+            str: A formulated search query for RAG.
+
+        Raises:
+            ValueError: If 'recent_conversation_history' is empty.
+        """
         logger.debug(f"Important context: {important_context}")
 
         if not recent_conversation_history:
@@ -549,12 +682,35 @@ class ClaudeAssistant(Model):
 
     @base_error_handler
     def get_recent_context(self, n_messages: int = 6) -> list[dict[str, str]]:
-        """Retrieves last 6 messages (3 user messages + 3 assistant messages)"""
+        """
+        Retrieve the most recent messages from the conversation history.
+
+        Args:
+            n_messages (int): The number of recent messages to retrieve. Defaults to 6.
+
+        Returns:
+            list[dict[str, str]]: A list of dictionaries representing the recent messages.
+
+        Raises:
+            None
+        """
         recent_messages = self.conversation_history.messages[-n_messages:]
         return [msg.to_dict() for msg in recent_messages]
 
     @base_error_handler
     def use_rag_search(self, tool_input: dict[str, Any]) -> list[str]:
+        """
+        Perform a retrieval-augmented generation (RAG) search using the provided tool input.
+
+        Args:
+            tool_input (dict[str, Any]): A dictionary containing 'important_context' key to formulate the RAG query.
+
+        Returns:
+            list[str]: A list of preprocessed ranked documents resulting from the RAG search.
+
+        Raises:
+            KeyError: If 'important_context' is not found in tool_input.
+        """
         # Get recent conversation context (last n messages for each role)
         recent_conversation_history = self.get_recent_context()
 
@@ -581,7 +737,16 @@ class ClaudeAssistant(Model):
     @base_error_handler
     def preprocess_ranked_documents(self, ranked_documents: dict[str, Any]) -> list[str]:
         """
-        Converts ranked documents into a structured string for passing to the Claude API.
+        Preprocess ranked documents to generate a list of formatted document strings.
+
+        Args:
+            ranked_documents (dict[str, Any]): A dictionary where keys are document identifiers and values are
+            dictionaries
+            containing document details such as 'relevance_score' and 'text'.
+
+        Returns:
+            list[str]: A list of formatted document strings, each containing the document's relevance score and text.
+
         """
         preprocessed_context = []
 
@@ -600,6 +765,20 @@ class ClaudeAssistant(Model):
     @anthropic_error_handler
     @weave.op()
     def generate_multi_query(self, query: str, model: str = None, n_queries: int = 5) -> list[str]:
+        """
+        Generate multiple related queries based on a user query.
+
+        Args:
+            query (str): The original user query.
+            model (str, optional): The model used for generating queries. Defaults to None.
+            n_queries (int, optional): The number of related queries to generate. Defaults to 5.
+
+        Returns:
+            list[str]: A list of generated queries related to the original query.
+
+        Raises:
+            Exception: If there is an error in the message generation process.
+        """
         prompt = f"""
             You are an AI assistant whose task is to generate multiple queries as part of a RAG system.
             You are helping users retrieve relevant information from a vector database.
@@ -630,7 +809,17 @@ class ClaudeAssistant(Model):
     @base_error_handler
     def combine_queries(self, user_query: str, generated_queries: list[str]) -> list[str]:
         """
-        Combines user query and generated queries into a list, removing any empty queries.
+        Combine user query with generated queries.
+
+        Args:
+            user_query (str): The initial user-provided query.
+            generated_queries (list[str]): A list of queries generated by the system.
+
+        Returns:
+            list[str]: A list containing the user query and the filtered generated queries.
+
+        Raises:
+            None
         """
         combined_queries = [query for query in [user_query] + generated_queries if query.strip()]
         return combined_queries
@@ -638,7 +827,19 @@ class ClaudeAssistant(Model):
     @anthropic_error_handler
     @weave.op()
     async def predict(self, question: str) -> dict:
-        """Should match the keys in the Dataset that is passed for evaluation"""
+        """
+        Predict the answer to the given question.
+
+        Args:
+            question (str): The question for which an answer is to be predicted.
+
+        Returns:
+            dict: A dictionary containing the answer and the contexts retrieved.
+
+        Raises:
+            TypeError: If the `question` is not of type `str`.
+            Exception: If there is an error in getting the response.
+        """
         logger.debug(f"Predict method called with row: {question}")
         # user_input = row.get('question', '')
 
@@ -659,5 +860,19 @@ class ClaudeAssistant(Model):
         }
 
     def reset_conversation(self):
+        """
+        Reset the conversation state to its initial state.
+
+        Resets the conversation history and clears any retrieved contexts.
+
+        Args:
+            self: The instance of the class calling this method.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         self.conversation_history = ConversationHistory()
         self.retrieved_contexts = []
