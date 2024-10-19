@@ -14,7 +14,7 @@ firecrawl_tool = MockFirecrawlTool()
 @cl.on_chat_start
 async def on_chat_start():
     welcome_text = """
-    Welcome to the OmniClaude docs bot!
+    Welcome to the Kollektiv docs bot!
 
     Available commands:
     - @docs add "url" : Add a new URL to index

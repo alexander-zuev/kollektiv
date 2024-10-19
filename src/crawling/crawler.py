@@ -127,7 +127,7 @@ class FireCrawler:
                     "formats": [
                         "markdown",
                     ],
-                    "excludeTags": ["img"],  # remove images as OmniClaude doesn't support multi-modal embeddings
+                    "excludeTags": ["img"],  # remove images as Kollektiv doesn't support multi-modal embeddings
                 },
             }
 

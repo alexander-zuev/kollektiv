@@ -52,8 +52,7 @@ async def on_chat_start():
         Exception: If there is an issue with sending messages.
     """
     # TODO: send a first message to let user know which documents it has access to.
-    await cl.Message(content="Hello! I'm OmniClaude, sync any web content and and let's chat!").send()
-
+    await cl.Message(content="Hello! I'm Kollektiv, sync any web content and and let's chat!").send()
 
 
 @cl.on_message

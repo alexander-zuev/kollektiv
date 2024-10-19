@@ -50,7 +50,7 @@ def configure_logging(debug=False, log_file="app.log"):
     - log_file (str): The name of the log file.
     """
     log_level = logging.DEBUG if debug else logging.INFO
-    app_logger = logging.getLogger("omni-claude")
+    app_logger = logging.getLogger("kollektiv")
     app_logger.setLevel(log_level)
 
     # Remove existing handlers to prevent duplication
@@ -79,7 +79,7 @@ def configure_logging(debug=False, log_file="app.log"):
 
 def get_logger():
     """
-    Retrieves a logger with the 'omni-claude' prefix based on the caller's module.
+    Retrieves a logger with the 'kollektiv' prefix based on the caller's module.
     """
     import inspect
 
@@ -88,8 +88,8 @@ def get_logger():
         # Get the frame of the caller
         caller_frame = frame.f_back
         module = inspect.getmodule(caller_frame)
-        module_name = module.__name__ if module else "omni-claude"
+        module_name = module.__name__ if module else "kollektiv"
     finally:
         del frame  # Prevent reference cycles
 
-    return logging.getLogger(f"omni-claude.{module_name}")
+    return logging.getLogger(f"kollektiv.{module_name}")

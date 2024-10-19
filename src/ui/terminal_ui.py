@@ -19,7 +19,7 @@ def run_terminal_ui(claude_assistant):
     Raises:
         Exception: If there is an error getting the response from ClaudeAssistant.
     """
-    print_welcome_message("Welcome to OmniClaude! How can I assist you today?")
+    print_welcome_message("Welcome to Kollektiv! How can I assist you today?")
     while True:
         print()  # new line before user input
         user_message = user_input()
@@ -29,7 +29,7 @@ def run_terminal_ui(claude_assistant):
         print()  # new line before assistant message
         stream = True
         response = claude_assistant.get_response(user_message, stream=stream)
-        print_assistant_stream("OmniClaude: ", end="")
+        print_assistant_stream("Kollektiv: ", end="")
         if stream:
             for event in response:
                 if event["type"] == "text":
