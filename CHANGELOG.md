@@ -8,14 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- (WIP) added basic eval suite to measure retrieval and end-to-end accuracy
-- Added chainlit UI that allows users:
-  - sync web content on demand (using FireCrawl)
-  - chat with the loaded web content
 
 ### Changed
-- **Kollektiv** is born - the project was renamed in order to exclude confusion with regards to Anthropic's Claude
-  family of models.
 
 ### Deprecated
 
@@ -24,6 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+
+## [0.1.6] - 2024-10-19
+### Added
+- 🖥️ Web UI: You can now chat with synced content via web interface. Built using Chainlit.
+
+### Under development
+- 🧪 Basic evaluation suite is setup using Weave.
+
+## [0.1.5] - 2024-10-19
+### Changed
+- 🤖🤖🤖 **Kollektiv** is born - the project was renamed in order to exclude confusion with regards to Anthropic's Claude
+  family of models.
+
 
 ## [0.1.4] - 2024-09-28
 
