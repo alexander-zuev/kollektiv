@@ -1,3 +1,9 @@
+# TODO: Implement user-specific context (use user_id) for managing vector data to avoid conflicts between users.
+# TODO: Batch vector insertions to improve performance when handling multiple embeddings at once.
+# TODO: Support concurrent vector lookups using async or multi-threading to enhance retrieval performance.
+# TODO: Ensure embeddings are stored in the background and notify users when embedding is complete.
+# TODO: Add logging and error handling for vector database operations.
+# TODO: Consider introducing a queuing system to handle multiple embeddings requests efficiently.
 from __future__ import annotations
 
 import json

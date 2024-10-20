@@ -1,3 +1,8 @@
+# TODO: Add validation to ensure non-empty content is passed into the chunker (fail gracefully if invalid content).
+# TODO: Refine error handling in chunking process, provide clear feedback to the user when chunking fails and why.
+# TODO: Consider implementing partial chunking: allow chunking of valid content even if some pages fail.
+# TODO: Introduce logging or metrics for tracking the success/failure rate of the chunking process.
+# TODO: Investigate possible automation for retrying failed chunking jobs if the failure is recoverable.
 import json
 import os
 import re
@@ -41,7 +46,7 @@ class MarkdownChunker:
 
     def __init__(
         self,
-        input_filename: str,
+        input_filename: str | None = None,
         output_dir: str = PROCESSED_DATA_DIR,
         max_tokens: int = 1000,
         soft_token_limit: int = 800,
@@ -225,9 +230,9 @@ class MarkdownChunker:
         # Remove images in headers
         cleaned_text = re.sub(r"!\[.*?\]\(.*?\)", "", cleaned_text)
         cleaned_text = cleaned_text.strip()
-        # Ensure shell commands are not mistaken as headers
+        # Ensure shell interface are not mistaken as headers
         if cleaned_text.startswith("!/") or cleaned_text.startswith("#!"):
-            cleaned_text = ""  # Empty out any shell commands mistaken as headers
+            cleaned_text = ""  # Empty out any shell interface mistaken as headers
         return cleaned_text
 
     @base_error_handler
