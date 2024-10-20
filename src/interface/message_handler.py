@@ -12,8 +12,8 @@ class MessageHandler:
 
     async def handle_message(self, message: cl.Message):
         """Handles incoming message."""
-        if message.content.startswith("@docs"):
-            response = self.command_handler.handle_command(message.content)
+        if message.content.startswith("@"):
+            response = await self.command_handler.handle_command(message.content)
             await cl.Message(content=response).send()
         else:
             await self.handle_regular_message(message.content)
