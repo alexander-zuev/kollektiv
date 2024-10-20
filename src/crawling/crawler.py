@@ -2,6 +2,11 @@
 # TODO: Improve the process flow
 # TODO: Properly handle errors
 # TODO: Allow users to retrieve the job results
+# TODO: Implement validation for non-empty content during crawling to prevent passing empty pages to the chunker.
+# TODO: Add checks for excluded URL patterns to ensure valid pages remain for processing after applying exclusions.
+# TODO: Implement retries or error handling for pages that fail to be crawled (e.g., network errors).
+# TODO: Provide more informative progress updates to the user during crawling (e.g., percentage completion).
+# TODO: Notify users only in case of critical errors or if no valid content is found after crawling.
 
 import json
 import os
@@ -35,7 +40,9 @@ class FireCrawler:
         jobs_dir (str): The directory where job files are stored. Default is JOB_FILE_DIR.
     """
 
-    def __init__(self, api_key: str, data_dir: str = RAW_DATA_DIR, jobs_dir: str = JOB_FILE_DIR) -> None:
+    def __init__(
+        self, api_key: str = FIRECRAWL_API_KEY, data_dir: str = RAW_DATA_DIR, jobs_dir: str = JOB_FILE_DIR
+    ) -> None:
         self.api_key: str = api_key
         self.current_job_id: str
         self.raw_data_dir: str = data_dir

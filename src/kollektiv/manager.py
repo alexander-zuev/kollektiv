@@ -1,7 +1,9 @@
 from os import listdir
 from os.path import isfile, join
 
+from src.crawling.crawler import FireCrawler
 from src.generation.claude_assistant import ClaudeAssistant
+from src.processing.chunking import MarkdownChunker
 from src.utils.config import PROCESSED_DATA_DIR
 from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
@@ -10,9 +12,10 @@ from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetr
 logger = get_logger()
 
 
-class ComponentInitializer:
+# TODO: refactor and remove. Load all documents by default.
+class Kollektiv:
     """
-    Handles the initialization of components for document processing and system setup.
+    The central orchestrator, managing the flow of documents through crawling, chunking, embedding, and summarization.
 
     Args:
         reset_db (bool): Determines whether to reset the database during initialization. Defaults to False.
@@ -31,11 +34,24 @@ class ComponentInitializer:
         Any exceptions raised within the @base_error_handler decorator.
     """
 
-    def __init__(self, reset_db: bool = False, load_all_docs: bool = False, files: list[str] | None = None):
+    def __init__(
+        self,
+        crawler: FireCrawler,
+        chunker: MarkdownChunker,
+        vector_db: VectorDB,
+        summarizer: SummaryManager,
+        reset_db: bool = False,
+        load_all_docs: bool = False,
+        files: list[str] | None = None,
+    ):
         self.reset_db = reset_db
         self.chunked_docs_dir = PROCESSED_DATA_DIR
         self.files = files if files is not None else []
         self.load_all = load_all_docs
+        self.crawler = crawler
+        self.chunker = chunker
+        self.vector_db = vector_db
+        self.summarizer = summarizer
 
     def load_all_docs(self) -> list[str]:
         """
@@ -71,31 +87,42 @@ class ComponentInitializer:
         """
         logger.info("Initializing components...")
 
-        vector_db = VectorDB()
-        reader = DocumentProcessor()
-
         if self.reset_db:
             logger.info("Resetting database...")
-            vector_db.reset_database()
+            self.vector_db.reset_database()
 
-        summary_manager = SummaryManager()
-
-        claude_assistant = ClaudeAssistant(vector_db=vector_db)
+        claude_assistant = ClaudeAssistant(vector_db=self.vector_db)
 
         if self.load_all:
             docs_to_load = self.load_all_docs()
         else:
             docs_to_load = self.load_selected_docs()
 
+        reader = DocumentProcessor()
         for file in docs_to_load:
             documents = reader.load_json(file)
-            vector_db.add_documents(documents, file)
+            self.vector_db.add_documents(documents, file)
 
-        claude_assistant.update_system_prompt(summary_manager.get_all_summaries())
+        claude_assistant.update_system_prompt(self.summarizer.get_all_summaries())
 
         reranker = Reranker()
-        retriever = ResultRetriever(vector_db=vector_db, reranker=reranker)
+        retriever = ResultRetriever(vector_db=self.vector_db, reranker=reranker)
         claude_assistant.retriever = retriever
 
         logger.info("Components initialized successfully.")
         return claude_assistant
+
+    def add_document(self, url: str) -> str:
+        """Adds documents that were parsed."""
+        # Placeholder for document addition logic
+        return f"Adding document from URL: {url}"
+
+    def remove_document(self, doc_id: str) -> str:
+        """Removes documents that were parsed."""
+        # Placeholder for document removal logic
+        return f"Removing document with ID: {doc_id}"
+
+    def list_documents(self) -> str:
+        """Returned all loaded documents."""
+        # Placeholder for document listing logic
+        return "Listing all documents"

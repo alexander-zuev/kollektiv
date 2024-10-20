@@ -1,17 +1,33 @@
+import os
+
 import chainlit as cl
 
-from src.core.component_initializer import ComponentInitializer
-from src.ui.terminal_ui import run_terminal_ui
+from src.crawling.crawler import FireCrawler
+from src.generation.summary_manager import SummaryManager
+from src.interface.command_handler import CommandHandler
+from src.interface.message_handler import MessageHandler
+from src.kollektiv.manager import Kollektiv
+from src.processing.chunking import MarkdownChunker
+from src.utils.config import PROCESSED_DATA_DIR
 from src.utils.decorators import base_error_handler
 from src.utils.logger import configure_logging, get_logger
+from src.vector_storage.vector_db import VectorDB
+
+DEBUG = False
+
+# Configure logging at the start of the file
+configure_logging(debug=DEBUG)
 
 logger = get_logger()
 
 
+# TODO: the files should not be hardcoded but persisted properly. Right now this is very brittle
+# TODO: the database should initialize with existing documents
+# TODO: there has to be a way to re-index / update a particular content
 @base_error_handler
-def setup_chainlit():
+def initialize_kollektiv():
     """
-    Set up and initialize the Chainlit environment.
+    Set up Kollektiv backend for the UI (Chainlit).
 
     Args:
         None
@@ -22,91 +38,92 @@ def setup_chainlit():
     Raises:
         BaseError: If there is an error during the initialization process.
     """
-    docs = [
-        "docs_anthropic_com_en_20240928_135426-chunked.json",
-        "langchain-ai_github_io_langgraph_20240928_210913-chunked.json",
-    ]
-    initializer = ComponentInitializer(reset_db=False, load_all_docs=False, files=docs)
-    claude_assistant = initializer.init()
-    return claude_assistant
-
-
-@base_error_handler
-def main(debug: bool = False, reset_db: bool = False):
-    """
-    Execute the main functionality of the script.
-
-    Args:
-        debug (bool): Defines if debug mode should be enabled.
-        reset_db (bool): Indicates whether the database should be reset.
-
-    Returns:
-        None
-    """
-    # Configure logging before importing other modules
-    configure_logging(debug=debug)
-
+    logger.info("Initializing Kollektiv...")
+    docs_to_load = [f for f in os.listdir(PROCESSED_DATA_DIR) if os.path.isfile(os.path.join(PROCESSED_DATA_DIR, f))]
     # Initialize components
-    claude_assistant = setup_chainlit()
-    run_terminal_ui(claude_assistant)
+    crawler = FireCrawler()
+    chunker = MarkdownChunker()
+    vector_db = VectorDB()
+    summarizer = SummaryManager()
+
+    kollektiv = Kollektiv(
+        crawler=crawler,
+        chunker=chunker,
+        vector_db=vector_db,
+        summarizer=summarizer,
+        reset_db=False,
+        load_all_docs=False,
+        files=docs_to_load,
+    )
+
+    claude_assistant = kollektiv.init()
+    command_handler = CommandHandler(kollektiv)
+    message_handler = MessageHandler(claude_assistant, command_handler)
+    return message_handler
+
+
+# @base_error_handler
+# def main(debug: bool = False, reset_db: bool = False):
+#     """
+#     Execute the main functionality of the script.
+#
+#     Args:
+#         debug (bool): Defines if debug mode should be enabled.
+#         reset_db (bool): Indicates whether the database should be reset.
+#
+#     Returns:
+#         None
+#     """
+#     # Configure logging before importing other modules
+#     configure_logging(debug=debug)
+#
+#     # Initialize components
+#     claude_assistant = initialize_kollektiv()
+#     run_terminal_ui(claude_assistant)
 
 
 # Initialize the assistant when the Chainlit app starts
-assistant = setup_chainlit()
+# assistant = initialize_kollektiv()
+
+# Initialize the message handler when the Chainlit app starts
+message_handler = initialize_kollektiv()
 
 
 @cl.on_chat_start
 async def on_chat_start():
-    """
-    Handle the chat start event and send initial welcome messages.
-
-    Args:
-        None
-
-    Returns:
-        None
-    """
-    await cl.Message(content="Hello! I'm Kollektiv, sync any web content and let's chat!").send()
+    """Handle the chat start event and send initial welcome messages."""
+    await cl.Message(
+        content="Welcome to **Kollektiv**. I'm ready to assist you with web content management "
+        "and answering your questions."
+    ).send()
 
 
 @cl.on_message
 async def handle_message(message: cl.Message):
-    """
-    Handle an incoming message from the CL framework.
-
-    Args:
-        message (cl.Message): The message object containing the user's input.
-
-    Returns:
-        None
-    """
-    if assistant is None:
-        logger.error("Assistant instance is not initialized.")
-        await cl.Message(content="Error: Assistant is not initialized.").send()
-        return
-
-    response = assistant.get_response(user_input=message.content, stream=True)
-
-    current_message = cl.Message(content="")
-    await current_message.send()
-
-    tool_used = False
-
-    for event in response:
-        if event["type"] == "text":
-            if tool_used:
-                # If a tool was used, start a new message for the assistant's response
-                current_message = cl.Message(content="")
-                await current_message.send()
-                tool_used = False
-            await current_message.stream_token(event["content"])
-        elif event["type"] == "tool_use":
-            tool_name = event.get("tool", "Unknown tool")
-            await cl.Message(content=f"🛠️ Using {tool_name} tool.").send()
-            tool_used = True
-
-    await current_message.update()
+    """Passes user message to MessageHandler for processing."""
+    await message_handler.handle_message(message)
+    # response = message_handler.get_response(user_input=message.content, stream=True)
+    #
+    # current_message = cl.Message(content="")
+    # await current_message.send()
+    #
+    # tool_used = False
+    #
+    # for event in response:
+    #     if event["type"] == "text":
+    #         if tool_used:
+    #             # If a tool was used, start a new message for the assistant's response
+    #             current_message = cl.Message(content="")
+    #             await current_message.send()
+    #             tool_used = False
+    #         await current_message.stream_token(event["content"])
+    #     elif event["type"] == "tool_use":
+    #         tool_name = event.get("tool", "Unknown tool")
+    #         await cl.Message(content=f"🛠️ Using {tool_name} tool.").send()
+    #         tool_used = True
+    #
+    # await current_message.update()
 
 
-if __name__ == "__main__":
-    main(debug=False, reset_db=False)
+# if __name__ == "__main__":
+#     main(debug=False, reset_db=False)
