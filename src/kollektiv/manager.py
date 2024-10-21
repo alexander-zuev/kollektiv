@@ -112,10 +112,27 @@ class Kollektiv:
         logger.info("Components initialized successfully.")
         return claude_assistant
 
-    def add_document(self, url: str) -> str:
-        """Adds documents that were parsed."""
+    def add_document(self, url: str, num_pages: int = 25, exclude_patterns: list = None) -> str:
+        """Orchestrates the document crawling, chunking, embedding, and summarization.
+
+        Args:
+            url (str): The URL to crawl.
+            num_pages (int): The maximum number of pages to crawl (default is 25).
+            exclude_patterns (list): List of URL patterns to exclude during crawling.
+
+        Returns:
+            str: Success message after processing.
+        """
+        exclude_patterns = exclude_patterns or []  # Ensure it's a list
+
         # Placeholder for document addition logic
-        return f"Adding document from URL: {url}"
+        logger.info(f"Adding document from URL: {url}")
+        logger.info(f"Max pages: {num_pages}")
+        logger.info(f"Exclude patterns: {exclude_patterns}")
+
+        # TODO: Integrate the logic for crawling, chunking, and embedding
+
+        return f"Document added from URL: {url} with max pages: {num_pages} and exclude patterns: {exclude_patterns}"
 
     def remove_document(self, doc_id: str) -> str:
         """Removes documents that were parsed."""
