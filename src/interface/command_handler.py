@@ -1,8 +1,11 @@
 import re
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+if TYPE_CHECKING:
+    from src.kollektiv.manager import Kollektiv  # Avoids circular import
+
 from src.interface.flow_manager import FlowManager
-from src.kollektiv.manager import Kollektiv
 from src.utils.logger import get_logger
 
 logger = get_logger()
@@ -20,7 +23,7 @@ class CommandHandler:
         handle_docs(args: list) -> str: Manages the document-related commands like add, list, and remove.
     """
 
-    def __init__(self, kollektiv: Kollektiv, flow_manager: FlowManager):
+    def __init__(self, kollektiv: "Kollektiv", flow_manager: FlowManager):
         self.kollektiv = kollektiv
         self.flow_manager = flow_manager
         self.commands = {
