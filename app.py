@@ -22,48 +22,23 @@ logger = get_logger()
 
 
 @base_error_handler
-def initialize_kollektiv():
+def initialize_application():
     """
-    Set up Kollektiv backend for the UI (Chainlit).
+    Initializes the Kollektiv system and returns the MessageHandler.
 
     Args:
         None
 
     Returns:
-        ClaudeAssistant: An instance of the ClaudeAssistant initialized with the specified documents.
+        MessageHandler: An instance of the MessageHandler initialized with all components.
 
     Raises:
         BaseError: If there is an error during the initialization process.
     """
-    logger.info("Initializing Kollektiv...")
-    docs_to_load = [f for f in os.listdir(PROCESSED_DATA_DIR) if os.path.isfile(os.path.join(PROCESSED_DATA_DIR, f))]
-
-    # Initialize components
-    crawler = FireCrawler()
-    chunker = MarkdownChunker()
-    vector_db = VectorDB()
-    summarizer = SummaryManager()
-
-    kollektiv = Kollektiv(
-        crawler=crawler,
-        chunker=chunker,
-        vector_db=vector_db,
-        summarizer=summarizer,
-        reset_db=False,
-        load_all_docs=False,
-        files=docs_to_load,
-    )
-
-    claude_assistant = kollektiv.init()
-    flow_manager = FlowManager()
-    command_handler = CommandHandler(kollektiv, flow_manager)
-    message_handler = MessageHandler(claude_assistant, command_handler)
-    return message_handler
+    return Kollektiv.setup(reset_db=False, load_all_docs=False)
 
 
-# Initialize the message handler when the Chainlit app starts
-message_handler = initialize_kollektiv()
-
+message_handler = initialize_application()
 
 @cl.on_chat_start
 async def on_chat_start():
