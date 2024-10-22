@@ -96,7 +96,7 @@ So do let me know if you are experiencing issues and I'll try to fix them.
      urls_to_crawl = ["https://docs.anthropic.com/en/docs/"]
      ```
       Ensure you include the url patterns of sub-pages you want to parse and exclude url patterns of sub-pages you
-         don't want to parse:
+   don't want to parse:
      ```python
       "includePaths": ["/tutorials/*", "/how-tos/*", "/concepts/*"],
       "excludePaths": ["/community/*"],

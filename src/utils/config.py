@@ -38,7 +38,7 @@ CHROMA_DB_DIR = os.path.join(SRC_ROOT, "vector_storage", "chroma")
 VECTOR_STORAGE_DIR = os.path.join(SRC_ROOT, "vector_storage")
 
 # LLM config
-MAIN_MODEL = "claude-3-5-sonnet-20240620"
+MAIN_MODEL = "claude-3-5-sonnet-20241022"
 
 # Evaluation config
 EVALUATOR_MODEL_NAME = "gpt-4o-mini"

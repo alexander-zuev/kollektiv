@@ -1,10 +1,11 @@
+import os
 from os import listdir
 from os.path import isfile, join
 
 from src.crawling.crawler import FireCrawler
 from src.generation.claude_assistant import ClaudeAssistant
 from src.interface.command_handler import CommandHandler
-from src.interface.flow_manager import FlowManager
+from src.interface.flow_manager import UserInputManager
 from src.interface.message_handler import MessageHandler
 from src.processing.chunking import MarkdownChunker
 from src.utils.config import PROCESSED_DATA_DIR
@@ -109,68 +110,38 @@ class Kollektiv:
         logger.info("Components initialized successfully.")
         return claude_assistant
 
-    # @base_error_handler
-    # def init(self):
-    #     """
-    #     Initializes the components and sets up the ClaudeAssistant.
-    #
-    #     Args:
-    #         self: An instance of the class containing the initialization method.
-    #
-    #     Returns:
-    #         ClaudeAssistant: An instance of ClaudeAssistant configured with initialized components.
-    #
-    #     Raises:
-    #         Exception: If there is an error during component initialization.
-    #     """
-    #     logger.info("Initializing components...")
-    #
-    #     if self.reset_db:
-    #         logger.info("Resetting database...")
-    #         self.vector_db.reset_database()
-    #
-    #     claude_assistant = ClaudeAssistant(vector_db=self.vector_db)
-    #
-    #     if self.load_all:
-    #         docs_to_load = self.load_all_docs()
-    #     else:
-    #         docs_to_load = self.load_selected_docs()
-    #
-    #     reader = DocumentProcessor()
-    #     for file in docs_to_load:
-    #         documents = reader.load_json(file)
-    #         self.vector_db.add_documents(documents, file)
-    #
-    #     claude_assistant.update_system_prompt(self.summarizer.get_all_summaries())
-    #
-    #     reranker = Reranker()
-    #     retriever = ResultRetriever(vector_db=self.vector_db, reranker=reranker)
-    #     claude_assistant.retriever = retriever
-    #
-    #     logger.info("Components initialized successfully.")
-    #     return claude_assistant
+    # TODO: abstract CrawlInputs and CrawlOutputs
+    async def crawl(self, crawl_inputs: dict) -> str:
+        """Crawls the url provided by the user and returns filename"""
+        url = crawl_inputs["url"]
+        num_pages = crawl_inputs["num_pages"]
+        exclude_patterns = crawl_inputs["exclude_patterns"] or []
 
-    def add_document(self, url: str, num_pages: int = 25, exclude_patterns: list = None) -> str:
-        """Orchestrates the document crawling, chunking, embedding, and summarization.
+        logger.info(
+            f"Adding document from URL: {url} with max pages: {num_pages} and exclude patterns:" f" {exclude_patterns}"
+        )
 
-        Args:
-            url (str): The URL to crawl.
-            num_pages (int): The maximum number of pages to crawl (default is 25).
-            exclude_patterns (list): List of URL patterns to exclude during crawling.
+        crawl_results = await self.crawler.async_crawl_url
 
-        Returns:
-            str: Success message after processing.
-        """
-        exclude_patterns = exclude_patterns or []  # Ensure it's a list
+    def chunk(self, filename: str) -> str:
+        """Conducts chunking and returns the filename of the chunked file."""
+        pass
 
-        # Placeholder for document addition logic
-        logger.info(f"Adding document from URL: {url}")
-        logger.info(f"Max pages: {num_pages}")
-        logger.info(f"Exclude patterns: {exclude_patterns}")
+    def store_new_documents(self, filename) -> str:
+        pass
 
-        # TODO: Integrate the logic for crawling, chunking, and embedding
+    def extract_file_summary(self, filename: str) -> str:
+        """Generates summary of the added file"""
+        pass
 
-        return f"Document added from URL: {url} with max pages: {num_pages} and exclude patterns: {exclude_patterns}"
+    @base_error_handler
+    async def index_web_content(self, crawl_inputs: dict) -> str:
+        """Orchestrates the document crawling, chunking, embedding, and summarization."""
+        logger.info("Starting indexing of new content. This might take a while")
+
+        # Step 1 - Get crawl results
+        crawl_results = await self.crawl(crawl_inputs)
+        pass
 
     def remove_document(self, doc_id: str) -> str:
         """Removes documents that were parsed."""
@@ -221,7 +192,7 @@ class Kollektiv:
         claude_assistant = kollektiv.initialize()
 
         # Initialize FlowManager separately
-        flow_manager = FlowManager()
+        flow_manager = UserInputManager()
 
         # Initialize CommandHandler with separate FlowManager
         command_handler = CommandHandler(kollektiv, flow_manager)
