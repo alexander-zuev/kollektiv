@@ -1,4 +1,3 @@
-# TODO: Add a CLI to crawler
 # TODO: Improve the process flow
 # TODO: Properly handle errors
 # TODO: Allow users to retrieve the job results
@@ -7,19 +6,22 @@
 # TODO: Implement retries or error handling for pages that fail to be crawled (e.g., network errors).
 # TODO: Provide more informative progress updates to the user during crawling (e.g., percentage completion).
 # TODO: Notify users only in case of critical errors or if no valid content is found after crawling.
-
+# TODO: Refactor job management
+# TODO: Implement proper classes for CrawlInput and CrawlOutput
+import asyncio
 import json
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
 from urllib.parse import urlparse
 from uuid import uuid4
 
 import requests
 from firecrawl import FirecrawlApp
-from pydantic import HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from requests.exceptions import HTTPError, RequestException
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -28,6 +30,133 @@ from src.utils.decorators import base_error_handler
 from src.utils.logger import configure_logging, get_logger
 
 logger = get_logger()
+
+
+class CrawlRequest(BaseModel):
+    """
+    Represents a crawl request to FireCrawl.
+
+    Validates and structures the input parameters for a crawl operation.
+    """
+
+    url: HttpUrl = Field(..., description="The starting URL of the crawl request.")
+    page_limit: int = Field(..., gt=0, le=1000, description="Maximum number of pages to crawl. Maxium")
+    max_depth: int = Field(
+        default=5, gt=0, le=10, description="Maximum depth for crawling"  # Move from hardcoded in async_crawl_url
+    )
+    exclude_patterns: list[str] = Field(
+        default_factory=list,
+        description="The list of str of patterns to "
+        "exclude. For "
+        "example, "
+        "/blog/*, /author/. Delimited by a comma",
+    )
+    include_patterns: list[str] = Field(
+        default_factory=list,
+        description="The list of str of patterns to "
+        "include. For "
+        "example, "
+        "/blog/*, /api/. Delimited by a comma",
+    )
+
+    @field_validator("url")
+    def url_must_be_http_url(cls, v):
+        try:
+            HttpUrl(v)
+            return v
+        except Exception as e:
+            raise ValueError("Invalid URL. It should start with 'http://' or 'https://'.") from e
+
+    @field_validator("exclude_patterns", "include_patterns")
+    def validate_patterns(cls, v: list[str]) -> list[str]:
+        """Validate URL patterns are properly formatted."""
+        for pattern in v:
+            if not pattern.strip():
+                raise ValueError("Empty patterns are not allowed")
+            if not pattern.startswith("/"):
+                raise ValueError("Pattern must start with '/', got: {pattern}")
+        return v
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class CrawlData(BaseModel):
+    """
+    Represents the crawled data from a single page.
+
+    Maintains compatibility with FireCrawl's output structure.
+    """
+
+    data: list[dict[str, Any]] = Field(..., description="List of page data objects from FireCrawl")
+
+    @field_validator("data")
+    def validate_data(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not v:
+            raise ValueError("Data must not be empty")
+        for item in v:
+            if not isinstance(item, dict):
+                raise ValueError(f"Expected dict, got {type(item)}")
+            if "markdown" not in item:
+                raise ValueError("Missing 'markdown' key in data")
+            if "metadata" not in item:
+                raise ValueError("Missing 'metadata' key in data")
+            if item["markdown"] is None:
+                raise ValueError("Markdown cannot be None")
+        return v
+
+
+class CrawlJobStatus(str, Enum):
+    """Add proper status enum instead of free-form string"""
+
+    COMPLETED = "completed"
+    FAILED = "failed"
+    IN_PROGRESS = "in_progress"
+    PENDING = "pending"
+
+
+class CrawlResult(BaseModel):
+    """
+    Represents the complete result of a crawl operation.
+
+    Maintains compatibility with your existing result structure while adding
+    validation and proper typing.
+    """
+
+    job_status: CrawlJobStatus = Field(...)
+    input_url: str = Field(..., description="The original URL that was crawled")
+    total_pages: int = Field(..., ge=0, description="Total number of pages successfully crawled")
+    unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")
+    data: list[CrawlData] = Field(..., description="The actual crawled data from all pages")
+    completed_at: datetime | None = Field(
+        default_factory=lambda: datetime.now(timezone.utc), description="When the crawl job completed"
+    )
+    error_message: str | None = Field(None, description="Error message if the crawl failed")
+
+    @field_validator("data")
+    def validate_data_length(cls, v: list[CrawlData], values: dict) -> list[CrawlData]:
+        """Ensure total_pages matches data length"""
+        if len(v) != values.get("total_pages", 0):
+            raise ValueError(f"Data length {len(v)} does not match total_pages {values.get('total_pages')}")
+        return v
+
+    class Config:
+        # Allows converting datetime to ISO format in JSON
+        json_encoders = {datetime: lambda v: v.isoformat()}
+
+        # Allows extra fields in input data
+        extra = "allow"
+
+        # Validates whenever a field is set
+        validate_assignment = True
+
+
+class CrawlJob:
+    pass
+
+
+class CrawlJobStats(BaseModel):
+    pass
 
 
 class FireCrawler:
@@ -55,6 +184,7 @@ class FireCrawler:
         logger.info("FireCrawler app initialized successfully.")
         return app
 
+    # TODO: refactor into proper classes
     @base_error_handler
     def map_url(self, url: HttpUrl) -> dict[str, Any] | None:
         """
@@ -88,7 +218,7 @@ class FireCrawler:
             "links": links,
         }
 
-        self.save_results(result, method="map")
+        filepath, filename = self.save_results(result, method="map")
 
         return result
 
@@ -99,6 +229,9 @@ class FireCrawler:
             return exception.response.status_code in [429, 500, 502, 503, 504]
         return False
 
+    def crawl_handler(self, urls: list[HttpUrl]) -> dict[str, Any] | None:
+        """Handles the crawl request -> ei"""
+
     @retry(
         stop=stop_after_attempt(3),
         retry=retry_if_exception_type(HTTPError),
@@ -108,13 +241,12 @@ class FireCrawler:
         ),
     )
     @base_error_handler
-    def async_crawl_url(self, urls: list[HttpUrl], page_limit: int = 25) -> dict[str, Any]:
+    async def async_crawl_url(self, crawl_request: CrawlRequest) -> dict[str, Any]:
         """
         Crawl multiple URLs asynchronously and retrieve results.
 
         Args:
-            urls (list[HttpUrl]): A list of URLs to crawl.
-            page_limit (int): The maximum number of pages to crawl for each URL. Default is 25.
+            crawl_request (CrawlRequest): A CrawlRequest instance.
 
         Returns:
             dict: A dictionary containing the input URLs and the corresponding crawl results.
@@ -122,71 +254,81 @@ class FireCrawler:
         Raises:
             HTTPError: If an HTTP error occurs and is determined to be retryable.
         """
-        all_results = []
 
-        for url in urls:
-            params = {
-                "limit": page_limit,
-                "maxDepth": 5,
-                "includePaths": [],
-                "excludePaths": [],
-                "scrapeOptions": {
-                    "formats": [
-                        "markdown",
-                    ],
-                    "excludeTags": ["img"],  # remove images as Kollektiv doesn't support multi-modal embeddings
-                },
+        url = str(crawl_request.url)
+        page_limit = crawl_request.page_limit
+        exclude_patterns = crawl_request.exclude_patterns
+        include_patterns = crawl_request.include_patterns
+
+
+        params = {
+            "limit": page_limit,
+            "maxDepth": 5,
+            "includePaths": include_patterns if include_patterns else [],
+            "excludePaths": exclude_patterns if exclude_patterns else [],
+            "scrapeOptions": {
+                "formats": [
+                    "markdown",
+                ],
+                "excludeTags": ["img"],  # remove images as Kollektiv doesn't support multi-modal embeddings
+            },
+        }
+
+        logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
+        try:
+            response = self.app.async_crawl_url(url, params)
+            crawl_job_id = response["id"]  # return the id from FireCrawl
+            logger.info(f"Received job ID: {crawl_job_id}")
+
+            # create a job with this id
+            self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
+
+            # check job status
+            job_failed = False
+            logger.info("***Polling job status***")
+            job_status = self._poll_job_results(crawl_job_id)
+            if job_status == "failed":
+                # return {"status": "failed", "job_id": crawl_job_id}
+                logger.warning(f"Job {crawl_job_id} failed. Attempting to retrieve partial results.")
+                job_failed = True
+
+            # get all the results
+            crawl_results = self._get_all_crawl_results(crawl_job_id)
+            unique_links = self._extract_unique_links(crawl_results)
+            logger.info(f"Job {crawl_job_id} results received.")
+            logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
+
+            # save the results
+            crawl_result = CrawlResult(
+                job_status=job_status,
+                input_url=url,
+                total_pages=len(crawl_results),
+                unique_links=unique_links,
+                data=crawl_results,
+            )
+
+            crawl_results = {
+                "job_failed": job_failed,
+                "input_url": url,
+                "total_pages": len(crawl_results),
+                "unique_links": unique_links,
+                "data": crawl_results,
             }
 
-            logger.info(f"Starting crawl job for URL: {url} with page limit: {page_limit}")
-            try:
-                response = self.app.async_crawl_url(url, params)
-                crawl_job_id = response["id"]  # return the id from FireCrawl
-                logger.info(f"Received job ID: {crawl_job_id}")
+            filepath, filename = self.save_results(crawl_results, method="crawl")
 
-                # create a job with this id
-                self.create_job(job_id=crawl_job_id, method="crawl", input_url=url)
+            # complete the job
+            self.complete_job(crawl_job_id)
 
-                # check job status
-                job_failed = False
-                logger.info("***Polling job status***")
-                job_status = self._poll_job_results(crawl_job_id)
-                if job_status == "failed":
-                    # return {"status": "failed", "job_id": crawl_job_id}
-                    logger.warning(f"Job {crawl_job_id} failed. Attempting to retrieve partial results.")
-                    job_failed = True
+            return {"input_urls": url, "results": crawl_results, "filename": filename}
 
-                # get all the results
-                crawl_results = self._get_all_crawl_results(crawl_job_id)
-                unique_links = self._extract_unique_links(crawl_results)
-                logger.info(f"Job {crawl_job_id} results received.")
-                logger.info(f"Total data entries: {len(crawl_results)}, Unique links: {len(unique_links)}")
-
-                # save the results
-                crawl_results = {
-                    "job_failed": job_failed,
-                    "input_url": url,
-                    "total_pages": len(crawl_results),
-                    "unique_links": unique_links,
-                    "data": crawl_results,
-                }
-
-                self.save_results(crawl_results, method="crawl")
-
-                # complete the job
-                self.complete_job(crawl_job_id)
-                all_results.append(crawl_results)
-
-            except HTTPError as e:
-                logger.warning(f"Received HTTPError while crawling {url}: {e}")
-                if self.is_retryable_error(e):
-                    raise  # raise to the decorator to handle
-                else:
-                    logger.error(f"HTTPError occurred while crawling {url}: {e}")
-                    # Handle other HTTP errors without retrying
-                    continue  # Skip to the next URL
-
-        return {"input_urls": urls, "results": all_results}
+        except HTTPError as e:
+            logger.warning(f"Received HTTPError while crawling {url}: {e}")
+            if self.is_retryable_error(e):
+                raise  # raise to the decorator to handle
+            else:
+                logger.error(f"HTTPError occurred while crawling {url}: {e}")
+                # Handle other HTTP errors without retrying
 
     @base_error_handler
     def _poll_job_results(self, job_id: str, attempts=None) -> str:
@@ -227,6 +369,9 @@ class FireCrawler:
             if not next_url:
                 logger.info("No more pages to fetch.")
                 break  # exit if no more pages to fetch
+
+            # IT'S A NEW WAY, IT'S A NEW LIFE
+            data = CrawlData(data=(batch_data))
 
         return all_data
 
@@ -287,7 +432,7 @@ class FireCrawler:
         return {"data": []}, None
 
     @base_error_handler
-    def save_results(self, result: dict[str, Any], method: str) -> None:
+    def save_results(self, result: dict[str, Any], method: str) -> str:
         """
         Save results to a JSON file and build an example file.
 
@@ -311,6 +456,8 @@ class FireCrawler:
         self.build_example_file(filename)
 
         logger.info(f"Results saved to file: {filepath}")
+
+        return filepath, filename
 
     @base_error_handler
     def _create_file_name(self, url: HttpUrl, method: str) -> str:
@@ -511,20 +658,8 @@ class FireCrawler:
 
 
 # Test usage
-def main():
-    """
-    Configure logging and initiate a web crawler to asynchronously crawl specified URLs with a page limit.
-
-    Args:
-        debug (bool): Optional; If True, sets logging to debug level. Defaults to True.
-        FIRECRAWL_API_KEY (str): API key required to initialize the FireCrawler instance.
-
-    Returns:
-        None
-
-    Raises:
-        Various exceptions related to logging or web crawling could be raised.
-    """
+async def main():
+    """Run crawler as a script. Initiates logger separately."""
     configure_logging(debug=True)
     crawler = FireCrawler(FIRECRAWL_API_KEY)
 
@@ -532,8 +667,18 @@ def main():
     urls_to_crawl = [
         "https://docs.ragas.io/en/stable/",  # replace this
     ]
-    crawler.async_crawl_url(urls_to_crawl, page_limit=50)
+    exclude_patterns = ["/blog/*", "/author/"]
+    # include_patterns = []
+
+    crawl_request = CrawlRequest(
+        url="https://docs.ragas.io/en/stable/",
+        page_limit=1,
+        exclude_patterns=exclude_patterns,
+        # include_patterns=include_patterns
+    )
+
+    await crawler.async_crawl_url(crawl_request)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

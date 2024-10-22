@@ -1,4 +1,8 @@
-class FlowManager:
+# TODO: Abstract prompts
+# TODO: Abstract replies to the user
+
+
+class UserInputManager:
     """Manages the input flow for collecting required parameters from the user."""
 
     def __init__(self):

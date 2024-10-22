@@ -3,6 +3,7 @@ import chainlit as cl
 from src.interface.command_handler import CommandHandler
 
 
+# TODO: Different types of replies: AssistantMessage, SystemMessage (success/error/warning)
 class MessageHandler:
     """Handles incoming messages and routes them to appropriate handlers."""
 
@@ -35,7 +36,7 @@ class MessageHandler:
             user_input = await cl.AskUserMessage(content=prompt).send()
 
             if user_input:
-                result = self.command_handler.process_flow_input(user_input["output"])
+                result = await self.command_handler.process_flow_input(user_input["output"])
                 await cl.Message(content=result["response"]).send()
 
                 if result.get("done"):

@@ -88,12 +88,12 @@ class MarkdownChunker:
         self.inline_code_pattern = re.compile(r"`([^`\n]+)`")
 
     @base_error_handler
-    def load_data(self) -> dict[str, Any]:
+    def load_data(self, input_filename: str | None) -> dict[str, Any]:
         """
         Load data from a JSON file and return as a dictionary.
 
         Args:
-            None
+            input_filename (str): The filename of the input file.
 
         Returns:
             dict[str, Any]: The JSON content parsed as a dictionary.
@@ -102,7 +102,10 @@ class MarkdownChunker:
             FileNotFoundError: If the JSON file is not found.
             json.JSONDecodeError: If the JSON file has invalid content.
         """
-        input_filepath = os.path.join(RAW_DATA_DIR, self.input_filename)
+        if not input_filename:
+            input_filepath = os.path.join(RAW_DATA_DIR, self.input_filename)
+        else:
+            input_filepath = os.path.join(RAW_DATA_DIR, input_filename)
 
         try:
             with open(input_filepath, encoding="utf-8") as f:

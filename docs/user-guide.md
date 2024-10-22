@@ -94,10 +94,11 @@ python src/crawling/crawler.py
 ```
 
 Example:
+
 ```python
 urls_to_crawl = [
- "https://docs.yourlibrary.com",
- "https://api.anotherlibrary.com"
+   "https://docs.yourlibrary.com",
+   "https://api.anotherlibrary.com"
 ]
 crawler.async_crawl_url(urls_to_crawl, page_limit=100)
 ```
