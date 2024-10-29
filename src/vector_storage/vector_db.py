@@ -4,8 +4,11 @@
 # TODO: Ensure embeddings are stored in the background and notify users when embedding is complete.
 # TODO: Add logging and error handling for vector database operations.
 # TODO: Consider introducing a queuing system to handle multiple embeddings requests efficiently.
+# TODO: 10x SPEED
+# TODO: 10x ACCURACY
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -93,7 +96,7 @@ class VectorDBInterface(ABC):
         pass
 
     @abstractmethod
-    def add_documents(self, processed_docs: dict[str, list[str]]) -> None:
+    async def add_documents(self, processed_docs: dict[str, list[str]]) -> None:
         """Add processed documents to the data store.
 
         Args:
@@ -249,7 +252,7 @@ class VectorDB(VectorDBInterface):
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
     @base_error_handler
-    def add_documents(self, json_data: list[dict], file_name: str) -> None:
+    async def add_documents(self, json_data: list[dict], file_name: str) -> dict[str, str]:
         """
         Add documents from a given JSON list to the database, handling duplicates and generating summaries.
 
@@ -599,7 +602,7 @@ class ResultRetriever:
         return ranked_documents
 
 
-def main():
+async def main():
     """
     Configure logging, reset the vector database, process JSON documents, and add them to the database.
 
@@ -619,9 +622,9 @@ def main():
 
     file = "langchain-ai_github_io_langgraph_20240928_143920-chunked.json"
     reader = DocumentProcessor()
-    documents = reader.load_json(file)
-    vector_db.add_documents(documents, file)
+    documents = reader.load_json(filename=file)
+    await vector_db.add_documents(documents, file)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

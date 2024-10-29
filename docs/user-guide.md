@@ -97,10 +97,10 @@ Example:
 
 ```python
 urls_to_crawl = [
-   "https://docs.yourlibrary.com",
-   "https://api.anotherlibrary.com"
+    "https://docs.yourlibrary.com",
+    "https://api.anotherlibrary.com"
 ]
-crawler.async_crawl_url(urls_to_crawl, page_limit=100)
+crawler.async_crawl(urls_to_crawl, page_limit=100)
 ```
 This will save the crawled data in the src/data/raw directory.
 
@@ -144,7 +144,7 @@ file_names = [
 for file_name in file_names:
     document_loader = DocumentProcessor(file_name)
     json_data = document_loader.load_json()
-    vector_db.add_documents(json_data, claude_assistant)
+    await vector_db.add_documents(json_data, claude_assistant)
 ```
 This will embed the chunks and store them in the vector database.
 
