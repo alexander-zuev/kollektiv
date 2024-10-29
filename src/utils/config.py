@@ -1,29 +1,47 @@
 import os
+from enum import Enum
+from typing import Final
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Environment
+class Environment(str, Enum):
+    LOCAL = "local"
+    STAGING = "staging"
+    PRODUCTION = "production"
+
+ENVIRONMENT: Final = Environment(
+    os.getenv("ENVIRONMENT", Environment.LOCAL))
+
+# Base URLs
+BASE_URL = {
+    Environment.LOCAL: "http://localhost:8000",
+    Environment.STAGING: "https://staging.yourdomain.com",
+    Environment.PRODUCTION: "https://yourdomain.com"
+}[ENVIRONMENT]
+
 # FireCrawl Configuration
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
 FIRECRAWL_API_URL = "https://api.firecrawl.dev/v1"
 
-# Anthropic Configuration
+# Crawler Configuration
+MAX_RETRIES: Final = 3
+BACKOFF_FACTOR: Final = 2
+DEFAULT_PAGE_LIMIT: Final = 25
+DEFAULT_MAX_DEPTH: Final = 5
+
+# Webhook Configuration
+WEBHOOK_PATH: Final = "/api/webhook"
+WEBHOOK_URL: Final = f"{BASE_URL}{WEBHOOK_PATH}"
+
+# API Keys
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-
-# Google Configuration
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-
-# OpenAI API KEY
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Cohere API Key
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
-
-# GitHub Personal access token
 GITHUB_TOKEN = os.getenv("GITHUB_ACCESS_TOKEN")
-
-# Weave Project Name
 WEAVE_PROJECT_NAME = os.getenv("WEAVE_PROJECT_NAME")
 
 # File Paths

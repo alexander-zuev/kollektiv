@@ -23,7 +23,6 @@ class MarkdownChunker:
     """Processes markdown data, removes boilerplate, images, and validates chunks.
 
     Args:
-        input_filename (str): The name of the input markdown file.
         output_dir (str): The directory to save processed data. Defaults to PROCESSED_DATA_DIR.
         max_tokens (int): Maximum tokens per chunk. Defaults to 1000.
         soft_token_limit (int): Soft limit for tokens per chunk, aiming to avoid splitting phrases. Defaults to 800.
@@ -46,7 +45,6 @@ class MarkdownChunker:
 
     def __init__(
         self,
-        input_filename: str | None = None,
         output_dir: str = PROCESSED_DATA_DIR,
         max_tokens: int = 1000,
         soft_token_limit: int = 800,
@@ -55,7 +53,7 @@ class MarkdownChunker:
         save: bool = False,
     ):
         self.output_dir = output_dir
-        self.input_filename = input_filename
+        self.input_filename: str | None
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         self.max_tokens = max_tokens  # Hard limit
         self.soft_token_limit = soft_token_limit  # Soft limit
@@ -66,7 +64,6 @@ class MarkdownChunker:
             min_chunk_size=self.min_chunk_size,
             max_tokens=self.max_tokens,
             output_dir=self.output_dir,
-            input_filename=self.input_filename,
             save=save,
         )
 
@@ -88,7 +85,7 @@ class MarkdownChunker:
         self.inline_code_pattern = re.compile(r"`([^`\n]+)`")
 
     @base_error_handler
-    def load_data(self, input_filename: str | None) -> dict[str, Any]:
+    def load_data(self, input_filename: str ) -> dict[str, Any]:
         """
         Load data from a JSON file and return as a dictionary.
 
@@ -102,15 +99,12 @@ class MarkdownChunker:
             FileNotFoundError: If the JSON file is not found.
             json.JSONDecodeError: If the JSON file has invalid content.
         """
-        if not input_filename:
-            input_filepath = os.path.join(RAW_DATA_DIR, self.input_filename)
-        else:
-            input_filepath = os.path.join(RAW_DATA_DIR, input_filename)
+        input_filepath = os.path.join(RAW_DATA_DIR, input_filename)
 
         try:
             with open(input_filepath, encoding="utf-8") as f:
                 doc = json.load(f)
-            logger.info(f"{self.input_filename} loaded")
+            logger.info(f"{input_filename} loaded")
             return doc
         except FileNotFoundError:
             logger.error(f"File not found: {input_filepath}")
@@ -755,7 +749,7 @@ class MarkdownChunker:
         return self.tokenizer.decode(last_n_tokens)
 
     @base_error_handler
-    def save_chunks(self, chunks: list[dict[str, Any]]):
+    def save_chunks(self, chunks: list[dict[str, Any]]) -> str:
         """
         Save the given chunks to a JSON file.
 
@@ -771,6 +765,8 @@ class MarkdownChunker:
         with open(output_filepath, "w", encoding="utf-8") as f:
             json.dump(chunks, f, indent=2)
         logger.info(f"Chunks saved to {output_filepath}")
+
+        return output_filename
 
     @base_error_handler
     def _generate_chunk_id(self) -> uuid.UUID:
@@ -831,15 +827,13 @@ class MarkdownChunkValidator:
         min_chunk_size (int): Minimum size for a valid chunk.
         max_tokens (int): Maximum allowable tokens per chunk.
         output_dir (str): Directory to save output files.
-        input_filename (str): Input file name for reference.
         save (bool): Flag to indicate whether to save incorrect chunks to a file.
     """
 
-    def __init__(self, min_chunk_size, max_tokens, output_dir, input_filename, save: bool = False):
+    def __init__(self, min_chunk_size, max_tokens, output_dir, save: bool = False):
         self.min_chunk_size = min_chunk_size
         self.max_tokens = max_tokens
         self.output_dir = output_dir
-        self.input_filename = input_filename
         self.save = save
         # Validation-related attributes
         self.validation_errors = []
@@ -1062,18 +1056,7 @@ class MarkdownChunkValidator:
         # Store counts for logging summary
         self.incorrect_counts = {"too_small": len(incorrect["too_small"]), "too_large": len(incorrect["too_large"])}
 
-        if any(incorrect.values()):
-
-            if save:
-                base_name = os.path.splitext(self.input_filename)[0]
-                output_filename = f"{base_name}-incorrect-chunks.json"
-                output_filepath = os.path.join(self.output_dir, output_filename)
-                with open(output_filepath, "w", encoding="utf-8") as f:
-                    json.dump(incorrect, f, indent=2, ensure_ascii=False)
-                logger.info(f"Incorrect chunks saved to {output_filepath}")
-            else:
-                pass
-        else:
+        if not any(incorrect.values()):
             logger.info("No incorrect chunks found.")
 
 
@@ -1101,8 +1084,8 @@ def main():
             files_to_chunk.append(filename)
 
     for file in files_to_chunk:
-        markdown_chunker = MarkdownChunker(input_filename=file, save=False)  # save incorrect chunks or not
-        result = markdown_chunker.load_data()
+        markdown_chunker = MarkdownChunker()  # save incorrect chunks or not
+        result = markdown_chunker.load_data(filename=file)
         chunks = markdown_chunker.process_pages(result)
         markdown_chunker.save_chunks(chunks)
         logger.info("Chunking job for " + file + " complete!")

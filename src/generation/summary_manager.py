@@ -278,3 +278,5 @@ class SummaryManager:
 
         # Save updated summaries
         self.save_summaries()
+
+        return summary

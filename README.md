@@ -103,7 +103,7 @@ So do let me know if you are experiencing issues and I'll try to fix them.
      ```
       Set the maximum number of pages you want to crawl:
       ```python
-       crawler.async_crawl_url(urls_to_crawl, page_limit=250)
+       crawler.async_crawl(urls_to_crawl, page_limit=250)
       ```
 
 2. **Chunk FireCrawl parsed docs:**

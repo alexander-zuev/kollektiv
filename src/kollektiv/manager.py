@@ -1,8 +1,11 @@
 import os
+from datetime import time
+from fileinput import filename
 from os import listdir
 from os.path import isfile, join
 
-from src.crawling.crawler import FireCrawler
+from src.crawling.crawler import FireCrawler, CrawlRequest, CrawlJobStatus, CrawlResult
+from src.crawling.exceptions import CrawlerException
 from src.generation.claude_assistant import ClaudeAssistant
 from src.interface.command_handler import CommandHandler
 from src.interface.flow_manager import UserInputManager
@@ -76,7 +79,7 @@ class Kollektiv:
         return self.files
 
     @base_error_handler
-    def initialize(self) -> ClaudeAssistant:
+    async def initialize(self) -> ClaudeAssistant:
         """
         Initializes the components and sets up the ClaudeAssistant.
 
@@ -99,7 +102,7 @@ class Kollektiv:
         reader = DocumentProcessor()
         for file in docs_to_load:
             documents = reader.load_json(file)
-            self.vector_db.add_documents(documents, file)
+            await self.vector_db.add_documents(documents, file)
 
         claude_assistant.update_system_prompt(self.summarizer.get_all_summaries())
 
@@ -110,25 +113,70 @@ class Kollektiv:
         logger.info("Components initialized successfully.")
         return claude_assistant
 
-    # TODO: abstract CrawlInputs and CrawlOutputs
-    async def crawl(self, crawl_inputs: dict) -> str:
+    @staticmethod
+    def _get_crawl_message(crawl_result: CrawlResult) -> str:
+        if crawl_result.job_status == CrawlJobStatus.COMPLETED:
+            message = f"""
+            ✅ Crawl completed successfully!\n
+            Extracted results from {len(crawl_result.data)} pages, starting from {crawl_result.url} in 
+            {crawl_result.time_taken:.2f} seconds.\n
+            """
+            return message
+        elif crawl_result.job_status == CrawlJobStatus.FAILED:
+            message = f"""
+            ❌ Crawl request failed! Please try again."""
+            return message
+        else:
+            return "Unknown error occurred, please try again."
+
+    async def handle_crawl(self, crawl_inputs: dict) -> tuple[CrawlRequest, str] | tuple[None, Exception]:
         """Crawls the url provided by the user and returns filename"""
-        url = crawl_inputs["url"]
-        num_pages = crawl_inputs["num_pages"]
-        exclude_patterns = crawl_inputs["exclude_patterns"] or []
+        crawl_request = CrawlRequest(url=crawl_inputs['url'],
+                                     page_limit=crawl_inputs['num_pages'],
+                                     exclude_patterns=crawl_inputs['exclude_patterns'])
 
-        logger.info(
-            f"Adding document from URL: {url} with max pages: {num_pages} and exclude patterns:" f" {exclude_patterns}"
-        )
+        try:
+            crawl_result = await self.crawler.async_crawl(crawl_request)
+            logger.info("Crawling complete.")
 
-        crawl_results = await self.crawler.async_crawl_url
+            success_message = f"""
+            ✅ Crawl completed successfully!\n
+            Extracted results from {len(crawl_result.data)} pages, starting from {crawl_result.url} in 
+            {crawl_result.time_taken:.2f} seconds.\n
+            """
+            return crawl_result, success_message
 
-    def chunk(self, filename: str) -> str:
+        except CrawlerException as e:
+            logger.error(f"A crawling error occured: {e}")
+            return None, e
+        except Exception as e:
+            logger.error(f"An unhandled error occured: {e}")
+            raise
+
+
+
+    async def prepare_chunks(self, crawl_results: CrawlResult) -> tuple[str, str]:
         """Conducts chunking and returns the filename of the chunked file."""
-        pass
+        try:
+            result = self.chunker.load_data(filename=crawl_results.filename)
+            chunks = self.chunker.process_pages(result)
+            chunk_filename = self.chunker.save_chunks(chunks)
+            message = """
+            ✅Chunking completed successfully!\n"""
+            return chunk_filename, message
+        except Exception as e:
+            logger.error(f"An unhandled error occurred: {e}")
+            raise
 
-    def store_new_documents(self, filename) -> str:
-        pass
+    async def embed_and_store(self, filename) -> str:
+        try:
+            vector_db_reader = DocumentProcessor()
+            docs = vector_db_reader.load_json(filename)
+            await self.vector_db.add_documents(docs, filename)
+            summary = ""
+        except Exception as e:
+            logger.error(f"An unhandled error occured: {e}")
+            raise
 
     def extract_file_summary(self, filename: str) -> str:
         """Generates summary of the added file"""
@@ -140,8 +188,18 @@ class Kollektiv:
         logger.info("Starting indexing of new content. This might take a while")
 
         # Step 1 - Get crawl results
-        crawl_results = await self.crawl(crawl_inputs)
-        pass
+        crawl_results, message = await self.handle_crawl(crawl_inputs)
+        yield message
+
+        # TODO: implement custom exception classes for crawler exceptions
+        # Step 2 - Chunk the crawling results
+        chunks_filename, message = await self.prepare_chunks(crawl_results)
+        yield message
+
+        # Step 3 - Embed and store them
+        summary, message = await self.embed_and_store(chunks_filename)
+
+        # Step 4 - Inform the user on the results.
 
     def remove_document(self, doc_id: str) -> str:
         """Removes documents that were parsed."""
