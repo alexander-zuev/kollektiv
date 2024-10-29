@@ -6,20 +6,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 # Environment
 class Environment(str, Enum):
     LOCAL = "local"
     STAGING = "staging"
     PRODUCTION = "production"
 
-ENVIRONMENT: Final = Environment(
-    os.getenv("ENVIRONMENT", Environment.LOCAL))
+
+ENVIRONMENT: Final = Environment(os.getenv("ENVIRONMENT", Environment.LOCAL))
 
 # Base URLs
 BASE_URL = {
     Environment.LOCAL: "http://localhost:8000",
     Environment.STAGING: "https://staging.yourdomain.com",
-    Environment.PRODUCTION: "https://yourdomain.com"
+    Environment.PRODUCTION: "https://yourdomain.com",
 }[ENVIRONMENT]
 
 # FireCrawl Configuration
@@ -33,8 +34,12 @@ DEFAULT_PAGE_LIMIT: Final = 25
 DEFAULT_MAX_DEPTH: Final = 5
 
 # Webhook Configuration
-WEBHOOK_PATH: Final = "/api/webhook"
-WEBHOOK_URL: Final = f"{BASE_URL}{WEBHOOK_PATH}"
+WEBHOOK_PATH: Final = "/webhook"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+# Fallback to local URL if not set
+if not WEBHOOK_URL:
+    WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 
 # API Keys
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
@@ -70,3 +75,11 @@ os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 os.makedirs(VECTOR_STORAGE_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
+
+
+class Config:
+    """Configuration settings for the application.
+
+    This class manages all configuration settings and environment variables
+    used throughout the application.
+    """

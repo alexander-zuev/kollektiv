@@ -85,7 +85,7 @@ class MarkdownChunker:
         self.inline_code_pattern = re.compile(r"`([^`\n]+)`")
 
     @base_error_handler
-    def load_data(self, input_filename: str ) -> dict[str, Any]:
+    def load_data(self, input_filename: str) -> dict[str, Any]:
         """
         Load data from a JSON file and return as a dictionary.
 

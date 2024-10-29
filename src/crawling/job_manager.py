@@ -1,120 +1,97 @@
 # job_manager.py
-from pathlib import Path
 import json
-from typing import Optional
+from datetime import datetime, timezone
+from pathlib import Path
 
 import aiofiles
 
 from src.crawling.exceptions import JobNotFoundException
-from src.crawling.models import CrawlJob, CrawlJobStatus, WebhookEvent, WebhookEventType
+from src.crawling.models import CrawlJob, CrawlJobStatus
+from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
 
 logger = get_logger()
 
+
 class JobManager:
-    """Manages crawl job lifecycle"""
+    """Manages crawl job lifecycle and storage.
+
+    This class handles the creation, retrieval, and updating of crawl jobs,
+    including their persistence to storage.
+
+    Args:
+        storage_dir (str): Directory path for storing job data.
+
+    Attributes:
+        storage_dir (Path): Path object for the storage directory.
+        jobs_file (Path): Path object for the jobs JSON file.
+    """
 
     def __init__(self, storage_dir: str):
         self.storage_dir = Path(storage_dir)
         self.jobs_file = self.storage_dir / "jobs.json"
         self._ensure_storage()
 
-    def _ensure_storage(self):
-        """Ensure storage directory exists"""
+    def _ensure_storage(self) -> None:
+        """Ensure storage directory exists and initialize jobs file if needed."""
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         if not self.jobs_file.exists():
             self.jobs_file.write_text("{}")
 
+    @base_error_handler
     async def create_job(self, firecrawl_id: str, start_url: str) -> CrawlJob:
         """Create new job"""
-        job = CrawlJob(
-            firecrawl_id=firecrawl_id,
-            start_url=start_url,
-            status=CrawlJobStatus.PENDING
-        )
-        #TODO: Refactor to use FileManager
+        job = CrawlJob(firecrawl_id=firecrawl_id, start_url=start_url, status=CrawlJobStatus.PENDING)
         await self._save_job(job)
         return job
 
-    async def get_job(self, job_id: str) -> Optional[CrawlJob]:
+    @base_error_handler
+    async def get_job(self, job_id: str) -> CrawlJob:
         """Get job by ID"""
-        #TODO: refacotor to use FileManager
         jobs = await self._load_jobs()
         job_data = jobs.get(job_id)
-        return CrawlJob(**job_data) if job_data else None
+        if not job_data:
+            raise JobNotFoundException(job_id)
+        return CrawlJob(**job_data)
 
+    @base_error_handler
     async def update_job(self, job: CrawlJob) -> None:
         """Update job state"""
         await self._save_job(job)
 
+    @base_error_handler
     async def _save_job(self, job: CrawlJob) -> None:
-        """Save job with proper async IO"""
+        """Save job with basic validation.
+
+        Args:
+            job (CrawlJob): The job to save.
+        """
         jobs = await self._load_jobs()
-        job_data = job.model_dump(mode='json')
-        jobs[job.id] = job_data
-        async with aiofiles.open(self.jobs_file, 'w') as f:
+        jobs[job.id] = job.model_dump(mode="json")
+        async with aiofiles.open(self.jobs_file, "w") as f:
             await f.write(json.dumps(jobs, indent=2))
+        logger.debug(f"Saved job {job.id} with status {job.status}")
 
-
-    #TODO: refactor to use FileManager
+    @base_error_handler
     async def _load_jobs(self) -> dict:
-        """Load jobs from storage"""
+        """Load jobs from storage.
+
+        Returns:
+            dict: Dictionary of jobs keyed by job ID.
+        """
         try:
-            json_data = self.jobs_file.read_text()
-            return json.loads(json_data)
+            async with aiofiles.open(self.jobs_file) as f:
+                content = await f.read()
+                return json.loads(content)
         except Exception as e:
+            logger.error(f"Error loading jobs: {e}")
             return {}
 
-
-    async def start_job(self, job_id: str):
-        """Update job status to IN_PROGRESS when the job starts."""
-        job = await self.get_job(job_id)
-        job.status = CrawlJobStatus.IN_PROGRESS
-        await self.update_job(job)
-
-    async def update_job_progress(self, job_id: str, progress_percentage: float):
-        """Update job progress while it is in progress."""
-        job = await self.get_job(job_id)
-        job.status = CrawlJobStatus.IN_PROGRESS
-        job.progress_percentage = progress_percentage
-        await self.update_job(job)
-
-    async def complete_job(self, job_id: str, result_data):
-        """Complete the job and save final results."""
-        job = await self.get_job(job_id)
-        job.status = CrawlJobStatus.COMPLETED
-        job.result_data = result_data
-        await self.update_job(job)
-
-    async def fail_job(self, job_id: str, error_message: str):
-        """Fail the job and log an error message."""
-        job = await self.get_job(job_id)
-        job.status = CrawlJobStatus.FAILED
-        job.error = error_message
-        await self.update_job(job)
-
-    # TODO: consider if this belongs here? Why JobManage handles events?
-    async def handle_webhook_event(self, event: WebhookEvent) -> CrawlJob:
-        """Handle webhook with validation"""
-        if not event.success:
-            logger.error(f"Webhook event failed: {event.error}")
-
-        job = await self.get_job(event.jobId)
-        if not job:
-            raise JobNotFoundException(f"Job {event.jobId} not found")
-
-        match event.type:
-            case WebhookEventType.STARTED:
-                job.mark_started()
-
-            case WebhookEventType.PAGE_CRAWLED:
-                job.update_progress(event.completed, event.total)
-
-            case WebhookEventType.COMPLETED:
-                job.mark_completed(None)  # Result file set later
-
-            case WebhookEventType.FAILED:
-                job.mark_failed(event.error)
-
-        await self.update_job(job)
-        return job
+    @base_error_handler
+    async def get_job_by_firecrawl_id(self, firecrawl_id: str) -> CrawlJob:
+        """Get job by FireCrawl ID"""
+        jobs = await self._load_jobs()
+        for job_data in jobs.values():
+            if job_data["firecrawl_id"] == firecrawl_id:
+                return CrawlJob(**job_data)
+        raise JobNotFoundException(f"No job found for FireCrawl ID: {firecrawl_id}")

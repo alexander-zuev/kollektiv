@@ -3,8 +3,9 @@ from datetime import time
 from fileinput import filename
 from os import listdir
 from os.path import isfile, join
+from pathlib import Path
 
-from src.crawling.crawler import FireCrawler, CrawlRequest, CrawlJobStatus, CrawlResult
+from src.crawling.crawler import CrawlJobStatus, CrawlRequest, CrawlResult, FireCrawlAPIError, FireCrawler
 from src.crawling.exceptions import CrawlerException
 from src.generation.claude_assistant import ClaudeAssistant
 from src.interface.command_handler import CommandHandler
@@ -118,7 +119,7 @@ class Kollektiv:
         if crawl_result.job_status == CrawlJobStatus.COMPLETED:
             message = f"""
             ✅ Crawl completed successfully!\n
-            Extracted results from {len(crawl_result.data)} pages, starting from {crawl_result.url} in 
+            Extracted results from {len(crawl_result.data)} pages, starting from {crawl_result.url} in
             {crawl_result.time_taken:.2f} seconds.\n
             """
             return message
@@ -129,31 +130,31 @@ class Kollektiv:
         else:
             return "Unknown error occurred, please try again."
 
-    async def handle_crawl(self, crawl_inputs: dict) -> tuple[CrawlRequest, str] | tuple[None, Exception]:
+    async def handle_crawl(self, crawl_inputs: dict) -> tuple[CrawlResult, str]:
         """Crawls the url provided by the user and returns filename"""
-        crawl_request = CrawlRequest(url=crawl_inputs['url'],
-                                     page_limit=crawl_inputs['num_pages'],
-                                     exclude_patterns=crawl_inputs['exclude_patterns'])
+        crawl_request = CrawlRequest(
+            url=crawl_inputs["url"],
+            page_limit=crawl_inputs["num_pages"],
+            exclude_patterns=crawl_inputs["exclude_patterns"],
+        )
 
         try:
-            crawl_result = await self.crawler.async_crawl(crawl_request)
-            logger.info("Crawling complete.")
+            job = await self.crawler.crawl(crawl_request)
+            logger.info("Crawl job started successfully.")
 
             success_message = f"""
-            ✅ Crawl completed successfully!\n
-            Extracted results from {len(crawl_result.data)} pages, starting from {crawl_result.url} in 
-            {crawl_result.time_taken:.2f} seconds.\n
+            ✅ Crawl job started successfully!\n
+            Job ID: {job.id}\n
+            Progress will be tracked via webhooks.\n
             """
-            return crawl_result, success_message
+            return job, success_message
 
-        except CrawlerException as e:
-            logger.error(f"A crawling error occured: {e}")
-            return None, e
-        except Exception as e:
-            logger.error(f"An unhandled error occured: {e}")
+        except FireCrawlAPIError as e:
+            logger.error(f"API error occurred: {e}")
             raise
-
-
+        except Exception as e:
+            logger.error(f"An unhandled error occurred: {e}")
+            raise
 
     async def prepare_chunks(self, crawl_results: CrawlResult) -> tuple[str, str]:
         """Conducts chunking and returns the filename of the chunked file."""
@@ -260,3 +261,11 @@ class Kollektiv:
 
         logger.info("Kollektiv system setup completed.")
         return message_handler
+
+    async def process_file(self, filename: str) -> None:
+        """Process the given file and generate summaries.
+
+        Args:
+            filename (str): The name of the file to process.
+        """
+        # ... rest of the method

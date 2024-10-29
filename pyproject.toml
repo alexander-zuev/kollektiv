@@ -31,6 +31,7 @@ wandb = "^0.18.3"
 ragas = "^0.2.0"
 chainlit = "^1.2.0"
 flake8-docstrings = "^1.7.0"
+uvicorn = ">=0.25.0,<0.26.0"
 
 
 [tool.black]
@@ -70,6 +71,7 @@ source = ["src"]
 [tool.poetry.scripts]
 kollektiv = "python app.py"
 chunker = "python src/processing/chunking.py"
+crawler = "src.crawling.crawler:run_crawler"
 
 
 [tool.coverage.report]
