@@ -4,39 +4,39 @@
 # TODO: Provide more informative progress updates to the user during crawling (e.g., percentage completion).
 # TODO: Notify users only in case of critical errors or if no valid content is found after crawling.
 import asyncio
-import json
-import os
-import re
 import time
-import uuid
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any
-from urllib.parse import urlparse
-from uuid import uuid4
 
-import aiofiles
 import requests
-
-from src.crawling.exceptions import JobNotCompletedError
-from src.crawling.file_manager import FileManager
-from src.crawling.job_manager import JobManager
-from src.crawling.models import *
 from firecrawl import FirecrawlApp
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import HttpUrl
 from requests.exceptions import HTTPError, RequestException
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from src.crawling.exceptions import EmptyContentError, FireCrawlAPIError, FireCrawlConnectionError, JobNotCompletedError
+from src.crawling.file_manager import FileManager
+from src.crawling.job_manager import JobManager
+from src.crawling.models import (
+    CrawlData,
+    CrawlJob,
+    CrawlJobStatus,
+    CrawlRequest,
+    CrawlResult,
+    WebhookEvent,
+    WebhookEventType,
+)
 from src.utils.config import (
+    BACKOFF_FACTOR,
+    ENVIRONMENT,
     FIRECRAWL_API_KEY,
     FIRECRAWL_API_URL,
-    RAW_DATA_DIR,
     JOB_FILE_DIR,
     MAX_RETRIES,
-    BACKOFF_FACTOR,
-    WEBHOOK_URL, ENVIRONMENT, Environment,
+    RAW_DATA_DIR,
+    WEBHOOK_URL,
 )
-from src.utils.decorators import base_error_handler, application_level_handler
+from src.utils.decorators import base_error_handler
 from src.utils.logger import configure_logging, get_logger
 
 logger = get_logger()
@@ -45,16 +45,36 @@ logger = get_logger()
 class FireCrawler:
     """
     A class for crawling and mapping URLs using the Firecrawl API.
+
+    This class handles the interaction with the FireCrawl API, managing crawl jobs,
+    and processing crawl results.
+
+    Args:
+        job_manager (JobManager): Manager for handling crawl job lifecycle.
+        file_manager (FileManager): Manager for handling file operations.
+        api_key (str, optional): FireCrawl API key. Defaults to FIRECRAWL_API_KEY.
+        api_url (str, optional): FireCrawl API URL. Defaults to FIRECRAWL_API_URL.
+        data_dir (str, optional): Directory for raw data. Defaults to RAW_DATA_DIR.
+        jobs_dir (str, optional): Directory for job files. Defaults to JOB_FILE_DIR.
+
+    Attributes:
+        api_key (str): The FireCrawl API key.
+        api_url (str): The FireCrawl API base URL.
+        raw_data_dir (str): Directory for storing raw crawl data.
+        jobs_dir (str): Directory for storing job information.
+        job_manager (JobManager): Manager for job operations.
+        file_manager (FileManager): Manager for file operations.
+        firecrawl_app (FirecrawlApp): Instance of FireCrawl API client.
     """
 
     def __init__(
         self,
-            job_manager: JobManager,
-            file_manager: FileManager,
-            api_key: str = FIRECRAWL_API_KEY,
-            api_url: str = FIRECRAWL_API_URL,
-            data_dir: str = RAW_DATA_DIR,
-            jobs_dir: str = JOB_FILE_DIR
+        job_manager: JobManager,
+        file_manager: FileManager,
+        api_key: str = FIRECRAWL_API_KEY,
+        api_url: str = FIRECRAWL_API_URL,
+        data_dir: str = RAW_DATA_DIR,
+        jobs_dir: str = JOB_FILE_DIR,
     ) -> None:
         self.api_key: str = api_key
         self.api_url = api_url
@@ -96,13 +116,7 @@ class FireCrawler:
 
         logger.info(f"Total number of links received: {total_links}")
 
-        result = {
-            "status": "success",
-            "input_url": url,
-            "total_links": total_links,
-            "links": links,
-            'method' : 'map'
-        }
+        result = {"status": "success", "input_url": url, "total_links": total_links, "links": links, "method": "map"}
 
         filename = await self.file_manager.save_result(result)
         return filename
@@ -117,16 +131,16 @@ class FireCrawler:
 
     def _build_params(self, request: CrawlRequest) -> dict[str, Any]:
         """Returns complied firecrawl params based on the raw CrawlRequest."""
-        params =  {
-        "limit": request.page_limit,
-        "maxDepth": request.max_depth if request.max_depth else 5,
-        "includePaths": request.include_patterns if request.include_patterns else [],
-        "excludePaths": request.exclude_patterns if request.exclude_patterns else [],
-        "scrapeOptions": {
-            "formats": ["markdown"],
-            "excludeTags": ["img"],
-        },
-    }
+        params = {
+            "limit": request.page_limit,
+            "maxDepth": request.max_depth if request.max_depth else 5,
+            "includePaths": request.include_patterns if request.include_patterns else [],
+            "excludePaths": request.exclude_patterns if request.exclude_patterns else [],
+            "scrapeOptions": {
+                "formats": ["markdown"],
+                "excludeTags": ["img"],
+            },
+        }
         if not request.webhook_url:
             # Use default webhook URL if none provided
             params["webhook"] = WEBHOOK_URL
@@ -134,56 +148,71 @@ class FireCrawler:
         return params
 
     @retry(
-        stop=stop_after_attempt(3),
-        retry=retry_if_exception_type(HTTPError),
+        stop=stop_after_attempt(MAX_RETRIES),
+        retry=retry_if_exception_type((HTTPError, FireCrawlConnectionError)),
         wait=wait_exponential(multiplier=1, min=30, max=300),
         before_sleep=lambda retry_state: logger.info(
             f"Retryable error occurred. Retrying in {retry_state.next_action.sleep} seconds..."
         ),
     )
     async def start_crawl(self, request: CrawlRequest) -> CrawlJob:
-        """Start new crawl job"""
-        # Build params with webhook
-        params = self._build_params(request)
-        if request.webhook_url:
-            params["webhook"] = str(request.webhook_url)
+        """Start a new crawl job with webhook configuration."""
+        try:
+            params = self._build_params(request)
 
-        logger.debug(f"Crawl params: {params}")
+            # Ensure webhook URL is set
+            if not params.get("webhook"):
+                params["webhook"] = WEBHOOK_URL
 
-        # Start FireCrawl job
-        response = self.firecrawl_app.async_crawl_url(
-            str(request.url),
-            params
-        )
-        logger.info(f"Received response from FireCrawl: {response}")
+            logger.debug(f"Starting crawl with params: {params}")
 
-        # Create tracked job
-        job = await self.job_manager.create_job(
-            firecrawl_id=response["id"],
-            start_url=request.url
-        )
-        logger.info(f"Created job: {job.id} with start url: {job.start_url} and firecrawl id: {job.firecrawl_id}")
+            # Start FireCrawl job
+            response = self.firecrawl_app.async_crawl_url(str(request.url), params)
+            logger.info(f"Received response from FireCrawl: {response}")
 
-        return job
+            # Create tracked job
+            job = await self.job_manager.create_job(firecrawl_id=response["id"], start_url=request.url)
+
+            return job
+
+        except HTTPError as err:
+            if err.response.status_code == 429:
+                raise FireCrawlAPIError("Rate limit exceeded") from err
+            elif err.response.status_code >= 500:
+                raise FireCrawlConnectionError(f"FireCrawl API error: {err}") from err
+            raise FireCrawlAPIError(f"FireCrawl API error: {err}") from err
+        except RequestException as err:
+            raise FireCrawlConnectionError(f"Connection error: {err}") from err
 
     @base_error_handler
     async def get_results(self, job_id: str) -> CrawlResult:
-        """Get final results for completed job"""
+        """Get final results for a completed job."""
         job = await self.job_manager.get_job(job_id)
         if not job or job.status != CrawlJobStatus.COMPLETED:
             raise JobNotCompletedError(f"Job {job_id} not complete")
 
+        # Get the crawl data
         crawl_data = await self._accumulate_crawl_results(job.firecrawl_id)
+
+        # Extract unique URLs from metadata
+        unique_links = set()
+        for page in crawl_data.data:
+            metadata = page.get("metadata", {})
+            # Add og:url if present
+            if og_url := metadata.get("og:url"):
+                unique_links.add(og_url)
+
+        # Create result with proper structure
         result = CrawlResult(
             job_status=job.status,
             input_url=str(job.start_url),
-            total_pages=len(crawl_data),
-            data=crawl_data
+            total_pages=len(crawl_data.data),
+            unique_links=list(unique_links),  # Convert set to list
+            data=crawl_data,
+            completed_at=datetime.now(timezone.utc),
+            method=job.method,
         )
 
-        filename = await self.file_manager.save_result(result)
-        job.result_file = filename
-        await self.job_manager.update_job(job)
         return result
 
     @base_error_handler
@@ -198,16 +227,20 @@ class FireCrawler:
             CrawlData:  CrawlData object containing the accumulated crawl results.
         """
         next_url = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
-        crawl_data = CrawlData(data=[])
+        crawl_data = []
 
         while next_url:
             logger.info("Accumulating job results.")
             batch_data, next_url = await self._fetch_results_from_url(next_url)
-            crawl_data.data.extend(batch_data["data"])
+            crawl_data.extend(batch_data["data"])
+
+        if not crawl_data:
+            logger.error(f"No data accumulated for job {job_id}")
+            raise EmptyContentError(f"No content found for job {job_id}")
 
         logger.info("No more pages to fetch. Returning results")
 
-        return crawl_data
+        return CrawlData(data=crawl_data)
 
     @base_error_handler
     async def _fetch_results_from_url(self, next_url: HttpUrl) -> tuple[dict[str, Any], str | None]:
@@ -265,81 +298,33 @@ class FireCrawler:
         logger.error("Failed to fetch results after maximum retries or received error responses.")
         return {"data": []}, None
 
-    # TODO: refactor to use FileManager
     @base_error_handler
-    async def save_result(self, result: CrawlResult) -> str:
+    async def crawl(self, request: CrawlRequest) -> CrawlJob:
         """
-        Save results to a JSON file.
+        Start a crawl job. Webhook URL is configured via environment.
 
         Args:
-            result (CrawlResult): The CrawlResult object to save.
+            request (CrawlRequest): The crawl request configuration
 
         Returns:
-            filename: str
+            CrawlJob: The created crawl job
 
         Raises:
-            OSError: If there is an issue writing to the file.
+            FireCrawlAPIError: For API-related errors
+            FireCrawlConnectionError: For connection issues
         """
-        filename = self._create_file_name(result.input_url, result.method)
-        filepath = os.path.join(self.raw_data_dir, filename)
-
-        async with aiofiles.open(filepath, 'w') as f:
-            await f.write(result.model_dump_json(indent=2))
-        return filepath
-
-    @base_error_handler
-    def _create_file_name(self, url: HttpUrl, method: str) -> str:
-        """
-        Generate a file name based on the URL and HTTP method.
-
-        Args:
-            url (HttpUrl): The URL to be parsed.
-            method (str): The HTTP method used (e.g., 'GET', 'POST').
-
-        Returns:
-            str: A file name string derived from the URL and current timestamp.
-
-        Raises:
-            ValueError: If the URL is invalid.
-        """
-        parsed_url = urlparse(url)
-        bare_url = parsed_url.netloc + parsed_url.path.rstrip("/")
-        bare_url = re.sub(r"[^\w\-]", "_", bare_url)  # Replace non-word chars with underscore
-        timestamp = self._get_timestamp()
-        return f"{bare_url}_{timestamp}.json"
-
-
-    @base_error_handler
-    async def run_crawl_locally(self, request: CrawlRequest):
-        """Run crawler with local polling"""
-
-        # Create crawl request
-        request = request
-
-        logger.info(f"Running in {ENVIRONMENT} environment")
-        logger.info(f"Using webhook URL: {request.webhook_url or 'None (polling mode)'}")
+        logger.info(f"Starting crawl of {request.url} in {ENVIRONMENT} environment")
+        logger.info(f"Using webhook URL: {WEBHOOK_URL}")
 
         try:
-            # Start crawl
-            start_time = datetime.now()
-            logger.info(f"Starting crawl of {request.url}")
-
             job = await self.start_crawl(request)
             logger.info(f"Created job {job.id}")
+            return job
 
-
-            # Get results
-            result = await self.get_results(job.id)
-            end_time = datetime.now()
-
-            # Log results
-            logger.info(f"Crawl completed in {end_time - start_time}")
-            logger.info(f"Pages crawled: {result.total_pages}")
-            logger.info(f"Results saved to: {result.filename}")
-
-        except Exception as e:
+        except (FireCrawlAPIError, FireCrawlConnectionError) as e:
             logger.error(f"Crawl failed: {str(e)}")
             raise
+
 
 async def initialize_components():
     """Initialize required components"""
@@ -351,31 +336,74 @@ async def initialize_components():
         file_manager=file_manager,
         api_key=FIRECRAWL_API_KEY,
         data_dir=RAW_DATA_DIR,
-        jobs_dir=JOB_FILE_DIR
+        jobs_dir=JOB_FILE_DIR,
     )
     return crawler, job_manager
 
 
-
 async def main():
-    crawler, job_manager = await initialize_components()
+    """Test crawler functionality locally"""
+    logger.info("Starting local crawler test")
 
-    # Create crawl request
-    request = CrawlRequest(
-        url="https://docs.anthropic.com/en/",
-        page_limit=1,
-        exclude_patterns=["/blog/*"],
-        include_patterns=["/docs/*"],
-        # Use webhook URL based on environment
-        webhook_url=WEBHOOK_URL if ENVIRONMENT != Environment.LOCAL else None
-    )
+    try:
+        # 1. Initialize components properly
+        crawler, job_manager = await initialize_components()
 
-    await crawler.run_crawl_locally(request)
+        # 2. Create test crawl request
+        request = CrawlRequest(
+            url="https://docs.anthropic.com/en/docs/welcome",
+            page_limit=5,  # Small limit for testing
+            exclude_patterns=["/blog/*"],
+        )
+
+        # 3. Start crawl
+        logger.info(f"Starting crawl of {request.url}")
+        job = await crawler.crawl(request)
+        logger.info(f"Created job {job.id}")
+
+        # 4. Monitor job status
+        while True:
+            job = await job_manager.get_job(job.id)
+            logger.info(f"Job status: {job.status}, Progress: {job.progress_percentage:.1f}%")
+
+            if job.status == CrawlJobStatus.COMPLETED:
+                logger.info("Job completed, fetching results...")
+                try:
+                    # Get results from crawler
+                    result = await crawler.get_results(job.id)
+
+                    # Save results using file manager
+                    filename = await crawler.file_manager.save_result(result)
+
+                    # Update job with result file
+                    job.result_file = filename
+                    await job_manager.update_job(job)
+
+                    logger.info(f"Successfully saved results to {filename}")
+                except Exception as e:
+                    logger.error(f"Failed to fetch or save results: {str(e)}")
+                break
+            elif job.status == CrawlJobStatus.FAILED:
+                logger.error(f"Job failed: {job.error}")
+                break
+
+            await asyncio.sleep(10)
+
+        logger.info(f"Job finished with status: {job.status}")
+
+    except FireCrawlAPIError as e:
+        logger.error(f"API Error: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"Test failed: {str(e)}")
+        raise
+
+
+def run_crawler():
+    """Entry point for the crawler script"""
+    configure_logging(debug=True)
+    asyncio.run(main())
 
 
 if __name__ == "__main__":
-    # Setup logging
-    configure_logging(debug=True)
-
-    # Run crawler
-    asyncio.run(main())
+    run_crawler()

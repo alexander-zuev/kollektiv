@@ -1,10 +1,9 @@
-import os
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, ValidationInfo, field_validator
 
 from src.utils.config import DEFAULT_MAX_DEPTH, DEFAULT_PAGE_LIMIT
 
@@ -33,9 +32,14 @@ class CrawlRequest(BaseModel):
     """
 
     url: HttpUrl = Field(..., description="The starting URL of the crawl request.")
-    page_limit: int = Field(default=DEFAULT_PAGE_LIMIT, gt=0, le=1000, description="Maximum number of pages to crawl. Maxium")
+    page_limit: int = Field(
+        default=DEFAULT_PAGE_LIMIT, gt=0, le=1000, description="Maximum number of pages to crawl. Maxium"
+    )
     max_depth: int = Field(
-        default=DEFAULT_MAX_DEPTH, gt=0, le=10, description="Maximum depth for crawling"  # Move from hardcoded in async_crawl_url
+        default=DEFAULT_MAX_DEPTH,
+        gt=0,
+        le=10,
+        description="Maximum depth for crawling",  # Move from hardcoded in async_crawl_url
     )
     exclude_patterns: list[str] = Field(
         default_factory=list,
@@ -52,10 +56,10 @@ class CrawlRequest(BaseModel):
         "/blog/*, /api/. Delimited by a comma",
     )
     time_taken: float | None = Field(None, description="The time taken to crawl this request end to end.")
-    webhook_url: Optional[HttpUrl] = None  # Optional webhook URL for updates
-
+    webhook_url: HttpUrl | None = None  # Optional webhook URL for updates
 
     @field_validator("url")
+    @classmethod
     def url_must_be_http_url(cls, v):
         """Validates the input URL and converts it to HttpURL"""
         if not v:
@@ -67,6 +71,7 @@ class CrawlRequest(BaseModel):
             raise ValueError("Invalid URL. It should start with 'http://' or 'https://'.") from e
 
     @field_validator("url")
+    @classmethod
     def url_must_end_with_slash(cls, url):
         """Ensures that start URL always with a trailing slash"""
         if not url:
@@ -76,7 +81,6 @@ class CrawlRequest(BaseModel):
         if not url.endswith("/"):
             url += "/"
         return url
-
 
     @field_validator("exclude_patterns", "include_patterns")
     def validate_patterns(cls, v: list[str]) -> list[str]:
@@ -110,35 +114,41 @@ class CrawlRequest(BaseModel):
             patterns.append(f"exclude: {self.exclude_patterns}")
         patterns_str = f", patterns: [{', '.join(patterns)}]" if patterns else ""
 
-        return (f"CrawlRequest(url: {self.url}, "
-                f"page_limit: {self.page_limit}, "
-                f"max_depth: {self.max_depth}"
-                f"{patterns_str})")
+        return (
+            f"CrawlRequest(url: {self.url}, "
+            f"page_limit: {self.page_limit}, "
+            f"max_depth: {self.max_depth}"
+            f"{patterns_str})"
+        )
 
     class Config:
+        """Configuration class for CrawlRequest model."""
+
         arbitrary_types_allowed = True
+
 
 class CrawlData(BaseModel):
     """
-        CrawlData
+    CrawlData
 
-        A class that represents the data structure for crawling page data. This class
-        inherits from BaseModel and is designed to ensure that the data provided
-        conforms to the required structure and constraints.
+    A class that represents the data structure for crawling page data. This class
+    inherits from BaseModel and is designed to ensure that the data provided
+    conforms to the required structure and constraints.
 
-        Attributes:
-            data (list[dict[str, Any]]): List of page data objects from FireCrawl,
-                each containing 'markdown' and 'metadata' keys.
+    Attributes:
+        data (list[dict[str, Any]]): List of page data objects from FireCrawl,
+            each containing 'markdown' and 'metadata' keys.
 
-        Methods:
-            validate_data(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
-                Validates the 'data' field to make sure it meets the specified requirements.
-                Ensures 'data' is not empty, and each item in 'data' is a dictionary
-                containing 'markdown' and 'metadata' keys, with 'markdown' not being None.
+    Methods:
+        validate_data(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            Validates the 'data' field to make sure it meets the specified requirements.
+            Ensures 'data' is not empty, and each item in 'data' is a dictionary
+            containing 'markdown' and 'metadata' keys, with 'markdown' not being None.
     """
 
-    data: list[dict[str, Any]] = Field(..., default_factory=list, description="List of page data objects from "
-                                                                              "FireCrawl")
+    data: list[dict[str, Any]] = Field(
+        ..., default_factory=list, description="List of page data objects from " "FireCrawl"
+    )
 
     @field_validator("data")
     def validate_data(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -176,10 +186,10 @@ class CrawlData(BaseModel):
                 raise ValueError("Markdown must be a non-null string")
         return v
 
-
     def __len__(self):
         """Return the length of the data list."""
         return len(self.data)
+
 
 class CrawlResult(BaseModel):
     """
@@ -203,11 +213,11 @@ class CrawlResult(BaseModel):
         validate_assignment (bool): Validates whenever a field is set. Set to True.
     """
 
-    job_status: 'CrawlJobStatus' = Field(...)
+    job_status: "CrawlJobStatus" = Field(...)
     input_url: str = Field(..., description="The original URL that was crawled")
     total_pages: int = Field(..., ge=0, description="Total number of pages successfully crawled")
     unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")
-    data: CrawlData = Field(..., description="CrawlData object containing a list of objects returned by FireCrawl")
+    data: CrawlData = Field(...)
     completed_at: datetime | None = Field(
         default_factory=lambda: datetime.now(timezone.utc), description="When the crawl job completed"
     )
@@ -215,23 +225,19 @@ class CrawlResult(BaseModel):
     filename: str | None = Field(None, description="Filename of the saved results")
     method: str = Field(default="crawl", description="Firecrawl API method used")
 
-    @field_validator("data")
-    def validate_data_length(cls, v: list[CrawlData], values: dict) -> list[CrawlData]:
-        """Ensure total_pages matches data length"""
-        if len(v) != values.get("total_pages", 0):
-            raise ValueError(f"Data length {len(v)} does not match total_pages {values.get('total_pages')}")
-        return v
+    # @field_validator("data")
+    # def validate_data_length(cls, v: list[CrawlData], values: dict) -> list[CrawlData]:
+    #     """Ensure total_pages matches data length"""
+    #     if len(v) != values.get("total_pages", 0):
+    #         raise ValueError(f"Data length {len(v)} does not match total_pages {values.get('total_pages')}")
+    #     return v
 
     class Config:
-        # Allows converting datetime to ISO format in JSON
+        """Configuration class for CrawlResult model."""
+
         json_encoders = {datetime: lambda v: v.isoformat()}
-
-        # Allows extra fields in input data
         extra = "allow"
-
-        # Validates whenever a field is set
         validate_assignment = True
-
 
 
 # JOBS
@@ -255,10 +261,10 @@ class CrawlJobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-
 # 2. Concrete job object that tracks everything we care about
 class CrawlJob(BaseModel):
     """Track crawl job status and progress"""
+
     id: str = Field(default_factory=lambda: str(uuid4()))
     firecrawl_id: str
     status: CrawlJobStatus
@@ -266,40 +272,77 @@ class CrawlJob(BaseModel):
     method: str = Field(default="crawl")
 
     # Progress tracking
-    total_pages: Optional[int] = None
+    total_pages: int | None = None
     pages_crawled: int = 0
     progress_percentage: float = 0.0
 
     # Timing
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     # Results reference only
-    result_file: Optional[str] = None
-    error: Optional[str] = None
+    result_file: str | None = None
+    error: str | None = None
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat()}
 
+
 # Webhook models
+
 
 class WebhookEventType(str, Enum):
     """FireCrawl webhook event types"""
-    STARTED = "started"  # Crawl started
-    PAGE_CRAWLED = "page_crawled"  # Single page done + data
-    COMPLETED = "completed"  # All done
-    FAILED = "failed"  # Error occurred
+
+    STARTED = "crawl.started"
+    PAGE = "crawl.page"
+    COMPLETED = "crawl.completed"
+    FAILED = "crawl.failed"
 
 
 class WebhookEvent(BaseModel):
-    """FireCrawl webhook event schema"""
-    type: WebhookEventType
-    jobId: str  # Their naming convention
-    success: bool  # Success flag from FireCrawl
-    data: Optional[list[dict]] = None  # Page data (only for page_crawled and completed)
-    error: Optional[str] = None  # Error message if failed
+    """Firecrawl webhook event model.
 
-    # Progress info from FireCrawl status
-    completed: Optional[int] = None  # Pages done
-    total: Optional[int] = None  # Total pages to crawl
+    This class represents webhook events received from the FireCrawl API,
+    including progress updates and completion notifications.
+
+    Attributes:
+        id (str): Unique identifier for the webhook event.
+        type (WebhookEventType): Type of the webhook event.
+        success (bool): Whether the event represents a successful operation.
+        error (str | None): Error message if the event represents a failure.
+        completed (int | None): Number of pages crawled (for page events).
+        total (int | None): Total pages to crawl (for page events).
+    """
+
+    id: str
+    type: WebhookEventType
+    success: bool = True
+    error: str | None = None
+
+    # Progress information for page events
+    completed: int | None = None  # Number of pages crawled
+    total: int | None = None  # Total pages to crawl
+
+    @field_validator("completed", "total")
+    @classmethod
+    def validate_progress(cls, v: int | None, info: ValidationInfo) -> int | None:
+        """Validate progress information for page events.
+
+        Args:
+            v (int | None): The value to validate.
+            info (ValidationInfo): Validation context information.
+
+        Returns:
+            int | None: The validated value.
+
+        Raises:
+            ValueError: If validation fails for page events.
+        """
+        if info.data.get("type") == WebhookEventType.PAGE:
+            if v is None:
+                raise ValueError("Page events must include progress information")
+            if v < 0:
+                raise ValueError("Progress values cannot be negative")
+        return v

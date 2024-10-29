@@ -1,10 +1,11 @@
 import json
-from datetime import datetime
-import aiofiles
 import os
-from typing import Tuple, Any
-from urllib.parse import urlparse
 import re
+from datetime import datetime
+from typing import Any, Tuple
+from urllib.parse import urlparse
+
+import aiofiles
 
 from src.crawling.models import CrawlResult
 
@@ -14,6 +15,7 @@ class FileReference:
         self.filename = None
         self.filepath = None
 
+
 # TODO: refactor to be a common / infra class
 class FileManager:
     def __init__(self, raw_data_dir: str):
@@ -21,18 +23,22 @@ class FileManager:
         os.makedirs(self.raw_data_dir, exist_ok=True)
 
     def _create_filename(self, url: str, method: str) -> str:
+        """Create standardized filename for results"""
         parsed_url = urlparse(url)
         bare_url = parsed_url.netloc + parsed_url.path.rstrip("/")
         bare_url = re.sub(r"[^\w\-]", "_", bare_url)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return f"{bare_url}_{timestamp}.json"
 
-    async def save_result(self, result: CrawlResult | Any) -> str:
+    async def save_result(self, result: CrawlResult) -> str:
         """Save crawl result and return filename"""
         filename = self._create_filename(result.input_url, result.method)
         filepath = os.path.join(self.raw_data_dir, filename)
 
-        async with aiofiles.open(filepath, 'w') as f:
+        # Update result with filename before saving
+        result.filename = filename  # Set the filename in the result
+
+        async with aiofiles.open(filepath, "w") as f:
             await f.write(result.model_dump_json(indent=2))
 
         return filename
