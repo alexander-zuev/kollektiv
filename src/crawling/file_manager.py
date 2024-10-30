@@ -2,7 +2,6 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import Any, Tuple
 from urllib.parse import urlparse
 
 import aiofiles

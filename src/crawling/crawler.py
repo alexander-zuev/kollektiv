@@ -5,7 +5,7 @@
 # TODO: Notify users only in case of critical errors or if no valid content is found after crawling.
 import asyncio
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import requests
@@ -23,8 +23,6 @@ from src.crawling.models import (
     CrawlJobStatus,
     CrawlRequest,
     CrawlResult,
-    WebhookEvent,
-    WebhookEventType,
 )
 from src.utils.config import (
     BACKOFF_FACTOR,
@@ -209,7 +207,7 @@ class FireCrawler:
             total_pages=len(crawl_data.data),
             unique_links=list(unique_links),  # Convert set to list
             data=crawl_data,
-            completed_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(UTC),
             method=job.method,
         )
 
@@ -327,7 +325,7 @@ class FireCrawler:
 
 
 async def initialize_components():
-    """Initialize required components"""
+    """Initialize required components."""
     job_manager = JobManager(JOB_FILE_DIR)
     file_manager = FileManager(RAW_DATA_DIR)
 
@@ -342,7 +340,7 @@ async def initialize_components():
 
 
 async def main():
-    """Test crawler functionality locally"""
+    """Test crawler functionality locally."""
     logger.info("Starting local crawler test")
 
     try:
@@ -400,7 +398,7 @@ async def main():
 
 
 def run_crawler():
-    """Entry point for the crawler script"""
+    """Entry point for the crawler script."""
     configure_logging(debug=True)
     asyncio.run(main())
 

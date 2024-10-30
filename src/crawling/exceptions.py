@@ -1,6 +1,3 @@
-from src.crawling.models import CrawlJob
-
-
 class CrawlerException(Exception):
     """Base exception class for the crawler module."""
 

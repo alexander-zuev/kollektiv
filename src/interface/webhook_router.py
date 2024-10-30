@@ -4,7 +4,6 @@ from src.crawling.job_manager import JobManager
 from src.crawling.models import WebhookEvent
 from src.crawling.webhook_handler import WebhookHandler
 from src.utils.config import JOB_FILE_DIR, WEBHOOK_PATH
-from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
 
 logger = get_logger()
@@ -17,7 +16,7 @@ webhook_handler = WebhookHandler(job_manager)
 
 @router.post(WEBHOOK_PATH)
 async def handle_webhook(request: Request):
-    """Handle Firecrawl webhook events"""
+    """Handle Firecrawl webhook events."""
     try:
         data = await request.json()
         logger.debug(f"Received webhook data: {data}")

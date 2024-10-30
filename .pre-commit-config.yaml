@@ -1,45 +1,55 @@
+# Pre-commit configuration for Python project quality checks
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
     -   id: trailing-whitespace
+        description: 'Removes trailing whitespace from all files'
     -   id: check-yaml
+        description: 'Validates YAML syntax'
     -   id: check-ast
+        description: 'Validates Python syntax'
     -   id: check-json
+        description: 'Validates JSON syntax'
     -   id: check-merge-conflict
+        description: 'Checks for merge conflict markers'
     -   id: detect-private-key
--   repo: https://github.com/psf/black
-    rev: 24.10.0
+        description: 'Prevents committing private keys'
+    -   id: end-of-file-fixer
+        description: 'Ensures files end with a newline'
+    -   id: mixed-line-ending
+        description: 'Normalizes line endings'
+        args: ['--fix=lf']
+
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.1
     hooks:
-    -   id: black
-        args: [--safe]
--   repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-    -   id: isort
-        args: [--profile, black]
--   repo: https://github.com/PyCQA/flake8
-    rev: 7.1.1
-    hooks:
-    -   id: flake8
-        additional_dependencies: [flake8-bugbear, flake8-comprehensions, flake8-docstrings]
--   repo: https://github.com/asottile/pyupgrade
-    rev: v3.19.0
-    hooks:
-    -   id: pyupgrade
-        args: [--py312-plus]
+    -   id: ruff
+        description: 'Run Ruff linter with auto-fixes'
+        args: [--fix]
+        types_or: [python, pyi, jupyter]
+    -   id: ruff-format
+        description: 'Run Ruff formatter'
+        types_or: [python, pyi, jupyter]
+
 -   repo: local
     hooks:
     -   id: pytest-check
         name: pytest-check
+        description: 'Run pytest suite'
         entry: pytest
         language: system
         pass_filenames: false
         always_run: true
-    - id: update-project-structure
-      name: update project structure
-      entry: python scripts/generate_structure.py
-      language: system
-      pass_filenames: false
-      always_run: true
-      stages: [ commit ]
+        stages: [commit]
+        # Add verbose output and show test coverage
+        args: ["-v", "--cov=src", "--cov-report=term-missing"]
+
+    -   id: update-project-structure
+        name: update project structure
+        description: 'Updates project structure documentation'
+        entry: python scripts/generate_structure.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
