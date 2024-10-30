@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 from uuid import uuid4
@@ -219,7 +219,7 @@ class CrawlResult(BaseModel):
     unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")
     data: CrawlData = Field(...)
     completed_at: datetime | None = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="When the crawl job completed"
+        default_factory=lambda: datetime.now(UTC), description="When the crawl job completed"
     )
     error_message: str | None = Field(None, description="Error message if the crawl failed")
     filename: str | None = Field(None, description="Filename of the saved results")
@@ -277,7 +277,7 @@ class CrawlJob(BaseModel):
     progress_percentage: float = 0.0
 
     # Timing
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     started_at: datetime | None = None
     completed_at: datetime | None = None
 

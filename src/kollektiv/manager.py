@@ -1,12 +1,7 @@
-import os
-from datetime import time
-from fileinput import filename
 from os import listdir
 from os.path import isfile, join
-from pathlib import Path
 
 from src.crawling.crawler import CrawlJobStatus, CrawlRequest, CrawlResult, FireCrawlAPIError, FireCrawler
-from src.crawling.exceptions import CrawlerException
 from src.generation.claude_assistant import ClaudeAssistant
 from src.interface.command_handler import CommandHandler
 from src.interface.flow_manager import UserInputManager
@@ -124,7 +119,7 @@ class Kollektiv:
             """
             return message
         elif crawl_result.job_status == CrawlJobStatus.FAILED:
-            message = f"""
+            message = """
             ❌ Crawl request failed! Please try again."""
             return message
         else:

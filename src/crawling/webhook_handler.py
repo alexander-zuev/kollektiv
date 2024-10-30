@@ -1,6 +1,6 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from src.crawling.exceptions import InvalidWebhookEventError, JobNotFoundException
+from src.crawling.exceptions import JobNotFoundException
 from src.crawling.job_manager import JobManager
 from src.crawling.models import CrawlJob, CrawlJobStatus, WebhookEvent, WebhookEventType
 from src.utils.decorators import base_error_handler
@@ -60,7 +60,7 @@ class WebhookHandler:
     async def _handle_started(self, job: CrawlJob) -> None:
         """Handle crawl.started event"""
         job.status = CrawlJobStatus.IN_PROGRESS
-        job.started_at = datetime.now(timezone.utc)
+        job.started_at = datetime.now(UTC)
         await self.job_manager.update_job(job)
 
     @base_error_handler
@@ -74,7 +74,7 @@ class WebhookHandler:
     async def _handle_completed(self, job: CrawlJob) -> None:
         """Handle crawl.completed event"""
         job.status = CrawlJobStatus.COMPLETED
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
         job.total_pages = job.pages_crawled  # Set total pages to what we've crawled
         job.progress_percentage = 100.0
         await self.job_manager.update_job(job)
@@ -84,5 +84,5 @@ class WebhookHandler:
         """Handle crawl.failed event"""
         job.status = CrawlJobStatus.FAILED
         job.error = error
-        job.completed_at = datetime.now(timezone.utc)
+        job.completed_at = datetime.now(UTC)
         await self.job_manager.update_job(job)

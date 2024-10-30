@@ -449,7 +449,6 @@ class ClaudeAssistant(Model):
         )
 
         while True:
-
             try:
                 messages = self.conversation_history.get_conversation_history()
                 with self.client.messages.stream(
