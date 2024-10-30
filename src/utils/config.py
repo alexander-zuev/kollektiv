@@ -9,6 +9,8 @@ load_dotenv()
 
 # Environment
 class Environment(str, Enum):
+    """Environment types."""
+
     LOCAL = "local"
     STAGING = "staging"
     PRODUCTION = "production"

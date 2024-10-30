@@ -83,7 +83,7 @@ class CrawlRequest(BaseModel):
         return url
 
     @field_validator("exclude_patterns", "include_patterns")
-    def validate_patterns(cls, v: list[str]) -> list[str]:
+    def validate_patterns(cls, v: list[str]) -> list[str]:  # noqa: N805
         """
 
         Validates patterns to ensure they start with '/' and are not empty.
@@ -128,11 +128,9 @@ class CrawlRequest(BaseModel):
 
 
 class CrawlData(BaseModel):
-    """
-    CrawlData
+    """A class that represents the data structure for crawling page data.
 
-    A class that represents the data structure for crawling page data. This class
-    inherits from BaseModel and is designed to ensure that the data provided
+    This class inherits from BaseModel and is designed to ensure that the data provided
     conforms to the required structure and constraints.
 
     Attributes:
@@ -151,7 +149,7 @@ class CrawlData(BaseModel):
     )
 
     @field_validator("data")
-    def validate_data(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def validate_data(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:  # noqa: N805
         """
 
         Validates the field 'data' for the given class.
@@ -271,21 +269,21 @@ class CrawlJob(BaseModel):
     start_url: str
     method: str = Field(default="crawl")
 
-    # Progress tracking
-    total_pages: int | None = None
+    # Simple progress tracking
     pages_crawled: int = 0
-    progress_percentage: float = 0.0
 
     # Timing
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     started_at: datetime | None = None
     completed_at: datetime | None = None
 
-    # Results reference only
+    # Results
     result_file: str | None = None
     error: str | None = None
 
     class Config:
+        """Configuration class for CrawlJob model."""
+
         json_encoders = {datetime: lambda v: v.isoformat()}
 
 

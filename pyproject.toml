@@ -50,6 +50,8 @@ source = ["src"]
 kollektiv = "python app.py"
 chunker = "python src/processing/chunking.py"
 crawler = "src.crawling.crawler:run_crawler"
+serve = "src.interface.app:run"
+
 
 
 [tool.coverage.report]
@@ -123,6 +125,7 @@ ignore = [
     "D107",  # Missing docstring in __init__
     "E203",  # Whitespace before ':'
     "E266",  # Too many leading '#' for block comment
+    "D415",  # First line should end with a period, question mark, or exclamation point
 
 ]
 

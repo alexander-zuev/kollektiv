@@ -1,3 +1,4 @@
+from collections.abc import AsyncGenerator
 from os import listdir
 from os.path import isfile, join
 
@@ -165,11 +166,13 @@ class Kollektiv:
             raise
 
     async def embed_and_store(self, filename) -> str:
+        """Embed and store the documents in the vector database."""
         try:
             vector_db_reader = DocumentProcessor()
             docs = vector_db_reader.load_json(filename)
             await self.vector_db.add_documents(docs, filename)
             summary = ""
+            return summary
         except Exception as e:
             logger.error(f"An unhandled error occured: {e}")
             raise
@@ -179,7 +182,7 @@ class Kollektiv:
         pass
 
     @base_error_handler
-    async def index_web_content(self, crawl_inputs: dict) -> str:
+    async def index_web_content(self, crawl_inputs: dict) -> AsyncGenerator[str, None]:
         """Orchestrates the document crawling, chunking, embedding, and summarization."""
         logger.info("Starting indexing of new content. This might take a while")
 
@@ -187,7 +190,6 @@ class Kollektiv:
         crawl_results, message = await self.handle_crawl(crawl_inputs)
         yield message
 
-        # TODO: implement custom exception classes for crawler exceptions
         # Step 2 - Chunk the crawling results
         chunks_filename, message = await self.prepare_chunks(crawl_results)
         yield message

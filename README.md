@@ -59,14 +59,14 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 ## 🚀 Quick Start
 
 1. **Clone the repository:**
-   ```
+   ```bash
    git clone https://github.com/Twist333d/kollektiv.git
-   cd rag-docs
+   cd kollektiv
    ```
 
 2. **Set up environment variables:**
    Create a `.env` file in the project root with the following:
-   ```
+   ```bash
    FIRECRAWL_API_KEY="your_firecrawl_api_key"
    OPENAI_API_KEY="your_openai_api_key"
    ANTHROPIC_API_KEY="your_anthropic_api_key"
@@ -74,72 +74,51 @@ So do let me know if you are experiencing issues and I'll try to fix them.
    ```
 
 3. **Install dependencies:**
-   ```
+   ```bash
    poetry install
    ```
 
 4. **Run the application:**
    ```bash
-   poetry run python app.py
-   ```
-   or through a poetry alias:
-   ```bash
-   python app.py
+   chainlit run app.py
    ```
 
 ## 💡 Usage
 
-1. **Crawl Documentation:**
-
-   Update the root url you want to parse. For example:
-     ```python
-     urls_to_crawl = ["https://docs.anthropic.com/en/docs/"]
-     ```
-      Ensure you include the url patterns of sub-pages you want to parse and exclude url patterns of sub-pages you
-   don't want to parse:
-     ```python
-      "includePaths": ["/tutorials/*", "/how-tos/*", "/concepts/*"],
-      "excludePaths": ["/community/*"],
-     ```
-      Set the maximum number of pages you want to crawl:
-      ```python
-       crawler.async_crawl(urls_to_crawl, page_limit=250)
-      ```
-
-2. **Chunk FireCrawl parsed docs:**
-
-   Next step is to chunk all the parsed documents
-   ```python
-   poetry run python -m src.processing.chunking
+1. **Start the Interface:**
+   ```bash
+   chainlit run app.py
    ```
 
-3. **Configure basic parameters:**
+2. **Add Documentation:**
+   ```bash
+   @docs add https://your-docs-url.com
+   ```
+   The system will guide you through:
+   - Setting crawling depth
+   - Adding exclude patterns (optional)
+   - Processing and embedding content
 
-   Set up the following parameters in the `app.py`:
-   1. Whether to load only specified or all processed chunks in`PROCESSED_DATA_DIR`
-   ```python
-    docs = ["docs_anthropic_com_en_20240928_135426-chunked.json"]
-    initializer = ComponentInitializer(reset_db=reset_db, load_all_docs=True, files=[])
+3. **Manage Documents:**
+   ```bash
+   @docs list                  # List all documents
+   @docs remove [ID]          # Remove a document
+   @help                      # Show all commands
    ```
-   2. Whether to reset the database, which will clear all the data in local ChromaDB - use with caution. Defaults to
-      false.
-   ```python
-   if __name__ == "__main__":
-    main(debug=False, reset_db=False)
-   ```
-4. **Chat with documentation:**
-   You can run application via the following command:
-   ```python
-   python app.py
-   ```
+
+4. **Chat with Documentation:**
+   Simply ask questions in natural language. The system will:
+   - Search relevant documentation
+   - Re-rank results for accuracy
+   - Generate contextual responses
 
 ## ❤️‍🩹 Current Limitations
-- Only terminal UI (no Chainlit for now)
-- Image data not supported - ONLY text-based embeddings.
-- No automatic re-indexing of documents
-- Basic chat flow supported
-  - Either RAG tool is used or not
-    - if a tool is used -> retrieves up to 5 most relevant documents (after re-ranking)
+
+- Image content not supported (text-only embeddings)
+- No automatic re-indexing of documentation
+- URL validation limited to common formats
+- Exclude patterns must start with `/`
+- Up to 5 relevant documents retrieved per query
 
 ## 🛣️ Roadmap
 For a brief roadmap please check out [project wiki page](https://github.com/Twist333d/kollektiv/wiki).
