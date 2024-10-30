@@ -1,3 +1,6 @@
+# TODO: Add user-specific session handling so multiple users can interact with the assistant concurrently.
+# TODO: Implement async handling for document indexing, embedding, and summarizing to avoid blocking operations.
+# TODO: Add a queue for managing multiple user requests (e.g., submitting multiple documents).
 from __future__ import annotations
 
 import uuid
@@ -446,7 +449,6 @@ class ClaudeAssistant(Model):
         )
 
         while True:
-
             try:
                 messages = self.conversation_history.get_conversation_history()
                 with self.client.messages.stream(

@@ -13,7 +13,7 @@ def test_markdown_chunker_initialization():
     Raises:
         AssertionError: If any of the assertions fail.
     """
-    chunker = MarkdownChunker(input_filename="test_input.json")
+    chunker = MarkdownChunker()
     assert chunker is not None
     assert chunker.max_tokens == 1000
     assert chunker.soft_token_limit == 800
