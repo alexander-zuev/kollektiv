@@ -323,3 +323,6 @@ internal_docs/
 
 # ignore changelog template
 /CHANGELOG_template.md!/roadmap.md
+
+# Chainlit translations
+.chainlit/translations.codiumai

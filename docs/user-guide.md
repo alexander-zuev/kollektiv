@@ -56,29 +56,10 @@ COHERE_API_KEY="your_cohere_api_key"
 
 ### First-Time Setup
 
-When using Kollektiv for the first time, you'll need to crawl documentation, process it, and set up the vector
-database. Follow these steps:
+When using Kollektiv for the first time:
 
-1. Crawl documentation (see [Crawling Documentation](#crawling-documentation))
-2. Chunk the crawled documents (see [Chunking Documents](#chunking-documents))
-3. Embed and store the chunks (see [Embedding and Storing](#embedding-and-storing))
-4. Run the chat interface (see [Running the Chat Interface](#running-the-chat-interface))
-
-### Adding New Documentation
-
-To add new documentation to an existing Kollektiv setup:
-
-1. Crawl the new documentation
-2. Chunk the new documents
-3. Embed and store the new chunks
-4. Restart the chat interface to include the new information
-
-### Chatting with Existing Documentation
-
-If you've already set up Kollektiv with embedded documentation:
-
-1. Run the chat interface
-2. Start asking questions about the documentation
+1. Configure environment variables (see [Installation](#installation))
+2. Start the web interface:
 
 ## Step-by-Step Guide
 
@@ -94,12 +75,13 @@ python src/crawling/crawler.py
 ```
 
 Example:
+
 ```python
 urls_to_crawl = [
- "https://docs.yourlibrary.com",
- "https://api.anotherlibrary.com"
+    "https://docs.yourlibrary.com",
+    "https://api.anotherlibrary.com"
 ]
-crawler.async_crawl_url(urls_to_crawl, page_limit=100)
+crawler.async_crawl(urls_to_crawl, page_limit=100)
 ```
 This will save the crawled data in the src/data/raw directory.
 
@@ -143,7 +125,7 @@ file_names = [
 for file_name in file_names:
     document_loader = DocumentProcessor(file_name)
     json_data = document_loader.load_json()
-    vector_db.add_documents(json_data, claude_assistant)
+    await vector_db.add_documents(json_data, claude_assistant)
 ```
 This will embed the chunks and store them in the vector database.
 
