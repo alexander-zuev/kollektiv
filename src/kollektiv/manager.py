@@ -3,12 +3,14 @@ from os import listdir
 from os.path import isfile, join
 
 from src.crawling.crawler import CrawlJobStatus, CrawlRequest, CrawlResult, FireCrawlAPIError, FireCrawler
+from src.crawling.file_manager import FileManager
+from src.crawling.job_manager import JobManager
 from src.generation.claude_assistant import ClaudeAssistant
 from src.interface.command_handler import CommandHandler
 from src.interface.flow_manager import UserInputManager
 from src.interface.message_handler import MessageHandler
 from src.processing.chunking import MarkdownChunker
-from src.utils.config import PROCESSED_DATA_DIR
+from src.utils.config import JOB_FILE_DIR, PROCESSED_DATA_DIR, RAW_DATA_DIR
 from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
 from src.vector_storage.vector_db import DocumentProcessor, Reranker, ResultRetriever, SummaryManager, VectorDB
@@ -228,7 +230,9 @@ class Kollektiv:
         docs_to_load = [f for f in listdir(PROCESSED_DATA_DIR) if isfile(join(PROCESSED_DATA_DIR, f))]
 
         # Initialize components
-        crawler = FireCrawler()
+        job_manager = JobManager(storage_dir=JOB_FILE_DIR)
+        file_manager = FileManager(raw_data_dir=RAW_DATA_DIR)
+        crawler = FireCrawler(job_manager=job_manager, file_manager=file_manager)
         chunker = MarkdownChunker()
         vector_db = VectorDB()
         summarizer = SummaryManager()
