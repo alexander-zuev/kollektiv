@@ -56,29 +56,10 @@ COHERE_API_KEY="your_cohere_api_key"
 
 ### First-Time Setup
 
-When using Kollektiv for the first time, you'll need to crawl documentation, process it, and set up the vector
-database. Follow these steps:
+When using Kollektiv for the first time:
 
-1. Crawl documentation (see [Crawling Documentation](#crawling-documentation))
-2. Chunk the crawled documents (see [Chunking Documents](#chunking-documents))
-3. Embed and store the chunks (see [Embedding and Storing](#embedding-and-storing))
-4. Run the chat interface (see [Running the Chat Interface](#running-the-chat-interface))
-
-### Adding New Documentation
-
-To add new documentation to an existing Kollektiv setup:
-
-1. Crawl the new documentation
-2. Chunk the new documents
-3. Embed and store the new chunks
-4. Restart the chat interface to include the new information
-
-### Chatting with Existing Documentation
-
-If you've already set up Kollektiv with embedded documentation:
-
-1. Run the chat interface
-2. Start asking questions about the documentation
+1. Configure environment variables (see [Installation](#installation))
+2. Start the web interface:
 
 ## Step-by-Step Guide
 

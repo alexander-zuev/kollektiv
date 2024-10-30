@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from src.crawling.exceptions import JobNotFoundException
+from src.crawling.exceptions import JobNotFoundError
 from src.crawling.job_manager import JobManager
 from src.crawling.models import CrawlJob, CrawlJobStatus, WebhookEvent, WebhookEventType
 from src.utils.decorators import base_error_handler
@@ -47,7 +47,7 @@ class WebhookHandler:
                     logger.error(f"Crawl failed for job {job.id}: {event.error}")
                     await self._handle_failure(job, event.error or "Unknown error")
 
-        except JobNotFoundException as e:
+        except JobNotFoundError as e:
             logger.error(f"Job not found: {str(e)}")
             raise
         except Exception as e:
@@ -75,8 +75,7 @@ class WebhookHandler:
         """Handle crawl.completed event"""
         job.status = CrawlJobStatus.COMPLETED
         job.completed_at = datetime.now(UTC)
-        job.total_pages = job.pages_crawled  # Set total pages to what we've crawled
-        job.progress_percentage = 100.0
+        job.pages_crawled = job.pages_crawled  # Set total pages to what we've crawled
         await self.job_manager.update_job(job)
 
     @base_error_handler

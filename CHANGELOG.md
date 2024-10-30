@@ -8,45 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Web Interface: Added Chainlit-based web UI for improved user experience
+- Interactive Document Management: Added support for managing documents via web interface
+- Improved Command Handling: Enhanced @docs commands with better validation and feedback
+- URL Validation: Added robust URL validation with support for common formats
+- Pattern Validation: Added validation for exclude patterns in crawling configuration
 
 ### Changed
+- Updated documentation to reflect web interface usage
+- Refactored command handling for better user interaction
+- Improved error messages and user feedback
+- Enhanced help messages with clearer examples
+- Simplified document management workflow
+
+### Fixed
+- Fixed URL validation in document addition process
+- Improved error handling in crawling process
+- Added validation for exclude patterns format
+- Fixed inconsistencies in command documentation
 
 ### Deprecated
 
 ### Removed
-
-### Fixed
 
 ### Security
 
 
 ## [0.1.6] - 2024-10-19
 ### Added
-- 🖥️ Web UI: You can now chat with synced content via web interface. Built using Chainlit.
+- Web UI: You can now chat with synced content via web interface. Built using Chainlit.
 
 ### Under development
-- 🧪 Basic evaluation suite is setup using Weave.
+- Basic evaluation suite is setup using Weave.
 
 ## [0.1.5] - 2024-10-19
 ### Changed
-- 🤖🤖🤖 **Kollektiv** is born - the project was renamed in order to exclude confusion with regards to Anthropic's Claude
+- Kollektiv is born - the project was renamed in order to exclude confusion with regards to Anthropic's Claude
   family of models.
 
 
 ## [0.1.4] - 2024-09-28
 
 ### Added
-- added Anthropic API exception handling
+- Added Anthropic API exception handling
 
 ### Changed
-- updated pre-processing of chunker to remove images due to lack of multi-modal embeddings support
+- Updated pre-processing of chunker to remove images due to lack of multi-modal embeddings support
 
 ### Removed
-- removed redundant QueryGenerator class
+- Removed redundant QueryGenerator class
 
 ### Fixed
-- fixed errors in streaming & non-streaming responses
-
+- Fixed errors in streaming & non-streaming responses
 
 
 ## [0.1.3] - 2024-09-22
@@ -55,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Introduced sliding context window into conversation history based on token counts
 - Added streaming of assistant responses
 
-## Changed
+### Changed
 - Refactored conversation history handling
 - Refactored tool use and response handling
 - Refactored response generation to support both streaming and non-streaming
@@ -78,8 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2024-09-15
 Initial release of Kollektiv (called OmniClaude back then) with the following features:
-  - crawling of documentation with FireCrawl
-  - custom markdown chunking
-  - embedding and storage with ChromaDB
-  - custom retrieval with multi-query expansion and re-ranking
-  - chat with Sonnet 3.5 with rag search tool
+  - Crawling of documentation with FireCrawl
+  - Custom markdown chunking
+  - Embedding and storage with ChromaDB
+  - Custom retrieval with multi-query expansion and re-ranking
+  - Chat with Sonnet 3.5 with rag search tool

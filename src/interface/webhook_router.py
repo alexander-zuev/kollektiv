@@ -29,4 +29,4 @@ async def handle_webhook(request: Request):
 
     except Exception as e:
         logger.error(f"Webhook error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

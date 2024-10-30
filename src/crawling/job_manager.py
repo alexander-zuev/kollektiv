@@ -4,7 +4,7 @@ from pathlib import Path
 
 import aiofiles
 
-from src.crawling.exceptions import JobNotFoundException
+from src.crawling.exceptions import JobNotFoundError
 from src.crawling.models import CrawlJob, CrawlJobStatus
 from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
@@ -39,23 +39,23 @@ class JobManager:
 
     @base_error_handler
     async def create_job(self, firecrawl_id: str, start_url: str) -> CrawlJob:
-        """Create new job"""
+        """Create new job."""
         job = CrawlJob(firecrawl_id=firecrawl_id, start_url=start_url, status=CrawlJobStatus.PENDING)
         await self._save_job(job)
         return job
 
     @base_error_handler
     async def get_job(self, job_id: str) -> CrawlJob:
-        """Get job by ID"""
+        """Get job by ID."""
         jobs = await self._load_jobs()
         job_data = jobs.get(job_id)
         if not job_data:
-            raise JobNotFoundException(job_id)
+            raise JobNotFoundError(job_id)
         return CrawlJob(**job_data)
 
     @base_error_handler
     async def update_job(self, job: CrawlJob) -> None:
-        """Update job state"""
+        """Update job state."""
         await self._save_job(job)
 
     @base_error_handler
@@ -88,9 +88,9 @@ class JobManager:
 
     @base_error_handler
     async def get_job_by_firecrawl_id(self, firecrawl_id: str) -> CrawlJob:
-        """Get job by FireCrawl ID"""
+        """Get job by FireCrawl ID."""
         jobs = await self._load_jobs()
         for job_data in jobs.values():
             if job_data["firecrawl_id"] == firecrawl_id:
                 return CrawlJob(**job_data)
-        raise JobNotFoundException(f"No job found for FireCrawl ID: {firecrawl_id}")
+        raise JobNotFoundError(f"No job found for FireCrawl ID: {firecrawl_id}")

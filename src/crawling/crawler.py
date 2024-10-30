@@ -4,17 +4,28 @@
 # TODO: Provide more informative progress updates to the user during crawling (e.g., percentage completion).
 # TODO: Notify users only in case of critical errors or if no valid content is found after crawling.
 import asyncio
-import time
 from datetime import UTC, datetime
 from typing import Any
 
 import requests
 from firecrawl import FirecrawlApp
 from pydantic import HttpUrl
-from requests.exceptions import HTTPError, RequestException
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from requests.exceptions import HTTPError, RequestException, Timeout
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
-from src.crawling.exceptions import EmptyContentError, FireCrawlAPIError, FireCrawlConnectionError, JobNotCompletedError
+from src.crawling.exceptions import (
+    EmptyContentError,
+    FireCrawlAPIError,
+    FireCrawlConnectionError,
+    FireCrawlTimeoutError,
+    JobNotCompletedError,
+    is_retryable_error,
+)
 from src.crawling.file_manager import FileManager
 from src.crawling.job_manager import JobManager
 from src.crawling.models import (
@@ -25,7 +36,6 @@ from src.crawling.models import (
     CrawlResult,
 )
 from src.utils.config import (
-    BACKOFF_FACTOR,
     ENVIRONMENT,
     FIRECRAWL_API_KEY,
     FIRECRAWL_API_URL,
@@ -119,14 +129,6 @@ class FireCrawler:
         filename = await self.file_manager.save_result(result)
         return filename
 
-    # TODO: refactor into decorator? or exception? Why does it belong here?
-    @staticmethod
-    def is_retryable_error(exception):
-        """Return True if the exception is an HTTPError with a status code we want to retry."""
-        if isinstance(exception, HTTPError):
-            return exception.response.status_code in [429, 500, 502, 503, 504]
-        return False
-
     def _build_params(self, request: CrawlRequest) -> dict[str, Any]:
         """Returns complied firecrawl params based on the raw CrawlRequest."""
         params = {
@@ -147,38 +149,27 @@ class FireCrawler:
 
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
-        retry=retry_if_exception_type((HTTPError, FireCrawlConnectionError)),
+        retry=retry_if_exception_type((HTTPError, FireCrawlConnectionError, FireCrawlTimeoutError)),
         wait=wait_exponential(multiplier=1, min=30, max=300),
-        before_sleep=lambda retry_state: logger.info(
-            f"Retryable error occurred. Retrying in {retry_state.next_action.sleep} seconds..."
+        before_sleep=lambda retry_state: logger.warning(
+            f"Retryable error occurred. Attempt {retry_state.attempt_number}/{MAX_RETRIES}. "
+            f"Retrying in {retry_state.next_action.sleep} seconds..."
         ),
     )
     async def start_crawl(self, request: CrawlRequest) -> CrawlJob:
         """Start a new crawl job with webhook configuration."""
         try:
             params = self._build_params(request)
-
-            # Ensure webhook URL is set
-            if not params.get("webhook"):
-                params["webhook"] = WEBHOOK_URL
-
-            logger.debug(f"Starting crawl with params: {params}")
-
-            # Start FireCrawl job
             response = self.firecrawl_app.async_crawl_url(str(request.url), params)
-            logger.info(f"Received response from FireCrawl: {response}")
-
-            # Create tracked job
             job = await self.job_manager.create_job(firecrawl_id=response["id"], start_url=request.url)
-
             return job
-
         except HTTPError as err:
-            if err.response.status_code == 429:
-                raise FireCrawlAPIError("Rate limit exceeded") from err
-            elif err.response.status_code >= 500:
-                raise FireCrawlConnectionError(f"FireCrawl API error: {err}") from err
-            raise FireCrawlAPIError(f"FireCrawl API error: {err}") from err
+            should_retry, _ = is_retryable_error(err)
+            if should_retry:
+                raise  # Let retry decorator handle it
+            raise FireCrawlAPIError(f"Non-retryable API error: {err}") from err
+        except Timeout as err:
+            raise FireCrawlTimeoutError(f"Request timed out: {err}") from err
         except RequestException as err:
             raise FireCrawlConnectionError(f"Connection error: {err}") from err
 
@@ -240,61 +231,29 @@ class FireCrawler:
 
         return CrawlData(data=crawl_data)
 
-    @base_error_handler
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        retry=retry_if_exception_type((HTTPError, FireCrawlConnectionError, FireCrawlTimeoutError)),
+        wait=wait_exponential(multiplier=1, min=10, max=60),
+        before_sleep=lambda retry_state: logger.warning(
+            f"Error fetching results. Attempt {retry_state.attempt_number}/{MAX_RETRIES}. "
+            f"Retrying in {retry_state.next_action.sleep} seconds..."
+        ),
+    )
     async def _fetch_results_from_url(self, next_url: HttpUrl) -> tuple[dict[str, Any], str | None]:
-        """
-        Fetch the next batch of results from the given URL with retries.
+        """Fetch results with retries."""
+        try:
+            response = requests.get(next_url, headers={"Authorization": f"Bearer {self.api_key}"}, timeout=30)
+            response.raise_for_status()
 
-        Args:
-            next_url (HttpUrl): The URL to fetch the next batch of results from.
+            batch_data = response.json()
+            next_url = batch_data.get("next")
+            return batch_data, next_url
 
-        Returns:
-            tuple[dict[str, Any], str | None]: A tuple containing the batch data as a dictionary and the next URL as a
-            string or None.
-
-        Raises:
-            RequestException: If an error occurs while making the HTTP request and the maximum number of retries is
-            reached.
-        """
-        max_retries = MAX_RETRIES
-        backoff_factor = BACKOFF_FACTOR
-
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Trying to fetch the batch results for {next_url}")
-                url = next_url
-                headers = {"Authorization": f"Bearer {self.api_key}"}
-                response = requests.get(url, headers=headers)
-
-                if response.status_code != 200:
-                    logger.warning(f"Received status code {response.status_code} from API.")
-                    if attempt == max_retries - 1:
-                        logger.error(f"Failed to fetch results after {max_retries} attempts.")
-                        break
-                    else:
-                        wait_time = backoff_factor**attempt
-                        logger.warning(
-                            f"Request failed with status code {response.status_code}. "
-                            f"Retrying in {wait_time} seconds..."
-                        )
-                        time.sleep(wait_time)
-                        continue
-
-                batch_data = response.json()
-                next_url = batch_data.get("next")  # if it's missing -> there are no more pages to crawl
-                return batch_data, next_url
-            except RequestException as e:
-                if attempt == max_retries - 1:
-                    logger.error(f"Failed to fetch results after {max_retries} attempts: {str(e)}")
-                    raise
-                else:
-                    wait_time = backoff_factor**attempt
-                    logger.warning(f"Request failed. Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-
-        # raise Exception("Failed to fetch results after maximum retries")
-        logger.error("Failed to fetch results after maximum retries or received error responses.")
-        return {"data": []}, None
+        except Timeout as err:
+            raise FireCrawlTimeoutError(f"Request timed out: {err}") from err
+        except RequestException as err:
+            raise FireCrawlConnectionError(f"Connection error: {err}") from err
 
     @base_error_handler
     async def crawl(self, request: CrawlRequest) -> CrawlJob:
@@ -349,9 +308,9 @@ async def main():
 
         # 2. Create test crawl request
         request = CrawlRequest(
-            url="https://docs.anthropic.com/en/docs/welcome",
-            page_limit=5,  # Small limit for testing
-            exclude_patterns=["/blog/*"],
+            url="https://docs.anthropic.com/en/docs/",
+            page_limit=50,  # Small limit for testing
+            exclude_patterns=["/prompt-library/*", "/release-notes/*", "/developer-newsletter/*"],
         )
 
         # 3. Start crawl
@@ -362,7 +321,7 @@ async def main():
         # 4. Monitor job status
         while True:
             job = await job_manager.get_job(job.id)
-            logger.info(f"Job status: {job.status}, Progress: {job.progress_percentage:.1f}%")
+            logger.info(f"Job status: {job.status}, Pages crawled: {job.pages_crawled}")
 
             if job.status == CrawlJobStatus.COMPLETED:
                 logger.info("Job completed, fetching results...")
