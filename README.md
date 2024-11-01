@@ -31,7 +31,7 @@ Meet Kollektiv -> an open-source RAG app that helps you easily:
 - efficiently stores and embeds them in a local vector storage
 - sets up an LLM chat which you can rely on
 
-**Note** this is v.0.1.* and reliability of the system can be characterized as following:
+**Note** this is v.0.1.6 and reliability of the system can be characterized as following:
 - in 50% of the times it works every time!
 
 So do let me know if you are experiencing issues and I'll try to fix them.
@@ -48,13 +48,17 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 ## 🛠️ Technical Stack
 
-- **Language**: Python 3.7+
-- **Web Crawling**: FireCrawl API
-- **Vector Database**: Chroma DB
-- **Embeddings**: OpenAI's text-embedding-3-small
-- **LLM**: Anthropic's Claude 3.5 Sonnet
-- **Re-ranking**: Cohere API
-- **Additional Libraries**: tiktoken, chromadb, anthropic, cohere
+- **Backend**: Python/FastAPI
+- **Storage**:
+  - Supabase (auth/data)
+  - ChromaDB (vectors)
+  - Redis (queues/real-time)
+- **AI/ML**:
+  - OpenAI text-embedding-3-small (embeddings)
+  - Anthropic Claude 3.5 Sonnet (chat)
+  - Cohere (re-ranking)
+- **UI**: Chainlit
+- **Additional**: tiktoken, pydantic, pytest, ruff
 
 ## 🚀 Quick Start
 
@@ -80,7 +84,7 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 4. **Run the application:**
    ```bash
-   chainlit run app.py
+   poetry run kollektiv
    ```
 
 ## 💡 Usage
@@ -88,10 +92,10 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 1. **Start the Application:**
    ```bash
    # Run both API and Chainlit UI
-   poetry run python -m src.main
+   poetry run kollektiv
 
    # Or run only Chainlit UI
-   chainlit run src/main.py
+   chainlit run main.py
    ```
 
 2. **Add Documentation:**
@@ -137,9 +141,7 @@ Evaluation is currently done using `ragas` library. There are 2 key parts assess
    - Context recall
    - Context precision
 
-
 ## 📜 License
-
 
 Kollektiv is licensed under a modified version of the Apache License 2.0. While it allows for free use, modification,
 and distribution for non-commercial purposes, any commercial use requires explicit permission from the copyright owner.

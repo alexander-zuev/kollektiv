@@ -50,7 +50,7 @@ asyncio_fixture_loop_scope = "function"
 source = ["src"]
 
 [tool.poetry.scripts]
-kollektiv = "python -m src.main"
+kollektiv = "main:run"
 
 
 
