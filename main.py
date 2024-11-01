@@ -13,6 +13,7 @@ from src.api.system.health.health_router import router as health_router
 from src.api.system.webhooks.webhook_router import router as webhook_router
 from src.crawling.job_manager import JobManager
 from src.crawling.webhook_handler import WebhookHandler
+from src.interface.message_handler import MessageHandler
 from src.kollektiv.manager import Kollektiv
 from src.utils.config import (
     API_HOST,
@@ -30,7 +31,7 @@ configure_logging(debug=DEBUG)
 logger = get_logger()
 
 # Store the message handler globally (needed for Chainlit)
-message_handler = None
+message_handler: "MessageHandler" = None
 
 
 @asynccontextmanager
@@ -100,10 +101,7 @@ async def on_chat_start():
 async def handle_message(message: cl.Message):
     """Passes user message to MessageHandler for processing."""
     global message_handler
-    if message_handler:
-        await message_handler.route_message(message)
-    else:
-        await cl.Message(content="System is not properly initialized. Please try restarting.").send()
+    message_handler.route_message(message)
 
 
 def run_api():
