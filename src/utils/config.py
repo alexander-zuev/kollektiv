@@ -18,9 +18,16 @@ class Environment(str, Enum):
 
 ENVIRONMENT: Final = Environment(os.getenv("ENVIRONMENT", Environment.LOCAL))
 
+# Server Configuration
+API_HOST: Final = os.getenv("API_HOST", "127.0.0.1")
+API_PORT: Final = int(os.getenv("API_PORT", "8000"))
+CHAINLIT_HOST: Final = os.getenv("CHAINLIT_HOST", "127.0.0.1")
+CHAINLIT_PORT: Final = int(os.getenv("CHAINLIT_PORT", "8001"))
+LOG_LEVEL: Final = os.getenv("LOG_LEVEL", "debug")
+
 # Base URLs
 BASE_URL = {
-    Environment.LOCAL: "http://localhost:8000",
+    Environment.LOCAL: f"http://localhost:{API_PORT}",
     Environment.STAGING: "https://staging.yourdomain.com",
     Environment.PRODUCTION: "https://yourdomain.com",
 }[ENVIRONMENT]

@@ -50,10 +50,7 @@ asyncio_fixture_loop_scope = "function"
 source = ["src"]
 
 [tool.poetry.scripts]
-kollektiv = "python app.py"
-chunker = "python src/processing/chunking.py"
-crawler = "src.crawling.crawler:run_crawler"
-serve = "src.interface.app:run"
+kollektiv = "python -m src.main"
 
 
 

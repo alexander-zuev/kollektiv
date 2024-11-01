@@ -85,9 +85,13 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 ## 💡 Usage
 
-1. **Start the Interface:**
+1. **Start the Application:**
    ```bash
-   chainlit run app.py
+   # Run both API and Chainlit UI
+   poetry run python -m src.main
+
+   # Or run only Chainlit UI
+   chainlit run src/main.py
    ```
 
 2. **Add Documentation:**
