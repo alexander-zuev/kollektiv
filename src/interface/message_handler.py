@@ -1,5 +1,6 @@
 import chainlit as cl
 
+from src.generation.claude_assistant import ClaudeAssistant
 from src.interface.command_handler import CommandHandler
 
 
@@ -7,7 +8,7 @@ from src.interface.command_handler import CommandHandler
 class MessageHandler:
     """Handles incoming messages and routes them to appropriate handlers."""
 
-    def __init__(self, claude_assistant, command_handler: CommandHandler):
+    def __init__(self, claude_assistant: ClaudeAssistant, command_handler: CommandHandler):
         self.claude_assistant = claude_assistant
         self.command_handler = command_handler
 

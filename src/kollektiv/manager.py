@@ -5,6 +5,7 @@ from os.path import isfile, join
 from src.crawling.crawler import CrawlJobStatus, CrawlRequest, CrawlResult, FireCrawlAPIError, FireCrawler
 from src.crawling.file_manager import FileManager
 from src.crawling.job_manager import JobManager
+from src.crawling.models import CrawlJob
 from src.generation.claude_assistant import ClaudeAssistant
 from src.interface.command_handler import CommandHandler
 from src.interface.flow_manager import UserInputManager
@@ -113,23 +114,22 @@ class Kollektiv:
         return claude_assistant
 
     @staticmethod
-    def _get_crawl_message(crawl_result: CrawlResult) -> str:
-        if crawl_result.job_status == CrawlJobStatus.COMPLETED:
+    def _get_crawl_message(job: CrawlJob) -> str:
+        if job.status == CrawlJobStatus.COMPLETED:
+            # Get the crawl result
             message = f"""
-            ✅ Crawl completed successfully!\n
-            Extracted results from {len(crawl_result.data)} pages, starting from {crawl_result.url} in
-            {crawl_result.time_taken:.2f} seconds.\n
+            ✅ Successfully crawled {job.pages_crawled} pages from {job.start_url}.
             """
             return message
-        elif crawl_result.job_status == CrawlJobStatus.FAILED:
+        elif job.status == CrawlJobStatus.FAILED:
             message = """
             ❌ Crawl request failed! Please try again."""
             return message
         else:
             return "Unknown error occurred, please try again."
 
-    async def handle_crawl(self, crawl_inputs: dict) -> tuple[CrawlResult, str]:
-        """Crawls the url provided by the user and returns filename"""
+    async def handle_crawl(self, crawl_inputs: dict) -> tuple[CrawlJob, str]:
+        """Crawls the url provided by the user and returns a job object."""
         crawl_request = CrawlRequest(
             url=crawl_inputs["url"],
             page_limit=crawl_inputs["num_pages"],
@@ -140,11 +140,7 @@ class Kollektiv:
             job = await self.crawler.crawl(crawl_request)
             logger.info("Crawl job started successfully.")
 
-            success_message = f"""
-            ✅ Crawl job started successfully!\n
-            Job ID: {job.id}\n
-            Progress will be tracked via webhooks.\n
-            """
+            success_message = self._get_crawl_message(job)
             return job, success_message
 
         except FireCrawlAPIError as e:
@@ -161,7 +157,7 @@ class Kollektiv:
             chunks = self.chunker.process_pages(result)
             chunk_filename = self.chunker.save_chunks(chunks)
             message = """
-            ✅Chunking completed successfully!\n"""
+            ✅ Chunking completed successfully!\n"""
             return chunk_filename, message
         except Exception as e:
             logger.error(f"An unhandled error occurred: {e}")
@@ -189,11 +185,11 @@ class Kollektiv:
         logger.info("Starting indexing of new content. This might take a while")
 
         # Step 1 - Get crawl results
-        crawl_results, message = await self.handle_crawl(crawl_inputs)
+        job, message = await self.handle_crawl(crawl_inputs)
         yield message
 
         # Step 2 - Chunk the crawling results
-        chunks_filename, message = await self.prepare_chunks(crawl_results)
+        chunks_filename, message = await self.prepare_chunks(job)
         yield message
 
         # Step 3 - Embed and store them
@@ -213,7 +209,7 @@ class Kollektiv:
 
     @classmethod
     @base_error_handler
-    def setup(cls, reset_db: bool = False, load_all_docs: bool = False) -> MessageHandler:
+    async def setup(cls, reset_db: bool = False, load_all_docs: bool = False) -> MessageHandler:
         """
         Factory method to set up the Kollektiv system along with FlowManager, CommandHandler, and MessageHandler.
 
@@ -249,7 +245,7 @@ class Kollektiv:
         )
 
         # Initialize Kollektiv components
-        claude_assistant = kollektiv.initialize()
+        claude_assistant = await kollektiv.initialize()
 
         # Initialize FlowManager separately
         flow_manager = UserInputManager()
