@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.middleware.rate_limit import HealthCheckRateLimit
 from src.api.routes import Routes
 from src.api.system.health.health_router import router as health_router
 from src.api.system.webhooks.webhook_router import router as webhook_router
@@ -72,8 +73,11 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Add rate limiting for health endpoint
+    app.add_middleware(HealthCheckRateLimit, requests_per_minute=60)
+
     # System routes
-    app.include_router(health_router, prefix=Routes.System.HEALTH, tags=["system"])
+    app.include_router(health_router, tags=["system"])
     app.include_router(webhook_router, prefix=Routes.System.Webhooks.BASE, tags=["system"])
 
     return app
