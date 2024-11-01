@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, HttpUrl, ValidationInfo, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.utils.config import DEFAULT_MAX_DEPTH, DEFAULT_PAGE_LIMIT
 
@@ -285,62 +285,3 @@ class CrawlJob(BaseModel):
         """Configuration class for CrawlJob model."""
 
         json_encoders = {datetime: lambda v: v.isoformat()}
-
-
-# Webhook models
-
-
-class WebhookEventType(str, Enum):
-    """FireCrawl webhook event types"""
-
-    STARTED = "crawl.started"
-    PAGE = "crawl.page"
-    COMPLETED = "crawl.completed"
-    FAILED = "crawl.failed"
-
-
-class WebhookEvent(BaseModel):
-    """Firecrawl webhook event model.
-
-    This class represents webhook events received from the FireCrawl API,
-    including progress updates and completion notifications.
-
-    Attributes:
-        id (str): Unique identifier for the webhook event.
-        type (WebhookEventType): Type of the webhook event.
-        success (bool): Whether the event represents a successful operation.
-        error (str | None): Error message if the event represents a failure.
-        completed (int | None): Number of pages crawled (for page events).
-        total (int | None): Total pages to crawl (for page events).
-    """
-
-    id: str
-    type: WebhookEventType
-    success: bool = True
-    error: str | None = None
-
-    # Progress information for page events
-    completed: int | None = None  # Number of pages crawled
-    total: int | None = None  # Total pages to crawl
-
-    @field_validator("completed", "total")
-    @classmethod
-    def validate_progress(cls, v: int | None, info: ValidationInfo) -> int | None:
-        """Validate progress information for page events.
-
-        Args:
-            v (int | None): The value to validate.
-            info (ValidationInfo): Validation context information.
-
-        Returns:
-            int | None: The validated value.
-
-        Raises:
-            ValueError: If validation fails for page events.
-        """
-        if info.data.get("type") == WebhookEventType.PAGE:
-            if v is None:
-                raise ValueError("Page events must include progress information")
-            if v < 0:
-                raise ValueError("Progress values cannot be negative")
-        return v

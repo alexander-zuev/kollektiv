@@ -2,7 +2,8 @@ from datetime import UTC, datetime
 
 from src.crawling.exceptions import JobNotFoundError
 from src.crawling.job_manager import JobManager
-from src.crawling.models import CrawlJob, CrawlJobStatus, WebhookEvent, WebhookEventType
+from src.crawling.models import CrawlJob, CrawlJobStatus
+from src.models.events.webhooks import FireCrawlWebhookEvent, WebhookEventType
 from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
 
@@ -16,7 +17,7 @@ class WebhookHandler:
         self.job_manager = job_manager
 
     @base_error_handler
-    async def handle_event(self, event: WebhookEvent) -> None:
+    async def handle_event(self, event: FireCrawlWebhookEvent) -> None:
         """Handle webhook events from Firecrawl"""
         try:
             logger.info(f"Received webhook event: {event.type} for FireCrawl job {event.id}")
@@ -30,20 +31,20 @@ class WebhookHandler:
                 await self._handle_failure(job, event.error or "Unknown error")
                 return
 
-            match event.type:
-                case WebhookEventType.STARTED:
+            match event.event_type:
+                case WebhookEventType.CRAWL_STARTED:
                     logger.info(f"Crawl started for job {job.id}")
                     await self._handle_started(job)
 
-                case WebhookEventType.PAGE:
+                case WebhookEventType.CRAWL_PAGE:
                     logger.info(f"Page crawled for job {job.id}")
                     await self._handle_page_crawled(job)
 
-                case WebhookEventType.COMPLETED:
+                case WebhookEventType.CRAWL_COMPLETED:
                     logger.info(f"Crawl completed for job {job.id}")
                     await self._handle_completed(job)
 
-                case WebhookEventType.FAILED:
+                case WebhookEventType.CRAWL_FAILED:
                     logger.error(f"Crawl failed for job {job.id}: {event.error}")
                     await self._handle_failure(job, event.error or "Unknown error")
 
