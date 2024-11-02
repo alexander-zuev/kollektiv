@@ -61,7 +61,9 @@ repos:
           "--no-header",
           "--cov=src",
           "--cov-report=term-missing:skip-covered",
+          "-ra",
         ]
+        verbose: true
 
       - id: update-project-structure
         name: Update project documentation

@@ -43,9 +43,14 @@ pythonpath = [
     ".",
     "src",
 ]
-
 asyncio_mode = "auto"
 asyncio_fixture_loop_scope = "function"
+asyncio_default_fixture_loop_scope = "function"
+
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
 
 markers = [
     "integration: mark test as integration test",
@@ -72,6 +77,11 @@ exclude_lines = [
     "pass",
     "except ImportError:",
 ]
+
+show_missing = true
+skip_covered = true
+skip_empty = true
+precision = 2
 
 
 [build-system]
