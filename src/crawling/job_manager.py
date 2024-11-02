@@ -5,7 +5,7 @@ from pathlib import Path
 import aiofiles
 
 from src.crawling.exceptions import JobNotFoundError
-from src.crawling.models import CrawlJob, CrawlJobStatus
+from src.models.job_management.job_models import CrawlJob, CrawlJobStatus
 from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
 

@@ -1,53 +1,70 @@
 # Pre-commit configuration for Python project quality checks
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  # === Syntax & Basic Checks ===
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
-    -   id: trailing-whitespace
-        description: 'Removes trailing whitespace from all files'
-    -   id: check-yaml
-        description: 'Validates YAML syntax'
-    -   id: check-ast
-        description: 'Validates Python syntax'
-    -   id: check-json
-        description: 'Validates JSON syntax'
-    -   id: check-merge-conflict
-        description: 'Checks for merge conflict markers'
-    -   id: detect-private-key
-        description: 'Prevents committing private keys'
-    -   id: end-of-file-fixer
-        description: 'Ensures files end with a newline'
-    -   id: mixed-line-ending
-        description: 'Normalizes line endings'
+      - id: check-ast
+        name: Validate Python syntax
+      - id: check-yaml
+        name: Validate YAML files
+      - id: check-json
+        name: Validate JSON files
+      - id: check-toml
+        name: Validate TOML files
+      - id: mixed-line-ending
+        name: Normalize line endings
         args: ['--fix=lf']
+      - id: trailing-whitespace
+        name: Remove trailing whitespace
+      - id: end-of-file-fixer
+        name: Ensure file ends with newline
 
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.1
+  # === Security ===
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
     hooks:
-    -   id: ruff
-        description: 'Run Ruff linter with auto-fixes'
-        args: [--fix]
+      - id: detect-private-key
+        name: Check for private keys
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: debug-statements
+        name: Check for debugger imports
+
+  # === Code Quality & Style ===
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.2
+    hooks:
+      - id: ruff
+        name: Run Ruff linter
+        args: [
+          --fix,
+          --exit-non-zero-on-fix,
+        ]
         types_or: [python, pyi, jupyter]
-    -   id: ruff-format
-        description: 'Run Ruff formatter'
+      - id: ruff-format
+        name: Run Ruff formatter
         types_or: [python, pyi, jupyter]
 
--   repo: local
+  # === Testing & Documentation ===
+  - repo: local
     hooks:
-    -   id: pytest-check
-        name: pytest-check
-        description: 'Run pytest suite'
+      - id: pytest-check
+        name: Run pytest suite
         entry: pytest
         language: system
         pass_filenames: false
         always_run: true
         stages: [commit]
-        # Add verbose output and show test coverage
-        args: ["-v", "--cov=src", "--cov-report=term-missing"]
+        args: [
+          "--quiet",
+          "--no-header",
+          "--cov=src",
+          "--cov-report=term-missing:skip-covered",
+        ]
 
-    -   id: update-project-structure
-        name: update project structure
-        description: 'Updates project structure documentation'
+      - id: update-project-structure
+        name: Update project documentation
         entry: python scripts/generate_structure.py
         language: system
         pass_filenames: false

@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 import aiofiles
 
-from src.crawling.models import CrawlResult
+from src.models.content.firecrawl_models import CrawlResult
 
 
 class FileReference:

@@ -5,11 +5,11 @@ from os.path import isfile, join
 from src.crawling.crawler import CrawlJobStatus, CrawlRequest, CrawlResult, FireCrawlAPIError, FireCrawler
 from src.crawling.file_manager import FileManager
 from src.crawling.job_manager import JobManager
-from src.crawling.models import CrawlJob
 from src.generation.claude_assistant import ClaudeAssistant
 from src.interface.command_handler import CommandHandler
 from src.interface.flow_manager import UserInputManager
 from src.interface.message_handler import MessageHandler
+from src.models.job_management.job_models import CrawlJob
 from src.processing.chunking import MarkdownChunker
 from src.utils.config import JOB_FILE_DIR, PROCESSED_DATA_DIR, RAW_DATA_DIR
 from src.utils.decorators import base_error_handler

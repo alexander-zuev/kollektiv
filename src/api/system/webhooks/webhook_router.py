@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from src.api.routes import Routes
 from src.crawling.webhook_handler import WebhookHandler
-from src.models.events.webhooks import FireCrawlWebhookEvent, WebhookProvider, WebhookResponse
+from src.models.events.webhook_models import FireCrawlWebhookEvent, WebhookProvider, WebhookResponse
 from src.utils.logger import get_logger
 
 logger = get_logger()

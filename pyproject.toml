@@ -47,10 +47,17 @@ pythonpath = [
 asyncio_mode = "auto"
 asyncio_fixture_loop_scope = "function"
 
+markers = [
+    "integration: mark test as integration test",
+    "e2e: mark test as end-to-end test",
+    "slow: mark test as slow running"
+]
+
 [tool.coverage.run]
 source = ["src"]
 
 [tool.poetry.scripts]
+crawl = "src.crawling.crawler:run_crawler"
 kollektiv = "main:run"
 
 

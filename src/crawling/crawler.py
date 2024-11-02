@@ -28,13 +28,12 @@ from src.crawling.exceptions import (
 )
 from src.crawling.file_manager import FileManager
 from src.crawling.job_manager import JobManager
-from src.crawling.models import (
+from src.models.content.firecrawl_models import (
     CrawlData,
-    CrawlJob,
-    CrawlJobStatus,
     CrawlRequest,
     CrawlResult,
 )
+from src.models.job_management.job_models import CrawlJob, CrawlJobStatus
 from src.utils.config import (
     ENVIRONMENT,
     FIRECRAWL_API_KEY,
@@ -309,7 +308,7 @@ async def main():
         # 2. Create test crawl request
         request = CrawlRequest(
             url="https://docs.anthropic.com/en/docs/",
-            page_limit=50,  # Small limit for testing
+            page_limit=1,  # Small limit for testing
             exclude_patterns=["/prompt-library/*", "/release-notes/*", "/developer-newsletter/*"],
         )
 
