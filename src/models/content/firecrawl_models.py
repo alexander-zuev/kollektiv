@@ -1,14 +1,13 @@
 from datetime import UTC, datetime
-from enum import Enum
 from typing import Any
-from uuid import uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
+from src.models.job_management.job_models import CrawlJobStatus
 from src.utils.config import DEFAULT_MAX_DEPTH, DEFAULT_PAGE_LIMIT
 
 
-# CRAWLING
+# Crawl Request
 class CrawlRequest(BaseModel):
     """
     CrawlRequest model for initiating a web crawl.
@@ -127,6 +126,7 @@ class CrawlRequest(BaseModel):
         arbitrary_types_allowed = True
 
 
+# Crawl Data
 class CrawlData(BaseModel):
     """A class that represents the data structure for crawling page data.
 
@@ -189,6 +189,7 @@ class CrawlData(BaseModel):
         return len(self.data)
 
 
+# Crawl Result
 class CrawlResult(BaseModel):
     """
     Represents the result of a web crawling job, containing metadata and discovered data.
@@ -236,52 +237,3 @@ class CrawlResult(BaseModel):
         json_encoders = {datetime: lambda v: v.isoformat()}
         extra = "allow"
         validate_assignment = True
-
-
-# JOBS
-class CrawlJobStatus(str, Enum):
-    """
-
-    Represents the status of a web crawling job.
-
-    Attributes:
-        COMPLETED (str): Indicates that the crawl job has completed successfully.
-        FAILED (str): Indicates that the crawl job has failed.
-        IN_PROGRESS (str): Indicates that the crawl job is currently in progress.
-        PENDING (str): Indicates that the crawl job is pending and has not yet been started.
-        CANCELLED (str): Indicates the job was cancelled by the user.
-    """
-
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-# 2. Concrete job object that tracks everything we care about
-class CrawlJob(BaseModel):
-    """Track crawl job status and progress"""
-
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    firecrawl_id: str
-    status: CrawlJobStatus
-    start_url: str
-    method: str = Field(default="crawl")
-
-    # Simple progress tracking
-    pages_crawled: int = 0
-
-    # Timing
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
-
-    # Results
-    result_file: str | None = None
-    error: str | None = None
-
-    class Config:
-        """Configuration class for CrawlJob model."""
-
-        json_encoders = {datetime: lambda v: v.isoformat()}

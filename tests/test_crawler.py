@@ -6,7 +6,8 @@ from firecrawl import FirecrawlApp
 
 from src.crawling.crawler import FireCrawler
 from src.crawling.exceptions import FireCrawlAPIError, JobNotCompletedError
-from src.crawling.models import CrawlData, CrawlJob, CrawlJobStatus, CrawlRequest, CrawlResult
+from src.models.content.firecrawl_models import CrawlData, CrawlRequest, CrawlResult
+from src.models.job_management.job_models import CrawlJob, CrawlJobStatus
 
 
 @pytest.fixture
