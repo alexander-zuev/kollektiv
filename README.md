@@ -126,7 +126,6 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 - No automatic re-indexing of documentation
 - URL validation limited to common formats
 - Exclude patterns must start with `/`
-- Up to 5 relevant documents retrieved per query
 
 ## 🛣️ Roadmap
 For a brief roadmap please check out [project wiki page](https://github.com/Twist333d/kollektiv/wiki).
