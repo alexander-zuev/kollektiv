@@ -4,10 +4,10 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from firecrawl import FirecrawlApp
 
-from src.crawling.crawler import FireCrawler
-from src.crawling.exceptions import FireCrawlAPIError, JobNotCompletedError
+from src.core._exceptions import FireCrawlAPIError, JobNotCompletedError
+from src.core.content.crawler.crawler import FireCrawler
+from src.models.common.jobs import CrawlJob, CrawlJobStatus
 from src.models.content.firecrawl_models import CrawlData, CrawlRequest, CrawlResult
-from src.models.job_management.job_models import CrawlJob, CrawlJobStatus
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def mock_firecrawl_app():
 @pytest.fixture
 def crawler(mock_job_manager, mock_file_manager, mock_firecrawl_app):
     """Create a FireCrawler instance with mock dependencies."""
-    with patch("src.crawling.crawler.FirecrawlApp", return_value=mock_firecrawl_app):
+    with patch("src.core.content.crawler.crawler.FirecrawlApp", return_value=mock_firecrawl_app):
         crawler = FireCrawler(
             job_manager=mock_job_manager,
             file_manager=mock_file_manager,

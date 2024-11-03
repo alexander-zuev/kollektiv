@@ -2,8 +2,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from src.generation.claude_assistant import ClaudeAssistant, ConversationMessage
-from src.vector_storage.vector_db import VectorDB
+from src.core.chat.claude_assistant import ClaudeAssistant, ConversationMessage
+from src.core.search.vector_db import VectorDB
 
 
 @pytest.fixture

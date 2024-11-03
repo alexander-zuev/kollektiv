@@ -42,8 +42,8 @@ build-backend = "poetry.core.masonry.api"
 
 
 [tool.poetry.scripts]
-crawl = "src.crawling.crawler:run_crawler"
-kollektiv = "main:run"
+crawl = "src.core.content.crawler.crawler:run_crawler"
+kollektiv = "app:run"
 
 
 [tool.pytest.ini_options]
