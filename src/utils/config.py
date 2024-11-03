@@ -36,19 +36,15 @@ BASE_URL = {
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
 FIRECRAWL_API_URL = "https://api.firecrawl.dev/v1"
 
+# Webhook Configuration
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST", BASE_URL)  # Sets to ngrok host if available
+
 # Crawler Configuration
 MAX_RETRIES: Final = 3
 BACKOFF_FACTOR: Final = 2
 DEFAULT_PAGE_LIMIT: Final = 25
 DEFAULT_MAX_DEPTH: Final = 5
 
-# Webhook Configuration
-WEBHOOK_PATH: Final = "/webhook"
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-
-# Fallback to local URL if not set
-if not WEBHOOK_URL:
-    WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 
 # API Keys
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")

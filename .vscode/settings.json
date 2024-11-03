@@ -34,5 +34,32 @@
     "ruff.configurationPreference": "filesystemFirst",
     "editor.fontFamily": "JetBrains Mono, Consolas, 'Courier New', monospace",
     "editor.fontSize": 13,
-    "editor.lineHeight": 1.4
+    "editor.lineHeight": 1.4,
+    "python.analysis.typeCheckingMode": "strict",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.indexing": true,
+    "python.analysis.packageIndexDepths": [
+        [
+            "src",
+            5
+        ],
+        [
+            "",
+            2
+        ]
+    ],
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportPrivateUsage": "warning",
+        "reportUnnecessaryTypeIgnoreComment": "warning",
+        "reportSelfClsParameterType": "none",
+        "reportMissingParameterType": "none",
+        "reportUnknownParameterType": "none",
+        "reportUnknownMemberType": "none",
+        "reportUnknownVariableType": "warning",
+        "reportGeneralTypeIssues": "warning",
+        "reportOptionalMemberAccess": "none",
+        "reportUnknownArgumentType": "none",
+        "reportMissingTypeStubs": "warning",
+        "reportPropertyTypeMismatch": "warning"
+    }
 }

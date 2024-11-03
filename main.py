@@ -101,7 +101,7 @@ async def on_chat_start():
 async def handle_message(message: cl.Message):
     """Passes user message to MessageHandler for processing."""
     global message_handler
-    message_handler.route_message(message)
+    await message_handler.route_message(message)
 
 
 def run_api():

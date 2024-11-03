@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from src.crawling.exceptions import JobNotFoundError
 from src.crawling.job_manager import JobManager
-from src.models.events.webhook_models import FireCrawlWebhookEvent, WebhookEventType
+from src.models.events.webhook_models import FireCrawlEventType, FireCrawlWebhookEvent
 from src.models.job_management.job_models import CrawlJob, CrawlJobStatus
 from src.utils.decorators import base_error_handler
 from src.utils.logger import get_logger
@@ -31,20 +31,20 @@ class WebhookHandler:
                 await self._handle_failure(job, event.error or "Unknown error")
                 return
 
-            match event.event_type:
-                case WebhookEventType.CRAWL_STARTED:
+            match event.type:
+                case FireCrawlEventType.CRAWL_STARTED:
                     logger.info(f"Crawl started for job {job.id}")
                     await self._handle_started(job)
 
-                case WebhookEventType.CRAWL_PAGE:
+                case FireCrawlEventType.CRAWL_PAGE:
                     logger.info(f"Page crawled for job {job.id}")
                     await self._handle_page_crawled(job)
 
-                case WebhookEventType.CRAWL_COMPLETED:
+                case FireCrawlEventType.CRAWL_COMPLETED:
                     logger.info(f"Crawl completed for job {job.id}")
                     await self._handle_completed(job)
 
-                case WebhookEventType.CRAWL_FAILED:
+                case FireCrawlEventType.CRAWL_FAILED:
                     logger.error(f"Crawl failed for job {job.id}: {event.error}")
                     await self._handle_failure(job, event.error or "Unknown error")
 

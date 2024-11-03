@@ -7,6 +7,7 @@ readme = "README.md"
 package-mode = false
 packages = [{include = "src"}]
 
+
 [tool.poetry.dependencies]
 python = "^3.12"
 openai = "^1.42.0"
@@ -32,40 +33,40 @@ ragas = "^0.2.3"
 chromadb = "^0.5.16"
 chainlit = "^1.3.1"
 langchain = "^0.3.6"
+types-requests = "^2.32.0.20241016"
 
 
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-ra -q"
-testpaths = ["tests"]
-pythonpath = [
-    ".",
-    "src",
-]
-asyncio_mode = "auto"
-asyncio_fixture_loop_scope = "function"
-asyncio_default_fixture_loop_scope = "function"
-
-filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::UserWarning",
-]
-
-markers = [
-    "integration: mark test as integration test",
-    "e2e: mark test as end-to-end test",
-    "slow: mark test as slow running"
-]
-
-[tool.coverage.run]
-source = ["src"]
 
 [tool.poetry.scripts]
 crawl = "src.crawling.crawler:run_crawler"
 kollektiv = "main:run"
 
 
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+pythonpath = [".", "src"]
+asyncio_mode = "auto"
+asyncio_fixture_loop_scope = "function"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+markers = [
+    "integration: mark test as integration test",
+    "e2e: mark test as end-to-end test",
+    "slow: mark test as slow running"
+]
+
+
+[tool.coverage.run]
+source = ["src"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -77,26 +78,42 @@ exclude_lines = [
     "pass",
     "except ImportError:",
 ]
-
 show_missing = true
 skip_covered = true
 skip_empty = true
 precision = 2
 
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.pyright]
+include = ["src"]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+    "src/experimental",
+    "src/typestubs"
+]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = "warning"
+reportUnknownArgumentType = false
+reportOptionalMemberAccess = false
+reportGeneralTypeIssues = "warning"
+reportUnknownVariableType = "warning"
+reportPrivateUsage = "warning"
+reportPropertyTypeMismatch = "warning"
+reportUnnecessaryTypeIgnoreComment = "warning"
+reportMissingParameterType = false
+reportSelfClsParameterType = false
+reportMissingTypeArgument = false
+reportUnknownParameterType = false
+reportUnknownMemberType = false
+
 
 [tool.ruff]
-# Same as current Black config
 line-length = 120
 target-version = "py312"
 indent-width = 4
-
-
-
-# Exclude patterns
 exclude = [
     ".bzr",
     ".direnv",
@@ -109,49 +126,48 @@ exclude = [
     ".ruff_cache",
     ".ipynb_checkpoints",
     "__pypackages__",
-
 ]
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "D",   # Enable pycodestyle docstring checks
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "D",   # pydocstyle
-    "PT",  # flake8-pytest-style
-    "S",   # Bandit security rules
-    "N",   # pep8-naming
+    "E",    # pycodestyle errors
+    "D",    # pydocstyle
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "PT",   # flake8-pytest-style
+    "S",    # Bandit security rules
+    "N",    # pep8-naming
+    "TCH",  # typechecking
+    "PYI",  # pyi
+    "ANN",  # type annotation checks
 ]
-
-# Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
-
-# Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-
-
-
-# Match your current flake8 ignores
 ignore = [
     "D100",  # Missing docstring in public module
     "D212",  # Multi-line docstring should start at the first line
     "D107",  # Missing docstring in __init__
-    "E203",  # Whitespace before ':'
-    "E266",  # Too many leading '#' for block comment
-    "D415",  # First line should end with a period, question mark, or exclamation point
-
+    "D415",  # First line should end with period
+    "ANN101",  # Missing type annotation for self in method
+    "ANN102",  # Missing type annotation for cls in classmethod
+    "ANN002",  # Missing type annotation for *args
+    "ANN003",  # Missing type annotation for **kwargs
+    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed
+    "ANN204",  # Missing return type annotation for special method __init__
+    "E203",   # Whitespace before ':'
+    "E266",   # Too many leading '#' for block comment
 ]
 
-
-# Match your current per-file-ignores
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "D100", "D104", "D107", "D212"]
-"tests/*" = ["D100", "D101", "D102", "D103", "S101"]
+"tests/*" = [
+    "D100", "D101", "D102", "D103", "S101",
+    "ANN001", "ANN201", "ANN101",  # Type annotation rules
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -162,7 +178,6 @@ known-third-party = ["anthropic", "openai", "pydantic"]
 known-first-party = ["src"]
 
 [tool.ruff.lint.pyupgrade]
-# Preserve types, even if a file imports `from __future__ import annotations`
 keep-runtime-typing = true
 
 [tool.ruff.format]
@@ -171,3 +186,6 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 docstring-code-format = true
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true

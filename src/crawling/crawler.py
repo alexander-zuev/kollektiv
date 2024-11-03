@@ -18,6 +18,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from src.api.routes import Routes
 from src.crawling.exceptions import (
     EmptyContentError,
     FireCrawlAPIError,
@@ -41,7 +42,7 @@ from src.utils.config import (
     JOB_FILE_DIR,
     MAX_RETRIES,
     RAW_DATA_DIR,
-    WEBHOOK_URL,
+    WEBHOOK_HOST,
 )
 from src.utils.decorators import base_error_handler
 from src.utils.logger import configure_logging, get_logger
@@ -141,8 +142,9 @@ class FireCrawler:
             },
         }
         if not request.webhook_url:
-            # Use default webhook URL if none provided
-            params["webhook"] = WEBHOOK_URL
+            webhook_path = f"{Routes.System.Webhooks.BASE}{Routes.System.Webhooks.FIRECRAWL}"
+            params["webhook"] = f"{WEBHOOK_HOST}{webhook_path}"
+            logger.debug(f"Using webhook URL: {params['webhook']}")
 
         return params
 
@@ -222,9 +224,10 @@ class FireCrawler:
             batch_data, next_url = await self._fetch_results_from_url(next_url)
             crawl_data.extend(batch_data["data"])
 
-        if not crawl_data:
-            logger.error(f"No data accumulated for job {job_id}")
-            raise EmptyContentError(f"No content found for job {job_id}")
+            # Only checks at the end if data exists
+            if not crawl_data:
+                logger.error(f"No data accumulated for job {job_id}")
+                raise EmptyContentError(f"No content found for job {job_id}")
 
         logger.info("No more pages to fetch. Returning results")
 
@@ -270,7 +273,7 @@ class FireCrawler:
             FireCrawlConnectionError: For connection issues
         """
         logger.info(f"Starting crawl of {request.url} in {ENVIRONMENT} environment")
-        logger.info(f"Using webhook URL: {WEBHOOK_URL}")
+        logger.info(f"Using webhook URL: {request.webhook_url}")
 
         try:
             job = await self.start_crawl(request)
