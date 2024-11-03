@@ -345,8 +345,7 @@ id_rsa.pub
 .env.*.local
 
 # Exclude editor-specific files
-.vscode/
-!.vscode/settings.json  # Keep settings.json if needed
+.vscode/*
 
 # Exclude OS-specific files
 .DS_Store

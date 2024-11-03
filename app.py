@@ -12,6 +12,7 @@ from src.api.middleware.rate_limit import HealthCheckRateLimit
 from src.api.routes import Routes
 from src.api.system.health.health_router import router as health_router
 from src.api.system.webhooks.webhook_router import router as webhook_router
+from src.api.v0.content.sources import router as content_router
 from src.core.system.job_manager import JobManager
 from src.infrastructure.config.logger import configure_logging, get_logger
 from src.infrastructure.config.settings import (
@@ -80,6 +81,9 @@ def create_app() -> FastAPI:
     # System routes
     app.include_router(health_router, tags=["system"])
     app.include_router(webhook_router, prefix=Routes.System.Webhooks.BASE, tags=["system"])
+
+    # Content routes - Fix the prefix
+    app.include_router(content_router, prefix=Routes.V0.BASE, tags=["content"])
 
     return app
 

@@ -197,7 +197,8 @@ class VectorDB(VectorDBInterface):
         self._init()
 
     def _init(self):
-        self.client = chromadb.PersistentClient(path=CHROMA_DB_DIR)  # using default path for Chroma
+        """Initialize ChromaDB client and embedding function."""
+        self.client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
             api_key=self.openai_api_key, model_name=self.embedding_function_name
         )
@@ -205,8 +206,8 @@ class VectorDB(VectorDBInterface):
             self.collection_name, embedding_function=self.embedding_function
         )
         logger.info(
-            f"Successfully initialized ChromaDb with collection: {self.collection_name}\n with "
-            f"{self.collection.count()} documents (chunks)"
+            f"Successfully initialized ChromaDb with collection: {self.collection_name}\n"
+            f"with {self.collection.count()} documents (chunks)"
         )
 
     def prepare_documents(self, chunks: list[dict]) -> dict[str, list[str]]:
