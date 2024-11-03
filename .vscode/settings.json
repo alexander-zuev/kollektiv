@@ -61,5 +61,6 @@
         "reportUnknownArgumentType": "none",
         "reportMissingTypeStubs": "warning",
         "reportPropertyTypeMismatch": "warning"
-    }
+    },
+    "python.analysis.autoImportCompletions": true
 }

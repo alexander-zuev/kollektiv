@@ -159,7 +159,7 @@ kollektiv/
 │   │   │   └── system/       # System endpoints
 │   │   └── middleware/       # API middleware
 │   │
-│   ├── domain/               # Domain Logic
+│   ├── core/               # Domain Logic
 │   │   ├── content/         # Content Domain
 │   │   │   ├── processing/  # Content processing
 │   │   │   │   ├── chunker.py

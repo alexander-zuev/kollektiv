@@ -1,5 +1,5 @@
-from src.generation.claude_assistant import ClaudeAssistant
-from src.vector_storage.vector_db import Reranker, ResultRetriever, VectorDB
+from src.core.chat.claude_assistant import ClaudeAssistant
+from src.core.search.vector_db import Reranker, ResultRetriever, VectorDB
 
 
 def test_app_initialization():

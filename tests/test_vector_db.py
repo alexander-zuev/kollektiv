@@ -1,4 +1,4 @@
-from src.vector_storage.vector_db import DocumentProcessor, VectorDB
+from src.core.search.vector_db import DocumentProcessor, VectorDB
 
 
 def test_vector_db_initialization():

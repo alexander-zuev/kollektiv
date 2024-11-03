@@ -3,8 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from src.models.job_management.job_models import CrawlJobStatus
-from src.utils.config import DEFAULT_MAX_DEPTH, DEFAULT_PAGE_LIMIT
+from src.infrastructure.config.settings import DEFAULT_MAX_DEPTH, DEFAULT_PAGE_LIMIT
+from src.models.common.jobs import CrawlJobStatus
 
 
 # Crawl Request
@@ -59,7 +59,7 @@ class CrawlRequest(BaseModel):
 
     @field_validator("url")
     @classmethod
-    def url_must_be_http_url(cls, v):
+    def url_must_be_http_url(cls, v) -> str:
         """Validates the input URL and converts it to HttpURL"""
         if not v:
             raise ValueError("URL cannot be None or empty")
@@ -71,7 +71,7 @@ class CrawlRequest(BaseModel):
 
     @field_validator("url")
     @classmethod
-    def url_must_end_with_slash(cls, url):
+    def url_must_end_with_slash(cls, url) -> str:
         """Ensures that start URL always with a trailing slash"""
         if not url:
             raise ValueError("URL cannot be None or empty")
@@ -172,8 +172,6 @@ class CrawlData(BaseModel):
         if not v:
             raise ValueError("Data must not be empty")
         for item in v:
-            if not isinstance(item, dict):
-                raise ValueError(f"Expected dict, got {type(item)}")
             if "markdown" not in item:
                 raise ValueError("Missing 'markdown' key in data")
             if "metadata" not in item:

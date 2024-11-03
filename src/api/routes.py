@@ -36,11 +36,12 @@ class Routes:
         CHAT = f"{BASE}/chat"
 
         class Content:
-            """Content routes."""
+            """Content management routes."""
 
-            CRAWL = "/crawl"
-            STATUS = "/status"
-            DOCUMENTS = "/documents"
+            # Content source operations
+            SOURCES = "/sources"  # GET (list), POST (add)
+            SOURCE = "/sources/{source_id}"  # GET, DELETE
+            SOURCE_STATUS = "/sources/{source_id}/status"  # GET status
 
         class Chat:
             """Chat routes."""
