@@ -17,7 +17,7 @@ class WebhookProvider(str, Enum):
     # etc.
 
 
-class WebhookEventType(str, Enum):
+class FireCrawlEventType(str, Enum):
     """Base webhook event types."""
 
     # FireCrawl events - from docs
@@ -66,7 +66,7 @@ class FireCrawlWebhookEvent(BaseWebhookEvent):
 
     # Raw FireCrawl fields
     success: bool = Field(True, description="If the webhook was successful")
-    type: WebhookEventType = Field(..., description="The type of event that occurred")
+    type: FireCrawlEventType = Field(..., description="The type of event that occurred")
     id: str = Field(..., description="The ID of the crawl")
     data: list[dict[str, Any]] = Field(
         default_factory=list,

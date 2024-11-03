@@ -1,4 +1,3 @@
-# Pre-commit configuration for Python project quality checks
 repos:
   # === Syntax & Basic Checks ===
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -31,6 +30,19 @@ repos:
       - id: debug-statements
         name: Check for debugger imports
 
+  # === Type Checking ===
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.387
+    hooks:
+      - id: pyright
+        name: Run Pyright type checker
+        args: ["--level", "error"]
+        types_or: [python, pyi, jupyter]
+        files: ^(src|tests)/
+        exclude: ^src/experimental/
+        verbose: true
+        fail_fast: false
+
   # === Code Quality & Style ===
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.7.2
@@ -40,8 +52,11 @@ repos:
         args: [
           --fix,
           --exit-non-zero-on-fix,
+
         ]
         types_or: [python, pyi, jupyter]
+        files: ^(src|tests)/
+        exclude: ^src/experimental/
       - id: ruff-format
         name: Run Ruff formatter
         types_or: [python, pyi, jupyter]
@@ -62,6 +77,7 @@ repos:
           "--cov=src",
           "--cov-report=term-missing:skip-covered",
           "-ra",
+          "--run-integration",
         ]
         verbose: true
 
