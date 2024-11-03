@@ -40,7 +40,14 @@ class UserInputManager:
         return ""
 
     def process_input(self, user_input: str) -> dict:
-        """Processes the user input and returns the processed data."""
+        """Processes the user input and returns the processed data.
+
+        Args:
+            user_input: The input from the user
+
+        Returns:
+            dict: Response containing status and message
+        """
         if self.state == "num_pages":
             try:
                 num_pages = int(user_input) if user_input.strip() else 25
@@ -58,6 +65,9 @@ class UserInputManager:
             self.data["exclude_patterns"] = patterns
             self.state = None
             return {"response": "Processing request...", "done": True}
+
+        # Default return for unknown state
+        return {"response": "Invalid state", "done": True}
 
     def is_active(self) -> bool:
         """Checks if a flow is currently active."""

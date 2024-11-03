@@ -54,7 +54,7 @@ class CrawlRequest(BaseModel):
         "example, "
         "/blog/*, /api/. Delimited by a comma",
     )
-    time_taken: float | None = Field(None, description="The time taken to crawl this request end to end.")
+    time_taken: float | None = Field(default=0.0, description="The time taken to crawl this request end to end.")
     webhook_url: HttpUrl | None = None  # Optional webhook URL for updates
 
     @field_validator("url")

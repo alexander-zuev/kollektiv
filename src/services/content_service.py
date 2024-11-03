@@ -8,6 +8,7 @@ from src.api.v0.content.schemas import (
 )
 from src.core.content.crawler.crawler import FireCrawler
 from src.infrastructure.config.logger import get_logger
+from src.models.content.firecrawl_models import CrawlRequest
 
 logger = get_logger()
 
@@ -19,9 +20,38 @@ class ContentService:
 
     async def add_source(self, request: AddContentSourceRequest) -> ContentSourceResponse:
         """Add a new content source and initiate crawling."""
+        # 1. Create source first
+        source = self._create_source(request)
+
+        # 2. Store source locally
+        self._sources[source.id] = source
+
+        try:
+            # 3. Map to FireCrawl config and start crawl job
+            crawl_request = CrawlRequest(
+                url=str(request.url),
+                page_limit=request.config.max_pages,
+                exclude_patterns=[p if p.startswith("/") else f"/{p}" for p in request.config.exclude_sections],
+            )
+
+            # Start crawl and store job ID
+            job = await self.crawler.crawl(crawl_request)
+            source.job_id = job.id  # Store FireCrawl job ID
+            source.status = ContentSourceStatus.PROCESSING
+
+            return source
+
+        except Exception as e:
+            logger.error(f"Failed to create crawl job: {e}")
+            source.status = ContentSourceStatus.FAILED
+            raise
+
+        return source
+
+    def _create_source(self, request: AddContentSourceRequest) -> ContentSourceResponse:
+        """Create a new content source response."""
         source_id = str(uuid.uuid4())
 
-        # Create source response
         source = ContentSourceResponse(
             id=source_id,
             type=request.type,
@@ -31,16 +61,5 @@ class ContentService:
             created_at=datetime.now(UTC),
             config=request.config,
         )
-
-        # Store source
-        self._sources[source_id] = source
-
-        # Start crawl job
-        try:
-            await self.crawler.create_crawl_job(url=str(request.url), config=request.config)
-        except Exception as e:
-            logger.error(f"Failed to create crawl job: {e}")
-            source.status = ContentSourceStatus.FAILED
-            raise
 
         return source

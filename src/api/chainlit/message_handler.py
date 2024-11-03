@@ -1,7 +1,11 @@
+import logging
+
 import chainlit as cl
 
 from src.api.chainlit.command_handler import CommandHandler
 from src.core.chat.claude_assistant import ClaudeAssistant
+
+logger = logging.getLogger(__name__)
 
 
 # TODO: Different types of replies: AssistantMessage, SystemMessage (success/error/warning)
@@ -23,12 +27,16 @@ class MessageHandler:
 
     async def handle_command_message(self, content: str):
         """Processes command messages and manages multi-step flows."""
-        response = await self.command_handler.handle_command(content)
-        await cl.Message(content=response).send()
+        try:
+            response = await self.command_handler.handle_command(content)
+            await cl.Message(content=response).send()
 
-        # Check if we need to start a flow
-        if self.command_handler.flow_manager.is_active():
-            await self.handle_command_flow()
+            # Check if we need to start a flow
+            if self.command_handler.flow_manager.is_active():
+                await self.handle_command_flow()
+        except Exception as e:
+            logger.error(f"Command handling error: {e}")
+            await cl.Message(content=f"❌ Error processing command: {str(e)}").send()
 
     async def handle_command_flow(self):
         """Handles the command flow for multi-step inputs."""
