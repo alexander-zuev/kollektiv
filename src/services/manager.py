@@ -5,17 +5,19 @@ from os.path import isfile, join
 
 from src.api.chainlit.command_handler import CommandHandler
 from src.api.chainlit.message_handler import MessageHandler
+from src.core._exceptions import FireCrawlAPIError
 from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.chat.flow_manager import UserInputManager
 from src.core.content.chunker import MarkdownChunker
-from src.core.content.crawler import CrawlJobStatus, CrawlRequest, CrawlResult, FireCrawlAPIError, FireCrawler
+from src.core.content.crawler.crawler import FireCrawler
 from src.core.search.vector_db import DocumentProcessor, Reranker, ResultRetriever, SummaryManager, VectorDB
 from src.core.system.job_manager import JobManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.common.file_manager import FileManager
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.config.settings import JOB_FILE_DIR, PROCESSED_DATA_DIR, RAW_DATA_DIR
-from src.models.common.jobs import CrawlJob
+from src.models.common.jobs import CrawlJob, CrawlJobStatus
+from src.models.content.firecrawl_models import CrawlRequest, CrawlResult
 
 logger = get_logger()
 

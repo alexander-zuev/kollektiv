@@ -7,15 +7,14 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.api.chainlit.message_handler import MessageHandler
 from src.api.middleware.rate_limit import HealthCheckRateLimit
 from src.api.routes import Routes
 from src.api.system.health.health_router import router as health_router
 from src.api.system.webhooks.webhook_router import router as webhook_router
-from src.crawling.job_manager import JobManager
-from src.crawling.webhook_handler import WebhookHandler
-from src.interface.message_handler import MessageHandler
-from src.kollektiv.manager import Kollektiv
-from src.utils.config import (
+from src.core.system.job_manager import JobManager
+from src.infrastructure.config.logger import configure_logging, get_logger
+from src.infrastructure.config.settings import (
     API_HOST,
     API_PORT,
     CHAINLIT_HOST,
@@ -23,7 +22,8 @@ from src.utils.config import (
     JOB_FILE_DIR,
     LOG_LEVEL,
 )
-from src.utils.logger import configure_logging, get_logger
+from src.services.manager import Kollektiv
+from src.services.webhook_handler import WebhookHandler
 
 # Configure logging
 DEBUG = LOG_LEVEL == "debug"
@@ -120,7 +120,7 @@ def run_chainlit():
 
     # Run chainlit as a subprocess
     subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "chainlit", "run", "main.py", "--host", CHAINLIT_HOST, "--port", str(CHAINLIT_PORT)],
+        [sys.executable, "-m", "chainlit", "run", "app.py", "--host", CHAINLIT_HOST, "--port", str(CHAINLIT_PORT)],
         check=True,
         text=True,
         shell=False,  # Explicitly disable shell execution

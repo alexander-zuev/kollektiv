@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from src.services.manager import Kollektiv  # Avoids circular import
 
 from src.core.chat.flow_manager import UserInputManager
-from src.utils.logger import get_logger
+from src.infrastructure.config.logger import get_logger
 
 logger = get_logger()
 
