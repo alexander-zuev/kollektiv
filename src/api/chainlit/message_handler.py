@@ -1,7 +1,7 @@
 import chainlit as cl
 
-from src.generation.claude_assistant import ClaudeAssistant
-from src.interface.command_handler import CommandHandler
+from src.api.chainlit.command_handler import CommandHandler
+from src.core.chat.claude_assistant import ClaudeAssistant
 
 
 # TODO: Different types of replies: AssistantMessage, SystemMessage (success/error/warning)

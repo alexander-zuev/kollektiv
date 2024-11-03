@@ -1,11 +1,14 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 
 from src.api.routes import Routes
 from src.api.v0.content.schemas import AddContentSourceRequest, ContentSourceResponse, ContentSourceStatus
-from src.utils.logger import get_logger
+from src.core.content.crawler.crawler import FireCrawler
+from src.infrastructure.config.logger import get_logger
+from src.services.content_service import ContentService
 
 logger = get_logger()
 router = APIRouter()
+content_service = ContentService(crawler=FireCrawler())
 
 
 # POST: add new source
@@ -24,7 +27,11 @@ async def list_sources() -> list[ContentSourceResponse]:
 @router.post(Routes.V0.Content.SOURCES, response_model=ContentSourceResponse, status_code=status.HTTP_201_CREATED)
 async def add_source(request: AddContentSourceRequest) -> ContentSourceResponse:
     """Add a new content source."""
-    pass
+    try:
+        return await content_service.add_source(request)
+    except Exception as e:
+        logger.error(f"Failed to add source: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(Routes.V0.Content.SOURCE, response_model=ContentSourceResponse)

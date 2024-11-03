@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Response, status
 
 from src.api.routes import Routes
-from src.utils.logger import get_logger
+from src.infrastructure.config.logger import get_logger
 
 router = APIRouter()
 logger = get_logger()

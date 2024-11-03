@@ -2,16 +2,15 @@ from datetime import UTC, datetime
 
 from src.core._exceptions import JobNotFoundError
 from src.core.system.job_manager import JobManager
+from src.infrastructure.common.decorators import base_error_handler
+from src.infrastructure.config.logger import get_logger
+from src.models.common.jobs import CrawlJob, CrawlJobStatus
 from src.models.common.webhooks import FireCrawlEventType, FireCrawlWebhookEvent
-from src.models.job_management.job_models import CrawlJob, CrawlJobStatus
-from src.services.webhooks.base_handler import BaseWebhookHandler
-from src.utils.decorators import base_error_handler
-from src.utils.logger import get_logger
 
 logger = get_logger()
 
 
-class WebhookHandler(BaseWebhookHandler):
+class WebhookHandler:
     """Handles webhook events and coordinates job updates"""
 
     def __init__(self, job_manager: JobManager):
