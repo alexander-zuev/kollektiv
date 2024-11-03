@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Updated documentation to reflect new startup process
 - Updated to Python 3.12.6 -> 3.12.7
+- Restructured project layout for better domain separation:
+  - Moved domain logic to `src/core/`, models to `src/models/`
+  - Reorganized API endpoints under `src/api/`
+  - All infrastructure code to `src/infrastructure/`
+  - Aligned structure with domain-driven design principles
 
 ### Fixed
 
