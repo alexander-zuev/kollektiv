@@ -1,0 +1,165 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: "3.12"
+  POETRY_VERSION: "1.8.1"
+  POETRY_HOME: ~/.local/share/pypoetry
+  POETRY_CACHE_DIR: ~/.cache/pypoetry
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: 1
+  WANDB_MODE: "disabled"
+  # Global env vars
+  FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+
+jobs:
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.cache-key.outputs.value }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-in-project: true
+
+      - name: Generate cache key
+        id: cache-key
+        run: echo "value=${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock', '.pre-commit-config.yaml') }}" >> $GITHUB_OUTPUT
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            .venv
+            ${{ env.POETRY_CACHE_DIR }}
+          key: ${{ steps.cache-key.outputs.value }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+  validate:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-in-project: true
+
+      - name: Restore dependencies from cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            .venv
+            ${{ env.POETRY_CACHE_DIR }}
+          key: ${{ needs.setup.outputs.cache-key }}
+          
+      - name: Basic validation
+        run: |
+          # Syntax check only
+          poetry run python -m py_compile $(git ls-files '*.py')
+
+  quality:
+    needs: setup
+    runs-on: ubuntu-latest
+    continue-on-error: true  # Non-blocking
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-in-project: true
+
+      - name: Restore dependencies from cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            .venv
+            ${{ env.POETRY_CACHE_DIR }}
+          key: ${{ needs.setup.outputs.cache-key }}
+          
+      - name: Run linting and type checks
+        run: |
+          poetry run ruff check . || true
+          poetry run ruff format --check . || true
+
+  test:
+    needs: [validate, quality]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-in-project: true
+
+      - name: Restore cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            .venv
+            ${{ env.POETRY_CACHE_DIR }}
+          key: ${{ needs.setup.outputs.cache-key }}
+          
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Run tests with coverage
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          WANDB_MODE: "disabled"
+          WEAVE_PROJECT_NAME: ""
+        run: |
+          poetry run pytest \
+            --quiet \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml \
+            tests/
+            
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
