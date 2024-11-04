@@ -36,8 +36,8 @@ documentation:
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/rag-docs.git
-cd rag-docs
+git clone https://github.com/Twist333d/kollektiv.git
+cd kollektiv
 ```
 2. Install dependencies:
 ```bash
@@ -51,6 +51,15 @@ OPENAI_API_KEY="your_openai_api_key"
 ANTHROPIC_API_KEY="your_anthropic_api_key"
 COHERE_API_KEY="your_cohere_api_key"
 ```
+
+4. Start the application:
+```bash
+poetry run kollektiv
+```
+
+This will start both the API server and the Chainlit UI. You can access:
+- API at http://localhost:8000
+- Web UI at http://localhost:8001
 
 ## Usage Scenarios
 

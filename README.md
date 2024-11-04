@@ -1,5 +1,11 @@
 # 🚀 Kollektiv - LLMs + Up-to-date knowledge
 
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![CI](https://github.com/alexander-zuev/kollektiv/actions/workflows/tests.yml/badge.svg)](https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml)
+[![codecov](https://codecov.io/github/alexander-zuev/kollektiv/graph/badge.svg?token=FAT0JJNZG8)](https://codecov.io/github/alexander-zuev/kollektiv)
+[![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 ## 🌟 Overview
 
 Kollektiv is a Retrieval-Augmented Generation (RAG) system designed for one purpose - allow you to chat with your
@@ -31,7 +37,7 @@ Meet Kollektiv -> an open-source RAG app that helps you easily:
 - efficiently stores and embeds them in a local vector storage
 - sets up an LLM chat which you can rely on
 
-**Note** this is v.0.1.* and reliability of the system can be characterized as following:
+**Note** this is v.0.1.6 and reliability of the system can be characterized as following:
 - in 50% of the times it works every time!
 
 So do let me know if you are experiencing issues and I'll try to fix them.
@@ -48,19 +54,23 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 ## 🛠️ Technical Stack
 
-- **Language**: Python 3.7+
-- **Web Crawling**: FireCrawl API
-- **Vector Database**: Chroma DB
-- **Embeddings**: OpenAI's text-embedding-3-small
-- **LLM**: Anthropic's Claude 3.5 Sonnet
-- **Re-ranking**: Cohere API
-- **Additional Libraries**: tiktoken, chromadb, anthropic, cohere
+- **Backend**: Python/FastAPI
+- **Storage**:
+  - Supabase (auth/data)
+  - ChromaDB (vectors)
+  - Redis (queues/real-time)
+- **AI/ML**:
+  - OpenAI text-embedding-3-small (embeddings)
+  - Anthropic Claude 3.5 Sonnet (chat)
+  - Cohere (re-ranking)
+- **UI**: Chainlit
+- **Additional**: tiktoken, pydantic, pytest, ruff
 
 ## 🚀 Quick Start
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/Twist333d/kollektiv.git
+   git clone https://github.com/alexander-zuev/kollektiv.git
    cd kollektiv
    ```
 
@@ -80,14 +90,18 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 4. **Run the application:**
    ```bash
-   chainlit run app.py
+   poetry run kollektiv
    ```
 
 ## 💡 Usage
 
-1. **Start the Interface:**
+1. **Start the Application:**
    ```bash
-   chainlit run app.py
+   # Run both API and Chainlit UI
+   poetry run kollektiv
+
+   # Or run only Chainlit UI
+   chainlit run main.py
    ```
 
 2. **Add Documentation:**
@@ -118,10 +132,9 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 - No automatic re-indexing of documentation
 - URL validation limited to common formats
 - Exclude patterns must start with `/`
-- Up to 5 relevant documents retrieved per query
 
 ## 🛣️ Roadmap
-For a brief roadmap please check out [project wiki page](https://github.com/Twist333d/kollektiv/wiki).
+For a brief roadmap please check out [project wiki page](https://github.com/alexander-zuev/kollektiv/wiki).
 
 ## 📈 Performance Metrics
 Evaluation is currently done using `ragas` library. There are 2 key parts assessed:
@@ -133,9 +146,7 @@ Evaluation is currently done using `ragas` library. There are 2 key parts assess
    - Context recall
    - Context precision
 
-
 ## 📜 License
-
 
 Kollektiv is licensed under a modified version of the Apache License 2.0. While it allows for free use, modification,
 and distribution for non-commercial purposes, any commercial use requires explicit permission from the copyright owner.
@@ -164,7 +175,7 @@ If you have any questions regarding the renaming, feel free to reach out.
 
 ## 📞 Support
 
-For any questions or issues, please [open an issue](https://github.com/Twist333d/kollektiv/issues)
+For any questions or issues, please [open an issue](https://github.com/alexander-zuev/kollektiv/issues)
 
 ---
 

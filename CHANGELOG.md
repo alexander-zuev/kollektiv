@@ -9,27 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Web Interface: Added Chainlit-based web UI for improved user experience
-- Interactive Document Management: Added support for managing documents via web interface
-- Improved Command Handling: Enhanced @docs commands with better validation and feedback
-- URL Validation: Added robust URL validation with support for common formats
-- Pattern Validation: Added validation for exclude patterns in crawling configuration
+- Interactive Document Management (WIP): Added support for managing documents via web interface
+- FastAPI: Added health checks and webhook handlers
 
 ### Changed
-- Updated documentation to reflect web interface usage
-- Refactored command handling for better user interaction
-- Improved error messages and user feedback
-- Enhanced help messages with clearer examples
-- Simplified document management workflow
+- Updated documentation to reflect new startup process
+- Updated to Python 3.12.6 -> 3.12.7
+- Restructured project layout for better domain separation:
+  - Moved domain logic to `src/core/`, models to `src/models/`
+  - Reorganized API endpoints under `src/api/`
+  - All infrastructure code to `src/infrastructure/`
+  - Aligned structure with domain-driven design principles
 
 ### Fixed
-- Fixed URL validation in document addition process
-- Improved error handling in crawling process
-- Added validation for exclude patterns format
-- Fixed inconsistencies in command documentation
 
-### Deprecated
-
-### Removed
 
 ### Security
 
@@ -46,7 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Kollektiv is born - the project was renamed in order to exclude confusion with regards to Anthropic's Claude
   family of models.
 
-
 ## [0.1.4] - 2024-09-28
 
 ### Added
@@ -60,39 +52,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed errors in streaming & non-streaming responses
-
-
-## [0.1.3] - 2024-09-22
-### Added
-- Added caching of system prompt and tool definitions
-- Introduced sliding context window into conversation history based on token counts
-- Added streaming of assistant responses
-
-### Changed
-- Refactored conversation history handling
-- Refactored tool use and response handling
-- Refactored response generation to support both streaming and non-streaming
-- Updated logging
-- Improved vector db loading logic to handle missing chunks better
-- Improved summary generation logic by vector db
-
-
-## [0.1.2] - 2024-09-21
-- Introduced conventional commit styles
-- Refactored conversation history handling
-- Introduced sliding context window
-- Refactored tool use and response handling
-
-
-## [0.1.1] - 2024-09-18
-- Minor fixes, doc updates, basic tests setup
-- Minor CI changes
-
-
-## [0.1.0] - 2024-09-15
-Initial release of Kollektiv (called OmniClaude back then) with the following features:
-  - Crawling of documentation with FireCrawl
-  - Custom markdown chunking
-  - Embedding and storage with ChromaDB
-  - Custom retrieval with multi-query expansion and re-ranking
-  - Chat with Sonnet 3.5 with rag search tool

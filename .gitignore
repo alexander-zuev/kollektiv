@@ -326,3 +326,32 @@ internal_docs/
 
 # Chainlit translations
 .chainlit/translations.codiumai
+
+# .env.test
+.env.test
+
+# .ruff cache
+.ruff_cache/
+
+# Exclude private SSH keys
+id_rsa
+id_rsa.pub
+
+# Exclude additional environment files
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.*.local
+
+# Exclude editor-specific files
+.vscode/*
+
+# Exclude OS-specific files
+.DS_Store
+Thumbs.db
+
+# Exclude npm and Yarn debug log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

@@ -1,4 +1,4 @@
-from src.processing.chunking import MarkdownChunker
+from src.core.content.chunker import MarkdownChunker
 
 
 def test_markdown_chunker_initialization():

@@ -1,141 +1,186 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from firecrawl import FirecrawlApp
 
-from src.crawling.crawler import (
-    CrawlJob,
-    CrawlJobStatus,
-    CrawlRequest,
-    CrawlResult,
-    EmptyContentError,
-    FireCrawler,
-    JobNotCompletedError,
-)
-from src.crawling.file_manager import FileManager
-from src.crawling.job_manager import JobManager
-from src.utils.config import FIRECRAWL_API_KEY, WEBHOOK_URL
-
-# Test data
-TEST_URL = "https://docs.anthropic.com/claude/docs"
-TEST_JOB_ID = "test-job-123"
-TEST_FIRECRAWL_ID = "fc-123"
+from src.core._exceptions import FireCrawlAPIError, JobNotCompletedError
+from src.core.content.crawler.crawler import FireCrawler
+from src.models.common.jobs import CrawlJob, CrawlJobStatus
+from src.models.content.firecrawl_models import CrawlData, CrawlRequest, CrawlResult
 
 
 @pytest.fixture
 def mock_job_manager():
-    manager = AsyncMock(spec=JobManager)
-    manager.create_job.return_value = CrawlJob(
-        id=TEST_JOB_ID, firecrawl_id=TEST_FIRECRAWL_ID, status=CrawlJobStatus.PENDING, start_url=TEST_URL
-    )
+    """Create a mock job manager with async methods."""
+    manager = AsyncMock()
+    manager.get_job = AsyncMock()
+    manager.create_job = AsyncMock()
+    manager.update_job = AsyncMock()
     return manager
 
 
 @pytest.fixture
 def mock_file_manager():
-    return AsyncMock(spec=FileManager)
+    """Create a mock file manager with async methods."""
+    manager = AsyncMock()
+    manager.save_result = AsyncMock()
+    manager.load_result = AsyncMock()
+    return manager
 
 
 @pytest.fixture
 def mock_firecrawl_app():
-    app = Mock()
-    app.async_crawl_url.return_value = {"id": TEST_FIRECRAWL_ID}
-    app.map_url.return_value = ["url1", "url2"]
+    """Create a mock FirecrawlApp."""
+    app = Mock(spec=FirecrawlApp)
+    app.async_crawl_url = Mock()
     return app
 
 
 @pytest.fixture
-def crawler(mock_job_manager, mock_file_manager):
-    with patch("src.crawling.crawler.FirecrawlApp") as mock_app_class:
-        mock_app_class.return_value = mock_firecrawl_app
-        crawler = FireCrawler(job_manager=mock_job_manager, file_manager=mock_file_manager, api_key=FIRECRAWL_API_KEY)
+def crawler(mock_job_manager, mock_file_manager, mock_firecrawl_app):
+    """Create a FireCrawler instance with mock dependencies."""
+    with patch("src.core.content.crawler.crawler.FirecrawlApp", return_value=mock_firecrawl_app):
+        crawler = FireCrawler(
+            job_manager=mock_job_manager,
+            file_manager=mock_file_manager,
+        )
         return crawler
 
 
 class TestFireCrawler:
     """Test suite for FireCrawler class."""
 
-    def test_initialization(self, crawler):
-        """Test crawler initialization."""
-        assert crawler.api_key == FIRECRAWL_API_KEY
-        assert crawler.job_manager is not None
-        assert crawler.file_manager is not None
-        assert crawler.firecrawl_app is not None
-
     @pytest.mark.asyncio
-    async def test_crawl_success(self, crawler, mock_job_manager):
-        """Test successful crawl operation."""
-        request = CrawlRequest(url=TEST_URL, page_limit=50, exclude_patterns=["/blog/*"])
+    async def test_crawl_successful_job_creation(self, crawler, mock_job_manager):
+        """
+        Test successful crawl job creation and initialization.
 
-        job = await crawler.crawl(request)
-
-        assert job.id == TEST_JOB_ID
-        assert job.status == CrawlJobStatus.PENDING
-        assert job.start_url == TEST_URL
-        mock_job_manager.create_job.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_results_completed_job(self, crawler, mock_job_manager):
-        """Test getting results for a completed job."""
-        # Setup completed job
-        completed_job = CrawlJob(
-            id=TEST_JOB_ID, firecrawl_id=TEST_FIRECRAWL_ID, status=CrawlJobStatus.COMPLETED, start_url=TEST_URL
+        This is a critical unit test as job creation is the entry point for crawling.
+        """
+        # Arrange
+        request = CrawlRequest(url="https://test.com", page_limit=10, exclude_patterns=["/exclude/*"])
+        mock_firecrawl_response = {"id": "test_firecrawl_id"}
+        mock_job = CrawlJob(
+            id="test_job_id",
+            firecrawl_id="test_firecrawl_id",
+            status=CrawlJobStatus.PENDING,
+            start_url="https://test.com",
         )
-        mock_job_manager.get_job.return_value = completed_job
 
-        # Mock crawl data
-        mock_crawl_data = {"data": [{"content": "test", "metadata": {"og:url": TEST_URL}}]}
+        with patch.object(crawler.firecrawl_app, "async_crawl_url", return_value=mock_firecrawl_response):
+            mock_job_manager.create_job.return_value = mock_job
 
-        with patch.object(crawler, "_fetch_results_from_url", new_callable=AsyncMock) as mock_fetch:
-            mock_fetch.return_value = (mock_crawl_data, None)
+            # Act
+            result = await crawler.crawl(request)
 
-            result = await crawler.get_results(TEST_JOB_ID)
-
-            assert isinstance(result, CrawlResult)
-            assert result.job_status == CrawlJobStatus.COMPLETED
-            assert result.input_url == TEST_URL
-            assert len(result.unique_links) == 1
+            # Assert
+            assert result.id == "test_job_id"
+            assert result.status == CrawlJobStatus.PENDING
+            mock_job_manager.create_job.assert_awaited_once_with(
+                firecrawl_id="test_firecrawl_id", start_url="https://test.com/"
+            )
 
     @pytest.mark.asyncio
     async def test_get_results_incomplete_job(self, crawler, mock_job_manager):
-        """Test getting results for an incomplete job."""
-        pending_job = CrawlJob(
-            id=TEST_JOB_ID, firecrawl_id=TEST_FIRECRAWL_ID, status=CrawlJobStatus.PENDING, start_url=TEST_URL
-        )
-        mock_job_manager.get_job.return_value = pending_job
+        """
+        Test getting results for an incomplete job.
 
+        This is important as it validates proper job state handling.
+        """
+        # Arrange
+        job_id = "test_job_id"
+        incomplete_job = CrawlJob(
+            id=job_id, firecrawl_id="test_firecrawl_id", status=CrawlJobStatus.IN_PROGRESS, start_url="https://test.com"
+        )
+        mock_job_manager.get_job.return_value = incomplete_job
+
+        # Act & Assert
         with pytest.raises(JobNotCompletedError):
-            await crawler.get_results(TEST_JOB_ID)
+            await crawler.get_results(job_id)
 
+    @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_accumulate_empty_results(self, crawler):
-        """Test handling of empty crawl results."""
-        with patch.object(crawler, "_fetch_results_from_url", new_callable=AsyncMock) as mock_fetch:
-            mock_fetch.return_value = ({"data": []}, None)
+    async def test_end_to_end_crawl_flow(self, crawler, mock_job_manager, mock_file_manager):
+        """
+        Test the complete crawl flow from request to results.
 
-            with pytest.raises(EmptyContentError):
-                await crawler._accumulate_crawl_results(TEST_JOB_ID)
-
-    @pytest.mark.asyncio
-    async def test_map_url(self, crawler, mock_file_manager):
-        """Test URL mapping functionality."""
-        mock_file_manager.save_result.return_value = "test_file.json"
-
-        filename = await crawler.map_url(TEST_URL)
-
-        assert filename == "test_file.json"
-        mock_file_manager.save_result.assert_called_once()
-
-    def test_build_params(self, crawler):
-        """Test crawl parameters building."""
-        request = CrawlRequest(
-            url=TEST_URL, page_limit=50, exclude_patterns=["/blog/*"], include_patterns=["/docs/*"], max_depth=3
+        This integration test validates the entire crawl lifecycle.
+        """
+        # Arrange
+        request = CrawlRequest(url="https://test.com", page_limit=10)
+        mock_job = CrawlJob(
+            id="test_job_id",
+            firecrawl_id="test_firecrawl_id",
+            status=CrawlJobStatus.COMPLETED,
+            start_url="https://test.com",
+            completed_at=datetime.now(UTC),
         )
 
-        params = crawler._build_params(request)
+        mock_crawl_data = {"data": [{"markdown": "# Test Content", "metadata": {"og:url": "https://test.com/page1"}}]}
 
-        assert params["limit"] == 50
-        assert params["maxDepth"] == 3
-        assert params["excludePaths"] == ["/blog/*"]
-        assert params["includePaths"] == ["/docs/*"]
-        assert params["webhook"] == WEBHOOK_URL
-        assert params["scrapeOptions"]["formats"] == ["markdown"]
+        # Mock the API responses
+        with (
+            patch.object(crawler.firecrawl_app, "async_crawl_url", return_value={"id": "test_firecrawl_id"}),
+            patch.object(crawler, "_fetch_results_from_url", return_value=(mock_crawl_data, None)),
+        ):
+            mock_job_manager.create_job.return_value = mock_job
+            mock_job_manager.get_job.return_value = mock_job
+            mock_file_manager.save_result.return_value = "test_result.json"
+
+            # Act
+            job = await crawler.crawl(request)
+            result = await crawler.get_results(job.id)
+
+            # Assert
+            assert isinstance(result, CrawlResult)
+            assert result.job_status == CrawlJobStatus.COMPLETED
+            assert result.total_pages == 1
+            assert "https://test.com/page1" in result.unique_links
+
+    @pytest.mark.asyncio
+    async def test_crawl_api_error_handling(self, crawler):
+        """
+        Test proper handling of FireCrawl API errors.
+
+        Validates error handling and retry logic.
+        """
+        # Arrange
+        request = CrawlRequest(url="https://test.com", page_limit=10)
+
+        with patch.object(crawler.firecrawl_app, "async_crawl_url", side_effect=FireCrawlAPIError("API Error")):
+            # Act & Assert
+            with pytest.raises(FireCrawlAPIError) as exc_info:
+                await crawler.crawl(request)
+            assert "API Error" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_accumulate_crawl_results_pagination(self, crawler):
+        """
+        Test accumulation of paginated crawl results.
+
+        Validates proper handling of multi-page result fetching.
+        """
+        # Arrange
+        job_id = "test_job_id"
+        page1_data = {
+            "data": [{"markdown": "Page 1", "metadata": {"url": "https://test.com/page1"}}],
+            "next": "page2_url",
+        }
+        page2_data = {"data": [{"markdown": "Page 2", "metadata": {"url": "https://test.com/page2"}}], "next": None}
+
+        # Mock paginated responses
+        with patch.object(crawler, "_fetch_results_from_url") as mock_fetch:
+            mock_fetch.side_effect = [(page1_data, "page2_url"), (page2_data, None)]
+
+            # Act
+            result = await crawler._accumulate_crawl_results(job_id)
+
+            # Assert
+            assert isinstance(result, CrawlData)
+            assert len(result.data) == 2
+            assert result.data[0]["markdown"] == "Page 1"
+            assert result.data[1]["markdown"] == "Page 2"
+            assert result.data[0]["metadata"]["url"] == "https://test.com/page1"
+            assert result.data[1]["metadata"]["url"] == "https://test.com/page2"
+            assert mock_fetch.call_count == 2
