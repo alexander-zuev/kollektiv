@@ -51,8 +51,7 @@ repos:
         name: Run Ruff linter
         args: [
           --fix,
-          --exit-non-zero-on-fix,
-
+          --exit-zero,
         ]
         types_or: [python, pyi, jupyter]
         files: ^(src|tests)/

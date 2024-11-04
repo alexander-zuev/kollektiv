@@ -1,7 +1,7 @@
 from src.core.search.vector_db import DocumentProcessor, VectorDB
 
 
-def test_vector_db_initialization():
+def test_vector_db_initialization(mock_openai_embeddings):
     """
     Test the initialization of the VectorDB class.
 
@@ -10,7 +10,6 @@ def test_vector_db_initialization():
 
     Returns:
         bool: True if the tests pass, otherwise raises an assertion error.
-
     """
     vector_db = VectorDB()
     assert vector_db is not None

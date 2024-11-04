@@ -41,7 +41,10 @@ class SummaryManager:
     """
 
     def __init__(self, model_name: str = MAIN_MODEL):
-        weave.init(project_name=WEAVE_PROJECT_NAME)
+        # Only initialize weave if project name is set and non-empty
+        if WEAVE_PROJECT_NAME and WEAVE_PROJECT_NAME.strip():
+            weave.init(project_name=WEAVE_PROJECT_NAME)
+
         self.summaries = self.load_summaries()
         self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, max_retries=MAX_RETRIES)
         self.model_name = model_name

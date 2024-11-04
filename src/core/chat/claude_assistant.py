@@ -21,9 +21,6 @@ from src.infrastructure.common.decorators import anthropic_error_handler, base_e
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.config.settings import ANTHROPIC_API_KEY, MAIN_MODEL, WEAVE_PROJECT_NAME
 
-weave.init(WEAVE_PROJECT_NAME)
-
-
 logger = get_logger()
 
 
@@ -235,9 +232,16 @@ class ClaudeAssistant(Model):
     def __init__(
         self,
         vector_db: VectorDB,
-        api_key: str = None,
-        model_name: str = None,
+        api_key: str | None = None,
+        model_name: str | None = None,
     ):
+        # Initialize weave only if project name is set and non-empty
+        if WEAVE_PROJECT_NAME and WEAVE_PROJECT_NAME.strip():
+            try:
+                weave.init(WEAVE_PROJECT_NAME)
+            except Exception as e:
+                logger.warning(f"Failed to initialize weave: {e}")
+
         # Initialize fields via super().__init__()
         super().__init__(
             client=None,
