@@ -3,6 +3,7 @@
 # TODO: Implement retries or error handling for pages that fail to be crawled (e.g., network errors).
 # TODO: Provide more informative progress updates to the user during crawling (e.g., percentage completion).
 # TODO: Notify users only in case of critical errors or if no valid content is found after crawling.
+# TODO: Switch to Supabase/Redis for job storage
 import asyncio
 from datetime import UTC, datetime
 from typing import Any
