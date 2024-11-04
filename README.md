@@ -1,7 +1,7 @@
 # 🚀 Kollektiv - LLMs + Up-to-date knowledge
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![CI](https://github.com/alexander-zuev/kollektiv/actions/workflows/tests.yml/badge.svg)](https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml)
+[![CI](https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml/badge.svg)](https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml)
 [![codecov](https://codecov.io/github/alexander-zuev/kollektiv/graph/badge.svg?token=FAT0JJNZG8)](https://codecov.io/github/alexander-zuev/kollektiv)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
