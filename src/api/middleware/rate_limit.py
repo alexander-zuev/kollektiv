@@ -1,5 +1,7 @@
 import time
 from collections import defaultdict
+from collections.abc import Callable
+from typing import Any
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -10,17 +12,18 @@ from src.infrastructure.config.logger import get_logger
 logger = get_logger()
 
 
+# TODO: Is there a commonly reusable middleware?
 class HealthCheckRateLimit(BaseHTTPMiddleware):
     """Rate limit for the health endpoint"""
 
-    def __init__(self, app, requests_per_minute: int = 60, cleanup_interval: int = 300):
+    def __init__(self, app: Any, requests_per_minute: int = 60, cleanup_interval: int = 300) -> None:
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
         self.requests = defaultdict(list)
         self.last_cleanup = time.time()
         self.cleanup_interval = cleanup_interval
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Rate limit for the health endpoint"""
         if request.url.path == f"{Routes.System.HEALTH}":
             now = time.time()
@@ -56,7 +59,7 @@ class HealthCheckRateLimit(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-    def _cleanup_old_data(self, now: float):
+    def _cleanup_old_data(self, now: float) -> None:
         """Remove IPs that haven't made requests in the last minute"""
         for ip in list(self.requests.keys()):
             if not any(t > now - 60 for t in self.requests[ip]):

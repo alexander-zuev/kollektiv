@@ -5,7 +5,9 @@
 [![CI](https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml/badge.svg)](https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml)
 [![codecov](https://codecov.io/github/alexander-zuev/kollektiv/graph/badge.svg?token=FAT0JJNZG8)](https://codecov.io/github/alexander-zuev/kollektiv)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/alexander-zuev/kollektiv/graphs/commit-activity)
+[![Maintenance](https://img.shields.io/badge/Status-Active-brightgreen.svg)](https://github.com/alexander-zuev/kollektiv/graphs/commit-activity)
+
+
 
 ## 🌟 Overview
 

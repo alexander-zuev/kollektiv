@@ -665,5 +665,18 @@
     "completed_at": null,
     "result_file": null,
     "error": null
+  },
+  "c6aabe87-a3de-45bd-856f-618ad44da8e8": {
+    "id": "c6aabe87-a3de-45bd-856f-618ad44da8e8",
+    "firecrawl_id": "5539bf79-c60c-4891-8c1c-fa9782ad1d3c",
+    "status": "pending",
+    "start_url": "https://docs.anthropic.com/en/docs/",
+    "method": "crawl",
+    "pages_crawled": 0,
+    "created_at": "2024-11-05T05:38:17.013735+00:00",
+    "started_at": null,
+    "completed_at": null,
+    "result_file": null,
+    "error": null
   }
 }
