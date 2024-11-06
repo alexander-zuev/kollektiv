@@ -133,11 +133,7 @@ Temporary Items
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -251,6 +247,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+
 .env
 .venv
 env/
@@ -258,6 +255,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.secrets
 
 # Spyder project settings
 .spyderproject
@@ -283,14 +281,6 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
-structure.txt
-
 # Ignore data directories
 src/data/raw/*
 src/data/chunks/*
@@ -310,21 +300,13 @@ logs/*
 .mypy_cache/
 
 # ignore my actual project structure
-/scripts/project_structure.txt
-
-# ignore private jobs data
-/src/crawling/jobs.json
-
-# ignore private internal data
-internal_docs/
-
-# ignore experimental folder
-/src/experimental
+/scripts/maintenance/project_structure.txt
 
 # ignore changelog template
 /CHANGELOG_template.md!/roadmap.md
 
-# Chainlit translations
+# Chainlit
+chainlit.md
 .chainlit/translations.codiumai
 
 # .env.test
@@ -346,6 +328,7 @@ id_rsa.pub
 
 # Exclude editor-specific files
 .vscode/*
+.vscode
 
 # Exclude OS-specific files
 .DS_Store
@@ -355,3 +338,117 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# === Python Generated Files ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# === Project Specific ===
+# Data and Storage
+src/data/raw/*
+src/data/chunks/*
+src/vector_storage/chroma/*
+!src/data/raw/.gitkeep
+!src/data/chunks/.gitkeep
+!src/vector_storage/chroma/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Project Documentation
+/scripts/maintenance/project_structure.txt
+/CHANGELOG_template.md
+!/roadmap.md
+
+# === Environment & Configuration ===
+# Environment Files
+.env
+.env.*
+!.env.example
+config/environments/*
+!config/environments/.env.example
+.secrets/
+
+# === Development Tools ===
+# Testing and Coverage
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+coverage.xml
+.hypothesis/
+.nox/
+
+# Type Checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.ruff_cache/
+
+# IDE Settings
+.idea/
+.vscode/
+*.swp
+*.swo
+.spyderproject
+.spyproject
+.ropeproject
+
+# === Virtual Environments ===
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# === Chainlit ===
+chainlit.md
+.chainlit/translations.codiumai
+
+# === OS Generated Files ===
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# === Security ===
+# SSH & Keys
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+
+# === Dependencies ===
+# Poetry (uncomment if you want to version lock file)
+# poetry.lock

@@ -1,10 +1,9 @@
 import os
 from enum import Enum
+from pathlib import Path
 from typing import Final
 
 from dotenv import load_dotenv
-
-load_dotenv()
 
 
 # Environment
@@ -17,6 +16,24 @@ class Environment(str, Enum):
 
 
 ENVIRONMENT: Final = Environment(os.getenv("ENVIRONMENT", Environment.LOCAL))
+
+
+def get_env_file_path(environment: Environment) -> Path | None:
+    env_file_path = Path(f"config/environments/.env.{environment.value}")
+    if os.getenv("CI"):  # set in GitHub Actions
+        return None
+    if not env_file_path.exists():
+        raise FileNotFoundError(
+            f"Environment file not found: {env_file_path}"
+            f"Please ensure the file exists in the config/environments directory and is named correctly."
+        )
+    return env_file_path
+
+
+env_file_path = get_env_file_path(ENVIRONMENT)
+if env_file_path is not None and env_file_path.exists():
+    load_dotenv(dotenv_path=env_file_path)
+
 
 # Server Configuration
 API_HOST: Final = os.getenv("API_HOST", "127.0.0.1")
@@ -82,9 +99,20 @@ os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
 
-class Config:
-    """Configuration settings for the application.
+def validate_required_env_vars():
+    """Validate that all required environment variables are set."""
+    required_vars = {
+        "FIRECRAWL_API_KEY": FIRECRAWL_API_KEY,
+        "OPENAI_API_KEY": OPENAI_API_KEY,
+        "ANTHROPIC_API_KEY": ANTHROPIC_API_KEY,
+        # Add other required variables
+    }
 
-    This class manages all configuration settings and environment variables
-    used throughout the application.
-    """
+    missing_vars = [var for var, value in required_vars.items() if not value]
+    if missing_vars:
+        raise OSError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+
+# Add this after all environment variables are loaded
+if ENVIRONMENT != Environment.LOCAL:  # Only validate in non-local environments
+    validate_required_env_vars()
