@@ -31,17 +31,28 @@ repos:
         name: Check for debugger imports
 
   # === Type Checking ===
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.387
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.13.0"
     hooks:
-      - id: pyright
-        name: Run Pyright type checker
-        args: ["--level", "error"]
-        types_or: [python, pyi, jupyter]
-        files: ^(src|tests)/
-        exclude: ^src/experimental/
-        verbose: true
-        fail_fast: false
+      - id: mypy
+        name: Run mypy type checker
+        args: ["--config-file=pyproject.toml"]
+        additional_dependencies: [
+            "types-requests",
+            "types-aiofiles",
+            "types-pytz",
+            "pydantic",
+            "chainlit",
+            "anthropic",
+            "fastapi",
+            "httpx",
+            "tiktoken",
+            "weave",
+            "chromadb",
+            "cohere",
+            "langchain"
+        ]
 
   # === Code Quality & Style ===
   - repo: https://github.com/astral-sh/ruff-pre-commit

@@ -1,7 +1,7 @@
 import logging
 
 import chainlit as cl
-from chainlit.message import Message, AskUserMessage
+from chainlit.message import Message
 
 from src.api.chainlit.command_handler import CommandHandler
 from src.core.chat.claude_assistant import ClaudeAssistant

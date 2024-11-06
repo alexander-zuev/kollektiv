@@ -99,7 +99,7 @@ os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
 
 
-def validate_required_env_vars():
+def validate_required_env_vars() -> None:
     """Validate that all required environment variables are set."""
     required_vars = {
         "FIRECRAWL_API_KEY": FIRECRAWL_API_KEY,

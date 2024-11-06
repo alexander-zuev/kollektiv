@@ -22,10 +22,29 @@ env:
 jobs:
   quality:
     name: Code Quality
-    runs-on: [self-hosted, ubuntu-latest]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'poetry'
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Run mypy type checking
+        run: |
+          poetry run mypy src/ tests/ \
+            --config-file pyproject.toml \
+            --no-incremental \
+            --show-error-codes
+        continue-on-error: true
 
       - name: Run Ruff linting
         uses: astral-sh/ruff-action@v1
@@ -33,17 +52,15 @@ jobs:
           args: check .
         continue-on-error: true
 
-
       - name: Check code formatting
         uses: astral-sh/ruff-action@v1
         with:
           args: format --check .
         continue-on-error: true
 
-
   test:
     name: Unit and Integration Tests
-    runs-on: [self-hosted, ubuntu-latest]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
