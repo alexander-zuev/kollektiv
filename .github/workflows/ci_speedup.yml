@@ -1,0 +1,82 @@
+name: 10x CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: "3.12"
+  POETRY_VERSION: "1.8.3"
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: 1
+  WANDB_MODE: "disabled"
+  # Global env vars
+  FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+
+      - name: Run Ruff linting
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: check .
+        continue-on-error: true
+
+
+      - name: Check code formatting
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: format --check .
+        continue-on-error: true
+
+
+  test:
+    name: Unit and Integration Tests
+    runs-on: [self-hosted, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'poetry'
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Run tests with coverage
+        env:
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+        run: |
+          poetry run pytest --run-integration \
+            --quiet \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml \
+            tests/
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
