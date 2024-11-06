@@ -1,7 +1,12 @@
 [project]
 # Whether to enable telemetry (default: true). No personal data is collected.
-enable_telemetry = true
+enable_telemetry = false
 
+# Specify the welcome message file location
+welcome_message_path = "docs/chainlit/welcome.md"
+
+# Disable auto-generation of welcome file
+disable_default_welcome_message = true
 
 # List of environment variables to be provided by each user to use the app.
 user_env = []

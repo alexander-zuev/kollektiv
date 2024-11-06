@@ -1,143 +1,8 @@
-### JetBrains template
-# Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
-# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
-
-# User-specific stuff
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/**/usage.statistics.xml
-.idea/**/dictionaries
-.idea/**/shelf
-
-# AWS User-specific
-.idea/**/aws.xml
-
-# Generated files
-.idea/**/contentModel.xml
-
-# Sensitive or high-churn files
-.idea/**/dataSources/
-.idea/**/dataSources.ids
-.idea/**/dataSources.local.xml
-.idea/**/sqlDataSources.xml
-.idea/**/dynamic.xml
-.idea/**/uiDesigner.xml
-.idea/**/dbnavigator.xml
-
-# Gradle
-.idea/**/gradle.xml
-.idea/**/libraries
-
-# JetBrains IDEs
-.idea/
-*.iml
-*.iws
-*.ipr
-*.ids
-*.orig
-modules.xml
-.idea_modules/
-
-# CMake
-cmake-build-*/
-
-# Mongo Explorer plugin
-.idea/**/mongoSettings.xml
-
-# File-based project format
-*.iws
-
-# IntelliJ
-out/
-
-# mpeltonen/sbt-idea plugin
-.idea_modules/
-
-# JIRA plugin
-atlassian-ide-plugin.xml
-
-# Cursive Clojure plugin
-.idea/replstate.xml
-
-# SonarLint plugin
-.idea/sonarlint/
-
-# Crashlytics plugin (for Android Studio and IntelliJ)
-com_crashlytics_export_strings.xml
-crashlytics.properties
-crashlytics-build.properties
-fabric.properties
-
-# Editor-based Rest Client
-.idea/httpRequests
-
-# Android studio 3.1+ serialized cache file
-.idea/caches/build_file_checksums.ser
-
-### Windows template
-# Windows thumbnail cache files
-Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-
-# Dump file
-*.stackdump
-
-# Folder config file
-[Dd]esktop.ini
-
-# Recycle Bin used on file shares
-$RECYCLE.BIN/
-
-# Windows Installer files
-*.cab
-*.msi
-*.msix
-*.msm
-*.msp
-
-# Windows shortcuts
-*.lnk
-
-### macOS template
-# General
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Icon must end with two \r
-Icon
-
-# Thumbnails
-._*
-
-# Files that might appear in the root of a volume
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.icns
-.com.apple.timemachine.donotpresent
-
-# Directories potentially created on remote AFP share
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
-
-### Python template
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -157,201 +22,147 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# Environment Files
+.env*
+config/environments/*
+!config/environments/.env.example
+.venv/
+env/
+venv/
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# Project Data
+src/data/raw/*
+src/data/chunks/*
+!src/data/raw/.gitkeep
+!src/data/chunks/.gitkeep
 
-# Unit test / coverage reports
+# Vector Storage & Databases
+src/infrastructure/storage/vector/*
+!src/infrastructure/storage/vector/.gitkeep
+src/infrastructure/storage/vector/document_summaries.json
+src/infrastructure/vector_storage/chroma/*
+!src/infrastructure/vector_storage/chroma/.gitkeep
+*.sqlite3
+*.sqlite
+chroma.sqlite3
+
+# Document Summaries
+**/document_summaries.json
+
+# Project Documentation
+/scripts/maintenance/project_structure.txt
+/CHANGELOG_template.md
+!/roadmap.md
+
+# Testing and Coverage
+.pytest_cache/
+.coverage
+.coverage.*
 htmlcov/
 .tox/
 .nox/
-.coverage
-.coverage.*
-.cache
 nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
-.pytest_cache/
 cover/
+reports/coverage/
 
-# Translations
-*.mo
-*.pot
+# Development Tools
+## Poetry
+#poetry.lock  # Uncomment if you want to ignore poetry.lock
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/#use-with-ide
+## PDM
 .pdm.toml
+#pdm.lock
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
+## Pre-commit
+.pre-commit-config.yaml
+!.pre-commit-config.example.yaml
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+## Git
+.gitattributes
+!.gitattributes.example
 
-# SageMath parsed files
-*.sage.py
+## Ruff
+.ruff_cache/
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
+## MyPy
 .mypy_cache/
 .dmypy.json
 dmypy.json
 
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
+## PyType
 .pytype/
 
-# Cython debug symbols
-cython_debug/
+## PyBuilder
+.pybuilder/
+target/
 
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
-structure.txt
+# IDE
+## JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+*.ids
+*.orig
+modules.xml
+.idea_modules/
 
-# Ignore data directories
-src/data/raw/*
-src/data/chunks/*
+## VSCode
+.vscode/
+*.swp
+*.swo
 
-# Keep the directory structure
-!src/data/raw/.gitkeep
-!src/data/chunks/.gitkeep
-
-# Ignore ChromaDB files
-src/vector_storage/chroma/*
-!src/vector_storage/chroma/.gitkeep
-
-# Ignore everything in the logs directory
+# Logs
 logs/*
 !logs/.gitkeep
-
-.mypy_cache/
-
-# ignore my actual project structure
-/scripts/project_structure.txt
-
-# ignore private jobs data
-/src/crawling/jobs.json
-
-# ignore private internal data
-internal_docs/
-
-# ignore experimental folder
-/src/experimental
-
-# ignore changelog template
-/CHANGELOG_template.md!/roadmap.md
-
-# Chainlit translations
-.chainlit/translations.codiumai
-
-# .env.test
-.env.test
-
-# .ruff cache
-.ruff_cache/
-
-# Exclude private SSH keys
-id_rsa
-id_rsa.pub
-
-# Exclude additional environment files
-.env.local
-.env.development
-.env.production
-.env.staging
-.env.*.local
-
-# Exclude editor-specific files
-.vscode/*
-
-# Exclude OS-specific files
-.DS_Store
-Thumbs.db
-
-# Exclude npm and Yarn debug log files
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Chainlit
+.chainlit/translations.codiumai
+chainlit.md
+
+# Security
+id_rsa
+id_rsa.pub
+
+# OS Generated Files
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+## Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk

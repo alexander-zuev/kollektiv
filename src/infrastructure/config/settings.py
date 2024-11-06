@@ -1,13 +1,14 @@
+# TODO: transition to Pydantic settings
+# TODO: setup correct structure
 import os
 from enum import Enum
+from pathlib import Path
 from typing import Final
 
 from dotenv import load_dotenv
 
-load_dotenv()
 
-
-# Environment
+# Determine environment
 class Environment(str, Enum):
     """Environment types."""
 
@@ -17,6 +18,33 @@ class Environment(str, Enum):
 
 
 ENVIRONMENT: Final = Environment(os.getenv("ENVIRONMENT", Environment.LOCAL))
+
+
+# Load environment variables
+def get_env_file_path(environment: Environment) -> Path | None:
+    """Get the path to the environment-specific .env file."""
+    # Skip file check if running in CI
+    if os.getenv("CI"):  # GitHub Actions sets this automatically
+        return None
+
+    env_file_path = Path(f"config/environments/.env.{environment.value}")
+    if not env_file_path.exists():
+        raise FileNotFoundError(
+            f"Environment file not found: {env_file_path}. "
+            f"Please ensure .env.{environment.value} exists in config/environments/"
+        )
+
+    return env_file_path
+
+
+env_file = get_env_file_path(ENVIRONMENT)
+if env_file:
+    load_dotenv(env_file)
+
+# Local overrides
+local_override = Path("config/environments/.env.local")
+if ENVIRONMENT == Environment.LOCAL and local_override.exists():
+    load_dotenv(local_override, override=True)
 
 # Server Configuration
 API_HOST: Final = os.getenv("API_HOST", "127.0.0.1")
@@ -80,6 +108,14 @@ os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(RAW_DATA_DIR, exist_ok=True)
 os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
 os.makedirs(CHROMA_DB_DIR, exist_ok=True)
+
+# Add default test values for required settings
+if ENVIRONMENT == Environment.TEST:
+    FIRECRAWL_API_KEY = FIRECRAWL_API_KEY or "test-key"
+    ANTHROPIC_API_KEY = ANTHROPIC_API_KEY or "test-key"
+    OPENAI_API_KEY = OPENAI_API_KEY or "test-key"
+    COHERE_API_KEY = COHERE_API_KEY or "test-key"
+    WEAVE_PROJECT_NAME = WEAVE_PROJECT_NAME or "test-project"
 
 
 class Config:

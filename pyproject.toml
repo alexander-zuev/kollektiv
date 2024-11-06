@@ -69,6 +69,7 @@ markers = [
 
 [tool.coverage.run]
 source = ["src"]
+branch = true
 
 [tool.coverage.report]
 exclude_lines = [
@@ -83,7 +84,11 @@ exclude_lines = [
 show_missing = true
 skip_covered = true
 skip_empty = true
-precision = 2
+precision = 1
+
+[tool.coverage.html]
+directory = "reports/coverage"    # HTML report directory
+title = "Coverage Report"
 
 
 [tool.pyright]
