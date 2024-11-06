@@ -69,12 +69,10 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [commit]
+        stages: [pre-commit]
         args: [
           "--quiet",
           "--no-header",
-          "--cov=src",
-          "--cov-report=term-missing:skip-covered",
           "-ra",
           "--run-integration",
         ]
@@ -82,8 +80,8 @@ repos:
 
       - id: update-project-structure
         name: Update project documentation
-        entry: python scripts/generate_structure.py
+        entry: python scripts/maintenance/generate_structure.py
         language: system
         pass_filenames: false
         always_run: true
-        stages: [commit]
+        stages: [pre-commit]
