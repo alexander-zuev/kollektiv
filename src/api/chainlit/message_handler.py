@@ -1,6 +1,7 @@
 import logging
 
 import chainlit as cl
+from chainlit.message import Message
 
 from src.api.chainlit.command_handler import CommandHandler
 from src.core.chat.claude_assistant import ClaudeAssistant
@@ -16,7 +17,7 @@ class MessageHandler:
         self.claude_assistant = claude_assistant
         self.command_handler = command_handler
 
-    async def route_message(self, message: cl.Message):
+    async def route_message(self, message: Message) -> None:
         """Routes incoming messages to command or regular message handlers."""
         content = message.content.strip()
 
@@ -25,7 +26,7 @@ class MessageHandler:
         else:
             await self.handle_regular_message(content)
 
-    async def handle_command_message(self, content: str):
+    async def handle_command_message(self, content: str) -> None:
         """Processes command messages and manages multi-step flows."""
         try:
             response = await self.command_handler.handle_command(content)
@@ -38,13 +39,13 @@ class MessageHandler:
             logger.error(f"Command handling error: {e}")
             await cl.Message(content=f"❌ Error processing command: {str(e)}").send()
 
-    async def handle_command_flow(self):
+    async def handle_command_flow(self) -> None:
         """Handles the command flow for multi-step inputs."""
         while self.command_handler.flow_manager.is_active():
             prompt = self.command_handler.flow_manager.get_current_prompt()
             user_input = await cl.AskUserMessage(content=prompt).send()
 
-            if user_input:
+            if isinstance(user_input, dict) and "output" in user_input:
                 result = await self.command_handler.process_flow_input(user_input["output"])
                 await cl.Message(content=result["response"]).send()
 
@@ -57,11 +58,11 @@ class MessageHandler:
                 self.command_handler.flow_manager.reset()
                 break
 
-    async def handle_regular_message(self, content: str):
+    async def handle_regular_message(self, content: str) -> None:
         """Processes regular messages using the Claude assistant."""
         response = self.claude_assistant.get_response(user_input=content, stream=True)
 
-        current_message = cl.Message(content="")
+        current_message = Message(content="")
         await current_message.send()
 
         tool_used = False
@@ -70,7 +71,7 @@ class MessageHandler:
             if event["type"] == "text":
                 if tool_used:
                     # If a tool was used, start a new message for the assistant's response
-                    current_message = cl.Message(content="")
+                    current_message = Message(content="")
                     await current_message.send()
                     tool_used = False
                 await current_message.stream_token(event["content"])

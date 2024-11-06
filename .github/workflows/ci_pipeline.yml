@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: 10x CI Pipeline
 
 on:
   push:
@@ -8,9 +8,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.12"
-  POETRY_VERSION: "1.8.1"
-  POETRY_HOME: ~/.local/share/pypoetry
-  POETRY_CACHE_DIR: ~/.cache/pypoetry
+  POETRY_VERSION: "1.8.3"
   PYTHONPATH: ${{ github.workspace }}
   PYTHONUNBUFFERED: 1
   WANDB_MODE: "disabled"
@@ -20,122 +18,60 @@ env:
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
 
-jobs:
-  setup:
-    name: Setup Environment
-    runs-on: ubuntu-latest
-    outputs:
-      cache-key: ${{ steps.cache-key.outputs.value }}
-    steps:
-      - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-in-project: true
+        run: pip install poetry==${{ env.POETRY_VERSION }}
 
-      - name: Generate cache key
-        id: cache-key
-        run: echo "value=${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock', '.pre-commit-config.yaml') }}" >> $GITHUB_OUTPUT
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path: |
-            .venv
-            ${{ env.POETRY_CACHE_DIR }}
-          key: ${{ steps.cache-key.outputs.value }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'poetry'
 
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
 
-  validate:
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-in-project: true
-
-      - name: Restore dependencies from cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            .venv
-            ${{ env.POETRY_CACHE_DIR }}
-          key: ${{ needs.setup.outputs.cache-key }}
-
-      - name: Basic validation
+      - name: Run mypy type checking
         run: |
-          # Syntax check only
-          poetry run python -m py_compile $(git ls-files '*.py')
+          poetry run mypy src/ tests/ \
+            --config-file pyproject.toml \
+            --no-incremental \
+            --show-error-codes
+        continue-on-error: true
 
-  quality:
-    needs: setup
-    runs-on: ubuntu-latest
-    continue-on-error: true  # Non-blocking
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - name: Run Ruff linting
+        uses: astral-sh/ruff-action@v1
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          args: check .
+        continue-on-error: true
 
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
+      - name: Check code formatting
+        uses: astral-sh/ruff-action@v1
         with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-in-project: true
-
-      - name: Restore dependencies from cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            .venv
-            ${{ env.POETRY_CACHE_DIR }}
-          key: ${{ needs.setup.outputs.cache-key }}
-
-      - name: Run linting and type checks
-        run: |
-          poetry run ruff check . || true
-          poetry run ruff format --check . || true
+          args: format --check .
+        continue-on-error: true
 
   test:
-    needs: [validate, quality]
+    name: Unit and Integration Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/checkout@v4
 
       - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-in-project: true
+        run: pip install poetry==${{ env.POETRY_VERSION }}
 
-      - name: Restore cache
-        uses: actions/cache@v3
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path: |
-            .venv
-            ${{ env.POETRY_CACHE_DIR }}
-          key: ${{ needs.setup.outputs.cache-key }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'poetry'
 
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
@@ -146,22 +82,18 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-          WANDB_MODE: "disabled"
-          WEAVE_PROJECT_NAME: ""
         run: |
-          mkdir -p reports/coverage
-          poetry run pytest \
+          poetry run pytest --run-integration \
             --quiet \
             --cov=src \
-            --cov-report=xml:reports/coverage/coverage.xml \
-            --cov-report=html:reports/coverage/html \
+            --cov-report=xml \
             --cov-report=term-missing:skip-covered \
             --cov-config=pyproject.toml \
             tests/
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
-          file: ./reports/coverage/coverage.xml
+          file: coverage.xml
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

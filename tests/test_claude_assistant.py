@@ -27,7 +27,7 @@ def real_vector_db():
 
 
 @pytest.fixture
-def claude_assistant_with_mock(mock_vector_db):
+def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
     """Set up a ClaudeAssistant instance with mocked dependencies."""
     with patch("anthropic.Anthropic") as mock_anthropic:
         mock_client = Mock()
