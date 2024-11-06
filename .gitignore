@@ -29,6 +29,7 @@ config/environments/*
 .venv/
 env/
 venv/
+.secrets
 
 # Project Data
 src/data/raw/*
