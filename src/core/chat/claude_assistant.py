@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Generator
-from typing import Any
+from typing import Any, TypedDict
 
 import anthropic
 import tiktoken
@@ -24,39 +24,31 @@ from src.infrastructure.config.settings import ANTHROPIC_API_KEY, MAIN_MODEL, WE
 logger = get_logger()
 
 
+class MessageContent(TypedDict):
+    """Type definition for message content."""
+
+    type: str
+    content: str
+    tool_use_id: str | None
+
+
 class ConversationMessage:
     """
     Represent a conversation message with an ID, role, and content.
 
     Args:
         role (str): The role of the message sender (e.g., 'user', 'system').
-        content (str | list[dict[str, Any]]): The content of the message, which can be a string or a list of
-        dictionaries.
-
-    Returns:
-        None
-
-    Raises:
-        None
+        content (Union[str, list[MessageContent]]): The content of the message.
     """
 
-    def __init__(self, role: str, content: str | list[dict[str, Any]]):
-        self.id = str(uuid.uuid4())
-        self.role = role
-        self.content = content
+    def __init__(self, role: str, content: str | list[MessageContent]) -> None:
+        self.id: str = str(uuid.uuid4())
+        self.role: str = role
+        self.content: str | list[MessageContent] = content
 
     def to_dict(self, include_id: bool = False) -> dict[str, Any]:
-        """
-        Convert the message object to a dictionary.
-
-        Args:
-            include_id (bool): Whether to include the ID of the message in the dictionary.
-
-        Returns:
-            dict[str, Any]: A dictionary representation of the message with keys "role" and "content".
-                            Optionally includes "id" if `include_id` is True.
-        """
-        message_dict = {"role": self.role, "content": self.content}
+        """Convert the message object to a dictionary."""
+        message_dict: dict[str, Any] = {"role": self.role, "content": self.content}
         if include_id:
             message_dict["id"] = self.id
         return message_dict
@@ -216,7 +208,7 @@ class ClaudeAssistant(Model):
 
     client: anthropic.Anthropic | None = None
     vector_db: VectorDB
-    api_key: str = Field(default=ANTHROPIC_API_KEY)
+    api_key: str | None = Field(default=ANTHROPIC_API_KEY)
     model_name: str = Field(default=MAIN_MODEL)
     base_system_prompt: str = Field(default="")
     system_prompt: str = Field(default="")
@@ -322,15 +314,15 @@ class ClaudeAssistant(Model):
         self._init()
 
     @anthropic_error_handler
-    def _init(self):
-        self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=2)  # default number of re-tries
+    def _init(self) -> None:
+        """Initialize the Claude Assistant with API client and tools."""
+        self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=2)
         self.conversation_history = ConversationHistory()
-
-        self.tools = self.tool_manager.get_all_tools()  # Get all tools as a list of dicts
+        self.tools = self.tool_manager.get_all_tools()
         logger.debug("Claude assistant successfully initialized.")
 
     @base_error_handler
-    def update_system_prompt(self, document_summaries: list[dict[str, Any]]):
+    def update_system_prompt(self, document_summaries: list[dict[str, Any]]) -> None:
         """
         Update the system prompt with document summaries.
 
@@ -574,7 +566,7 @@ class ClaudeAssistant(Model):
         return response.content[0].text
 
     @base_error_handler
-    def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any] | str:
+    def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any]:
         """
         Handle tool use for specified tools.
 
@@ -584,8 +576,7 @@ class ClaudeAssistant(Model):
             tool_use_id (str): The unique identifier for this specific tool use.
 
         Returns:
-            dict[str, Any] | str: A dictionary containing the tool result if successful, otherwise a string with an
-            error message.
+            dict[str, Any]: A dictionary containing the tool result.
 
         Raises:
             Exception: If there is any error while executing the tool.
@@ -613,9 +604,11 @@ class ClaudeAssistant(Model):
                     f"{self.conversation_history.get_conversation_history()}"
                 )
                 return tool_result
+
+            raise ValueError(f"Unknown tool: {tool_name}")
         except Exception as e:
             logger.error(f"Error executing tool {tool_name}: {str(e)}")
-            return f"Error: {str(e)}"
+            return {"role": "system", "content": [{"type": "error", "content": f"Error: {str(e)}"}]}
 
     @anthropic_error_handler
     @weave.op()
@@ -770,7 +763,7 @@ class ClaudeAssistant(Model):
 
     @anthropic_error_handler
     @weave.op()
-    def generate_multi_query(self, query: str, model: str = None, n_queries: int = 5) -> list[str]:
+    def generate_multi_query(self, query: str, model: str | None = None, n_queries: int = 5) -> list[str]:
         """
         Generate multiple related queries based on a user query.
 
@@ -865,7 +858,7 @@ class ClaudeAssistant(Model):
             "contexts": contexts,
         }
 
-    def reset_conversation(self):
+    def reset_conversation(self) -> None:
         """
         Reset the conversation state to its initial state.
 

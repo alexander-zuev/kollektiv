@@ -1,6 +1,7 @@
 import multiprocessing
 import sys
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Optional
 
 import chainlit as cl
 import uvicorn
@@ -32,11 +33,11 @@ configure_logging(debug=DEBUG)
 logger = get_logger()
 
 # Store the message handler globally (needed for Chainlit)
-message_handler: "MessageHandler" = None
+message_handler: Optional[MessageHandler] = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events."""
     logger.info("Starting up Kollektiv API...")
     try:
@@ -50,7 +51,6 @@ async def lifespan(app: FastAPI):
 
         logger.info("Core services initialized successfully")
         yield
-
     except Exception as e:
         logger.error(f"Failed to initialize core services: {str(e)}")
         raise
@@ -90,7 +90,7 @@ def create_app() -> FastAPI:
 
 # Chainlit handlers
 @cl.on_chat_start
-async def on_chat_start():
+async def on_chat_start() -> None:
     """Handle the chat start event and send initial welcome messages."""
     global message_handler
     message_handler = await Kollektiv.setup(reset_db=True, load_all_docs=True)
@@ -102,19 +102,19 @@ async def on_chat_start():
 
 
 @cl.on_message
-async def handle_message(message: cl.Message):
+async def handle_message(message: cl.Message) -> None:
     """Passes user message to MessageHandler for processing."""
     global message_handler
     await message_handler.route_message(message)
 
 
-def run_api():
+def run_api() -> None:
     """Run the FastAPI application."""
     app = create_app()
     uvicorn.run(app, host=API_HOST, port=API_PORT, log_level=LOG_LEVEL)
 
 
-def run_chainlit():
+def run_chainlit() -> None:
     """Run the Chainlit application."""
     import os
     import subprocess
@@ -132,7 +132,7 @@ def run_chainlit():
     # subprocess.run(["chainlit", "run", "main.py", "--host", CHAINLIT_HOST, "--port", str(CHAINLIT_PORT)])
 
 
-def run():
+def run() -> None:
     """Run both API and Chainlit servers."""
     # Security warnings for non-localhost bindings
     if API_HOST != "127.0.0.1":

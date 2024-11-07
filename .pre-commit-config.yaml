@@ -37,7 +37,11 @@ repos:
     hooks:
       - id: mypy
         name: Run mypy type checker
-        args: ["--config-file=pyproject.toml"]
+        args: [
+          "--config-file=pyproject.toml",
+          "--show-error-codes",
+          "--pretty",
+        ]
         additional_dependencies: [
             "types-requests",
             "types-aiofiles",
@@ -53,6 +57,7 @@ repos:
             "cohere",
             "langchain"
         ]
+        verbose: true
 
   # === Code Quality & Style ===
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -63,13 +68,16 @@ repos:
         args: [
           --fix,
           --exit-zero,
+          --quiet,
         ]
         types_or: [python, pyi, jupyter]
         files: ^(src|tests)/
         exclude: ^src/experimental/
+        verbose: false
       - id: ruff-format
         name: Run Ruff formatter
         types_or: [python, pyi, jupyter]
+
 
   # === Testing & Documentation ===
   - repo: local
