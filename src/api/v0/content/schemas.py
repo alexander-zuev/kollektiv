@@ -72,5 +72,7 @@ class ContentSourceResponse(BaseModel):
     url: str
     status: ContentSourceStatus
     created_at: datetime
+    updated_at: datetime
+    total_pages: int
     config: ContentSourceConfig
-    job_id: str | None = None  # Track FireCrawl job
+    job_id: str | None = None  #

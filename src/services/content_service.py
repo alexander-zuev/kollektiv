@@ -14,6 +14,8 @@ logger = get_logger()
 
 
 class ContentService:
+    """Service for managing content sources."""
+
     def __init__(self, crawler: FireCrawler):
         self.crawler = crawler
         self._sources: dict[str, ContentSourceResponse] = {}  # In-memory storage for now
@@ -63,3 +65,7 @@ class ContentService:
         )
 
         return source
+
+    async def list_sources(self) -> list[ContentSourceResponse]:
+        """List all content sources."""
+        return list(self._sources.values())
