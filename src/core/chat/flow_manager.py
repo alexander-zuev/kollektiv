@@ -1,21 +1,30 @@
 # TODO: Abstract prompts
 # TODO: Abstract replies to the user
 
+from typing import Any
+
 
 class UserInputManager:
     """Manages the input flow for collecting required parameters from the user."""
 
-    def __init__(self):
-        self.state = None
-        self.data = {}
+    def __init__(self) -> None:
+        """Initialize the flow manager."""
+        self.state: str | None = None
+        self.data: dict[str, Any] = {}
 
-    def reset(self):
+    def reset(self) -> None:
         """Resets the state of the flow manager."""
         self.state = None
         self.data = {}
 
-    def start_flow(self, flow_type: str, initial_data: dict):
-        """Starts the flow manager."""
+    def start_flow(self, flow_type: str, initial_data: dict[str, Any]) -> None:
+        """
+        Starts the flow manager.
+
+        Args:
+            flow_type: Type of flow to start
+            initial_data: Initial data for the flow
+        """
         self.reset()
         self.data.update(initial_data)
         if flow_type == "add":

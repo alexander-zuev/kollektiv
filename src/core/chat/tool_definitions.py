@@ -38,37 +38,34 @@ class ToolManager:
         tools (Dict[str, Any]): A dictionary to store tools by their names.
     """
 
-    def __init__(self):
-        self.tools: dict[str, Any] = {}
+    def __init__(self) -> None:
+        """Initialize an empty tool collection."""
+        self.tools: dict[str, Tool] = {}
 
-    def add_tool(self, tool: Tool):
+    def add_tool(self, tool: Tool) -> None:
         """
         Add a tool to the tools collection.
 
         Args:
-            tool (Tool): The tool instance to be added to the collection.
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If a tool with the same name already exists in the collection.
+            tool: The tool instance to be added
         """
         self.tools[tool.name] = tool
 
     def get_tool(self, name: str) -> Tool:
         """
-        Retrieve a tool by its name from the tools dictionary.
+        Retrieve a tool by its name.
 
         Args:
-            name (str): The name of the tool to retrieve.
+            name: Name of the tool to retrieve
 
         Returns:
-            Tool: The tool associated with the given name.
+            Tool: The requested tool
 
         Raises:
-            KeyError: If no tool exists with the provided name.
+            KeyError: If no tool exists with the provided name
         """
+        if name not in self.tools:
+            raise KeyError(f"Tool '{name}' not found")
         return self.tools[name]
 
     def get_all_tools(self) -> list[dict[str, Any]]:

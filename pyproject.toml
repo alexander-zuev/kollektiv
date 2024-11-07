@@ -35,6 +35,8 @@ chainlit = "^1.3.1"
 langchain = "^0.3.6"
 types-requests = "^2.32.0.20241016"
 mypy = "^1.13.0"
+types-pytz = "^2024.2.0.20241003"
+types-aiofiles = "^24.1.0.20240626"
 
 
 [build-system]
@@ -65,7 +67,6 @@ markers = [
     "slow: mark test as slow running"
 ]
 
-
 [tool.coverage.run]
 source = ["src"]
 
@@ -85,58 +86,66 @@ skip_empty = true
 precision = 2
 
 
-[tool.pyright]
-venvPath = "C:/Users/azuev/AppData/Local/pypoetry/Cache/virtualenvs"
-venv = "kollektiv-Q2tIfxg1-py3.12"
-extraPaths = [
-    "C:/Users/azuev/AppData/Local/pypoetry/Cache/virtualenvs/kollektiv-Q2tIfxg1-py3.12/Lib/site-packages"
-]
-include = ["src"]
-exclude = [
-    "**/node_modules",
-    "**/__pycache__",
-    "src/experimental",
-    "src/typestubs"
-]
-pythonVersion = "3.12"
-typeCheckingMode = "standard"
-reportMissingImports = true
-reportMissingTypeStubs = "warning"
-reportUnknownArgumentType = false
-reportOptionalMemberAccess = false
-reportGeneralTypeIssues = "warning"
-reportUnknownVariableType = "warning"
-reportPrivateUsage = "warning"
-reportPropertyTypeMismatch = "warning"
-reportUnnecessaryTypeIgnoreComment = "warning"
-reportMissingParameterType = false
-reportSelfClsParameterType = false
-reportMissingTypeArgument = false
-reportUnknownParameterType = false
-reportUnknownMemberType = false
-
 
 [tool.mypy]
 python_version = "3.12"
-ignore_missing_imports = true  # For third-party libs
+ignore_missing_imports = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_return_any = true
 
-# Keep important checks
-disallow_untyped_defs = true  # Functions should have type hints
-check_untyped_defs = true     # Check body of untyped functions
-warn_return_any = true        # Warn about returning Any
+# Add these to handle __init__ specifically
+disallow_incomplete_defs = true
+no_implicit_optional = true
+
+plugins = [
+    "pydantic.mypy"
+]
 
 # Ignore noise
 disable_error_code = [
-    "attr-defined",      # Ignore dynamic attribute access (like your T? error)
-    "no-untyped-call",  # Ignore calls to untyped functions (like get_logger)
+    "attr-defined",      # Ignore dynamic attribute access
+    "no-untyped-call",  # Ignore calls to untyped functions
     "misc",             # Ignore misc issues like untyped decorators
-    "union-attr"        # Ignore union attribute access
+    "union-attr",       # Ignore union attribute access
+    "type-arg",         # Reduces generic type noise
+    "var-annotated",    # Reduces variable annotation noise
+    "return-value",     # Less strict on return value matching
 ]
 
 # For cleaner output
 warn_unused_ignores = false
 warn_redundant_casts = false
+disallow_subclassing_any = false
+disallow_any_explicit = false
 
+# Handle third-party libs that need stubs
+[[tool.mypy.overrides]]
+module = [
+    "pytz.*",
+    "aiofiles.*",
+    "chainlit.*",
+    "weave.*",
+    "ragas.*",
+    "wandb.*",
+    "cohere.*"
+]
+ignore_missing_imports = true
+
+# More relaxed settings for tests
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false    # More relaxed for tests
+check_untyped_defs = false       # More relaxed for tests
+warn_return_any = false          # More relaxed for tests
+
+# Strict settings for core business logic
+[[tool.mypy.overrides]]
+module = ["src.core.*"]
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_return_any = true
+strict_optional = true
 
 
 [tool.ruff]

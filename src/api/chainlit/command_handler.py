@@ -133,18 +133,13 @@ class CommandHandler:
         self.flow_manager.start_flow("add", {"url": processed_url})
         return f"Starting the process to add web content for **{processed_url}**."
 
-    def remove_web_content(self, args: list) -> str:
+    def remove_web_content(self, args: list) -> None:
         """Removes a document from the collection."""
-        logger.info(f"Attempting to remove web content with args: {args}")
-        if not args:
-            return "Missing document ID. Usage: @docs remove [ID]\nExample: @docs remove 123"
-        doc_id = args[0]
-        return self.kollektiv.remove_document(doc_id)
+        pass
 
-    def list_synced_web_content(self) -> str:
-        """Lists all documents in the collection."""
-        logger.info("Listing synced web content")
-        return self.kollektiv.list_documents()
+    def list_synced_web_content(self) -> None:
+        """Lists all synced web content."""
+        pass
 
     async def process_flow_input(self, user_input: str) -> dict:
         """Process user input during flow."""

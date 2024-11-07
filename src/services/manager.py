@@ -1,11 +1,9 @@
 # TODO: refactor and remove this service.
-from collections.abc import AsyncGenerator
 from os import listdir
 from os.path import isfile, join
 
 from src.api.chainlit.command_handler import CommandHandler
 from src.api.chainlit.message_handler import MessageHandler
-from src.core._exceptions import FireCrawlAPIError
 from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.chat.flow_manager import UserInputManager
 from src.core.content.chunker import MarkdownChunker
@@ -16,8 +14,6 @@ from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.common.file_manager import FileManager
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.config.settings import JOB_FILE_DIR, PROCESSED_DATA_DIR, RAW_DATA_DIR
-from src.models.common.jobs import CrawlJob, CrawlJobStatus
-from src.models.content.firecrawl_models import CrawlRequest, CrawlResult
 
 logger = get_logger()
 
@@ -116,100 +112,6 @@ class Kollektiv:
         logger.info("Components initialized successfully.")
         return claude_assistant
 
-    @staticmethod
-    def _get_crawl_message(job: CrawlJob) -> str:
-        if job.status == CrawlJobStatus.COMPLETED:
-            # Get the crawl result
-            message = f"""
-            ✅ Successfully crawled {job.pages_crawled} pages from {job.start_url}.
-            """
-            return message
-        elif job.status == CrawlJobStatus.FAILED:
-            message = """
-            ❌ Crawl request failed! Please try again."""
-            return message
-        else:
-            return "Unknown error occurred, please try again."
-
-    async def handle_crawl(self, crawl_inputs: dict) -> tuple[CrawlJob, str]:
-        """Crawls the url provided by the user and returns a job object."""
-        crawl_request = CrawlRequest(
-            url=crawl_inputs["url"],
-            page_limit=crawl_inputs["num_pages"],
-            exclude_patterns=crawl_inputs["exclude_patterns"],
-        )
-
-        try:
-            job = await self.crawler.crawl(crawl_request)
-            logger.info("Crawl job started successfully.")
-
-            success_message = self._get_crawl_message(job)
-            return job, success_message
-
-        except FireCrawlAPIError as e:
-            logger.error(f"API error occurred: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"An unhandled error occurred: {e}")
-            raise
-
-    async def prepare_chunks(self, crawl_results: CrawlResult) -> tuple[str, str]:
-        """Conducts chunking and returns the filename of the chunked file."""
-        try:
-            result = self.chunker.load_data(filename=crawl_results.filename)
-            chunks = self.chunker.process_pages(result)
-            chunk_filename = self.chunker.save_chunks(chunks)
-            message = """
-            ✅ Chunking completed successfully!\n"""
-            return chunk_filename, message
-        except Exception as e:
-            logger.error(f"An unhandled error occurred: {e}")
-            raise
-
-    async def embed_and_store(self, filename) -> str:
-        """Embed and store the documents in the vector database."""
-        try:
-            vector_db_reader = DocumentProcessor()
-            docs = vector_db_reader.load_json(filename)
-            await self.vector_db.add_documents(docs, filename)
-            summary = ""
-            return summary
-        except Exception as e:
-            logger.error(f"An unhandled error occured: {e}")
-            raise
-
-    def extract_file_summary(self, filename: str) -> str:
-        """Generates summary of the added file"""
-        pass
-
-    @base_error_handler
-    async def index_web_content(self, crawl_inputs: dict) -> AsyncGenerator[str, None]:
-        """Orchestrates the document crawling, chunking, embedding, and summarization."""
-        logger.info("Starting indexing of new content. This might take a while")
-
-        # Step 1 - Get crawl results
-        job, message = await self.handle_crawl(crawl_inputs)
-        yield message
-
-        # Step 2 - Chunk the crawling results
-        chunks_filename, message = await self.prepare_chunks(job)
-        yield message
-
-        # Step 3 - Embed and store them
-        summary, message = await self.embed_and_store(chunks_filename)
-
-        # Step 4 - Inform the user on the results.
-
-    def remove_document(self, doc_id: str) -> str:
-        """Removes documents that were parsed."""
-        # Placeholder for document removal logic
-        return f"Removing document with ID: {doc_id}"
-
-    def list_documents(self) -> str:
-        """Returned all loaded documents."""
-        # Placeholder for document listing logic
-        return "Listing all documents"
-
     @classmethod
     @base_error_handler
     async def setup(cls, reset_db: bool = False, load_all_docs: bool = False) -> MessageHandler:
@@ -257,15 +159,7 @@ class Kollektiv:
         command_handler = CommandHandler(kollektiv, flow_manager)
 
         # Initialize MessageHandler with CommandHandler and FlowManager
-        message_handler = MessageHandler(claude_assistant, command_handler)
+        message_handler = MessageHandler.create(claude_assistant, command_handler)
 
         logger.info("Kollektiv system setup completed.")
         return message_handler
-
-    async def process_file(self, filename: str) -> None:
-        """Process the given file and generate summaries.
-
-        Args:
-            filename (str): The name of the file to process.
-        """
-        # ... rest of the method

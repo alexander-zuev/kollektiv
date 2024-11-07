@@ -7,7 +7,7 @@ ASSISTANT_COLOR = Fore.LIGHTBLUE_EX
 USER_COLOR = Fore.GREEN
 
 
-def print_assistant_stream(message: str, end: str = "\n", flush: bool = True):
+def print_assistant_stream(message: str, end: str = "\n", flush: bool = True) -> None:
     """
     Print a message in the assistant's color stream.
 
@@ -23,32 +23,23 @@ def print_assistant_stream(message: str, end: str = "\n", flush: bool = True):
     print(f"{ASSISTANT_COLOR}{message}{Style.RESET_ALL}", end=end, flush=flush)
 
 
-def print_welcome_message(message: str):
+def print_welcome_message(message: str) -> None:
     """
-    Print the welcome message to the console.
+    Print a welcome message with formatting.
 
     Args:
-        message (str): The welcome message to be printed.
+        message: The message to print
+    """
+    print(f"\n{'-' * 80}")
+    print(f"{message:^80}")
+    print(f"{'-' * 80}\n")
+
+
+def user_input() -> str:
+    """
+    Get input from the user with proper formatting.
 
     Returns:
-        None
-
+        str: The user's input as a string
     """
-    print(f"\n{ASSISTANT_COLOR}{message}{Style.RESET_ALL}")
-
-
-def user_input():
-    """
-    Prompt the user for input and return the input string.
-
-    Args:
-        None
-
-    Returns:
-        str: The input provided by the user.
-
-    Raises:
-        None
-    """
-    user_input = input(f"{USER_COLOR}{Style.BRIGHT}You:{Style.RESET_ALL} ")
-    return user_input
+    return input("\nYour input > ").strip()
