@@ -19,6 +19,7 @@ ENVIRONMENT: Final = Environment(os.getenv("ENVIRONMENT", Environment.LOCAL))
 
 
 def get_env_file_path(environment: Environment) -> Path | None:
+    """Returns environment filepath."""
     env_file_path = Path(f"config/environments/.env.{environment.value}")
     if os.getenv("CI"):  # set in GitHub Actions
         return None
@@ -50,7 +51,7 @@ BASE_URL = {
 }[ENVIRONMENT]
 
 # FireCrawl Configuration
-FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+FIRECRAWL_API_KEY: Final[str] = os.getenv("FIRECRAWL_API_KEY", "")  # Empty string as default
 FIRECRAWL_API_URL = "https://api.firecrawl.dev/v1"
 
 # Webhook Configuration
@@ -111,6 +112,9 @@ def validate_required_env_vars() -> None:
     missing_vars = [var for var, value in required_vars.items() if not value]
     if missing_vars:
         raise OSError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
+    if not FIRECRAWL_API_KEY:
+        raise OSError("FIRECRAWL_API_KEY is required")
 
 
 # Add this after all environment variables are loaded

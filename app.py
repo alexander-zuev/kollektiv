@@ -1,7 +1,7 @@
 import multiprocessing
 import sys
+from collections.abs import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional
 
 import chainlit as cl
 import uvicorn
@@ -33,7 +33,7 @@ configure_logging(debug=DEBUG)
 logger = get_logger()
 
 # Store the message handler globally (needed for Chainlit)
-message_handler: Optional[MessageHandler] = None
+message_handler: MessageHandler | None
 
 
 @asynccontextmanager

@@ -10,7 +10,6 @@ from typing import Any
 
 import requests
 from firecrawl import FirecrawlApp
-from pydantic import HttpUrl
 from requests.exceptions import HTTPError, RequestException, Timeout
 from tenacity import (
     retry,
@@ -44,8 +43,10 @@ from src.infrastructure.config.settings import (
 from src.models.common.jobs import CrawlJob, CrawlJobStatus
 from src.models.content.firecrawl_models import (
     CrawlData,
+    CrawlParams,
     CrawlRequest,
     CrawlResult,
+    ScrapeOptions,
 )
 
 logger = get_logger()
@@ -80,72 +81,57 @@ class FireCrawler:
         self,
         job_manager: JobManager,
         file_manager: FileManager,
-        api_key: str = FIRECRAWL_API_KEY,
+        api_key: str | None = FIRECRAWL_API_KEY,
         api_url: str = FIRECRAWL_API_URL,
         data_dir: str = RAW_DATA_DIR,
         jobs_dir: str = JOB_FILE_DIR,
     ) -> None:
+        if not api_key:
+            raise ValueError("API key cannot be None")
         self.api_key: str = api_key
         self.api_url = api_url
         self.raw_data_dir: str = data_dir
         self.jobs_dir: str = jobs_dir
         self.job_manager = job_manager
         self.file_manager = file_manager
-        self.firecrawl_app = self._initialize_app()
+        self.firecrawl_app = self.initialize_firecrawl()
 
     @base_error_handler
-    def _initialize_app(self):
+    def initialize_firecrawl(self) -> FirecrawlApp:
+        """Initialize and return the Firecrawl app."""
         app = FirecrawlApp(api_key=self.api_key)
         logger.info("FireCrawler app initialized successfully.")
         return app
 
-    @base_error_handler
-    async def map_url(self, url: HttpUrl) -> str:
+    def _build_params(self, request: CrawlRequest) -> CrawlParams:
         """
-        Map the given URL and return structured results.
+        Build FireCrawl API parameters from a CrawlRequest.
 
         Args:
-            url (HttpUrl): The URL to be mapped.
+            request (CrawlRequest): The crawl request configuration
 
         Returns:
-            dict[str, Any] | None: A dictionary containing the status, input URL, total number of links, and the list
-            of links. Returns None if mapping fails.
-
-        Raises:
-            Any exceptions that the mapping function or save_results method might raise.
+            CrawlParams: Parameters formatted for the FireCrawl API
         """
-        logger.info(f"Mapping URL: {url}")
-
-        site_map = self.firecrawl_app.map_url(url)
-        logger.info("Map results received. Attempting to parse the results.")
-
-        # extract links and calculate total
-        links = site_map
-        total_links = len(links)
-
-        logger.info(f"Total number of links received: {total_links}")
-
-        result = {"status": "success", "input_url": url, "total_links": total_links, "links": links, "method": "map"}
-
-        filename = await self.file_manager.save_result(result)
-        return filename
-
-    def _build_params(self, request: CrawlRequest) -> dict[str, Any]:
-        """Returns complied firecrawl params based on the raw CrawlRequest."""
-        params = {
-            "limit": request.page_limit,
-            "maxDepth": request.max_depth if request.max_depth else 5,
-            "includePaths": request.include_patterns if request.include_patterns else [],
-            "excludePaths": request.exclude_patterns if request.exclude_patterns else [],
-            "scrapeOptions": {
-                "formats": ["markdown"],
-                "excludeTags": ["img"],
-            },
-        }
-        if not request.webhook_url:
+        # Handle webhook URL
+        webhook_str: str | None = None
+        if request.webhook_url:
+            webhook_str = str(request.webhook_url)
+        else:
             webhook_path = f"{Routes.System.Webhooks.BASE}{Routes.System.Webhooks.FIRECRAWL}"
-            params["webhook"] = f"{WEBHOOK_HOST}{webhook_path}"
-            logger.debug(f"Using webhook URL: {params['webhook']}")
+            webhook_str = f"{WEBHOOK_HOST}{webhook_path}"
+            logger.debug(f"Using webhook URL: {webhook_str}")
+
+        # Create and return CrawlParams
+        params = CrawlParams(
+            url=str(request.url),
+            limit=request.page_limit,
+            max_depth=request.max_depth,
+            include_paths=request.include_patterns,
+            exclude_paths=request.exclude_patterns,
+            webhook=webhook_str,
+            scrape_options=ScrapeOptions(),
+        )
 
         return params
 
@@ -158,11 +144,16 @@ class FireCrawler:
             f"Retrying in {retry_state.next_action.sleep} seconds..."
         ),
     )
-    async def start_crawl(self, request: CrawlRequest) -> CrawlJob:
+    async def start_crawl(self, request: CrawlRequest) -> CrawlJob | Any:
         """Start a new crawl job with webhook configuration."""
         try:
             params = self._build_params(request)
-            response = self.firecrawl_app.async_crawl_url(str(request.url), params)
+            logger.debug("Model configuration: %s", params)
+            logger.debug("API payload: %s", params.dict())
+            api_params = params.dict()
+
+            response = self.firecrawl_app.async_crawl_url(str(request.url), api_params)
+
             job = await self.job_manager.create_job(firecrawl_id=response["id"], start_url=request.url)
             return job
         except HTTPError as err:
@@ -215,12 +206,12 @@ class FireCrawler:
             job_id (str): The unique identifier of the crawling job.
 
         Returns:
-            CrawlData:  CrawlData object containing the accumulated crawl results.
+            CrawlData: CrawlData object containing the accumulated crawl results.
         """
-        next_url = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
+        next_url: str | None = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
         crawl_data = []
 
-        while next_url:
+        while next_url is not None:
             logger.info("Accumulating job results.")
             batch_data, next_url = await self._fetch_results_from_url(next_url)
             crawl_data.extend(batch_data["data"])
@@ -243,14 +234,21 @@ class FireCrawler:
             f"Retrying in {retry_state.next_action.sleep} seconds..."
         ),
     )
-    async def _fetch_results_from_url(self, next_url: HttpUrl) -> tuple[dict[str, Any], str | None]:
-        """Fetch results with retries."""
+    async def _fetch_results_from_url(self, next_url: str) -> tuple[dict[str, Any], str | None]:
+        """Fetch results with retries.
+
+        Args:
+            next_url: URL string for the next batch of results
+
+        Returns:
+            Tuple of (batch data dict, next URL string or None)
+        """
         try:
             response = requests.get(next_url, headers={"Authorization": f"Bearer {self.api_key}"}, timeout=30)
             response.raise_for_status()
 
             batch_data = response.json()
-            next_url = batch_data.get("next")
+            next_url = batch_data.get("next")  # This will be str | None
             return batch_data, next_url
 
         except Timeout as err:
@@ -286,7 +284,7 @@ class FireCrawler:
             raise
 
 
-async def initialize_components():
+async def initialize_components() -> tuple[FireCrawler, JobManager]:
     """Initialize required components."""
     job_manager = JobManager(JOB_FILE_DIR)
     file_manager = FileManager(RAW_DATA_DIR)
@@ -301,7 +299,7 @@ async def initialize_components():
     return crawler, job_manager
 
 
-async def main():
+async def main() -> None:
     """Test crawler functionality locally."""
     logger.info("Starting local crawler test")
 
@@ -359,7 +357,7 @@ async def main():
         raise
 
 
-def run_crawler():
+def run_crawler() -> None:
     """Entry point for the crawler script."""
     configure_logging(debug=True)
     asyncio.run(main())
