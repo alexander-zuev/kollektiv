@@ -1,527 +1,278 @@
 # Kollektiv System Design
 
-## 1. Introduction & Requirements
+## 1. Introduction and Goals
 
-### 1.1 Purpose
-Kollektiv is a RAG-powered chat application enabling accurate, context-aware interactions with technical documentation through an AI interface.
+Kollektiv is a platform for building and deploying RAG-powered chatbots, targeting two main user groups:
 
-### 1.2 Business Requirements
+1. **End Users:** Individuals who want to easily create and customize chatbots that can access and reference various content for contextually rich replies, starting with web content. This is achieved through a user-friendly web application.
 
-**Core Functionality**
-- Process and index web-based documentation with high accuracy
-- Enable natural language querying with context awareness
-- Provide accurate, context-aware responses
-- Support multiple document sources
-- Real-time feedback and responses
+2. **Developers (Future):** Developers who want to integrate RAG capabilities into their applications using a robust and scalable API service. This service will manage the entire RAG pipeline, including content syncing, referencing, and retrieval, also initially focusing on web content.
 
-**User Experience**
-- Simple, intuitive interface
-- Real-time responses
-- Multi-document support
+This document details the architecture and design of the Kollektiv web application, with considerations for its future evolution into a comprehensive platform including the API service.
 
-**Business Goals**
-- Serve 10-1000 initial users
-- Support self-hosted and SaaS deployments
-- Enable future scaling
+### 1.1 Goals and Objectives
 
-### 1.3 Quality Attributes
-- Response Time: Sub-second for queries
-- Accuracy: >90% relevant responses
-- Availability: 99.9% uptime
-- Data Freshness: Support manual reindexing
+* **Short-Term:** Deliver a functional and intuitive web application enabling end-users to create and deploy RAG-powered chatbots with web content integration.
+* **Long-Term:** Expand Kollektiv into a platform offering both a web application and API service, supporting diverse content sources and advanced RAG features.
+
+### 1.2 User Personas
+
+* **Web App User:** Non-technical users seeking a simple way to create and configure chatbots, manage content sources, and customize responses.
+* **API User:** Developers needing a reliable and scalable API for integrating RAG functionalities into their applications.
 
 ## 2. Architecture Overview
 
-### 2.1 Design Principles
+### 2.1 Architectural Style
 
-**Simplicity First**
-- Single application deployment
-- Minimal infrastructure complexity
-- Clear service boundaries
-Rationale: Reduces operational overhead, speeds development, easier maintenance
+Kollektiv adopts a layered architecture with an API-first approach. This promotes separation of concerns, maintainability, and facilitates the future development of the API service. The layers interact as follows:
 
-**Future-Proof Design**
-- Modular services with clear interfaces
-- Pluggable external services
-- Domain-driven structure
-Rationale: Enable component replacement and scaling without rewrites
+* **Interface Layer (`api`):** Provides external access points, including API endpoints for various clients (web app, future API users) and the web user interface. It interacts with the Application Services layer.
 
-**Resilient Processing**
-- Comprehensive error tracking
-- Automated recovery paths
-- Status visibility
-Rationale: Maintain reliability with minimal operational overhead
+* **Application Services Layer (`services`):** Orchestrates business logic, manages interactions between domains (content, knowledge, chat), and interacts with the Domain Logic layer.
 
-### 2.2 Technology Stack
+* **Domain Logic Layer (`core`):** Encapsulates the core business rules and operations for each domain, interacting with Domain Models and the Infrastructure layer.
 
-**Core Stack**
-- Python/FastAPI: Strong async support, excellent documentation
-- Supabase: Handles auth and data with minimal overhead
-- ChromaDB: Efficient vector storage, simple embedded mode
-- Redis: Reliable job queue and real-time features
+* **Domain Models Layer (`models`):** Defines data structures and models used across the application, independent of specific domain logic.
 
-**AI/ML Stack**
-- OpenAI: Text embeddings (text-embedding-3-small)
-- Anthropic: Chat completion (Claude 3.5 Sonnet)
-- Cohere: Result re-ranking
+* **Infrastructure Layer (`infrastructure`):** Offers technical services and utilities, including data storage, external service integrations (Firecrawl, Anthropic, Cohere), and logging.
 
-**Development Tools**
-- Poetry: Dependency management
-- Pytest: Testing framework
-- Ruff: Code quality
-- Chainlit: UI framework
+### 2.2 Key Architectural Decisions
 
-## 3. Architecture Organization
+* **Layered Architecture:** Chosen for separation of concerns, maintainability, and testability.
+* **API-First Approach:** Enables future expansion into a standalone API service and supports diverse client interfaces.
+* **Asynchronous Processing:** Handles time-consuming tasks like web crawling and embedding generation asynchronously to maintain application responsiveness. Redis queues manage these asynchronous operations.
+* **Modular Design:** Allows independent development, testing, and deployment of individual components. This modularity is reflected in the package structure, separating concerns by domain and layer.
+
+## 3. Logical View: Domain Model and Relationships
+
+This section describes the key domains, their components, and how they interact to fulfill Kollektiv's functionalities. Understanding these relationships is crucial for designing a cohesive and maintainable system.
 
 ### 3.1 Core Domains
 
-1. **Content Management Domain**
-   - Purpose: Handle document acquisition and processing
-   - Key Concepts:
-     - Documents, Chunks
-     - Processing Jobs
-     - Content Versions
-   - Core Operations:
-     - Document crawling
-     - Content chunking
-     - Version tracking
+1. **Content Management:** Responsible for acquiring, processing, and managing content from various sources (currently web pages).
+    * **Components:** Crawler, Chunker, Embedder, Content Repository.
+    * **Responsibilities:**
+        * Fetching content from URLs.
+        * Splitting content into manageable chunks.
+        * Generating embeddings for each chunk.
+        * Storing and managing content metadata and versions.
 
-2. **Knowledge Engine Domain**
-   - Purpose: Manage vector operations and search
-   - Key Concepts:
-     - Vector Embeddings
-     - Search Queries
-     - Ranking Results
-   - Core Operations:
-     - Embedding generation
-     - Similarity search
-     - Result ranking
+2. **Knowledge Engine:**  Manages the knowledge base, including vector embeddings and search functionality.
+    * **Components:** Vector Database, Search Index, Ranking Engine.
+    * **Responsibilities:**
+        * Storing and managing vector embeddings.
+        * Indexing content for efficient search.
+        * Performing similarity searches and ranking results.
 
-3. **Chat Interface Domain**
-   - Purpose: Handle user interactions and responses
-   - Key Concepts:
-     - Chat Sessions
-     - Messages
-     - Response Context
-   - Core Operations:
-     - Context management
-     - Response generation
-     - Stream handling
+3. **Chat Interface:** Handles user interactions and chatbot responses.
+    * **Components:** Chat Session Manager, Response Generator, Streaming Service.
+    * **Responsibilities:**
+        * Managing chat sessions and context.
+        * Generating chatbot responses based on user queries and retrieved knowledge.
+        * Streaming responses in real-time.
 
-4. **System Core Domain**
-   - Purpose: Manage cross-cutting concerns
-   - Key Concepts:
-     - Jobs
-     - Events
-     - Configuration
-   - Core Operations:
-     - Job orchestration
-     - Event handling
-     - Health monitoring
+4. **System Core:**  Provides cross-cutting functionalities and manages system-level concerns.
+    * **Components:** Job Manager, Event Handler, Configuration Manager.
+    * **Responsibilities:**
+        * Orchestrating jobs and tasks.
+        * Handling system events and notifications.
+        * Managing application configuration and settings.
 
-### 3.2 Domain Relationships
 
-1. **Primary Flows**
-   ```
-   Content Management → Knowledge Engine
-   - Document processing triggers embedding
-   - Content updates require re-indexing
+### 3.2 Domain Interactions
 
-   Knowledge Engine → Chat Interface
-   - Provides search results for queries
-   - Manages context retrieval
+The domains interact to provide the core functionality of Kollektiv:
 
-   System Core ↔ All Domains
-   - Coordinates operations
-   - Manages state
-   ```
+1. **Content Management → Knowledge Engine:**  Processed and chunked content from Content Management is sent to the Knowledge Engine for embedding generation and indexing.  Content updates trigger re-indexing.
 
-2. **Event Flows**
-   ```
-   Content Events:
-   Document Added → Processing → Indexed
+2. **Knowledge Engine → Chat Interface:** The Chat Interface queries the Knowledge Engine for relevant information based on user input.  The Knowledge Engine returns ranked search results.
 
-   Chat Events:
-   Query Received → Context Retrieved → Response Generated
-   ```
+3. **System Core ↔ All Domains:** The System Core coordinates operations across all domains, manages job execution, handles events, and provides configuration settings.
 
-### 3.3 Hybrid Package Structure
+**Diagram (Recommended):**
 
-```
-kollektiv/
-├── src/
-│   ├── api/                    # Interface Layer
-│   │   ├── v0/                # API Version
-│   │   │   ├── content/       # Content endpoints
-│   │   │   │   ├── routes.py
-│   │   │   │   └── schemas.py
-│   │   │   ├── chat/         # Chat endpoints
-│   │   │   └── system/       # System endpoints
-│   │   └── middleware/       # API middleware
-│   │
-│   ├── core/               # Domain Logic
-│   │   ├── content/         # Content Domain
-│   │   │   ├── processing/  # Content processing
-│   │   │   │   ├── chunker.py
-│   │   │   │   └── crawler.py
-│   │   │   └── repository.py
-│   │   ├── knowledge/       # Knowledge Domain
-│   │   │   ├── search.py
-│   │   │   └── vectors.py
-│   │   └── chat/           # Chat Domain
-│   │       ├── session.py
-│   │       └── generation.py
-│   │
-│   ├── models/              # Domain Models
-│   │   ├── content/        # Content models
-│   │   │   ├── document.py
-│   │   │   └── chunk.py
-│   │   ├── knowledge/      # Knowledge models
-│   │   │   ├── embedding.py
-│   │   │   └── search.py
-│   │   └── chat/          # Chat models
-│   │       ├── message.py
-│   │       └── session.py
-│   │
-│   ├── services/           # Application Services
-│   │   ├── content.py     # Content orchestration
-│   │   ├── search.py      # Search orchestration
-│   │   └── chat.py        # Chat orchestration
-│   │
-│   └── infrastructure/     # Technical Concerns
-       ├── storage/        # Storage implementations
-       │   ├── chroma.py
-       │   └── redis.py
-       ├── external/       # External services
-       │   ├── firecrawl.py
-       │   └── anthropic.py
-       └── common/         # Shared utilities
-           ├── config.py
-           └── logging.py
-```
+Consider adding a diagram here to visually represent the domain interactions and data flow.  A simple diagram can significantly improve understanding.  For example, you could use a sequence diagram or a context diagram.
 
-### 3.4 Layer-Domain Mapping
 
-1. **Interface Layer** (api/)
-   - HTTP/WebSocket endpoints
-   - Request/response handling
-   - No domain logic
+## 4. Development View: Package Structure and Implementation
 
-2. **Application Layer** (services/)
-   - Orchestrates domain operations
-   - Manages workflows
-   - Uses domain models and logic
+### 4.1 Architectural Pattern: Layered Architecture and Design Patterns
 
-3. **Domain Layer** (domain/ + models/)
-   - Core business logic
-   - Domain models with behavior
-   - Domain-specific operations
+Kollektiv follows a layered architecture to promote separation of concerns and maintainability. This architecture is further enhanced by incorporating specific design patterns within each layer:
 
-4. **Infrastructure Layer** (infrastructure/)
-   - Technical implementations
-   - External service integrations
-   - Cross-cutting concerns
+* **Interface Layer (`api`):**  Utilizes the **Controller** pattern.  Controllers act as intermediaries between external requests (from the web app or API clients) and the application's internal logic. They handle routing, input validation, data transformation, and orchestrate the execution of appropriate application services.  This keeps the interface layer thin and focused on presentation, delegating business logic to the services layer.  *Implementation:*  Each API endpoint is handled by a dedicated controller function within the `api/v0` directory, organized by domain.
 
-### 3.5 Implementation Guidelines
+* **Application Services Layer (`services`):** Employs the **Service Orchestrator** pattern.  Service orchestrators coordinate complex workflows and transactions that span multiple domains. They manage dependencies between domain services, ensuring data consistency and transactional integrity.  This pattern centralizes complex logic, making it easier to manage and test.  *Implementation:* Services are defined in the `services` directory (e.g., `services/content_service.py`).  They interact with multiple domain services to implement complete user journeys.
 
-1. **Domain Models**
-   - Rich models with behavior
-   - Business rule enforcement
-   - Domain event generation
-   Example:
-   ```python
-   # models/content/document.py
-   class Document:
-       def __init__(self, url: str):
-           self.url = url
-           self._chunks = []
-           self._state = DocumentState.NEW
+* **Domain Logic Layer (`core`):**  Implements core business rules using several patterns:
+    * **Strategy:** Used for content chunking and embedding generation.  The Strategy pattern defines a family of algorithms (different chunking or embedding methods), encapsulates each one, and makes them interchangeable.  This allows for flexibility in choosing the best algorithm for a given context.  *Implementation:*  Different chunking and embedding strategies can be implemented as separate classes, adhering to a common interface.
+    * **Repository:** Used for data access.  The Repository pattern abstracts the underlying data storage mechanism (ChromaDB, Redis, Supabase) from the domain logic.  This promotes data access consistency and simplifies testing.  *Implementation:*  Repositories are defined in the `infrastructure/storage` directory, providing a consistent interface for accessing different data stores.
 
-       def chunk(self, strategy: ChunkingStrategy) -> None:
-           """Apply chunking strategy and validate results."""
-           if self._state != DocumentState.NEW:
-               raise InvalidStateError("Document already chunked")
+* **Domain Models Layer (`models`):**  Uses **Plain Old Python Objects (POPOs)** or **Data Transfer Objects (DTOs)**.  These simple objects represent data structures and are used for data transfer between layers.  They are primarily data containers and do not contain business logic.  *Implementation:*  Models are defined in the `models` directory, organized by domain.  Pydantic is used for data validation and serialization.
 
-           self._chunks = strategy.chunk(self.content)
-           self._state = DocumentState.CHUNKED
-   ```
+* **Infrastructure Layer (`infrastructure`):**  Implements technical services and utilities using these patterns:
+    * **Repository (as mentioned above):**  Abstracts data access.
+    * **Adapter/Facade:** Used for external service integrations (Firecrawl, Anthropic, Cohere).  These patterns provide a simplified interface to complex external services, decoupling the application from the specifics of the external API.  *Implementation:*  Adapters or facades are defined in the `infrastructure/external` directory.
+    * **Singleton:** Used for logging.  Ensures that there is only one instance of the logger, providing a consistent logging interface across the application.  *Implementation:*  A single logger instance is typically initialized in the `infrastructure/common/logging.py` module.
 
-2. **Domain Services**
-   - Complex operations
-   - Multi-entity coordination
-   Example:
-   ```python
-   # domain/content/processing/chunker.py
-   class DocumentChunker:
-       def process(self, doc: Document) -> list[Chunk]:
-           """Process document with business rules."""
-           strategy = self._select_strategy(doc)
-           doc.chunk(strategy)
-           return doc.chunks
-   ```
+This combination of layered architecture and design patterns ensures a clear separation of concerns, promotes code reusability, and enhances maintainability.
 
-3. **Application Services**
-   - Workflow orchestration
-   - Transaction management
-   Example:
-   ```python
-   # services/content.py
-   class ContentService:
-       async def process_document(self, url: str) -> Document:
-           """Orchestrate document processing workflow."""
-           doc = await self.repository.create(url)
-           chunks = await self.chunker.process(doc)
-           await self.vector_service.embed(chunks)
-           return doc
-   ```
+### 4.2 Layer Definitions and Implementation Guide
 
-## 4. Development View
+The layers are further broken down into specific packages:
 
-### 4.1 Layer Definitions
+* **`api`:**  Exposes API endpoints for interacting with Kollektiv.
+    * `v0`:  Contains the current version of the API.
+        * `content`: Endpoints related to content management.
+        * `chat`: Endpoints related to chat interactions.
+        * `system`: Endpoints for system-level operations.
+* **`services`:** Orchestrates complex operations and interacts with multiple domains.
+    * `content_service.py`: Manages content sources and crawling.
+    * `search_service.py`: Handles search queries and knowledge retrieval.
+    * `chat_service.py`: Manages chat sessions and interactions.
+* **`core`:** Contains the core business logic of the application.
+    * `content`:  Handles content processing and crawling.
+        * `crawler.py`: Implements the web crawling logic.
+        * `embedder.py`: Handles embedding generation logic.
+    * `knowledge`: Manages knowledge base operations.
+        * `search.py`: Implements search functionality.
+        * `vectors.py`: Handles vector embeddings and storage.
+    * `chat`:  Manages chat sessions and interactions.
+        * `session.py`: Handles chat session management.
+        * `generation.py`: Handles response generation.
+* **`models`:** Defines data structures and models used across the application.
+    * `content`: Models related to content.
+        * `document.py`: Defines the structure of a document.
+        * `chunk.py`: Defines the structure of a content chunk.
+    * `knowledge`: Models related to knowledge.
+        * `embedding.py`: Defines the structure of a vector embedding.
+        * `search_result.py`: Defines the structure of a search result.
+    * `chat`: Models related to chat.
+        * `message.py`: Defines the structure of a chat message.
+        * `session.py`: Defines the structure of a chat session.
+* **`infrastructure`:** Provides technical services and utilities.
+    * `storage`: Implementations for different storage backends.
+        * `chroma.py`: ChromaDB implementation.
+        * `redis.py`: Redis implementation.
+    * `external`: Integrations with external services.
+        * `firecrawl.py`: Integration with the Firecrawl API.
+    * `config`: Configuration management.
+    * `common`: Shared utilities and helpers.
 
-**Interface Layer**
-- Primary: Handle external communication
-- Components:
-  - API Controllers: HTTP endpoints, validation
-  - WebSocket Handlers: Real-time updates
-  - Command Interface: Chainlit commands
-- Design decisions:
-  - Thin controllers
-  - Consistent error handling
-  - Clear API/UI separation
+### 4.3 API Design and Management
 
-**Application Layer**
-- Primary: Orchestrate domain operations
-- Components:
-  - Document Service: Processing pipeline
-  - Chat Service: Conversation flow
-  - Search Service: Retrieval/ranking
-- Design decisions:
-  - Service boundaries match domains
-  - Stateless services
-  - Clear external interfaces
+API endpoints are versioned and organized by domain within the `api/v0` directory. Each domain has its own subdirectory containing routes and schemas. This modular approach promotes maintainability and scalability.
 
-**Domain Layer**
-- Primary: Core business logic
-- Components:
-  - Domain Models: Business entities
-  - Value Objects: Business rules
-  - Domain Services: Complex operations
-- Design decisions:
-  - Rich domain models
-  - Immutable value objects
-  - Domain events
+* **Routing:** Routes are defined using FastAPI's routing mechanisms within each domain's `routes.py` file.  This decentralized approach allows for better organization and scalability compared to a centralized routing scheme.
 
-**Infrastructure Layer**
-- Primary: Technical capabilities
-- Components:
-  - Repository Implementations
-  - External Service Clients
-  - Technical Services
-- Design decisions:
-  - Abstract dependencies
-  - Consistent error handling
-  - Configuration-driven
+* **Schemas:** Request and response models (schemas) are defined using Pydantic in each domain's `schemas.py` file, co-located with the routes they serve.
 
-## 5. Process View
+* **API Structure:**
 
-### 5.1 Runtime Components
-
-**FastAPI Application**
-- HTTP/WebSocket handling
-- API routing
-- Command processing
-- UI integration
-
-**Background Workers**
-- Document processing
-- Embedding generation
-- Status updates
-Implementation: Redis queue
-
-**State Management**
-- Job tracking
-- Session management
-- Processing status
-Implementation: Redis with TTL
-
-### 5.2 Key Processes
-
-**Document Processing Pipeline**
-States:
-- PENDING: Initial request
-- CRAWLING: FireCrawl active
-- PROCESSING: Chunking/embedding
-- COMPLETED: Indexed
-- FAILED: Error state
-
-Recovery:
-- Automatic retries
-- Manual intervention
-- State restoration
-
-**Query Processing Pipeline**
-Steps:
-- Query analysis/expansion
-- Vector search
-- Result re-ranking
-- Response streaming
-
-## 6. Package Structure
-
-### 6.1 Organization Principles
-
-1. **Hybrid Structure Rationale**
-   - Separate technical layers (api, infrastructure)
-   - Group domain logic by feature
-   - Centralize models with domain alignment
-   - Isolate cross-cutting concerns
-
-2. **Key Design Decisions**
-   - Models stay close to their domains
-   - Business logic in domain services
-   - Infrastructure concerns isolated
-   - Clear dependency flow
-
-### 6.2 Detailed Package Structure
-```
-kollektiv/
-├── src/
-│   ├── api/                    # Interface Layer
-│   │   ├── v0/
-│   │   │   ├── content/       # Content Management API
-│   │   │   │   ├── routes.py  # HTTP endpoints
-│   │   │   │   ├── schemas.py # Request/response models
-│   │   │   │   └── deps.py    # Endpoint dependencies
-│   │   │   ├── chat/          # Chat Interface API
-│   │   │   │   ├── routes.py
-│   │   │   │   ├── schemas.py
-│   │   │   │   └── stream.py  # SSE handling
-│   │   │   └── system/        # System API
-│   │   │       ├── health.py
-│   │   │       └── webhooks.py
-│   │   └── middleware/
-│   │       ├── auth.py        # Authentication
-│   │       ├── error.py       # Error handling
-│   │       └── logging.py     # Request logging
-│   │
-│   ├── domain/                # Domain Logic
-│   │   ├── content/
-│   │   │   ├── processing/    # Content Processing
-│   │   │   │   ├── chunker.py # Chunking logic
-│   │   │   │   ├── crawler.py # Crawling logic
-│   │   │   │   └── embedder.py # Embedding logic
-│   │   │   └── repository.py  # Content persistence
-│   │   ├── knowledge/
-│   │   │   ├── engine.py     # Search coordination
-│   │   │   ├── ranking.py    # Result ranking
-│   │   │   └── vectors.py    # Vector operations
-│   │   └── chat/
-│   │       ├── session.py    # Session management
-│   │       ├── context.py    # Context handling
-│   │       └── generation.py # Response generation
-│   │
-│   ├── models/               # Domain Models
-│   │   ├── base.py          # Base model classes
-│   │   ├── mixins.py        # Shared behaviors
-│   │   ├── content/
-│   │   │   ├── document.py  # Document model
-│   │   │   ├── chunk.py     # Chunk model
-│   ���   │   └── job.py       # Processing job model
-│   │   ├── knowledge/
-│   │   │   ├── embedding.py # Embedding model
-│   │   │   ├── query.py     # Query model
-│   │   │   └── result.py    # Search result model
-│   │   └── chat/
-│   │       ├── message.py   # Message model
-│   │       └── session.py   # Session model
-│   │
-│   ├── services/            # Application Services
-│   │   ├── content.py      # Content workflows
-│   │   ├── search.py       # Search workflows
-│   │   └── chat.py         # Chat workflows
-│   │
-│   └── infrastructure/      # Infrastructure Layer
-       ├── config/
-       │   ├── settings.py   # Configuration
-       │   └── logging.py    # Logging setup
-       ├── storage/
-       │   ├── chroma.py     # Vector store
-       │   └── redis.py      # Cache/queue
-       ├── external/
-       │   ├── firecrawl.py  # Crawling API
-       │   ├── anthropic.py  # LLM API
-       │   └── cohere.py     # Ranking API
-       └── common/
-           ├── errors.py     # Error definitions
-           └── utils.py      # Shared utilities
-```
-
-### 6.3 Implementation Guidelines
-
-1. **Dependencies Flow**
-```
-api → services → domain → models
-               ↘ infrastructure
-```
-
-2. **Key Files**
-- `base.py`: Base classes and shared behaviors
-- `routes.py`: API endpoint definitions
-- `service.py`: Use case implementations
-- `repository.py`: Data access patterns
-
-3. **Cross-Cutting Concerns**
-- Error handling in middleware
-- Logging through infrastructure
-- Configuration via settings
-
-## 7. API Management
-
-### 7.1 API Structure
 ```
 /api/v0/
 ├── content/
-│   ├── POST /crawl
-│   ├── GET  /status
-│   └── GET  /documents
+│   ├── routes.py
+│   ├── schemas.py
+│   ├── POST /crawl  (Initiates a crawl job)
+│   ├── GET /jobs/{job_id}/status (Gets the status of a crawl job)
+│   └── GET /sources/{source_id} (Retrieves crawled data for a source)
 ├── chat/
-│   ├── POST /message
-│   └── GET  /stream
+│   ├── routes.py
+│   ├── schemas.py
+│   ├── POST /message (Sends a message to the chatbot)
+│   └── GET  /stream (Streams chatbot responses)
 └── system/
-    └── webhooks/
+    ├── routes.py
+    ├── schemas.py
+    └── POST /webhooks/firecrawl (Receives Firecrawl webhooks)
 ```
 
-### 7.2 Webhook Handling
-```
-/webhooks/
-├── firecrawl/  # Crawl updates
-└── llm/        # LLM callbacks
-```
+* **Webhook Integration:**  Firecrawl webhooks are handled by the `/system/webhooks/firecrawl` endpoint.  This endpoint updates the job status and triggers subsequent processing steps.
 
-## 8. Deployment Model
 
-### 8.1 Application Architecture
-- Single FastAPI application
-- Embedded ChromaDB
-- Redis for queues/real-time
-- Supabase for auth/data
+## 5. Process View: Data Flow and Key Considerations
 
-### 8.2 Infrastructure
-```
-Railway Project
-├── FastAPI App
-│   ├── API Server
-│   ├── Workers
-│   └── ChromaDB
-└── Redis
-    ├── Queue
-    └── Pub/Sub
-```
+This section outlines the key processes and runtime components within Kollektiv, highlighting important considerations for data flow, asynchronous operations, and error handling. Detailed process flows for specific features will be documented separately.
 
-## 9. Technical Decisions & Rationale
+### 5.1 Runtime Components
 
-### 9.1 Core Architecture Decisions
+Kollektiv consists of the following key runtime components:
+
+* **FastAPI Application:** The central hub, handling API requests, routing, background tasks, and component interaction.
+
+* **Redis:**  An in-memory data store used for job queues (asynchronous tasks), caching, and real-time updates.
+
+* **ChromaDB:**  The vector database for storing and managing vector embeddings, enabling efficient similarity search.  Currently embedded, but scalable to a separate service.
+
+* **Supabase:**  Provides persistent data storage (content metadata, user data), authentication, and authorization.
+
+* **Firecrawl, Anthropic, Cohere (External Services):**  Respectively handle web crawling, LLM response generation, and NLP services.  Interacted with via their APIs.
+
+### 5.2 Asynchronous Processing with Redis Queues
+
+Kollektiv leverages asynchronous processing for long-running tasks such as web crawling and embedding generation. This ensures that the application remains responsive to user requests while these tasks are being executed in the background. Redis queues are used to manage these asynchronous operations.  A worker process consumes tasks from the queue and executes them.
+
+### 5.3 Key Process Considerations
+
+* **Content Acquisition:**  The process begins with a user providing a URL. The crawler fetches the content, which is then chunked and embedded.  These steps are executed asynchronously.
+* **Knowledge Storage:**  Chunks and their corresponding embeddings are stored in the vector database (ChromaDB) for efficient retrieval. Metadata and versioning information are stored in a persistent data store (Supabase).
+* **Query Processing:**  User queries are processed by expanding them, performing similarity searches against the vector database, and ranking the results.
+* **Response Generation:**  The chatbot generates responses based on the ranked results and the conversation context.  Responses are streamed back to the user in real-time.
+* **Webhook Handling:**  Webhooks from external services (e.g., Firecrawl) are processed asynchronously to update job statuses and trigger subsequent processing steps.
+
+### 5.4 Error Handling, Logging, Monitoring, and Alerting
+
+Kollektiv employs a comprehensive approach to error handling, logging, monitoring, and alerting to ensure system reliability and maintainability.
+
+* **Error Handling:**  Each layer of the application implements appropriate error handling mechanisms.  Transient errors (e.g., network issues, temporary API unavailability) are handled with retries.  Persistent errors are logged, and appropriate error messages are returned to the user or calling service.  Custom exceptions are used to provide specific error information.
+
+* **Logging:**  Structured logging is used to capture detailed information about system events, errors, and performance.  Logs include timestamps, severity levels, relevant context information, and stack traces for debugging.  Logs are stored centrally and can be analyzed for trends and patterns.
+
+* **Monitoring:**  Key metrics, such as job processing times, error rates, API response times, and resource utilization, are continuously monitored.  This allows for proactive identification of potential issues and performance bottlenecks.
+
+* **Alerting:**  Automated alerts are triggered for critical errors and performance degradations.  Alerts are sent to administrators via appropriate channels (e.g., email, Slack) to enable timely intervention and resolution.
+
+
+## 6. Use Case View
+
+This section describes a few key use cases to illustrate how users interact with Kollektiv:
+
+* **Adding a Content Source:** A user provides a URL to a documentation website.  Kollektiv crawls the website, extracts content, chunks it, generates embeddings, and stores them in the vector database.
+
+* **Searching for Information:** A user enters a natural language query.  Kollektiv expands the query, performs a similarity search against the vector database, re-ranks the results, and returns the most relevant content.
+
+* **Chatting with the AI Assistant:** A user interacts with the AI assistant in a chat interface.  The assistant uses the knowledge base to provide context-aware responses to the user's queries.
+
+## 7. Physical View
+
+### 7.1 Application Architecture
+
+Kollektiv is deployed on Railway.  The infrastructure consists of:
+
+* **FastAPI Application:**  Handles API requests, background tasks, and communication with other services.
+* **Redis:**  Used for job queues, caching, and real-time updates.
+* **ChromaDB:**  Stores vector embeddings and facilitates similarity search.  Currently embedded within the FastAPI application, but can be separated for scalability.
+* **Supabase:**  Provides authentication and persistent data storage.
+
+### 7.2 Infrastructure
+
+Kollektiv is deployed on Railway.  The infrastructure consists of:
+
+* **FastAPI Application:**  Handles API requests, background tasks, and communication with other services.
+* **Redis:**  Used for job queues, caching, and real-time updates.
+* **ChromaDB:**  Stores vector embeddings and facilitates similarity search.  Currently embedded within the FastAPI application, but can be separated for scalability.
+* **Supabase:**  Provides authentication and persistent data storage.
+
+### 7.3 Deployment Process
+
+... (Add details about your deployment process, including CI/CD, environment configuration, etc.)
+
+## 8. Cross-Cutting Concerns
+
+### 8.1 Error Handling and Logging
+
+... (Expand on error handling strategies, logging levels, and monitoring tools.)
 
 **Single Application Deployment**
 Decision: Monolithic application with domain-based internal structure
@@ -538,77 +289,26 @@ Migration Path:
 - Split into services when domains need independent scaling
 - Add API gateway when traffic patterns diversify
 
-**State Management**
-Decision: Redis for transient state, ChromaDB for vectors, Supabase for persistence
+**Authentication & Authorization**
+Decision: Supabase Auth with custom RBAC
 Rationale:
-- Redis: Perfect for job queues and real-time updates
-  - Built-in pub/sub for SSE
-  - Atomic operations for job state
-  - TTL for temporary data
-- ChromaDB: Embedded mode for simplicity
-  - Direct access to vector operations
-  - No network overhead
-  - Simple backup/restore
-- Supabase: Managed service for auth/data
-  - Reduces operational overhead
-  - Built-in row-level security
-  - PostgreSQL for complex queries
-
-### 9.2 Domain-Specific Decisions
-
-**Content Processing**
-Decision: Async pipeline with status tracking
+- Proven auth provider
+- JWT-based sessions
+- Built-in user management
 Implementation:
-- FireCrawl for web crawling
-  - Reliable HTML processing
-  - Rate limiting handled
-  - Webhook-based status updates
-- Custom chunking strategies
-  - Content-aware splitting
-  - Metadata preservation
-  - Configurable chunk sizes
-- Embedding generation
-  - Batched processing
-  - Caching of embeddings
-  - Version tracking
+- Role-based permissions
+- Resource-level access control
+- API rate limiting
 
-**Search & Retrieval**
-Decision: Multi-stage search with re-ranking
-Rationale:
-- Better accuracy than single-stage search
-- Manageable computational cost
-- Easy to tune/modify components
-Implementation:
-- Query expansion for better recall
-- Vector similarity for initial candidates
-- Re-ranking for precision
-- Response streaming for UX
+**Data Protection**
+- Encryption at rest for sensitive data
+- TLS for all communications
+- Regular security audits
+- Clear data retention policies
 
-### 9.3 Error Handling & Recovery
+## 9. Performance and Scalability
 
-**Failure Domains**
-- External Services
-  - Retry with exponential backoff
-  - Circuit breakers for protection
-  - Fallback strategies defined
-- Processing Pipeline
-  - State recovery from crashes
-  - Partial results handling
-  - Manual intervention points
-- User Interactions
-  - Graceful degradation
-  - Clear error messages
-  - Recovery suggestions
-
-**Error Propagation**
-Decision: Domain-specific exceptions with global handling
-Implementation:
-- Custom exception hierarchy
-- Error context preservation
-- Structured logging
-- User-friendly messages
-
-### 9.4 Performance Strategy
+### 9.1 Performance Strategy
 
 **Response Time Targets**
 - Chat responses: <1s for initial tokens
@@ -629,41 +329,13 @@ Implementation:
    - Resource monitoring
    - Performance budgets
 
-### 9.5 Security Model
+### 9.2 Scalability
 
-**Authentication & Authorization**
-Decision: Supabase Auth with custom RBAC
-Rationale:
-- Proven auth provider
-- JWT-based sessions
-- Built-in user management
-Implementation:
-- Role-based permissions
-- Resource-level access control
-- API rate limiting
+**Vector Store Separation:**  >100K documents
+**Service Extraction:**  >1000 concurrent users
+**Load Balancing:**  >100 req/s
 
-**Data Protection**
-- Encryption at rest for sensitive data
-- TLS for all communications
-- Regular security audits
-- Clear data retention policies
-
-## 10. Operations & Quality
-
-### 10.1 Development Workflow
-Decision: Trunk-based development with feature flags
-Rationale:
-- Rapid iteration needs
-- Easy feature rollback
-- Simple branching model
-
-Implementation:
-- Main branch always deployable
-- Feature flags for new capabilities
-- Automated testing gates
-- Regular deployments
-
-### 10.2 Quality Assurance
+## 10. Quality Assurance
 
 **Testing Strategy**
 Decision: Focus on domain logic and RAG quality
@@ -672,6 +344,7 @@ Key Areas:
 - Processing pipeline reliability
 - RAG response quality
 - Integration points
+- **Unit, Integration, and E2E test coverage as described in Section 4.2.**  This ensures comprehensive testing across all layers of the application.
 
 **RAG Quality Metrics**
 Primary:
@@ -680,35 +353,7 @@ Primary:
 - Response coherence
 Implementation: Ragas-based evaluation suite
 
-### 10.3 Monitoring & Recovery
-
-**Critical Metrics**
-- Processing pipeline health
-  - Job completion rates
-  - Processing times
-  - Error patterns
-- RAG performance
-  - Query response times
-  - Context relevance scores
-  - User satisfaction metrics
-
-**Recovery Procedures**
-Priority order:
-1. User-facing services (chat, search)
-2. Processing pipeline
-3. Background tasks
-
-Automated recovery for:
-- Failed crawl jobs
-- Embedding generation
-- Vector store operations
-
-Manual intervention for:
-- Data corruption
-- Persistent external service failures
-- Security incidents
-
-## 11. Evolution Strategy
+## 11. Future Enhancements
 
 **Near-term Focus**
 - RAG quality improvements
@@ -724,5 +369,36 @@ Manual intervention for:
 1. ChromaDB: Embedded → Dedicated
 2. Processing: Sync → Async queue
 3. Search: Single → Distributed
+
+## 12. Implementation Details
+
+### 12.1 Modules and Responsibilities
+
+This section details the key modules and their responsibilities within Kollektiv's layered architecture.  The structure follows the domain-driven design principles and the chosen design patterns (see Section 4.1).
+
+* **`api` (Interface Layer):**  Handles external interactions.
+    * `v0/*/<domain>/routes.py`:  API endpoints for each domain, using FastAPI.
+    * `v0/*/<domain>/schemas.py`:  Pydantic schemas for request/response validation.
+
+* **`services` (Application Services Layer):** Orchestrates domain logic.
+    * `<domain>_service.py`:  Service orchestrators for each domain, managing complex workflows.
+
+* **`core` (Domain Logic Layer):** Implements core business rules.
+    * `content/*`:  Content processing logic (crawling, embedding).
+    * `knowledge/*`: Knowledge base management (search, ranking).
+    * `chat/*`: Chat session and response generation logic.
+
+* **`models` (Domain Models Layer):**  Pydantic models for data representation, organized by domain.
+
+* **`infrastructure` (Infrastructure Layer):**  Provides technical services.
+    * `storage/*`: Data access implementations (ChromaDB, Redis, Supabase).
+    * `external/*`: Adapters for external services (Firecrawl, Anthropic, Cohere).
+    * `config`: Configuration management.
+    * `common/logging.py`:  Logging setup and configuration.
+
+
+### 12.2 Asynchronous Task and Job Management
+
+Asynchronous tasks (crawling, embedding, webhooks) are managed using Redis queues.  The `JobManager` (System Core) handles task creation, queuing, monitoring, and status tracking.  Results are stored for retrieval.  This asynchronous approach ensures application responsiveness during long-running operations.
 
 [End of document]

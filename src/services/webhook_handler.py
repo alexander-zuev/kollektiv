@@ -5,7 +5,8 @@ from src.core.system.job_manager import JobManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.models.common.jobs import CrawlJob, CrawlJobStatus
-from src.models.common.webhooks import FireCrawlEventType, FireCrawlWebhookEvent
+from src.models.common.webhook_models import FireCrawlEventType, WebhookEvent
+from src.services.content_service import ContentService
 
 logger = get_logger()
 
@@ -13,11 +14,12 @@ logger = get_logger()
 class WebhookHandler:
     """Handles webhook events and coordinates job updates"""
 
-    def __init__(self, job_manager: JobManager):
+    def __init__(self, content_service: ContentService, job_manager: JobManager):
         self.job_manager = job_manager
 
+    # TODO: Webhook handler should not know how to handle each event. It's not the responsibility of it. Content Service
     @base_error_handler
-    async def handle_event(self, event: FireCrawlWebhookEvent) -> None:
+    async def handle_event(self, event: WebhookEvent) -> None:
         """Handle webhook events from Firecrawl"""
         try:
             logger.info(f"Received webhook event: {event.type} for FireCrawl job {event.id}")

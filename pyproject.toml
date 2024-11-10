@@ -89,7 +89,7 @@ precision = 2
 
 [tool.mypy]
 python_version = "3.12"
-ignore_missing_imports = true
+ignore_missing_imports = false
 disallow_untyped_defs = true
 check_untyped_defs = true
 warn_return_any = true
@@ -135,9 +135,13 @@ ignore_missing_imports = true
 # More relaxed settings for tests
 [[tool.mypy.overrides]]
 module = ["tests.*"]
-disallow_untyped_defs = false    # More relaxed for tests
-check_untyped_defs = false       # More relaxed for tests
-warn_return_any = false          # More relaxed for tests
+disallow_untyped_defs = false    # Allow untyped definitions
+check_untyped_defs = false       # Don't check untyped definitions
+warn_return_any = false          # Don't warn about implicit Any returns
+warn_unused_ignores = true
+no_implicit_optional = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
 
 # Strict settings for core business logic
 [[tool.mypy.overrides]]

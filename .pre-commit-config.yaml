@@ -25,10 +25,13 @@ repos:
     hooks:
       - id: detect-private-key
         name: Check for private keys
+        stages: [pre-commit, pre-push, manual]
       - id: check-merge-conflict
         name: Check for merge conflicts
+        stages: [pre-commit, manual]
       - id: debug-statements
         name: Check for debugger imports
+        stages: [pre-commit, manual]
 
   # === Type Checking ===
 
@@ -88,7 +91,7 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-commit]
+        stages: [pre-commit, manual]
         args: [
           "--quiet",
           "--no-header",
@@ -103,4 +106,4 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-commit]
+        stages: [pre-commit, manual]

@@ -1,36 +1,35 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, FastAPI
 
 from src.core.content.crawler.crawler import FireCrawler
 from src.core.system.job_manager import JobManager
-from src.infrastructure.common.file_manager import FileManager
-from src.infrastructure.config.settings import JOB_FILE_DIR, RAW_DATA_DIR
 from src.services.content_service import ContentService
 
 
-async def get_job_manager() -> JobManager:
-    """Get JobManager instance with proper configuration."""
-    return JobManager(storage_dir=JOB_FILE_DIR)
+def get_app() -> FastAPI:
+    """Get FastAPI application instance."""
+    from .app import app  # Import inside the function
+
+    return app
 
 
-async def get_file_manager() -> FileManager:
-    """Get FileManager instance with proper configuration."""
-    return FileManager(raw_data_dir=RAW_DATA_DIR)
+def get_content_service(app: FastAPI = Depends(get_app)) -> ContentService:
+    """Get ContentService from app state."""
+    return app.state.content_service
 
 
-async def get_crawler(
-    job_manager: Annotated[JobManager, Depends(get_job_manager)],
-    file_manager: Annotated[FileManager, Depends(get_file_manager)],
-) -> FireCrawler:
-    """Get configured FireCrawler instance."""
-    return FireCrawler(job_manager=job_manager, file_manager=file_manager)
+def get_job_manager(app: FastAPI = Depends(get_app)) -> JobManager:
+    """Get JobManager from app state."""
+    return app.state.job_manager
 
 
-async def get_content_service(crawler: Annotated[FireCrawler, Depends(get_crawler)]) -> ContentService:
-    """Get ContentService with all required dependencies."""
-    return ContentService(crawler=crawler)
+def get_crawler(app: FastAPI = Depends(get_app)) -> FireCrawler:
+    """Get FireCrawler from app state."""
+    return app.state.firecrawler
 
 
-# Create type aliases for cleaner dependency injection
+# Type aliases for cleaner dependency injection
 ContentServiceDep = Annotated[ContentService, Depends(get_content_service)]
+JobManagerDep = Annotated[JobManager, Depends(get_job_manager)]
+FireCrawlerDep = Annotated[FireCrawler, Depends(get_crawler)]

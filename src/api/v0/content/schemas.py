@@ -1,7 +1,10 @@
 from datetime import datetime
 from enum import Enum
+from uuid import UUID
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
+
+from src.models.content.content_source_models import DataSourceType, Source, SourceStatus
 
 
 class ContentSourceType(str, Enum):
@@ -14,65 +17,90 @@ class ContentSourceType(str, Enum):
 
 
 class ContentSourceConfig(BaseModel):
-    """Standardized config for content sources."""
+    """Configuration parameters for a content source."""
 
-    max_pages: int = Field(default=50, gt=0)
-    exclude_sections: list[str] = Field(default_factory=list)
-
-
-class AddContentSourceRequest(BaseModel):
-    """Request to add new content source."""
-
-    type: ContentSourceType = Field(..., description="Type of content source")
-    name: str = Field(..., description="Display name for content source")
-    url: HttpUrl = Field(..., description="Base URL of the content")
-    config: ContentSourceConfig  # Use typed config instead of dict
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "type": "web",
-                "name": "Product Docs",
-                "url": "https://docs.example.com",
-                "config": {
-                    "max_pages": 50,
-                    "exclude_paths": ["/blog/*"],
-                },
-            }
-        }
+    url: str = Field(..., description="Base URL of the content to crawl.")
+    page_limit: int = Field(default=50, gt=0, description="Maximum number of pages to crawl.")
+    exclude_patterns: list[str] = Field(
+        default_factory=list,
+        description="The list of patterns to exclude, e.g., '/blog/*', '/author/*'.",
+    )
+    include_patterns: list[str] = Field(
+        default_factory=list,
+        description="The list of patterns to include, e.g., '/blog/*', '/api/*'.",
+    )
 
     @field_validator("url")
     @classmethod
-    def url_must_be_http_url(cls, v) -> str:
-        """Validates the input URL and converts it to HttpURL"""
-        if not v:
-            raise ValueError("URL cannot be None or empty")
+    def validate_url(cls, v: str) -> str:
+        """Validates start url of the crawl and returns a str."""
         try:
             parsed = HttpUrl(str(v))
             return str(parsed)  # Convert to string immediately
         except Exception as e:
             raise ValueError("Invalid URL. It should start with 'http://' or 'https://'.") from e
 
+    @field_validator("exclude_patterns", "include_patterns")
+    def validate_patterns(cls, v: list[str]) -> list[str]:  # noqa: N805
+        """
 
-class ContentSourceStatus(str, Enum):
-    """Content source processing status."""
+        Validates patterns to ensure they start with '/' and are not empty.
 
-    PENDING = "pending"  # Source created
-    PROCESSING = "processing"  # Crawling / processing
-    COMPLETED = "completed"  # Source added
-    FAILED = "failed"  # Error occured
+        Args:
+            cls: The class instance.
+            v (list[str]): List of string patterns to validate.
+
+        Returns:
+            list[str]: The validated list of patterns.
+
+        Raises:
+            ValueError: If any pattern is empty or does not start with '/'.
+        """
+        for pattern in v:
+            if not pattern.strip():
+                raise ValueError("Empty patterns are not allowed")
+            if not pattern.startswith("/"):
+                raise ValueError("Pattern must start with '/', got: {pattern}")
+        return v
 
 
-class ContentSourceResponse(BaseModel):
-    """Content source details."""
+class AddContentSourceRequest(BaseModel):
+    """Request to add a new content source."""
 
-    id: str
-    type: ContentSourceType
-    name: str
-    url: str
-    status: ContentSourceStatus
-    created_at: datetime
-    updated_at: datetime
-    total_pages: int
+    source_type: ContentSourceType = Field(
+        ..., description="Type of content source (currently only 'web' is supported)."
+    )
     config: ContentSourceConfig
-    job_id: str | None = None  #
+
+    class Config:
+        """Example config."""
+
+        json_schema_extra = {
+            "example": {
+                "source_type": "web",
+                "config": {
+                    "url": "https://docs.example.com",
+                    "max_pages": 50,
+                    "exclude_paths": ["/blog/*"],
+                },
+            }
+        }
+
+
+class SourceAPIResponse(BaseModel):
+    """Simplified model inheriting from Source."""
+
+    source_id: UUID = Field(...)
+    source_type: DataSourceType = Field(..., description="Data source type")
+    status: SourceStatus = Field(..., description="Status of the data source")
+    created_at: datetime = Field(..., description="Date timestamp in UTC when data source was created.")
+    error: str | None = Field(None, description="Error message, null if no error")
+
+    @classmethod
+    def from_source(cls, source: Source) -> "SourceAPIResponse":
+        return cls(
+            source_id=source.source_id,
+            status=source.status,
+            source_type=source.source_type,
+            created_at=source.created_at,
+        )

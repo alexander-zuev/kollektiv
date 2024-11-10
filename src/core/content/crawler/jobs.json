@@ -717,5 +717,31 @@
     "completed_at": "2024-11-08T05:41:46.027834+00:00",
     "result_file": null,
     "error": null
+  },
+  "d69b5e86-6985-4f65-8ee9-a0fe6f65f8c3": {
+    "id": "d69b5e86-6985-4f65-8ee9-a0fe6f65f8c3",
+    "firecrawl_id": "983dae2c-c76f-4db1-83b9-263e61525c42",
+    "status": "pending",
+    "start_url": "http://www.supabase.com/",
+    "method": "crawl",
+    "pages_crawled": 0,
+    "created_at": "2024-11-09T11:51:49.615341+00:00",
+    "started_at": null,
+    "completed_at": null,
+    "result_file": null,
+    "error": null
+  },
+  "9b88e25d-67c4-4b02-b278-bb32fb41c09c": {
+    "id": "9b88e25d-67c4-4b02-b278-bb32fb41c09c",
+    "firecrawl_id": "7e639e0c-aa47-4f94-9aa5-d7c693af3685",
+    "status": "completed",
+    "start_url": "http://www.supabase.com/",
+    "method": "crawl",
+    "pages_crawled": 1,
+    "created_at": "2024-11-09T11:52:58.690196+00:00",
+    "started_at": "2024-11-09T11:52:58.967072+00:00",
+    "completed_at": "2024-11-09T11:53:04.899402+00:00",
+    "result_file": null,
+    "error": null
   }
 }

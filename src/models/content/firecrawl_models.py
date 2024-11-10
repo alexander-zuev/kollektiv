@@ -374,3 +374,16 @@ class CrawlResult(BaseModel):
         json_encoders = {datetime: lambda v: v.isoformat()}
         extra = "allow"
         validate_assignment = True
+
+
+class FireCrawlResponse(BaseModel):
+    """Object encapsulating response from FireCrawl async_crawl_url."""
+
+    success: bool = Field(..., description="Indicates if the crawl initiation was successful.")
+    job_id: str = Field(..., description="The unique identifier for the crawl job.")
+    url: str = Field(..., description="The URL to check the status of the crawl job.")
+
+    @classmethod
+    def from_firecrawl_response(cls, response: dict[str, Any]) -> "FireCrawlResponse":
+        """Converts a Firecrawl API response dictionary to a FireCrawlResponse object."""
+        return cls(success=response["success"], job_id=response["id"], url=response["url"])

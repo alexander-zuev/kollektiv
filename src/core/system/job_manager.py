@@ -1,13 +1,15 @@
 # job_manager.py
 import json
 from pathlib import Path
+from typing import Any
+from uuid import UUID
 
 import aiofiles
 
 from src.core._exceptions import JobNotFoundError
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
-from src.models.common.jobs import CrawlJob, CrawlJobStatus
+from src.models.common.jobs import CrawlJob
 
 logger = get_logger()
 
@@ -38,9 +40,9 @@ class JobManager:
             self.jobs_file.write_text("{}")
 
     @base_error_handler
-    async def create_job(self, firecrawl_id: str, start_url: str) -> CrawlJob:
+    async def create_job(self, source_id: UUID) -> CrawlJob:
         """Create new job."""
-        job = CrawlJob(firecrawl_id=firecrawl_id, start_url=start_url, status=CrawlJobStatus.PENDING)
+        job = CrawlJob(source_id=source_id)
         await self._save_job(job)
         return job
 
@@ -72,7 +74,7 @@ class JobManager:
         logger.debug(f"Saved job {job.id} with status {job.status}")
 
     @base_error_handler
-    async def _load_jobs(self) -> dict:
+    async def _load_jobs(self) -> dict[Any, Any]:
         """Load jobs from storage.
 
         Returns:

@@ -1,9 +1,3 @@
-# TODO: Properly handle errors
-# TODO: Implement validation for non-empty content during crawling to prevent passing empty pages to the chunker.
-# TODO: Implement retries or error handling for pages that fail to be crawled (e.g., network errors).
-# TODO: Provide more informative progress updates to the user during crawling (e.g., percentage completion).
-# TODO: Notify users only in case of critical errors or if no valid content is found after crawling.
-# TODO: Switch to Supabase/Redis for job storage
 import asyncio
 from datetime import UTC, datetime
 from typing import Any
@@ -29,7 +23,6 @@ from src.core._exceptions import (
 )
 from src.core.system.job_manager import JobManager
 from src.infrastructure.common.decorators import base_error_handler
-from src.infrastructure.common.file_manager import FileManager
 from src.infrastructure.config.logger import configure_logging, get_logger
 from src.infrastructure.config.settings import (
     ENVIRONMENT,
@@ -46,6 +39,7 @@ from src.models.content.firecrawl_models import (
     CrawlParams,
     CrawlRequest,
     CrawlResult,
+    FireCrawlResponse,
     ScrapeOptions,
 )
 
@@ -79,8 +73,6 @@ class FireCrawler:
 
     def __init__(
         self,
-        job_manager: JobManager,
-        file_manager: FileManager,
         api_key: str | None = FIRECRAWL_API_KEY,
         api_url: str = FIRECRAWL_API_URL,
         data_dir: str = RAW_DATA_DIR,
@@ -92,8 +84,6 @@ class FireCrawler:
         self.api_url = api_url
         self.raw_data_dir: str = data_dir
         self.jobs_dir: str = jobs_dir
-        self.job_manager = job_manager
-        self.file_manager = file_manager
         self.firecrawl_app = self.initialize_firecrawl()
 
     @base_error_handler
@@ -144,7 +134,7 @@ class FireCrawler:
             f"Retrying in {retry_state.next_action.sleep} seconds..."
         ),
     )
-    async def start_crawl(self, request: CrawlRequest) -> CrawlJob | Any:
+    async def start_crawl(self, request: CrawlRequest) -> FireCrawlResponse:
         """Start a new crawl job with webhook configuration."""
         try:
             params = self._build_params(request)
@@ -154,8 +144,9 @@ class FireCrawler:
 
             response = self.firecrawl_app.async_crawl_url(str(request.url), api_params)
 
-            job = await self.job_manager.create_job(firecrawl_id=response["id"], start_url=request.url)
-            return job
+            firecrawl_response = FireCrawlResponse.from_firecrawl_response(response)
+            logger.info(f"Received response from FireCrawl: {firecrawl_response}")
+            return firecrawl_response
         except HTTPError as err:
             should_retry, _ = is_retryable_error(err)
             if should_retry:
@@ -286,17 +277,12 @@ class FireCrawler:
 
 async def initialize_components() -> tuple[FireCrawler, JobManager]:
     """Initialize required components."""
-    job_manager = JobManager(JOB_FILE_DIR)
-    file_manager = FileManager(RAW_DATA_DIR)
-
     crawler = FireCrawler(
-        job_manager=job_manager,
-        file_manager=file_manager,
         api_key=FIRECRAWL_API_KEY,
         data_dir=RAW_DATA_DIR,
         jobs_dir=JOB_FILE_DIR,
     )
-    return crawler, job_manager
+    return crawler
 
 
 async def main() -> None:
