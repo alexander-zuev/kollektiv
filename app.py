@@ -26,14 +26,10 @@ DEBUG = LOG_LEVEL == "debug"
 configure_logging(debug=DEBUG)
 logger = get_logger()
 
-# Store the message handler and content service globally
-content_service: ContentService | None = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events."""
-    global content_service  # Declare intent to modify global variable
     logger.info("Starting up Kollektiv API...")
     try:
         # Initialize dependencies
@@ -47,42 +43,42 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.firecrawler = firecrawler
 
         logger.info("Core services initialized successfully")
-        yield
+        yield  # Hand over to the application
     except Exception as e:
         logger.error(f"Failed to initialize core services: {str(e)}")
-        raise
+        raise  # Re-raise the exception to prevent startup
     finally:
         logger.info("Shutting down Kollektiv API...")
 
 
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
-    app = FastAPI(
-        title="Kollektiv API",
-        description="RAG-powered documentation chat application",
-        lifespan=lifespan,
-    )
+# Create the FastAPI app
+app = FastAPI(
+    title="Kollektiv API",
+    description="RAG-powered documentation chat application",
+)
 
-    # Configure CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Assign the lifespan context to the app's lifespan attribute
+app.lifespan = lifespan  # Correctly associate lifespan here
 
-    # Add rate limiting for health endpoint
-    app.add_middleware(HealthCheckRateLimit, requests_per_minute=60)
+# Add middleware and routes *after* the app is created with lifespan
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    # System routes
-    app.include_router(health_router, tags=["system"])
-    app.include_router(webhook_router, prefix=Routes.System.Webhooks.BASE, tags=["system"])
+# Add rate limiting for health endpoint
+app.add_middleware(HealthCheckRateLimit, requests_per_minute=60)
 
-    # Content routes
-    app.include_router(content_router, prefix=Routes.V0.BASE, tags=["content"])
+# System routes
+app.include_router(health_router, tags=["system"])
+app.include_router(webhook_router, prefix=Routes.System.Webhooks.BASE, tags=["system"])
 
-    return app
+# Content routes
+app.include_router(content_router, prefix=Routes.V0.BASE, tags=["content"])
 
 
 def run() -> None:
@@ -96,7 +92,6 @@ def run() -> None:
 
     try:
         logger.info(f"Starting API server on {API_HOST}:{API_PORT}")
-        app = create_app()
         uvicorn.run(app, host=API_HOST, port=API_PORT, log_level=LOG_LEVEL)
     except KeyboardInterrupt:
         logger.info("Shutting down server...")
