@@ -1,17 +1,17 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from src.api.v0.content.schemas import (
+from src.api.v0.schemas.sources_schemas import (
     AddContentSourceRequest,
     SourceAPIResponse,
 )
+from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, WebhookEvent
 from src.core._exceptions import JobNotFoundError
 from src.core.content.crawler.crawler import FireCrawler
 from src.core.system.job_manager import JobManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.models.common.jobs import CrawlJob, CrawlJobStatus
-from src.models.common.webhook_models import FireCrawlEventType, WebhookEvent
 from src.models.content.content_source_models import Source, SourceStatus
 from src.models.content.firecrawl_models import CrawlRequest
 
@@ -72,7 +72,7 @@ class ContentService:
             source.status = SourceStatus.FAILED
             source.updated_at = datetime.now(UTC)
             source.data = {**source.data, "error": str(e)}  # Store error in source data
-            logger.error(f"Failed to create crawl job for source {source.source_id}: {str(e)}")
+            logger.error(f"Failed to create crawl job with source id {source.source_id}: {str(e)}")
             raise
 
     async def _persist_source(self, request: AddContentSourceRequest) -> Source:

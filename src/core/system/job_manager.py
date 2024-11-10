@@ -68,10 +68,11 @@ class JobManager:
             job (CrawlJob): The job to save.
         """
         jobs = await self._load_jobs()
-        jobs[job.id] = job.model_dump(mode="json")
+        job_id = str(job.job_id)
+        jobs[job_id] = job.model_dump(mode="json")
         async with aiofiles.open(self.jobs_file, "w") as f:
             await f.write(json.dumps(jobs, indent=2))
-        logger.debug(f"Saved job {job.id} with status {job.status}")
+        logger.debug(f"Saved job {job.job_id} with status {job.status}")
 
     @base_error_handler
     async def _load_jobs(self) -> dict[Any, Any]:

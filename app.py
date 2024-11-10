@@ -6,20 +6,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.middleware.rate_limit import HealthCheckRateLimit
-from src.api.routes import Routes
-from src.api.system.health.health_router import router as health_router
-from src.api.system.webhooks.webhook_router import router as webhook_router
-from src.api.v0.content.sources import router as content_router
-from src.core.content.crawler.crawler import FireCrawler
-from src.core.system.job_manager import JobManager
+from src.api.system.health import router as health_router
+from src.api.v0.endpoints.sources import router as content_router
+from src.api.v0.endpoints.webhooks import router as webhook_router
 from src.infrastructure.config.logger import configure_logging, get_logger
 from src.infrastructure.config.settings import (
     API_HOST,
     API_PORT,
-    JOB_FILE_DIR,
     LOG_LEVEL,
 )
-from src.services.content_service import ContentService
+from src.infrastructure.service_container import ServiceContainer
 
 # Configure logging
 DEBUG = LOG_LEVEL == "debug"
@@ -32,16 +28,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events."""
     logger.info("Starting up Kollektiv API...")
     try:
-        # Initialize dependencies
-        job_manager = JobManager(JOB_FILE_DIR)
-        firecrawler = FireCrawler()
-        content_service = ContentService(firecrawler, job_manager)
+        # Initialize services
+        container = ServiceContainer()
+        container.initialize_services()
 
-        # Store in app state for access in routes
-        app.state.job_manager = job_manager
-        app.state.content_service = content_service
-        app.state.firecrawler = firecrawler
-
+        # Save in app state
+        app.state.container = container
         logger.info("Core services initialized successfully")
         yield  # Hand over to the application
     except Exception as e:
@@ -51,34 +43,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Shutting down Kollektiv API...")
 
 
-# Create the FastAPI app
-app = FastAPI(
-    title="Kollektiv API",
-    description="RAG-powered documentation chat application",
-)
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="Kollektiv API",
+        description="RAG-powered documentation chat application",
+        lifespan=lifespan,
+    )
 
-# Assign the lifespan context to the app's lifespan attribute
-app.lifespan = lifespan  # Correctly associate lifespan here
+    # Configure CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# Add middleware and routes *after* the app is created with lifespan
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # Add rate limiting for health endpoint
+    app.add_middleware(HealthCheckRateLimit, requests_per_minute=60)
 
-# Add rate limiting for health endpoint
-app.add_middleware(HealthCheckRateLimit, requests_per_minute=60)
+    # Add routes
+    app.include_router(health_router, tags=["system"])
+    app.include_router(webhook_router, tags=["webhooks"])
+    app.include_router(content_router, tags=["content"])
 
-# System routes
-app.include_router(health_router, tags=["system"])
-app.include_router(webhook_router, prefix=Routes.System.Webhooks.BASE, tags=["system"])
-
-# Content routes
-app.include_router(content_router, prefix=Routes.V0.BASE, tags=["content"])
+    return app
 
 
 def run() -> None:
@@ -92,6 +82,7 @@ def run() -> None:
 
     try:
         logger.info(f"Starting API server on {API_HOST}:{API_PORT}")
+        app = create_app()
         uvicorn.run(app, host=API_HOST, port=API_PORT, log_level=LOG_LEVEL)
     except KeyboardInterrupt:
         logger.info("Shutting down server...")
