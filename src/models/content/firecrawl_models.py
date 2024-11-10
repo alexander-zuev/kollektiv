@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from src.infrastructure.config.settings import DEFAULT_MAX_DEPTH, DEFAULT_PAGE_LIMIT
+from src.infrastructure.config.settings import settings
 
 if TYPE_CHECKING:
     from src.models.common.jobs import CrawlJobStatus
@@ -170,10 +170,13 @@ class CrawlRequest(BaseModel):
 
     url: str = Field(..., description="The starting URL of the crawl request.")
     page_limit: int = Field(
-        default=DEFAULT_PAGE_LIMIT, gt=0, le=1000, description="Maximum number of pages to crawl. Maximum is 1000."
+        default=settings.default_page_limit,
+        gt=0,
+        le=1000,
+        description="Maximum number of pages to crawl. Maximum is 1000.",
     )
     max_depth: int = Field(
-        default=DEFAULT_MAX_DEPTH,
+        default=settings.default_max_depth,
         gt=0,
         le=10,
         description="Maximum depth for crawling",

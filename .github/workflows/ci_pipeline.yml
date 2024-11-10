@@ -10,6 +10,7 @@ env:
   PYTHON_VERSION: "3.12"
   POETRY_VERSION: "1.8.3"
   PYTHONPATH: ${{ github.workspace }}
+  ENVIRONMENT: "staging"
   PYTHONUNBUFFERED: 1
   WANDB_MODE: "disabled"
   # Global env vars

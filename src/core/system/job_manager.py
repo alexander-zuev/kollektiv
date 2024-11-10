@@ -21,14 +21,20 @@ class JobManager:
     including their persistence to storage.
 
     Args:
-        storage_dir (str): Directory path for storing job data.
+        storage_dir (Union[str, Path]): Directory path for storing job data. Can be string or Path.
 
     Attributes:
         storage_dir (Path): Path object for the storage directory.
         jobs_file (Path): Path object for the jobs JSON file.
     """
 
-    def __init__(self, storage_dir: str):
+    def __init__(self, storage_dir: str | Path):
+        """
+        Initialize JobManager.
+
+        Args:
+            storage_dir: Directory path for storing job data. Can be string or Path.
+        """
         self.storage_dir = Path(storage_dir)
         self.jobs_file = self.storage_dir / "jobs.json"
         self._ensure_storage()

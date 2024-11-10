@@ -12,7 +12,6 @@ from tenacity import (
     wait_exponential,
 )
 
-from src.api.routes import Routes
 from src.core._exceptions import (
     EmptyContentError,
     FireCrawlAPIError,
@@ -24,15 +23,7 @@ from src.core._exceptions import (
 from src.core.system.job_manager import JobManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import configure_logging, get_logger
-from src.infrastructure.config.settings import (
-    ENVIRONMENT,
-    FIRECRAWL_API_KEY,
-    FIRECRAWL_API_URL,
-    JOB_FILE_DIR,
-    MAX_RETRIES,
-    RAW_DATA_DIR,
-    WEBHOOK_HOST,
-)
+from src.infrastructure.config.settings import settings
 from src.models.common.jobs import CrawlJob, CrawlJobStatus
 from src.models.content.firecrawl_models import (
     CrawlData,
@@ -73,17 +64,13 @@ class FireCrawler:
 
     def __init__(
         self,
-        api_key: str | None = FIRECRAWL_API_KEY,
-        api_url: str = FIRECRAWL_API_URL,
-        data_dir: str = RAW_DATA_DIR,
-        jobs_dir: str = JOB_FILE_DIR,
+        api_key: str | None = settings.firecrawl_api_key,
+        api_url: str = settings.firecrawl_api_url,
     ) -> None:
         if not api_key:
             raise ValueError("API key cannot be None")
         self.api_key: str = api_key
         self.api_url = api_url
-        self.raw_data_dir: str = data_dir
-        self.jobs_dir: str = jobs_dir
         self.firecrawl_app = self.initialize_firecrawl()
 
     @base_error_handler
@@ -104,13 +91,8 @@ class FireCrawler:
             CrawlParams: Parameters formatted for the FireCrawl API
         """
         # Handle webhook URL
-        webhook_str: str | None = None
-        if request.webhook_url:
-            webhook_str = str(request.webhook_url)
-        else:
-            webhook_path = f"{Routes.System.Webhooks.BASE}{Routes.System.Webhooks.FIRECRAWL}"
-            webhook_str = f"{WEBHOOK_HOST}{webhook_path}"
-            logger.debug(f"Using webhook URL: {webhook_str}")
+        webhook_url = settings.firecrawl_webhook_url
+        logger.debug(f"Using webhook URL: {webhook_url}")
 
         # Create and return CrawlParams
         params = CrawlParams(
@@ -119,18 +101,18 @@ class FireCrawler:
             max_depth=request.max_depth,
             include_paths=request.include_patterns,
             exclude_paths=request.exclude_patterns,
-            webhook=webhook_str,
+            webhook=webhook_url,
             scrape_options=ScrapeOptions(),
         )
 
         return params
 
     @retry(
-        stop=stop_after_attempt(MAX_RETRIES),
+        stop=stop_after_attempt(settings.max_retries),
         retry=retry_if_exception_type((HTTPError, FireCrawlConnectionError, FireCrawlTimeoutError)),
         wait=wait_exponential(multiplier=1, min=30, max=300),
         before_sleep=lambda retry_state: logger.warning(
-            f"Retryable error occurred. Attempt {retry_state.attempt_number}/{MAX_RETRIES}. "
+            f"Retryable error occurred. Attempt {retry_state.attempt_number}/{settings.max_retries}. "
             f"Retrying in {retry_state.next_action.sleep} seconds..."
         ),
     )
@@ -217,11 +199,11 @@ class FireCrawler:
         return CrawlData(data=crawl_data)
 
     @retry(
-        stop=stop_after_attempt(MAX_RETRIES),
+        stop=stop_after_attempt(settings.max_retries),
         retry=retry_if_exception_type((HTTPError, FireCrawlConnectionError, FireCrawlTimeoutError)),
         wait=wait_exponential(multiplier=1, min=10, max=60),
         before_sleep=lambda retry_state: logger.warning(
-            f"Error fetching results. Attempt {retry_state.attempt_number}/{MAX_RETRIES}. "
+            f"Error fetching results. Attempt {retry_state.attempt_number}/{settings.max_retries}. "
             f"Retrying in {retry_state.next_action.sleep} seconds..."
         ),
     )
@@ -262,12 +244,11 @@ class FireCrawler:
             FireCrawlAPIError: For API-related errors
             FireCrawlConnectionError: For connection issues
         """
-        logger.info(f"Starting crawl of {request.url} in {ENVIRONMENT} environment")
+        logger.info(f"Starting crawl of {request.url} in {settings.environment} environment")
         logger.info(f"Using webhook URL: {request.webhook_url}")
 
         try:
             job = await self.start_crawl(request)
-            logger.info(f"Created job {job.id}")
             return job
 
         except (FireCrawlAPIError, FireCrawlConnectionError) as e:
@@ -277,12 +258,14 @@ class FireCrawler:
 
 async def initialize_components() -> tuple[FireCrawler, JobManager]:
     """Initialize required components."""
+    # Create both components
     crawler = FireCrawler(
-        api_key=FIRECRAWL_API_KEY,
-        data_dir=RAW_DATA_DIR,
-        jobs_dir=JOB_FILE_DIR,
+        api_key=settings.firecrawl_api_key,
     )
-    return crawler
+    job_manager = JobManager(storage_dir=str(settings.job_file_dir))
+
+    # Return both components as a tuple
+    return crawler, job_manager
 
 
 async def main() -> None:
@@ -303,11 +286,10 @@ async def main() -> None:
         # 3. Start crawl
         logger.info(f"Starting crawl of {request.url}")
         job = await crawler.crawl(request)
-        logger.info(f"Created job {job.id}")
 
         # 4. Monitor job status
         while True:
-            job = await job_manager.get_job(job.id)
+            job = await job_manager.get_job(job.job_id)
             logger.info(f"Job status: {job.status}, Pages crawled: {job.pages_crawled}")
 
             if job.status == CrawlJobStatus.COMPLETED:

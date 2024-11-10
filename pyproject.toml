@@ -36,6 +36,7 @@ types-requests = "^2.32.0.20241016"
 mypy = "^1.13.0"
 types-pytz = "^2024.2.0.20241003"
 types-aiofiles = "^24.1.0.20240626"
+pydantic-settings = "^2.6.1"
 
 
 [build-system]
