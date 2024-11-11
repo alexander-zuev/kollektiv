@@ -1,12 +1,10 @@
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.infrastructure.config.settings import settings
-
-if TYPE_CHECKING:
-    from src.models.common.jobs import CrawlJobStatus
+from src.models.common.jobs import CrawlJobStatus
 
 
 # Scrape Options
@@ -359,7 +357,7 @@ class CrawlResult(BaseModel):
         ```
     """
 
-    job_status: "CrawlJobStatus" = Field(...)
+    job_status: CrawlJobStatus = Field(..., description="Enum status of the crawl job")
     input_url: str = Field(..., description="The original URL that was crawled")
     total_pages: int = Field(..., ge=0, description="Total number of pages successfully crawled")
     unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")

@@ -77,7 +77,7 @@ class WebhookResponse(BaseModel):
 
     status: str = Field("success", description="Status of webhook processing")
     message: str = Field(..., description="Human-readable processing result")
-    event_id: str = Field(..., description="ID of the processed event")
+    event_id: UUID = Field(..., description="ID of the processed event")
     provider: WebhookProvider = Field(..., description="Provider that sent the webhook")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="When the webhook was processed")
 

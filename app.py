@@ -10,15 +10,11 @@ from src.api.system.health import router as health_router
 from src.api.v0.endpoints.sources import router as content_router
 from src.api.v0.endpoints.webhooks import router as webhook_router
 from src.infrastructure.config.logger import configure_logging, get_logger
-from src.infrastructure.config.settings import (
-    API_HOST,
-    API_PORT,
-    LOG_LEVEL,
-)
+from src.infrastructure.config.settings import Environment, settings
 from src.infrastructure.service_container import ServiceContainer
 
 # Configure logging
-DEBUG = LOG_LEVEL == "debug"
+DEBUG = settings.log_level == "debug"
 configure_logging(debug=DEBUG)
 logger = get_logger()
 
@@ -28,6 +24,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events."""
     logger.info("Starting up Kollektiv API...")
     try:
+        # Initialize ngrok for local development
+        if settings.environment == Environment.LOCAL:
+            settings.setup_ngrok()
+
         # Initialize services
         container = ServiceContainer()
         container.initialize_services()
@@ -41,6 +41,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         raise  # Re-raise the exception to prevent startup
     finally:
         logger.info("Shutting down Kollektiv API...")
+        if settings.environment == Environment.LOCAL and settings.use_ngrok:
+            from pyngrok import ngrok
+
+            ngrok.kill()
 
 
 def create_app() -> FastAPI:
@@ -74,16 +78,16 @@ def create_app() -> FastAPI:
 def run() -> None:
     """Run the FastAPI application."""
     # Security warnings for non-localhost bindings
-    if API_HOST != "127.0.0.1":
+    if settings.api_host != "127.0.0.1":
         logger.warning(
             "Warning: API server is binding to a non-localhost address. "
             "Make sure this is intended for production use."
         )
 
     try:
-        logger.info(f"Starting API server on {API_HOST}:{API_PORT}")
+        logger.info(f"Starting API server on {settings.api_host}:{settings.api_port}")
         app = create_app()
-        uvicorn.run(app, host=API_HOST, port=API_PORT, log_level=LOG_LEVEL)
+        uvicorn.run(app, host=settings.api_host, port=settings.api_port, log_level=settings.log_level)
     except KeyboardInterrupt:
         logger.info("Shutting down server...")
         logger.info("Server shut down successfully")

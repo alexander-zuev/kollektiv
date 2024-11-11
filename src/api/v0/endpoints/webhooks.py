@@ -33,21 +33,19 @@ async def handle_firecrawl_webhook(
     Raises:
         HTTPException: If webhook processing fails
     """
-    logger.debug(f"Full path: {request.url.path}")
+    logger.debug(f"Receiving webhook at: {request.url}")
     try:
         handler = FireCrawlWebhookHandler()
 
         # Get raw payload
-        data = await request.json()
-        logger.debug(f"Received FireCrawl webhook data: {data}")
+        raw_payload = await request.json()
+        logger.debug(f"Received FireCrawl webhook data: {raw_payload}")
 
         # Create FireCrawl event
-        event_data = handler._create_firecrawl_event(data=data)
+        event_data = handler._create_firecrawl_event(data=raw_payload)
 
         # Create FireCrawlWebhookEvent
-        event = handler._create_webhook_event(firecrawl_event=event_data, raw_payload=data)
-
-        logger.info(f"Processing FireCrawl webhook event: {event_data.event_type} for job {event_data.crawl_id}")
+        event = handler._create_webhook_event(event_data=event_data, raw_payload=raw_payload)
 
         # Call ContentService with CrawlEvent
         await content_service.handle_event(event=event)

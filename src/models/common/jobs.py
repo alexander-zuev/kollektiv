@@ -35,6 +35,7 @@ class CrawlJob(BaseModel):
         None, description="Job id returned by FireCrawl. Added only if a jobs starts " "successfully"
     )
     status: CrawlJobStatus = Field(default=CrawlJobStatus.PENDING, description="Crawl job status in the system.")
+    start_url: str = Field(..., description="Start url of the crawl job")
     method: str = Field(default="crawl")
 
     # Simple progress tracking

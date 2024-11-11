@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     vector_storage_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/storage/vector"))
     chroma_db_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/storage/vector/chroma"))
 
+    # Ngrok configuration (only for local development)
+    use_ngrok: bool = Field(True, description="Whether to use ngrok in local development")
+    ngrok_auth_token: str | None = Field(None, alias="NGROK_AUTH_TOKEN")
+    _ngrok_url: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),
         env_file_encoding="utf-8",
@@ -79,6 +84,8 @@ class Settings(BaseSettings):
     def base_url(self) -> str:
         """Dynamically generate base URL based on environment."""
         if self.environment == Environment.LOCAL:
+            if self.use_ngrok and self._ngrok_url:
+                return self._ngrok_url
             return f"http://{self.api_host}:{self.api_port}"
 
         base_url = os.getenv("BASE_URL")
@@ -90,6 +97,29 @@ class Settings(BaseSettings):
     def firecrawl_webhook_url(self) -> str:
         """Dynamically generates the Firecrawl webhook URL."""
         return f"{self.base_url}{Routes.System.Webhooks.FIRECRAWL}"
+
+    def setup_ngrok(self) -> None:
+        """Initialize ngrok tunnel if in local environment."""
+        if self.environment != Environment.LOCAL or not self.use_ngrok:
+            return
+
+        try:
+            from pyngrok import conf, ngrok
+
+            if self.ngrok_auth_token:
+                conf.get_default().auth_token = self.ngrok_auth_token
+
+            # Use api_port directly instead of ngrok_port
+            tunnel = ngrok.connect(self.api_port, bind_tls=True)
+            self._ngrok_url = tunnel.public_url
+            logger.info(f"Ngrok tunnel established at {self._ngrok_url}")
+
+        except ImportError:
+            logger.warning("pyngrok not installed. Ngrok integration disabled.")
+            self.use_ngrok = False
+        except Exception as e:
+            logger.error(f"Failed to initialize ngrok: {str(e)}")
+            self.use_ngrok = False
 
 
 # Initialize settings instance

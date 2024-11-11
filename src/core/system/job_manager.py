@@ -46,9 +46,9 @@ class JobManager:
             self.jobs_file.write_text("{}")
 
     @base_error_handler
-    async def create_job(self, source_id: UUID) -> CrawlJob:
+    async def create_job(self, source_id: UUID, start_url: str) -> CrawlJob:
         """Create new job."""
-        job = CrawlJob(source_id=source_id)
+        job = CrawlJob(source_id=source_id, start_url=start_url)
         await self._save_job(job)
         return job
 

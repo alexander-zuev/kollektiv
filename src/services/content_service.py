@@ -13,7 +13,7 @@ from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.models.common.jobs import CrawlJob, CrawlJobStatus
 from src.models.content.content_source_models import Source, SourceStatus
-from src.models.content.firecrawl_models import CrawlRequest
+from src.models.content.firecrawl_models import CrawlRequest, CrawlResult
 
 logger = get_logger()
 
@@ -44,21 +44,26 @@ class ContentService:
             source.status = SourceStatus.PENDING  # Initial status
             self._sources[str(source.source_id)] = source
 
-            # 2. Create Job
+            # 2. Create CrawlRequest
+            crawl_request = await self._create_crawl_request(request)
+
+            # 3. Create Job
             job = await self.job_manager.create_job(
                 source_id=source.source_id,  # for tracking later
+                start_url=crawl_request.url,
             )
             source.job_id = job.job_id
             self._sources[str(source.source_id)] = source  # Update source in local storage
 
             # 3. Start the crawl
-            crawl_request = await self._create_crawl_request(request)
+
             response = await self.crawler.start_crawl(request=crawl_request)
 
             # 4. Update Source to CRAWLING (Firecrawl has accepted the job)
             if response.success:
                 # Update firecrawl job id
                 job.firecrawl_id = response.job_id
+                await self.job_manager.update_job(job)
 
                 # Update source
                 source.status = SourceStatus.CRAWLING
@@ -140,19 +145,19 @@ class ContentService:
 
                 match event.data.event_type:
                     case FireCrawlEventType.CRAWL_STARTED:
-                        logger.info(f"Crawl started for job {job.id}")
+                        logger.info(f"Crawl started for job {job.job_id}")
                         await self._handle_started(job)
 
                     case FireCrawlEventType.CRAWL_PAGE:
-                        logger.info(f"Page crawled for job {job.id}")
+                        logger.info(f"Page crawled for job {job.job_id}")
                         await self._handle_page_crawled(job)
 
                     case FireCrawlEventType.CRAWL_COMPLETED:
-                        logger.info(f"Crawl completed for job {job.id}")
+                        logger.info(f"Crawl completed for job {job.job_id}")
                         await self._handle_completed(job)
 
                     case FireCrawlEventType.CRAWL_FAILED:
-                        logger.error(f"Crawl failed for job {job.id}: {event.error}")
+                        logger.error(f"Crawl failed for job {job.job_id}: {event.error}")
                         await self._handle_failure(job, event.error or "Unknown error")
 
         except JobNotFoundError as e:
@@ -169,7 +174,6 @@ class ContentService:
         """Handle crawl.started event"""
         # Update job
         job.status = CrawlJobStatus.IN_PROGRESS
-        job.started_at = datetime.now(UTC)
 
         # Update Source
 
@@ -187,10 +191,22 @@ class ContentService:
     @base_error_handler
     async def _handle_completed(self, job: CrawlJob) -> None:
         """Handle crawl.completed event"""
+        # Update job data
+
         job.status = CrawlJobStatus.COMPLETED
         job.completed_at = datetime.now(UTC)
         job.pages_crawled = job.pages_crawled  # Set total pages to what we've crawled
+
+        # Retrieve the results
+        results = await self._get_crawl_results(job=job)
+
+        # Update source record
+        # self.update_source_status()
+
         await self.job_manager.update_job(job)
+
+        logger.info("Printing results for now")
+        return results
 
     @base_error_handler
     async def _handle_failure(self, job: CrawlJob, error: str) -> None:
@@ -199,3 +215,8 @@ class ContentService:
         job.error = error
         job.completed_at = datetime.now(UTC)
         await self.job_manager.update_job(job)
+
+    @base_error_handler
+    async def _get_crawl_results(self, job: CrawlJob) -> CrawlResult:
+        results = await self.crawler.get_results(crawl_job=job)
+        return results

@@ -102,7 +102,7 @@ enum SourceState {
 ### State Transitions
 ```
 PENDING -> CRAWLING -> PROCESSING -> COMPLETED
-    |          |           |            
+    |          |           |
     +--------> +--------> + ---------> FAILED
 ```
 
@@ -337,4 +337,3 @@ content_service.update_source_status()
 -- crawler.get results
 if event type == failed
 -- crawler get_results?
-

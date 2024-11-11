@@ -23,17 +23,17 @@ class FireCrawlWebhookHandler:
         )
 
     @staticmethod
-    def _create_webhook_event(firecrawl_event: FireCrawlEvent, raw_payload: dict[str, Any]) -> FireCrawlWebhookEvent:
+    def _create_webhook_event(event_data: FireCrawlEvent, raw_payload: dict[str, Any]) -> FireCrawlWebhookEvent:
         return FireCrawlWebhookEvent(
             provider=WebhookProvider.FIRECRAWL,
             raw_payload=raw_payload,
-            data=firecrawl_event,
+            data=event_data,
         )
 
     @staticmethod
     def _create_webhook_response(event: FireCrawlWebhookEvent) -> WebhookResponse:
         return WebhookResponse(
             event_id=event.event_id,
-            message=f"Processed {event.event_data.event_type} event for job {event.event_data.crawl_id}",
+            message=f"Processed {event.data.event_type} event for job {event.data.crawl_id}",
             provider=WebhookProvider.FIRECRAWL,
         )

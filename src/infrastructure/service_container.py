@@ -1,6 +1,6 @@
 from src.core.content.crawler.crawler import FireCrawler
 from src.core.system.job_manager import JobManager
-from src.infrastructure.config.settings import JOB_FILE_DIR
+from src.infrastructure.config.settings import settings
 from src.services.content_service import ContentService
 
 
@@ -14,6 +14,6 @@ class ServiceContainer:
 
     def initialize_services(self) -> None:
         """Initialize all services."""
-        self.job_manager = JobManager(storage_dir=JOB_FILE_DIR)
+        self.job_manager = JobManager(storage_dir=settings.job_file_dir)
         self.firecrawler = FireCrawler()
         self.content_service = ContentService(self.firecrawler, self.job_manager)

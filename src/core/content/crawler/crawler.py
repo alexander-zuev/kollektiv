@@ -1,4 +1,3 @@
-import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,12 +16,10 @@ from src.core._exceptions import (
     FireCrawlAPIError,
     FireCrawlConnectionError,
     FireCrawlTimeoutError,
-    JobNotCompletedError,
     is_retryable_error,
 )
-from src.core.system.job_manager import JobManager
 from src.infrastructure.common.decorators import base_error_handler
-from src.infrastructure.config.logger import configure_logging, get_logger
+from src.infrastructure.config.logger import get_logger
 from src.infrastructure.config.settings import settings
 from src.models.common.jobs import CrawlJob, CrawlJobStatus
 from src.models.content.firecrawl_models import (
@@ -45,20 +42,12 @@ class FireCrawler:
     and processing crawl results.
 
     Args:
-        job_manager (JobManager): Manager for handling crawl job lifecycle.
-        file_manager (FileManager): Manager for handling file operations.
         api_key (str, optional): FireCrawl API key. Defaults to FIRECRAWL_API_KEY.
         api_url (str, optional): FireCrawl API URL. Defaults to FIRECRAWL_API_URL.
-        data_dir (str, optional): Directory for raw data. Defaults to RAW_DATA_DIR.
-        jobs_dir (str, optional): Directory for job files. Defaults to JOB_FILE_DIR.
 
     Attributes:
         api_key (str): The FireCrawl API key.
         api_url (str): The FireCrawl API base URL.
-        raw_data_dir (str): Directory for storing raw crawl data.
-        jobs_dir (str): Directory for storing job information.
-        job_manager (JobManager): Manager for job operations.
-        file_manager (FileManager): Manager for file operations.
         firecrawl_app (FirecrawlApp): Instance of FireCrawl API client.
     """
 
@@ -140,14 +129,13 @@ class FireCrawler:
             raise FireCrawlConnectionError(f"Connection error: {err}") from err
 
     @base_error_handler
-    async def get_results(self, job_id: str) -> CrawlResult:
+    async def get_results(self, crawl_job: CrawlJob) -> CrawlResult:
         """Get final results for a completed job."""
-        job = await self.job_manager.get_job(job_id)
-        if not job or job.status != CrawlJobStatus.COMPLETED:
-            raise JobNotCompletedError(f"Job {job_id} not complete")
+        # Get firecrawl id
+        firecrawl_id = crawl_job.firecrawl_id
 
-        # Get the crawl data
-        crawl_data = await self._accumulate_crawl_results(job.firecrawl_id)
+        # Get the crawl data by firecrawl id
+        crawl_data = await self._accumulate_crawl_results(firecrawl_id)
 
         # Extract unique URLs from metadata
         unique_links = set()
@@ -159,13 +147,12 @@ class FireCrawler:
 
         # Create result with proper structure
         result = CrawlResult(
-            job_status=job.status,
-            input_url=str(job.start_url),
+            job_status=crawl_job.status,
+            input_url=crawl_job.start_url,
             total_pages=len(crawl_data.data),
-            unique_links=list(unique_links),  # Convert set to list
+            unique_links=list(unique_links),
             data=crawl_data,
             completed_at=datetime.now(UTC),
-            method=job.method,
         )
 
         return result
@@ -254,82 +241,3 @@ class FireCrawler:
         except (FireCrawlAPIError, FireCrawlConnectionError) as e:
             logger.error(f"Crawl failed: {str(e)}")
             raise
-
-
-async def initialize_components() -> tuple[FireCrawler, JobManager]:
-    """Initialize required components."""
-    # Create both components
-    crawler = FireCrawler(
-        api_key=settings.firecrawl_api_key,
-    )
-    job_manager = JobManager(storage_dir=str(settings.job_file_dir))
-
-    # Return both components as a tuple
-    return crawler, job_manager
-
-
-async def main() -> None:
-    """Test crawler functionality locally."""
-    logger.info("Starting local crawler test")
-
-    try:
-        # 1. Initialize components properly
-        crawler, job_manager = await initialize_components()
-
-        # 2. Create test crawl request
-        request = CrawlRequest(
-            url="https://docs.anthropic.com/en/docs/",
-            page_limit=1,  # Small limit for testing
-            exclude_patterns=["/prompt-library/*", "/release-notes/*", "/developer-newsletter/*"],
-        )
-
-        # 3. Start crawl
-        logger.info(f"Starting crawl of {request.url}")
-        job = await crawler.crawl(request)
-
-        # 4. Monitor job status
-        while True:
-            job = await job_manager.get_job(job.job_id)
-            logger.info(f"Job status: {job.status}, Pages crawled: {job.pages_crawled}")
-
-            if job.status == CrawlJobStatus.COMPLETED:
-                logger.info("Job completed, fetching results...")
-                try:
-                    # Get results from crawler
-                    result = await crawler.get_results(job.id)
-
-                    # Save results using file manager
-                    filename = await crawler.file_manager.save_result(result)
-
-                    # Update job with result file
-                    job.result_file = filename
-                    await job_manager.update_job(job)
-
-                    logger.info(f"Successfully saved results to {filename}")
-                except Exception as e:
-                    logger.error(f"Failed to fetch or save results: {str(e)}")
-                break
-            elif job.status == CrawlJobStatus.FAILED:
-                logger.error(f"Job failed: {job.error}")
-                break
-
-            await asyncio.sleep(10)
-
-        logger.info(f"Job finished with status: {job.status}")
-
-    except FireCrawlAPIError as e:
-        logger.error(f"API Error: {str(e)}")
-        raise
-    except Exception as e:
-        logger.error(f"Test failed: {str(e)}")
-        raise
-
-
-def run_crawler() -> None:
-    """Entry point for the crawler script."""
-    configure_logging(debug=True)
-    asyncio.run(main())
-
-
-if __name__ == "__main__":
-    run_crawler()
