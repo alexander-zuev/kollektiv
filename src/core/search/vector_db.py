@@ -198,7 +198,7 @@ class VectorDB(VectorDBInterface):
 
     def _init(self):
         """Initialize ChromaDB client and embedding function."""
-        self.client = chromadb.PersistentClient(path=settings.chroma_db_dir)
+        self.client = chromadb.PersistentClient(path=str(settings.chroma_db_dir))
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
             api_key=self.openai_api_key, model_name=self.embedding_function_name
         )

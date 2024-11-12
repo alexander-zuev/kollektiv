@@ -1,3 +1,4 @@
+# TODO: redo from scratch
 from src.core.search.vector_db import DocumentProcessor, VectorDB
 
 

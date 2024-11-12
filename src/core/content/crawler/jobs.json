@@ -269,5 +269,18 @@
     "completed_at": null,
     "result_file": null,
     "error": null
+  },
+  "edd97b65-5a69-4016-b053-27c89a33fd06": {
+    "job_id": "edd97b65-5a69-4016-b053-27c89a33fd06",
+    "source_id": "31a932be-77cb-454f-9c25-1562630d5ed3",
+    "firecrawl_id": "9d331991-9717-4fad-8ee1-8e2f43782c2f",
+    "status": "pending",
+    "start_url": "https://example.com/",
+    "method": "crawl",
+    "pages_crawled": 0,
+    "created_at": "2024-11-12T07:07:15.359072+00:00",
+    "completed_at": null,
+    "result_file": null,
+    "error": null
   }
 }
