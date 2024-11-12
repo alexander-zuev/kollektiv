@@ -38,6 +38,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          poetry lock --no-update
           poetry install --with dev --no-interaction --no-root
 
       - name: Run mypy type checking
@@ -76,7 +77,9 @@ jobs:
           cache: 'poetry'
 
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: |
+          poetry lock --no-update
+          poetry install --with dev --no-interaction --no-root
 
       - name: Run all tests
         id: all-tests
