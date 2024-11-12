@@ -5,7 +5,7 @@ from src.api.v0.schemas.sources_schemas import (
     AddContentSourceRequest,
     SourceAPIResponse,
 )
-from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, WebhookEvent
+from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent
 from src.core._exceptions import JobNotFoundError
 from src.core.content.crawler.crawler import FireCrawler
 from src.core.system.job_manager import JobManager
@@ -40,6 +40,7 @@ class ContentService:
         """
         try:
             # 1. Create Source with Pending state
+            # TODO: Transition to a persistent storage
             source = await self._persist_source(request=request)
             source.status = SourceStatus.PENDING  # Initial status
             self._sources[str(source.source_id)] = source
@@ -98,7 +99,7 @@ class ContentService:
         crawl_request = CrawlRequest(**request.config.model_dump())
         return crawl_request
 
-    async def update_source_status(self, source_id: UUID, status: SourceStatus) -> Source:
+    async def update_source_status(self, source_id: UUID, status: SourceStatus) -> None:
         """Update source status.
 
         Args:
@@ -114,7 +115,6 @@ class ContentService:
         source = self._sources[str(source_id)]
         source.status = status
         source.updated_at = datetime.now(UTC)
-        return source
 
     async def list_sources(self) -> list[SourceAPIResponse]:
         """List all content sources."""
@@ -127,7 +127,8 @@ class ContentService:
             raise KeyError(f"Source {source_id} not found")
         return SourceAPIResponse.from_source(source)
 
-    async def handle_event(self, event: WebhookEvent) -> None:
+    @base_error_handler
+    async def handle_event(self, event: FireCrawlWebhookEvent) -> None:
         """Handles webhook events related to content ingestion."""
         try:
             logger.info(f"Received webhook event: {event.data.event_type} for FireCrawl job " f"{event.data.crawl_id}")
@@ -137,9 +138,8 @@ class ContentService:
             job = await self.job_manager.get_job_by_firecrawl_id(event.data.crawl_id)
 
             # Identify provider
-            if event.provider == "firecrawl":
+            if event.provider == event.provider.FIRECRAWL:
                 if not event.data.success:
-                    logger.error(f"Event failed: {event.data.error}")
                     await self._handle_failure(event)
                     return
 
@@ -150,7 +150,7 @@ class ContentService:
 
                     case FireCrawlEventType.CRAWL_PAGE:
                         logger.info(f"Page crawled for job {job.job_id}")
-                        await self._handle_page_crawled(job)
+                        await self._handle_page_crawled(job=job, event=event)
 
                     case FireCrawlEventType.CRAWL_COMPLETED:
                         logger.info(f"Crawl completed for job {job.job_id}")
@@ -161,29 +161,26 @@ class ContentService:
                         await self._handle_failure(job, event.error or "Unknown error")
 
         except JobNotFoundError as e:
-            logger.error(f"Job not found: {str(e)}")
-            raise
+            logger.error(f"Job not found for FireCrawl ID {event.data.crawl_id}: {e}")
+            raise JobNotFoundError from e
         except Exception as e:
-            logger.error(f"Unhandled error in webhook handler: {str(e)}", exc_info=True)
-            if "job" in locals():
-                await self._handle_failure(job, f"Internal error: {str(e)}")
-            raise
+            logger.error(f"Error handling webhook event {event.data.event_type}: {e}", exc_info=True)
+            raise Exception from e
 
     @base_error_handler
     async def _handle_started(self, job: CrawlJob) -> None:
         """Handle crawl.started event"""
         # Update job
         job.status = CrawlJobStatus.IN_PROGRESS
-
-        # Update Source
-
-        # Do other logic
-
         await self.job_manager.update_job(job)
 
+        # Update Source
+        await self.update_source_status(source_id=job.source_id, status=SourceStatus.CRAWLING)
+
     @base_error_handler
-    async def _handle_page_crawled(self, job: CrawlJob) -> None:
+    async def _handle_page_crawled(self, job: CrawlJob, event: FireCrawlWebhookEvent) -> None:
         """Handle crawl.page event - increment page count"""
+        # Update job count
         job.pages_crawled += 1
         logger.debug(f"Pages crawled: {job.pages_crawled}")
         await self.job_manager.update_job(job)
@@ -205,16 +202,22 @@ class ContentService:
 
         await self.job_manager.update_job(job)
 
+        # Trigger process and store (later)
+
         logger.info("Printing results for now")
         return results
 
     @base_error_handler
     async def _handle_failure(self, job: CrawlJob, error: str) -> None:
         """Handle crawl.failed event"""
+        # Update job
         job.status = CrawlJobStatus.FAILED
         job.error = error
         job.completed_at = datetime.now(UTC)
         await self.job_manager.update_job(job)
+
+        # Update source
+        await self.update_source_status(source_id=job.source_id, status=SourceStatus.FAILED)
 
     @base_error_handler
     async def _get_crawl_results(self, job: CrawlJob) -> CrawlResult:

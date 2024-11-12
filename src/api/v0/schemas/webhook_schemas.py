@@ -51,7 +51,7 @@ class FireCrawlEvent(BaseModel):
 
     From FireCrawl docs:
     - success: If the webhook was successful
-    - type: The type of event that occurred
+    - event_type: The type of event that occurred
     - id: The ID of the crawl
     - data: The data that was scraped (Array). Only non-empty on crawl.page
     - error: If the webhook failed, this will contain the error message

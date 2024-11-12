@@ -14,7 +14,7 @@ import tiktoken
 
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import configure_logging, get_logger
-from src.infrastructure.config.settings import PROCESSED_DATA_DIR, RAW_DATA_DIR
+from src.infrastructure.config.settings import settings
 
 logger = get_logger()
 
@@ -45,7 +45,7 @@ class MarkdownChunker:
 
     def __init__(
         self,
-        output_dir: str = PROCESSED_DATA_DIR,
+        output_dir: str = settings.processed_data_dir,
         max_tokens: int = 1000,
         soft_token_limit: int = 800,
         min_chunk_size: int = 100,
@@ -99,7 +99,7 @@ class MarkdownChunker:
             FileNotFoundError: If the JSON file is not found.
             json.JSONDecodeError: If the JSON file has invalid content.
         """
-        input_filepath = os.path.join(RAW_DATA_DIR, input_filename)
+        input_filepath = os.path.join(settings.raw_data_dir, input_filename)
 
         try:
             with open(input_filepath, encoding="utf-8") as f:
@@ -162,11 +162,20 @@ class MarkdownChunker:
             ValueError: If there is an issue with the page content processing.
         """
         all_chunks = []
-        for _index, page in enumerate(json_input["data"]):
-            page_content = page["markdown"]
+        # Access the nested data structure correctly
+        pages = json_input.get("data", {}).get("data", [])
+
+        for page in pages:
+            page_content = page.get("markdown", "")
+            page_metadata = page.get("metadata", {})
+
+            # Skip empty content
+            if not page_content.strip():
+                logger.warning(f"Skipping empty page content for URL: {page_metadata.get('sourceURL', 'unknown')}")
+                continue
+
             page_content = self.remove_boilerplate(page_content)
-            page_content = self.remove_images(page_content)  # Add this line
-            page_metadata = page["metadata"]
+            page_content = self.remove_images(page_content)
 
             sections = self.identify_sections(page_content, page_metadata)
             chunks = self.create_chunks(sections, page_metadata)
@@ -183,6 +192,9 @@ class MarkdownChunker:
             all_chunks.extend(chunks)
 
         # After processing all pages, perform validation
+        if not all_chunks:
+            logger.warning("No chunks were generated from the input data")
+
         self.validator.validate(all_chunks)
         return all_chunks
 
@@ -1061,7 +1073,7 @@ class MarkdownChunkValidator:
 
 
 # Test usage
-def main():
+def main() -> None:
     """
     Initialize logging settings, identify and process markdown files into chunks.
 
@@ -1078,14 +1090,14 @@ def main():
     configure_logging(debug=True)
 
     files_to_chunk = []
-    chunks_dir = RAW_DATA_DIR
+    chunks_dir = settings.raw_data_dir
     for filename in os.listdir(chunks_dir):
         if os.path.isfile(os.path.join(chunks_dir, filename)):
             files_to_chunk.append(filename)
 
     for file in files_to_chunk:
         markdown_chunker = MarkdownChunker()  # save incorrect chunks or not
-        result = markdown_chunker.load_data(filename=file)
+        result = markdown_chunker.load_data(input_filename=file)
         chunks = markdown_chunker.process_pages(result)
         markdown_chunker.save_chunks(chunks)
         logger.info("Chunking job for " + file + " complete!")

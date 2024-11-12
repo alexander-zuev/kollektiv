@@ -24,7 +24,7 @@ from cohere import RerankResponse
 from src.core.chat.summary_manager import SummaryManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import configure_logging, get_logger
-from src.infrastructure.config.settings import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR
+from src.infrastructure.config.settings import settings
 
 logger = get_logger()
 
@@ -45,7 +45,7 @@ class DocumentProcessor:
     """
 
     def __init__(self):
-        self.processed_dir = PROCESSED_DATA_DIR
+        self.processed_dir = settings.processed_data_dir
 
     def load_json(self, filename: str) -> list[dict]:
         """
@@ -184,7 +184,7 @@ class VectorDB(VectorDBInterface):
     def __init__(
         self,
         embedding_function: str = "text-embedding-3-small",
-        openai_api_key: str = OPENAI_API_KEY,
+        openai_api_key: str = settings.openai_api_key,
     ):
         self.embedding_function = None
         self.client = None
@@ -198,7 +198,7 @@ class VectorDB(VectorDBInterface):
 
     def _init(self):
         """Initialize ChromaDB client and embedding function."""
-        self.client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+        self.client = chromadb.PersistentClient(path=settings.chroma_db_dir)
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
             api_key=self.openai_api_key, model_name=self.embedding_function_name
         )
@@ -426,7 +426,7 @@ class Reranker:
         model_name (str): Name of the model to use for re-ranking. Defaults to "rerank-english-v3.0".
     """
 
-    def __init__(self, cohere_api_key: str = COHERE_API_KEY, model_name: str = "rerank-english-v3.0"):
+    def __init__(self, cohere_api_key: str = settings.cohere_api_key, model_name: str = "rerank-english-v3.0"):
         self.cohere_api_key = cohere_api_key
         self.model_name = model_name
         self.client = None

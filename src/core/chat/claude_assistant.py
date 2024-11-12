@@ -19,7 +19,7 @@ from src.core.chat.tool_definitions import tool_manager
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
 from src.infrastructure.config.logger import get_logger
-from src.infrastructure.config.settings import ANTHROPIC_API_KEY, MAIN_MODEL, WEAVE_PROJECT_NAME
+from src.infrastructure.config.settings import settings
 
 logger = get_logger()
 
@@ -208,8 +208,8 @@ class ClaudeAssistant(Model):
 
     client: anthropic.Anthropic | None = None
     vector_db: VectorDB
-    api_key: str | None = Field(default=ANTHROPIC_API_KEY)
-    model_name: str = Field(default=MAIN_MODEL)
+    api_key: str | None = Field(default=settings.anthropic_api_key)
+    model_name: str = Field(default=settings.main_model)
     base_system_prompt: str = Field(default="")
     system_prompt: str = Field(default="")
     conversation_history: ConversationHistory | None = None
@@ -228,9 +228,9 @@ class ClaudeAssistant(Model):
         model_name: str | None = None,
     ):
         # Initialize weave only if project name is set and non-empty
-        if WEAVE_PROJECT_NAME and WEAVE_PROJECT_NAME.strip():
+        if settings.weave_project_name and settings.weave_project_name.strip():
             try:
-                weave.init(WEAVE_PROJECT_NAME)
+                weave.init(settings.weave_project_name)
             except Exception as e:
                 logger.warning(f"Failed to initialize weave: {e}")
 
@@ -238,8 +238,8 @@ class ClaudeAssistant(Model):
         super().__init__(
             client=None,
             vector_db=vector_db,
-            api_key=api_key or ANTHROPIC_API_KEY,
-            model_name=model_name or MAIN_MODEL,
+            api_key=api_key or settings.anthropic_api_key,
+            model_name=model_name or settings.main_model,
             base_system_prompt="""
                     You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval
                     Augmented Generation) system. Your primary function is to provide accurate, relevant, and helpful

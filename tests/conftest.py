@@ -1,9 +1,16 @@
 import os
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 import pytest
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
+from fastapi.testclient import TestClient
+
+from app import create_app
+from src.core.content.crawler.crawler import FireCrawler
+from src.core.system.job_manager import JobManager
+from src.infrastructure.service_container import ServiceContainer
+from src.services.content_service import ContentService
 
 
 class MockEmbeddingFunction(EmbeddingFunction):
@@ -53,10 +60,74 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "e2e: mark test as end-to-end test")
 
 
-def pytest_collection_modifyitems(config, items):
-    """Skip integration tests unless --run-integration is specified."""
-    if not config.getoption("--run-integration"):
-        skip_integration = pytest.mark.skip(reason="need --run-integration option to run")
-        for item in items:
-            if "integration" in item.keywords:
-                item.add_marker(skip_integration)
+@pytest.fixture(scope="session")
+def mock_app():
+    """Session-scoped fixture for the mocked app."""
+    test_app = create_app()
+
+    # Create mocks that match the service structure
+    mock_job_manager = MagicMock(spec=JobManager)
+    mock_firecrawler = MagicMock(spec=FireCrawler)
+
+    # Create ContentService mock with its dependencies
+    mock_content_service = AsyncMock(spec=ContentService)
+    mock_content_service.handle_event = AsyncMock(return_value=None)
+    mock_content_service.crawler = mock_firecrawler
+    mock_content_service.job_manager = mock_job_manager
+
+    # Create container with properly structured mocks
+    container = MagicMock(spec=ServiceContainer)
+    container.job_manager = mock_job_manager
+    container.firecrawler = mock_firecrawler
+    container.content_service = mock_content_service
+
+    test_app.state.container = container
+    return test_app
+
+
+@pytest.fixture
+def integration_app():
+    """Fixture to create a FastAPI app instance with real services for integration tests."""
+    test_app = create_app()
+    container = ServiceContainer()
+    # Initialize with test configurations
+    container.initialize_services()
+    test_app.state.container = container
+    return test_app
+
+
+@pytest.fixture(scope="function")
+def mock_client(mock_app):
+    """Function-scoped fixture for the test client."""
+    return TestClient(mock_app, raise_server_exceptions=True)
+
+
+@pytest.fixture
+def integration_client(integration_app):
+    """TestClient with real services for integration tests."""
+    return TestClient(integration_app, raise_server_exceptions=True)
+
+
+@pytest.fixture
+def mock_content_service():
+    """Fixture to mock the content service dependency."""
+    with patch("src.api.v0.endpoints.webhooks.ContentServiceDep", new_callable=MagicMock) as mock_service:
+        yield mock_service
+
+
+@pytest.fixture
+def mock_webhook_content_service(mock_app):
+    """Fixture specifically for webhook testing with async support."""
+    mock_job_manager = MagicMock(spec=JobManager)
+    mock_firecrawler = MagicMock(spec=FireCrawler)
+
+    mock_service = AsyncMock(spec=ContentService)
+    mock_service.handle_event = AsyncMock(return_value=None)
+    mock_service.crawler = mock_firecrawler
+    mock_service.job_manager = mock_job_manager
+
+    # Patch both the dependency and the container's service
+    with patch("src.api.v0.endpoints.webhooks.ContentServiceDep", return_value=mock_service):
+        # Also update the app's container service
+        mock_app.state.container.content_service = mock_service
+        yield mock_service

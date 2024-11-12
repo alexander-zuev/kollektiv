@@ -10,9 +10,6 @@ logger = get_logger()
 router = APIRouter(prefix=f"{V0_PREFIX}{Routes.V0.CONTENT}")
 
 
-print("Defining sources endpoint")
-
-
 @router.post(
     Routes.V0.Content.SOURCES,
     response_model=SourceResponse,

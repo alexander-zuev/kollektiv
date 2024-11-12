@@ -21,7 +21,7 @@ from src.core._exceptions import (
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.config.settings import settings
-from src.models.common.jobs import CrawlJob, CrawlJobStatus
+from src.models.common.jobs import CrawlJob
 from src.models.content.firecrawl_models import (
     CrawlData,
     CrawlParams,
@@ -215,29 +215,3 @@ class FireCrawler:
             raise FireCrawlTimeoutError(f"Request timed out: {err}") from err
         except RequestException as err:
             raise FireCrawlConnectionError(f"Connection error: {err}") from err
-
-    @base_error_handler
-    async def crawl(self, request: CrawlRequest) -> CrawlJob:
-        """
-        Start a crawl job. Webhook URL is configured via environment.
-
-        Args:
-            request (CrawlRequest): The crawl request configuration
-
-        Returns:
-            CrawlJob: The created crawl job
-
-        Raises:
-            FireCrawlAPIError: For API-related errors
-            FireCrawlConnectionError: For connection issues
-        """
-        logger.info(f"Starting crawl of {request.url} in {settings.environment} environment")
-        logger.info(f"Using webhook URL: {request.webhook_url}")
-
-        try:
-            job = await self.start_crawl(request)
-            return job
-
-        except (FireCrawlAPIError, FireCrawlConnectionError) as e:
-            logger.error(f"Crawl failed: {str(e)}")
-            raise

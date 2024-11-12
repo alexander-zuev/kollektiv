@@ -59,10 +59,10 @@ class Settings(BaseSettings):
     src_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent)
 
     # All paths are now relative to src_dir
-    log_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/logs"))
+    log_dir: Path = Field(default_factory=lambda: Path("src/logs"))
     eval_dir: Path = Field(default_factory=lambda: Path("src/core/evaluation"))
-    raw_data_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/data/raw"))
-    processed_data_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/data/processed"))
+    raw_data_dir: Path = Field(default_factory=lambda: Path("src/data/raw"))
+    processed_data_dir: Path = Field(default_factory=lambda: Path("src/data/processed"))
     job_file_dir: Path = Field(default_factory=lambda: Path("src/core/content/crawler"))
     vector_storage_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/storage/vector"))
     chroma_db_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/storage/vector/chroma"))
@@ -124,7 +124,6 @@ class Settings(BaseSettings):
 
 # Initialize settings instance
 try:
-    print(f"Loading .env from {os.path.join('config', 'environments', '.env')}")
     settings = Settings()
     logger.info("Settings initialized successfully.")
 
