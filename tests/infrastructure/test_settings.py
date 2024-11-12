@@ -57,9 +57,9 @@ def test_default_values():
 
 def test_path_construction():
     settings = Settings()
-    assert settings.log_dir == Path("src/infrastructure/logs")
-    assert settings.raw_data_dir == Path("src/infrastructure/data/raw")
-    assert settings.processed_data_dir == Path("src/infrastructure/data/processed")
+    assert settings.log_dir == Path("src/logs")
+    assert settings.raw_data_dir == Path("src/data/raw")
+    assert settings.processed_data_dir == Path("src/data/processed")
     assert settings.chroma_db_dir == Path("src/infrastructure/storage/vector/chroma")
 
 

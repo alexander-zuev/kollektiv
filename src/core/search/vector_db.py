@@ -44,7 +44,7 @@ class DocumentProcessor:
         json.JSONDecodeError: If the file contains invalid JSON.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.processed_dir = settings.processed_data_dir
 
     def load_json(self, filename: str) -> list[dict]:
@@ -603,7 +603,7 @@ class ResultRetriever:
         return ranked_documents
 
 
-async def main():
+async def main() -> None:
     """
     Configure logging, reset the vector database, process JSON documents, and add them to the database.
 
@@ -621,7 +621,7 @@ async def main():
     vector_db = VectorDB()
     vector_db.reset_database()
 
-    file = "langchain-ai_github_io_langgraph_20240928_143920-chunked.json"
+    file = "docs_anthropic_com_en_docs_20241030_104114-chunked.json"
     reader = DocumentProcessor()
     documents = reader.load_json(filename=file)
     await vector_db.add_documents(documents, file)

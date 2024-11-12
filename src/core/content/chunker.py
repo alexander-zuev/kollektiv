@@ -45,7 +45,7 @@ class MarkdownChunker:
 
     def __init__(
         self,
-        output_dir: str = settings.processed_data_dir,
+        output_dir: str = str(settings.processed_data_dir),
         max_tokens: int = 1000,
         soft_token_limit: int = 800,
         min_chunk_size: int = 100,
@@ -99,6 +99,7 @@ class MarkdownChunker:
             FileNotFoundError: If the JSON file is not found.
             json.JSONDecodeError: If the JSON file has invalid content.
         """
+        self.input_filename = input_filename
         input_filepath = os.path.join(settings.raw_data_dir, input_filename)
 
         try:
