@@ -85,8 +85,8 @@ repos:
   # === Testing & Documentation ===
   - repo: local
     hooks:
-      - id: pytest-check
-        name: Run pytest suite
+      - id: pytest-unit
+        name: Run unit tests
         entry: pytest
         language: system
         pass_filenames: false
@@ -96,7 +96,22 @@ repos:
           "--quiet",
           "--no-header",
           "-ra",
-          "--run-integration",
+          "tests/unit/",
+        ]
+        verbose: true
+
+      - id: pytest-integration
+        name: Run integration tests
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: false
+        stages: [pre-commit, manual]
+        args: [
+          "--quiet",
+          "--no-header",
+          "-ra",
+          "tests/integration/",
         ]
         verbose: true
 

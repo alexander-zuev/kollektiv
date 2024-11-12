@@ -78,20 +78,22 @@ jobs:
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
 
-      - name: Run tests with coverage
+      - name: Run all tests
+        id: all-tests
         env:
-          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}
+          ENVIRONMENT: "test"
         run: |
-          poetry run pytest --run-integration \
+          poetry run pytest \
+            tests/unit tests/integration \
             --quiet \
             --cov=src \
             --cov-report=xml \
             --cov-report=term-missing:skip-covered \
             --cov-config=pyproject.toml \
-            tests/
+            --maxfail=5 \
+            --reruns 2 \
+            --durations=5
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

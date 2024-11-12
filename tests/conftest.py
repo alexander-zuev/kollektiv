@@ -1,5 +1,5 @@
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import numpy as np
 import pytest
@@ -7,7 +7,9 @@ from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fastapi.testclient import TestClient
 
 from app import create_app
+from src.core.chat.claude_assistant import ClaudeAssistant, ConversationMessage
 from src.core.content.crawler.crawler import FireCrawler
+from src.core.search.vector_db import VectorDB
 from src.core.system.job_manager import JobManager
 from src.infrastructure.service_container import ServiceContainer
 from src.services.content_service import ContentService
@@ -18,7 +20,6 @@ class MockEmbeddingFunction(EmbeddingFunction):
 
     def __call__(self, input: Document | Documents) -> list[Embedding]:
         """Return mock embeddings that match ChromaDB's expected types."""
-        # Convert float lists to numpy arrays to match Embedding type
         mock_embedding = np.array([0.1, 0.2, 0.3], dtype=np.float32)
 
         if isinstance(input, str):
@@ -49,6 +50,42 @@ def mock_environment_variables():
         yield env_vars
 
 
+@pytest.fixture
+def mock_vector_db():
+    """Create a mock object for VectorDB."""
+    return MagicMock(spec=VectorDB)
+
+
+@pytest.fixture
+def real_vector_db():
+    """Create a real VectorDB instance for testing."""
+    return VectorDB()
+
+
+@pytest.fixture
+def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
+    """Set up a ClaudeAssistant instance with mocked dependencies."""
+    with patch("anthropic.Anthropic") as mock_anthropic:
+        mock_client = Mock()
+        mock_client.handle_tool_use = Mock(
+            return_value={"role": "user", "content": [{"type": "tool_result", "content": "Tool response"}]}
+        )
+        mock_anthropic.return_value = mock_client
+
+        assistant = ClaudeAssistant(vector_db=mock_vector_db)
+        assistant.client = mock_client
+
+        assistant.conversation_history.messages = [ConversationMessage(role="user", content="Initial message")]
+        return assistant
+
+
+@pytest.fixture
+def claude_assistant_with_real_db(real_vector_db):
+    """Set up a ClaudeAssistant instance with real VectorDB."""
+    assistant = ClaudeAssistant(vector_db=real_vector_db)
+    return assistant
+
+
 def pytest_addoption(parser):
     """Add custom command line options."""
     parser.addoption("--run-integration", action="store_true", default=False, help="run integration tests")
@@ -65,17 +102,14 @@ def mock_app():
     """Session-scoped fixture for the mocked app."""
     test_app = create_app()
 
-    # Create mocks that match the service structure
     mock_job_manager = MagicMock(spec=JobManager)
     mock_firecrawler = MagicMock(spec=FireCrawler)
 
-    # Create ContentService mock with its dependencies
     mock_content_service = AsyncMock(spec=ContentService)
     mock_content_service.handle_event = AsyncMock(return_value=None)
     mock_content_service.crawler = mock_firecrawler
     mock_content_service.job_manager = mock_job_manager
 
-    # Create container with properly structured mocks
     container = MagicMock(spec=ServiceContainer)
     container.job_manager = mock_job_manager
     container.firecrawler = mock_firecrawler
@@ -90,7 +124,6 @@ def integration_app():
     """Fixture to create a FastAPI app instance with real services for integration tests."""
     test_app = create_app()
     container = ServiceContainer()
-    # Initialize with test configurations
     container.initialize_services()
     test_app.state.container = container
     return test_app
@@ -126,8 +159,6 @@ def mock_webhook_content_service(mock_app):
     mock_service.crawler = mock_firecrawler
     mock_service.job_manager = mock_job_manager
 
-    # Patch both the dependency and the container's service
     with patch("src.api.v0.endpoints.webhooks.ContentServiceDep", return_value=mock_service):
-        # Also update the app's container service
         mock_app.state.container.content_service = mock_service
         yield mock_service

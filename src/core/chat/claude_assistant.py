@@ -563,6 +563,7 @@ class ClaudeAssistant(Model):
             f"{self.conversation_history.get_conversation_history()}"
         )
 
+        # Access the text from the first content block
         return response.content[0].text
 
     @base_error_handler

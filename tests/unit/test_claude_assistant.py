@@ -1,68 +1,77 @@
-# TODO: redo from scratch
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import pytest
-
-from src.core.chat.claude_assistant import ClaudeAssistant, ConversationMessage
-from src.core.search.vector_db import VectorDB
+from src.core.chat.claude_assistant import ConversationHistory
 
 
-@pytest.fixture
-def mock_vector_db():
-    """Create a mock object for VectorDB.
-
-    Returns:
-        MagicMock: A mock object that mimics the behavior of VectorDB.
-    """
-    return MagicMock(spec=VectorDB)
+def test_claude_assistant_initialization(claude_assistant_with_mock):
+    """Test that ClaudeAssistant initializes correctly with mocked dependencies."""
+    assistant = claude_assistant_with_mock
+    assert assistant.client is not None
+    assert isinstance(assistant.conversation_history, ConversationHistory)
 
 
-@pytest.fixture
-def real_vector_db():
-    """Create a real VectorDB instance for testing.
-
-    Returns:
-        VectorDB: A real instance of VectorDB.
-    """
-    return VectorDB()
+def test_add_message_to_conversation_history(claude_assistant_with_mock):
+    """Test adding a message to the conversation history."""
+    assistant = claude_assistant_with_mock
+    initial_count = len(assistant.conversation_history.messages)
+    assistant.conversation_history.add_message(role="user", content="New message")
+    assert len(assistant.conversation_history.messages) == initial_count + 1
 
 
-@pytest.fixture
-def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
-    """Set up a ClaudeAssistant instance with mocked dependencies."""
-    with patch("anthropic.Anthropic") as mock_anthropic:
-        mock_client = Mock()
-        # Mock handle_tool_use to return a synchronous dict instead of AsyncMock
-        mock_client.handle_tool_use = Mock(
-            return_value={"role": "user", "content": [{"type": "tool_result", "content": "Tool response"}]}
-        )
-        mock_anthropic.return_value = mock_client
-
-        assistant = ClaudeAssistant(vector_db=mock_vector_db)
-        assistant.client = mock_client
-
-        # Create proper ConversationMessage objects
-        assistant.conversation_history.messages = [ConversationMessage(role="user", content="Initial message")]
-        return assistant
+def test_update_system_prompt(claude_assistant_with_mock):
+    """Test updating the system prompt with document summaries."""
+    assistant = claude_assistant_with_mock
+    summaries = [{"filename": "doc1", "summary": "Summary 1", "keywords": ["key1", "key2"]}]
+    assistant.update_system_prompt(summaries)
+    assert "doc1" in assistant.system_prompt
 
 
-@pytest.fixture
-def claude_assistant_with_real_db(real_vector_db):
-    """Set up a ClaudeAssistant instance with real VectorDB.
+def test_get_response(claude_assistant_with_mock):
+    """Test generating a response from the assistant."""
+    assistant = claude_assistant_with_mock
 
-    Args:
-        real_vector_db: A real instance of VectorDB.
+    # Configure the mock to return realistic values for input and output tokens
+    mock_response = Mock()
+    mock_response.usage.input_tokens = 2095
+    mock_response.usage.output_tokens = 503
 
-    Returns:
-        ClaudeAssistant: An instance of ClaudeAssistant with real VectorDB.
-    """
-    assistant = ClaudeAssistant(vector_db=real_vector_db)
-    return assistant
+    # Create a mock content object with dot notation access
+    content_item = Mock()
+    content_item.text = "Hi! My name is Claude."
+    content_item.type = "text"
+    mock_response.content = [content_item]
+    mock_response.stop_reason = "end_turn"
+
+    # Mock the create method to return the mock response
+    assistant.client.beta.prompt_caching.messages.create.return_value = mock_response
+
+    response = assistant.get_response("Hello", stream=False)
+    assert isinstance(response, str)
+    assert response == "Hi! My name is Claude."
 
 
-@pytest.fixture
-def mock_get_recent_context():
-    """Mock the get_recent_context method."""
-    with patch("src.generation.claude_assistant.ClaudeAssistant.get_recent_context") as mock:
-        mock.return_value = [{"role": "user", "content": "test query"}]
-        yield mock
+def test_handle_tool_use_rag_search(claude_assistant_with_mock):
+    """Test handling of RAG search tool use."""
+    assistant = claude_assistant_with_mock
+
+    # Mock the use_rag_search method at the module level where it's called
+    expected_search_results = ["Document 1 content", "Document 2 content"]
+
+    # Create a mock for the entire tool use flow
+    with patch("src.core.chat.claude_assistant.ClaudeAssistant.use_rag_search", return_value=expected_search_results):
+        # Test input that would trigger RAG search
+        tool_input = {"important_context": "test context"}
+        tool_use_id = "test_tool_id"
+
+        # Execute tool use
+        result = assistant.handle_tool_use(tool_name="rag_search", tool_input=tool_input, tool_use_id=tool_use_id)
+
+        # Verify the result format matches Anthropic's expected format
+        assert result["role"] == "user"
+        assert isinstance(result["content"], list)
+        assert result["content"][0]["type"] == "tool_result"
+        assert result["content"][0]["tool_use_id"] == tool_use_id
+
+        # Verify the tool result contains the expected search results
+        assert "Document 1 content" in result["content"][0]["content"]
+        assert "Document 2 content" in result["content"][0]["content"]

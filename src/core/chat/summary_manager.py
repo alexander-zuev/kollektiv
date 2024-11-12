@@ -230,9 +230,9 @@ class SummaryManager:
             return {}
 
     @base_error_handler
-    def save_summaries(self):
+    def save_summaries(self) -> None:
         """Saves the document summaries to a JSON file."""
-        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
+        summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
         try:
             with open(summaries_file, "w") as f:
                 json.dump(self.summaries, f, indent=2)
@@ -246,17 +246,17 @@ class SummaryManager:
         return list(self.summaries.values())
 
     @base_error_handler
-    def clear_summaries(self):
+    def clear_summaries(self) -> None:
         """Clears the document summaries and removes the summaries file."""
         self.summaries = {}
-        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
+        summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
         if os.path.exists(summaries_file):
             os.remove(summaries_file)
             logger.info("Document summaries cleared.")
         self.save_summaries()
 
     @base_error_handler
-    def process_file(self, data: list[dict], file_name: str):
+    def process_file(self, data: list[dict], file_name: str) -> None:
         """
         Process the file and generate or load its summary.
 

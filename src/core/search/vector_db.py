@@ -433,7 +433,7 @@ class Reranker:
 
         self._init()
 
-    def _init(self):
+    def _init(self) -> None:
         try:
             self.client = cohere.ClientV2(api_key=self.cohere_api_key)
             logger.debug("Successfully initialized Cohere client")

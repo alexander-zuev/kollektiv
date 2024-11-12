@@ -82,25 +82,35 @@ async def test_start_crawl_non_retryable_error(mock_async_crawl_url):
 @patch("src.core.content.crawler.crawler.FirecrawlApp.async_crawl_url")
 async def test_start_crawl_retryable_error(mock_async_crawl_url):
     """Test that retryable HTTP errors (503) trigger retry mechanism."""
-    original_max_retries = settings.max_retries  # Save original value
-    settings.max_retries = 1  # Set to 1 for this test to ensure 2 total attempts
-
-    try:
-        crawler = FireCrawler(api_key="test_key")
-        request = CrawlRequest(url="http://example.com", page_limit=10, max_depth=2)
-
+    # Mock the wait function to return immediately
+    with patch("tenacity.wait_exponential", return_value=lambda *args, **kwargs: 0.1):
+        # Set up the error response
         mock_response = MagicMock()
         mock_response.status_code = 503
         http_error = HTTPError("HTTP Error")
         http_error.response = mock_response
         mock_async_crawl_url.side_effect = http_error
 
-        with pytest.raises(RetryError):
-            await crawler.start_crawl(request)
+        # Configure settings for test
+        original_max_retries = settings.max_retries
+        settings.max_retries = 1  # This means: 1 initial try + 1 retry = 2 total attempts
 
-        assert mock_async_crawl_url.call_count == settings.max_retries  # Expect 2 retries + 1 initial = 3 total
-    finally:
-        settings.max_retries = original_max_retries  # Restore original value
+        try:
+            crawler = FireCrawler(api_key="test_key")
+            request = CrawlRequest(url="http://example.com", page_limit=10, max_depth=2)
+
+            with pytest.raises(RetryError):
+                await crawler.start_crawl(request)
+
+            # Verify the number of attempts
+            total_attempts = settings.max_retries + 1  # initial attempt + retries
+            assert mock_async_crawl_url.call_count == total_attempts, (
+                f"Expected {total_attempts} total attempts (1 initial + {settings.max_retries} retries), "
+                f"but got {mock_async_crawl_url.call_count}"
+            )
+
+        finally:
+            settings.max_retries = original_max_retries
 
 
 @pytest.mark.asyncio
