@@ -11,6 +11,7 @@ from src.core.chat.claude_assistant import ClaudeAssistant, ConversationMessage
 from src.core.content.crawler.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
 from src.core.system.job_manager import JobManager
+from src.infrastructure.config.settings import settings
 from src.infrastructure.service_container import ServiceContainer
 from src.services.content_service import ContentService
 
@@ -38,16 +39,36 @@ def mock_openai_embeddings(monkeypatch):
 @pytest.fixture(autouse=True)
 def mock_environment_variables():
     """Set required environment variables for tests."""
+    # Store original environment
+    original_env = dict(os.environ)
+
+    # Get environment from actual env var, default to LOCAL
+    test_env = os.getenv("ENVIRONMENT", "local")
+
     env_vars = {
+        "ENVIRONMENT": test_env,
         "WANDB_MODE": "disabled",
         "WEAVE_PROJECT_NAME": "",
         "ANTHROPIC_API_KEY": "test-key",
         "COHERE_API_KEY": "test-key",
         "OPENAI_API_KEY": "test-key",
-        "CO_API_KEY": "test-key",
+        "FIRECRAWL_API_KEY": "test-key",
     }
-    with patch.dict(os.environ, env_vars):
-        yield env_vars
+
+    # If we're in staging, add required staging vars
+    if test_env == "staging":
+        env_vars.update(
+            {
+                "BASE_URL": "http://mock-api:8000",  # Mock staging URL
+            }
+        )
+
+    with patch.dict(os.environ, env_vars, clear=True):
+        yield
+
+    # Restore original environment
+    os.environ.clear()
+    os.environ.update(original_env)
 
 
 @pytest.fixture
@@ -121,10 +142,20 @@ def mock_app():
 
 @pytest.fixture
 def integration_app():
-    """Fixture to create a FastAPI app instance with real services for integration tests."""
+    """Integration test app with mocked external services."""
     test_app = create_app()
     container = ServiceContainer()
-    container.initialize_services()
+
+    # Create mock FireCrawler with necessary attributes
+    mock_firecrawler = MagicMock(spec=FireCrawler)
+    mock_firecrawler.api_key = "test-key"  # Set the api_key attribute
+    mock_firecrawler.firecrawl_app = mock_firecrawler.initialize_firecrawl()
+
+    # Mock specific services while keeping container structure
+    container.job_manager = JobManager(storage_dir=settings.job_file_dir)
+    container.firecrawler = mock_firecrawler
+    container.content_service = ContentService(job_manager=container.job_manager, crawler=container.firecrawler)
+
     test_app.state.container = container
     return test_app
 

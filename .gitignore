@@ -453,3 +453,4 @@ id_rsa.pub
 # Poetry (uncomment if you want to version lock file)
 # poetry.lock
 src/infrastructure/storage/vector/chroma/chroma.sqlite3
+src/core/content/crawler/*.json

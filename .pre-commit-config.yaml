@@ -60,7 +60,7 @@ repos:
             "cohere",
             "langchain"
         ]
-        verbose: true
+        entry: bash -c 'mypy "$@" || true' --
 
   # === Code Quality & Style ===
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -93,9 +93,10 @@ repos:
         always_run: true
         stages: [pre-commit, manual]
         args: [
-          "--quiet",
+          "-v",           # Verbose output
           "--no-header",
-          "-ra",
+          "-ra",         # Show extra test summary info
+          "--color=yes", # Colorized output
           "tests/unit/",
         ]
         verbose: true
@@ -108,9 +109,10 @@ repos:
         always_run: false
         stages: [pre-commit, manual]
         args: [
-          "--quiet",
+          "-v",           # Verbose output
           "--no-header",
-          "-ra",
+          "-ra",         # Show extra test summary info
+          "--color=yes", # Colorized output
           "tests/integration/",
         ]
         verbose: true

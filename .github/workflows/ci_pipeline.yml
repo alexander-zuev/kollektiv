@@ -14,6 +14,7 @@ env:
   PYTHONUNBUFFERED: 1
   WANDB_MODE: "disabled"
   # Global env vars
+  BASE_URL: ${{ secrets.STAGING_BASE_URL}}
   FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -85,7 +86,6 @@ jobs:
         id: all-tests
         env:
           PYTHONPATH: ${{ github.workspace }}
-          ENVIRONMENT: "test"
         run: |
           poetry run pytest \
             tests/unit tests/integration \
@@ -94,9 +94,6 @@ jobs:
             --cov-report=xml \
             --cov-report=term-missing:skip-covered \
             --cov-config=pyproject.toml \
-            --maxfail=5 \
-            --reruns 2 \
-            --durations=5
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

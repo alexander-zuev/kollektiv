@@ -114,7 +114,13 @@ class TestEndpointIntegration:
 
     def test_sources_endpoint(self, integration_client: TestClient):
         """Test sources endpoint for adding new content sources."""
-        test_source = {"source_type": "web", "config": {"url": "https://example.com"}}
+        test_source = {
+            "source_type": "web",
+            "config": {
+                "url": "https://example.com",
+                "max_pages": 1,
+            },
+        }
 
         response = integration_client.post(
             f"{V0_PREFIX}{Routes.V0.CONTENT}{Routes.V0.Content.SOURCES}", json=test_source
@@ -122,6 +128,13 @@ class TestEndpointIntegration:
 
         assert response.status_code == 201
         data = response.json()
+
+        # Debug print to see actual response structure
+        print(f"Response data: {data}")
+
         assert data["success"] is True
         assert data["message"] == "Source added successfully"
         assert data["data"]["source_type"] == test_source["source_type"]
+
+        # For now, just verify the basic structure until we can see sources_schemas.py
+        assert isinstance(data["data"], dict), "Response data should be a dictionary"
