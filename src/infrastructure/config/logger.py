@@ -4,7 +4,7 @@ import sys
 
 from colorama import Fore, Style, init
 
-from src.infrastructure.config.settings import LOG_DIR
+from src.infrastructure.config.settings import settings
 
 # Initialize colorama
 init(autoreset=True)
@@ -96,7 +96,7 @@ def configure_logging(debug=False, log_file="app.log"):
     console_handler.setFormatter(console_formatter)
 
     # File handler
-    log_file_path = os.path.join(LOG_DIR, log_file)
+    log_file_path = os.path.join(settings.log_dir, log_file)
     file_handler = logging.FileHandler(log_file_path)
     file_handler.setLevel(logging.DEBUG)  # Log all levels to the file
     file_formatter = logging.Formatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")

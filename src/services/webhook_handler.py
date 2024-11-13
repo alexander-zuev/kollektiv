@@ -1,88 +1,46 @@
-from datetime import UTC, datetime
+from typing import Any
 
-from src.core._exceptions import JobNotFoundError
-from src.core.system.job_manager import JobManager
-from src.infrastructure.common.decorators import base_error_handler
-from src.infrastructure.config.logger import get_logger
-from src.models.common.jobs import CrawlJob, CrawlJobStatus
-from src.models.common.webhooks import FireCrawlEventType, FireCrawlWebhookEvent
+from src.api.v0.schemas.webhook_schemas import (
+    FireCrawlEvent,
+    FireCrawlEventType,
+    FireCrawlWebhookEvent,
+    WebhookProvider,
+    WebhookResponse,
+)
 
-logger = get_logger()
 
+class FireCrawlWebhookHandler:
+    """Handles FireCrawl webhook processing logic."""
 
-class WebhookHandler:
-    """Handles webhook events and coordinates job updates"""
+    @staticmethod
+    def _create_firecrawl_event(data: dict[str, Any]) -> FireCrawlEvent:
+        """Create FireCrawl event from webhook data.
 
-    def __init__(self, job_manager: JobManager):
-        self.job_manager = job_manager
-
-    @base_error_handler
-    async def handle_event(self, event: FireCrawlWebhookEvent) -> None:
-        """Handle webhook events from Firecrawl"""
+        Raises:
+            ValueError: If required fields are missing
+        """
         try:
-            logger.info(f"Received webhook event: {event.type} for FireCrawl job {event.id}")
-            logger.debug(f"Event data: {event.model_dump()}")
+            return FireCrawlEvent(
+                success=data["success"],
+                event_type=FireCrawlEventType(data["event_type"]) if "event_type" in data else None,
+                crawl_id=data["crawl_id"],  # We expect crawl_id as per schema
+                data=data.get("data", []),
+                error=data.get("error"),
+            )
+        except KeyError as e:
+            # Convert to ValueError for better error handling
+            raise ValueError(f"Missing required field: {e.args[0]}")
 
-            # Get job by FireCrawl ID
-            job = await self.job_manager.get_job_by_firecrawl_id(event.id)
+    @staticmethod
+    def _create_webhook_event(event_data: FireCrawlEvent, raw_payload: dict[str, Any]) -> FireCrawlWebhookEvent:
+        """Create webhook event wrapper."""
+        return FireCrawlWebhookEvent(provider=WebhookProvider.FIRECRAWL, raw_payload=raw_payload, data=event_data)
 
-            if not event.success:
-                logger.error(f"Event failed: {event.error}")
-                await self._handle_failure(job, event.error or "Unknown error")
-                return
-
-            match event.type:
-                case FireCrawlEventType.CRAWL_STARTED:
-                    logger.info(f"Crawl started for job {job.id}")
-                    await self._handle_started(job)
-
-                case FireCrawlEventType.CRAWL_PAGE:
-                    logger.info(f"Page crawled for job {job.id}")
-                    await self._handle_page_crawled(job)
-
-                case FireCrawlEventType.CRAWL_COMPLETED:
-                    logger.info(f"Crawl completed for job {job.id}")
-                    await self._handle_completed(job)
-
-                case FireCrawlEventType.CRAWL_FAILED:
-                    logger.error(f"Crawl failed for job {job.id}: {event.error}")
-                    await self._handle_failure(job, event.error or "Unknown error")
-
-        except JobNotFoundError as e:
-            logger.error(f"Job not found: {str(e)}")
-            raise
-        except Exception as e:
-            logger.error(f"Unhandled error in webhook handler: {str(e)}", exc_info=True)
-            if "job" in locals():
-                await self._handle_failure(job, f"Internal error: {str(e)}")
-            raise
-
-    @base_error_handler
-    async def _handle_started(self, job: CrawlJob) -> None:
-        """Handle crawl.started event"""
-        job.status = CrawlJobStatus.IN_PROGRESS
-        job.started_at = datetime.now(UTC)
-        await self.job_manager.update_job(job)
-
-    @base_error_handler
-    async def _handle_page_crawled(self, job: CrawlJob) -> None:
-        """Handle crawl.page event - increment page count"""
-        job.pages_crawled += 1
-        logger.debug(f"Pages crawled: {job.pages_crawled}")
-        await self.job_manager.update_job(job)
-
-    @base_error_handler
-    async def _handle_completed(self, job: CrawlJob) -> None:
-        """Handle crawl.completed event"""
-        job.status = CrawlJobStatus.COMPLETED
-        job.completed_at = datetime.now(UTC)
-        job.pages_crawled = job.pages_crawled  # Set total pages to what we've crawled
-        await self.job_manager.update_job(job)
-
-    @base_error_handler
-    async def _handle_failure(self, job: CrawlJob, error: str) -> None:
-        """Handle crawl.failed event"""
-        job.status = CrawlJobStatus.FAILED
-        job.error = error
-        job.completed_at = datetime.now(UTC)
-        await self.job_manager.update_job(job)
+    @staticmethod
+    def _create_webhook_response(event: FireCrawlWebhookEvent) -> WebhookResponse:
+        """Create standardized webhook response."""
+        return WebhookResponse(
+            event_id=event.event_id,
+            message=f"Processed {event.data.event_type} event for job {event.data.crawl_id}",
+            provider=WebhookProvider.FIRECRAWL,
+        )

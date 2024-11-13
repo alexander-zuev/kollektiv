@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from src.api.routes import Routes
 from src.api.v0.content.schemas import (
     AddContentSourceRequest,
-    ContentSourceResponse,
+    SourceAPIResponse,
 )
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.config.settings import API_HOST, API_PORT
@@ -30,7 +30,7 @@ class KollektivAPIClient:
         """Close the HTTP client."""
         await self.client.aclose()
 
-    async def add_source(self, request: AddContentSourceRequest) -> ContentSourceResponse:
+    async def add_source(self, request: AddContentSourceRequest) -> SourceAPIResponse:
         """Add a new content source.
 
         Args:
@@ -48,7 +48,7 @@ class KollektivAPIClient:
                 json=request.model_dump(),
             )
             response.raise_for_status()
-            return ContentSourceResponse.model_validate(response.json())
+            return SourceAPIResponse.model_validate(response.json())
         except httpx.HTTPError as e:
             logger.error(f"Failed to add source: {e}")
             raise HTTPException(
@@ -56,12 +56,12 @@ class KollektivAPIClient:
                 detail=f"Failed to add source: {str(e)}",
             ) from e
 
-    async def list_sources(self) -> list[ContentSourceResponse]:
+    async def list_sources(self) -> list[SourceAPIResponse]:
         """List all content sources."""
         try:
             response = await self.client.get(f"{self.base_url}{Routes.V0.Content.SOURCES}")
             response.raise_for_status()
-            return [ContentSourceResponse.model_validate(item) for item in response.json()]
+            return [SourceAPIResponse.model_validate(item) for item in response.json()]
         except httpx.HTTPError as e:
             logger.error(f"Failed to list sources: {e}")
             raise HTTPException(

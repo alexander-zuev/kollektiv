@@ -1,13 +1,15 @@
 # job_manager.py
 import json
 from pathlib import Path
+from typing import Any
+from uuid import UUID
 
 import aiofiles
 
 from src.core._exceptions import JobNotFoundError
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
-from src.models.common.jobs import CrawlJob, CrawlJobStatus
+from src.models.common.jobs import CrawlJob
 
 logger = get_logger()
 
@@ -19,14 +21,20 @@ class JobManager:
     including their persistence to storage.
 
     Args:
-        storage_dir (str): Directory path for storing job data.
+        storage_dir (Union[str, Path]): Directory path for storing job data. Can be string or Path.
 
     Attributes:
         storage_dir (Path): Path object for the storage directory.
         jobs_file (Path): Path object for the jobs JSON file.
     """
 
-    def __init__(self, storage_dir: str):
+    def __init__(self, storage_dir: str | Path):
+        """
+        Initialize JobManager.
+
+        Args:
+            storage_dir: Directory path for storing job data. Can be string or Path.
+        """
         self.storage_dir = Path(storage_dir)
         self.jobs_file = self.storage_dir / "jobs.json"
         self._ensure_storage()
@@ -38,9 +46,9 @@ class JobManager:
             self.jobs_file.write_text("{}")
 
     @base_error_handler
-    async def create_job(self, firecrawl_id: str, start_url: str) -> CrawlJob:
+    async def create_job(self, source_id: UUID, start_url: str) -> CrawlJob:
         """Create new job."""
-        job = CrawlJob(firecrawl_id=firecrawl_id, start_url=start_url, status=CrawlJobStatus.PENDING)
+        job = CrawlJob(source_id=source_id, start_url=start_url)
         await self._save_job(job)
         return job
 
@@ -66,13 +74,14 @@ class JobManager:
             job (CrawlJob): The job to save.
         """
         jobs = await self._load_jobs()
-        jobs[job.id] = job.model_dump(mode="json")
+        job_id = str(job.job_id)
+        jobs[job_id] = job.model_dump(mode="json")
         async with aiofiles.open(self.jobs_file, "w") as f:
             await f.write(json.dumps(jobs, indent=2))
-        logger.debug(f"Saved job {job.id} with status {job.status}")
+        logger.debug(f"Saved job {job.job_id} with status {job.status}")
 
     @base_error_handler
-    async def _load_jobs(self) -> dict:
+    async def _load_jobs(self) -> dict[Any, Any]:
         """Load jobs from storage.
 
         Returns:

@@ -2,6 +2,7 @@ import json
 import os
 import re
 from datetime import datetime
+from typing import Any
 from urllib.parse import urlparse
 
 import aiofiles
@@ -12,9 +13,9 @@ from src.models.content.firecrawl_models import CrawlResult
 class FileReference:
     """Reference to a file."""
 
-    def __init__(self):
-        self.filename = None
-        self.filepath = None
+    def __init__(self) -> None:
+        self.filename: str | None = None
+        self.filepath: str | None = None
 
 
 # TODO: refactor to be a common / infra class
@@ -46,7 +47,7 @@ class FileManager:
 
         return filename
 
-    async def load_result(self, filename: str) -> dict:
+    async def load_result(self, filename: str) -> dict[Any, Any]:
         """Load result file."""
         filepath = os.path.join(self.raw_data_dir, filename)
         async with aiofiles.open(filepath) as f:

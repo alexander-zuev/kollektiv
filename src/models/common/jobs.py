@@ -1,7 +1,7 @@
 # TODO: Transition to redis for job management. There is no reason to use custom implementation.
 from datetime import UTC, datetime
 from enum import Enum
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
@@ -29,10 +29,13 @@ class CrawlJobStatus(str, Enum):
 class CrawlJob(BaseModel):
     """Track crawl job status and progress"""
 
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    firecrawl_id: str
-    status: CrawlJobStatus
-    start_url: str
+    job_id: UUID = Field(default_factory=lambda: uuid4(), description="Internal job id in the system")
+    source_id: UUID = Field(..., description="Maps each crawl job to the Source object.")
+    firecrawl_id: str | None = Field(
+        None, description="Job id returned by FireCrawl. Added only if a jobs starts " "successfully"
+    )
+    status: CrawlJobStatus = Field(default=CrawlJobStatus.PENDING, description="Crawl job status in the system.")
+    start_url: str = Field(..., description="Start url of the crawl job")
     method: str = Field(default="crawl")
 
     # Simple progress tracking
@@ -40,7 +43,6 @@ class CrawlJob(BaseModel):
 
     # Timing
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    started_at: datetime | None = None
     completed_at: datetime | None = None
 
     # Results

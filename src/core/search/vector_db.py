@@ -24,7 +24,7 @@ from cohere import RerankResponse
 from src.core.chat.summary_manager import SummaryManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import configure_logging, get_logger
-from src.infrastructure.config.settings import CHROMA_DB_DIR, COHERE_API_KEY, OPENAI_API_KEY, PROCESSED_DATA_DIR
+from src.infrastructure.config.settings import settings
 
 logger = get_logger()
 
@@ -44,8 +44,8 @@ class DocumentProcessor:
         json.JSONDecodeError: If the file contains invalid JSON.
     """
 
-    def __init__(self):
-        self.processed_dir = PROCESSED_DATA_DIR
+    def __init__(self) -> None:
+        self.processed_dir = settings.processed_data_dir
 
     def load_json(self, filename: str) -> list[dict]:
         """
@@ -184,7 +184,7 @@ class VectorDB(VectorDBInterface):
     def __init__(
         self,
         embedding_function: str = "text-embedding-3-small",
-        openai_api_key: str = OPENAI_API_KEY,
+        openai_api_key: str = settings.openai_api_key,
     ):
         self.embedding_function = None
         self.client = None
@@ -198,7 +198,7 @@ class VectorDB(VectorDBInterface):
 
     def _init(self):
         """Initialize ChromaDB client and embedding function."""
-        self.client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+        self.client = chromadb.PersistentClient(path=str(settings.chroma_db_dir))
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
             api_key=self.openai_api_key, model_name=self.embedding_function_name
         )
@@ -426,14 +426,14 @@ class Reranker:
         model_name (str): Name of the model to use for re-ranking. Defaults to "rerank-english-v3.0".
     """
 
-    def __init__(self, cohere_api_key: str = COHERE_API_KEY, model_name: str = "rerank-english-v3.0"):
+    def __init__(self, cohere_api_key: str = settings.cohere_api_key, model_name: str = "rerank-english-v3.0"):
         self.cohere_api_key = cohere_api_key
         self.model_name = model_name
         self.client = None
 
         self._init()
 
-    def _init(self):
+    def _init(self) -> None:
         try:
             self.client = cohere.ClientV2(api_key=self.cohere_api_key)
             logger.debug("Successfully initialized Cohere client")
@@ -603,7 +603,7 @@ class ResultRetriever:
         return ranked_documents
 
 
-async def main():
+async def main() -> None:
     """
     Configure logging, reset the vector database, process JSON documents, and add them to the database.
 
@@ -621,7 +621,7 @@ async def main():
     vector_db = VectorDB()
     vector_db.reset_database()
 
-    file = "langchain-ai_github_io_langgraph_20240928_143920-chunked.json"
+    file = "docs_anthropic_com_en_docs_20241030_104114-chunked.json"
     reader = DocumentProcessor()
     documents = reader.load_json(filename=file)
     await vector_db.add_documents(documents, file)

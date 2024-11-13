@@ -3,11 +3,11 @@
 from typing import Final
 
 # API version prefix
-V0: Final = "/api/v0"
+V0_PREFIX: Final = "/api/v0"  # Rename for clarity
 
 
 class Routes:
-    """System routes (non-versioned)."""
+    """API route definitions."""
 
     class System:
         """System routes (non-versioned)."""
@@ -18,30 +18,20 @@ class Routes:
             """Webhook routes."""
 
             BASE = "/webhooks"
-            FIRECRAWL = "/firecrawl"  # This will be combined with BASE in the router
+            FIRECRAWL = f"{BASE}/firecrawl"
 
-    class Middleware:
-        """Middleware routes."""
-
-        AUTH = "/auth"
-
-    # API routes (versioned)
-    class V0:
+    class V0:  # Use lowercase for consistency with prefix
         """API routes (versioned)."""
 
-        BASE = V0
-
-        # Feature endpoints
-        CONTENT = f"{BASE}/content"
-        CHAT = f"{BASE}/chat"
+        CONTENT = "/content"
+        CHAT = "/chat"
 
         class Content:
             """Content management routes."""
 
-            # Content source operations
-            SOURCES = "/sources"  # GET (list), POST (add)
-            SOURCE = "/sources/{source_id}"  # GET, DELETE
-            SOURCE_STATUS = "/sources/{source_id}/status"  # GET status
+            SOURCES = "/sources"
+            SOURCE = "/sources/{source_id}"
+            SOURCE_STATUS = "/sources/{source_id}/status"
 
         class Chat:
             """Chat routes."""

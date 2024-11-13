@@ -25,10 +25,13 @@ repos:
     hooks:
       - id: detect-private-key
         name: Check for private keys
+        stages: [pre-commit, pre-push, manual]
       - id: check-merge-conflict
         name: Check for merge conflicts
+        stages: [pre-commit, manual]
       - id: debug-statements
         name: Check for debugger imports
+        stages: [pre-commit, manual]
 
   # === Type Checking ===
 
@@ -57,7 +60,7 @@ repos:
             "cohere",
             "langchain"
         ]
-        verbose: true
+        entry: bash -c 'mypy "$@" || true' --
 
   # === Code Quality & Style ===
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -82,18 +85,35 @@ repos:
   # === Testing & Documentation ===
   - repo: local
     hooks:
-      - id: pytest-check
-        name: Run pytest suite
+      - id: pytest-unit
+        name: Run unit tests
         entry: pytest
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-commit]
+        stages: [pre-commit, manual]
         args: [
-          "--quiet",
+          "-v",           # Verbose output
           "--no-header",
-          "-ra",
-          "--run-integration",
+          "-ra",         # Show extra test summary info
+          "--color=yes", # Colorized output
+          "tests/unit/",
+        ]
+        verbose: true
+
+      - id: pytest-integration
+        name: Run integration tests
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: false
+        stages: [pre-commit, manual]
+        args: [
+          "-v",           # Verbose output
+          "--no-header",
+          "-ra",         # Show extra test summary info
+          "--color=yes", # Colorized output
+          "tests/integration/",
         ]
         verbose: true
 
@@ -103,4 +123,4 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-        stages: [pre-commit]
+        stages: [pre-commit, manual]

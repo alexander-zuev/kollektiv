@@ -15,7 +15,7 @@ from anthropic.types import Message
 
 from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
 from src.infrastructure.config.logger import get_logger
-from src.infrastructure.config.settings import ANTHROPIC_API_KEY, MAIN_MODEL, VECTOR_STORAGE_DIR, WEAVE_PROJECT_NAME
+from src.infrastructure.config.settings import settings
 
 logger = get_logger()
 
@@ -40,13 +40,13 @@ class SummaryManager:
         process_file: Processes the file and generates or loads its summary.
     """
 
-    def __init__(self, model_name: str = MAIN_MODEL):
+    def __init__(self, model_name: str = settings.main_model):
         # Only initialize weave if project name is set and non-empty
-        if WEAVE_PROJECT_NAME and WEAVE_PROJECT_NAME.strip():
-            weave.init(project_name=WEAVE_PROJECT_NAME)
+        if settings.weave_project_name and settings.weave_project_name.strip():
+            weave.init(project_name=settings.weave_project_name)
 
         self.summaries = self.load_summaries()
-        self.client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, max_retries=MAX_RETRIES)
+        self.client = anthropic.Anthropic(api_key=settings.main_model, max_retries=MAX_RETRIES)
         self.model_name = model_name
 
     @anthropic_error_handler
@@ -218,7 +218,7 @@ class SummaryManager:
             Returns an empty dictionary if the summaries file does not exist or
             if there is an error loading the file.
         """
-        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
+        summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
         if os.path.exists(summaries_file):
             try:
                 with open(summaries_file) as f:
@@ -230,9 +230,9 @@ class SummaryManager:
             return {}
 
     @base_error_handler
-    def save_summaries(self):
+    def save_summaries(self) -> None:
         """Saves the document summaries to a JSON file."""
-        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
+        summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
         try:
             with open(summaries_file, "w") as f:
                 json.dump(self.summaries, f, indent=2)
@@ -246,17 +246,17 @@ class SummaryManager:
         return list(self.summaries.values())
 
     @base_error_handler
-    def clear_summaries(self):
+    def clear_summaries(self) -> None:
         """Clears the document summaries and removes the summaries file."""
         self.summaries = {}
-        summaries_file = os.path.join(VECTOR_STORAGE_DIR, "document_summaries.json")
+        summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
         if os.path.exists(summaries_file):
             os.remove(summaries_file)
             logger.info("Document summaries cleared.")
         self.save_summaries()
 
     @base_error_handler
-    def process_file(self, data: list[dict], file_name: str):
+    def process_file(self, data: list[dict], file_name: str) -> None:
         """
         Process the file and generate or load its summary.
 

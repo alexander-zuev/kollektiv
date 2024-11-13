@@ -1,77 +1,210 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from src.infrastructure.config.settings import DEFAULT_MAX_DEPTH, DEFAULT_PAGE_LIMIT
+from src.infrastructure.config.settings import settings
 from src.models.common.jobs import CrawlJobStatus
+
+
+# Scrape Options
+class ScrapeOptions(BaseModel):
+    """
+    Configuration model for web scraping options in the Firecrawl API.
+
+    This model defines various options that control how web pages are scraped,
+    including output formats, content filtering, and browser behavior.
+
+    Attributes:
+        formats (list[Literal] | None): Output formats, defaults to ["markdown"]
+        headers (dict[str, Any] | None): Custom HTTP headers for requests
+        include_tags (list[str] | None): HTML tags to include in output
+        exclude_tags (list[str] | None): HTML tags to exclude from output, defaults to ["img"]
+        only_main_content (bool | None): If True, excludes headers/footers/navigation
+        mobile (bool | None): If True, emulates mobile device
+        wait_for (int | None): Milliseconds to wait for page load
+
+    Example:
+        ```python
+        options = ScrapeOptions(formats=["markdown", "html"], only_main_content=True, wait_for=500)
+        ```
+    """
+
+    formats: list[Literal["markdown", "html", "rawHtml", "links", "screenshot"]] = Field(
+        default_factory=lambda: ["markdown"], description="Formats to include in output"
+    )
+    headers: dict[str, Any] = Field(default_factory=dict)
+    include_tags: list[str] = Field(default_factory=list)
+    exclude_tags: list[str] = Field(default_factory=lambda: ["img"])
+    only_main_content: bool = Field(default=True)
+    mobile: bool = Field(default=False)
+    wait_for: int = Field(default=123)
+
+    def dict(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Convert to dict with camelCase for API."""
+        d = super().dict(*args, exclude_none=True, **kwargs)
+        return {
+            "formats": d["formats"],
+            "headers": d["headers"],
+            "includeTags": d["include_tags"],
+            "excludeTags": d["exclude_tags"],
+            "onlyMainContent": d["only_main_content"],
+            "mobile": d["mobile"],
+            "waitFor": d["wait_for"],
+        }
+
+
+# Crawl Params
+class CrawlParams(BaseModel):
+    """
+    Parameter model for configuring web crawling behavior in the Firecrawl API.
+
+    This model defines the configuration for how the crawler should behave,
+    including URL patterns, depth limits, and crawling restrictions.
+
+    Attributes:
+        url (str): Required. The starting URL for crawling
+        exclude_paths (list[str] | None): URL patterns to exclude (regex)
+        include_paths (list[str] | None): URL patterns to include (regex)
+        max_depth (int | None): Maximum crawl depth from start URL
+        ignore_sitemap (bool | None): Whether to ignore site's sitemap
+        limit (int | None): Maximum pages to crawl (max 10000)
+        allow_backward_links (bool | None): Allow navigation to previous pages
+        allow_external_links (bool | None): Allow following external links
+        webhook (str | None): Notification webhook URL
+        scrape_options (ScrapeOptions | None): Scraping configuration
+
+    Example:
+        ```python
+        params = CrawlParams(url="https://example.com", max_depth=3, limit=100, exclude_paths=["/blog/*"])
+        ```
+
+    Note:
+        Only the 'url' field is required. All other fields are optional and will
+        use API defaults if not specified.
+    """
+
+    url: str = Field(..., description="The base URL to start crawling from")
+    exclude_paths: list[str] = Field(default_factory=list, description="URL patterns to exclude from crawl using regex")
+    include_paths: list[str] = Field(default_factory=list, description="URL patterns to include in crawl using regex")
+    max_depth: int = Field(default=2, ge=1, description="Maximum depth to crawl relative to entered URL")
+    ignore_sitemap: bool = Field(default=True, description="Ignore the website sitemap when crawling")
+    limit: int = Field(default=10, gt=0, le=10000, description="Maximum number of pages to crawl")
+    allow_backward_links: bool = Field(
+        default=False, description="Allow crawler to navigate to previously linked pages"
+    )
+    allow_external_links: bool = Field(default=False, description="Allow crawler to follow external website links")
+    webhook: str | None = Field(default=None, description="URL to send webhook notifications")
+    scrape_options: ScrapeOptions = Field(default_factory=ScrapeOptions)
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        """Validate URL format but keep as string."""
+        if not v:
+            raise ValueError("URL cannot be empty")
+        try:
+            # Validate format but return string
+            parsed = HttpUrl(str(v))
+            return str(parsed)
+        except Exception as e:
+            raise ValueError("Invalid URL format") from e
+
+    @field_validator("webhook")
+    @classmethod
+    def validate_webhook(cls, v: str | None) -> str | None:
+        """Validate webhook URL if provided."""
+        if v is not None:
+            try:
+                parsed = HttpUrl(str(v))
+                return str(parsed)
+            except Exception as e:
+                raise ValueError("Invalid webhook URL format") from e
+        return v
+
+    def dict(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Convert to dict with camelCase for API."""
+        d = super().dict(*args, exclude_none=True, **kwargs)
+        return {
+            "url": d["url"],
+            "excludePaths": d["exclude_paths"],
+            "includePaths": d["include_paths"],
+            "maxDepth": d["max_depth"],
+            "ignoreSitemap": d["ignore_sitemap"],
+            "limit": d["limit"],
+            "allowBackwardLinks": d["allow_backward_links"],
+            "allowExternalLinks": d["allow_external_links"],
+            "webhook": d["webhook"] if "webhook" in d else None,
+            "scrapeOptions": self.scrape_options.dict(),
+        }
 
 
 # Crawl Request
 class CrawlRequest(BaseModel):
-    """
-    CrawlRequest model for initiating a web crawl.
+    """CrawlRequest model for initiating a web crawl.
+
+    This model handles the initialization and validation of web crawl requests,
+    ensuring all parameters are properly formatted and within acceptable ranges.
 
     Attributes:
-        url (HttpUrl): The starting URL of the crawl request.
-        page_limit (int): Maximum number of pages to crawl. Maximum is 1000.
-        max_depth (int): Maximum depth for crawling. Default is 5, with a range of 1 to 10.
-        exclude_patterns (list[str]): The list of patterns to exclude, e.g., '/blog/*', '/author/*'.
-        include_patterns (list[str]): The list of patterns to include, e.g., '/blog/*', '/api/*'.
+        url (HttpUrl): The starting URL for the crawl
+        page_limit (int): Max pages to crawl (1-1000, default: DEFAULT_PAGE_LIMIT)
+        max_depth (int): Max crawl depth (1-10, default: DEFAULT_MAX_DEPTH)
+        exclude_patterns (list[str]): URL patterns to exclude (e.g., '/blog/*')
+        include_patterns (list[str]): URL patterns to include (e.g., '/api/*')
+        time_taken (float | None): Total crawl duration in seconds
+        webhook_url (HttpUrl | None): Optional webhook for status updates
 
-    Methods:
-        url_must_be_http_url(cls, v):
-            Validates that the URL is a valid HttpUrl.
+    Validators:
+        - Ensures URL is valid and ends with a slash
+        - Validates pattern formats for include/exclude patterns
+        - Enforces limits on page count and crawl depth
 
-        validate_patterns(cls, v: list[str]) -> list[str]:
-            Validates that the patterns in exclude_patterns and include_patterns are properly formatted.
-
-    Config:
-        arbitrary_types_allowed (bool): Configuration option to allow arbitrary types.
+    Example:
+        ```python
+        request = CrawlRequest(url="https://example.com", page_limit=100, max_depth=3, exclude_patterns=["/private/*"])
+        ```
     """
 
-    url: HttpUrl = Field(..., description="The starting URL of the crawl request.")
+    url: str = Field(..., description="The starting URL of the crawl request.")
     page_limit: int = Field(
-        default=DEFAULT_PAGE_LIMIT, gt=0, le=1000, description="Maximum number of pages to crawl. Maxium"
+        default=settings.default_page_limit,
+        gt=0,
+        le=1000,
+        description="Maximum number of pages to crawl. Maximum is 1000.",
     )
     max_depth: int = Field(
-        default=DEFAULT_MAX_DEPTH,
+        default=settings.default_max_depth,
         gt=0,
         le=10,
-        description="Maximum depth for crawling",  # Move from hardcoded in async_crawl_url
+        description="Maximum depth for crawling",
     )
     exclude_patterns: list[str] = Field(
         default_factory=list,
-        description="The list of str of patterns to "
-        "exclude. For "
-        "example, "
-        "/blog/*, /author/. Delimited by a comma",
+        description="The list of patterns to exclude, e.g., '/blog/*', '/author/*'.",
     )
     include_patterns: list[str] = Field(
         default_factory=list,
-        description="The list of str of patterns to "
-        "include. For "
-        "example, "
-        "/blog/*, /api/. Delimited by a comma",
+        description="The list of patterns to include, e.g., '/blog/*', '/api/*'.",
     )
     time_taken: float | None = Field(default=0.0, description="The time taken to crawl this request end to end.")
-    webhook_url: HttpUrl | None = None  # Optional webhook URL for updates
+    webhook_url: str | None = Field(default=None, description="Optional webhook URL for updates")
 
-    @field_validator("url")
+    @field_validator("url", "webhook_url")
     @classmethod
-    def url_must_be_http_url(cls, v) -> str:
-        """Validates the input URL and converts it to HttpURL"""
+    def url_must_be_http_url(cls, v: str | HttpUrl) -> str:
+        """Validates the input URL and webhook and converts it to str"""
         if not v:
             raise ValueError("URL cannot be None or empty")
         try:
             parsed = HttpUrl(str(v))
-            return str(parsed)  # Convert to string immediately
+            return str(parsed)
         except Exception as e:
-            raise ValueError("Invalid URL. It should start with 'http://' or 'https://'.") from e
+            raise ValueError(f"Invalid URL format for: {v}") from e
 
     @field_validator("url")
     @classmethod
-    def url_must_end_with_slash(cls, url) -> str:
+    def url_must_end_with_slash(cls, url: str | HttpUrl) -> str:
         """Ensures that start URL always with a trailing slash"""
         if not url:
             raise ValueError("URL cannot be None or empty")
@@ -104,7 +237,7 @@ class CrawlRequest(BaseModel):
                 raise ValueError("Pattern must start with '/', got: {pattern}")
         return v
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Returns a detailed string representation of the CrawlRequest."""
         patterns = []
         if self.include_patterns:
@@ -128,25 +261,31 @@ class CrawlRequest(BaseModel):
 
 # Crawl Data
 class CrawlData(BaseModel):
-    """A class that represents the data structure for crawling page data.
+    r"""
+    Model for storing and validating crawled page data.
 
-    This class inherits from BaseModel and is designed to ensure that the data provided
-    conforms to the required structure and constraints.
+    This model ensures that crawled data meets the required structure and
+    contains all necessary information for each crawled page.
 
     Attributes:
-        data (list[dict[str, Any]]): List of page data objects from FireCrawl,
-            each containing 'markdown' and 'metadata' keys.
+        data (list[dict[str, Any]]): List of page data objects, each containing:
+            - markdown (str): Page content in markdown format
+            - metadata (dict): Additional page information
 
-    Methods:
-        validate_data(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
-            Validates the 'data' field to make sure it meets the specified requirements.
-            Ensures 'data' is not empty, and each item in 'data' is a dictionary
-            containing 'markdown' and 'metadata' keys, with 'markdown' not being None.
+    Validators:
+        - Ensures data list is not empty
+        - Validates presence of required keys in each data item
+        - Checks that markdown content is non-null and properly formatted
+
+    Example:
+        ```python
+        crawl_data = CrawlData(
+            data=[{"markdown": "# Page Title\nContent...", "metadata": {"url": "https://example.com/page"}}]
+        )
+        ```
     """
 
-    data: list[dict[str, Any]] = Field(
-        ..., default_factory=list, description="List of page data objects from " "FireCrawl"
-    )
+    data: list[dict[str, Any]] = Field(default_factory=list, description="List of page data objects from FireCrawl")
 
     @field_validator("data")
     def validate_data(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:  # noqa: N805
@@ -182,7 +321,7 @@ class CrawlData(BaseModel):
                 raise ValueError("Markdown must be a non-null string")
         return v
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Return the length of the data list."""
         return len(self.data)
 
@@ -190,27 +329,35 @@ class CrawlData(BaseModel):
 # Crawl Result
 class CrawlResult(BaseModel):
     """
-    Represents the result of a web crawling job, containing metadata and discovered data.
+    Model representing the complete result of a web crawl operation.
+
+    This model contains all information about a completed crawl job,
+    including status, statistics, and collected data.
 
     Attributes:
-        job_status (CrawlJobStatus): The status of the crawl job.
-        input_url (str): The original URL that was crawled.
-        total_pages (int): Total number of pages successfully crawled. Must be non-negative.
-        unique_links (list[str]): List of unique URLs discovered during crawling. Defaults to an empty list.
-        data (list[CrawlData]): The actual crawled data from all pages.
-        completed_at (datetime | None): When the crawl job completed. Defaults to the current UTC datetime.
-        error_message (str | None): Error message if the crawl failed. Defaults to None.
+        job_status (CrawlJobStatus): Current status of the crawl job
+        input_url (str): Original URL that was crawled
+        total_pages (int): Number of successfully crawled pages
+        unique_links (list[str]): All unique URLs discovered
+        data (CrawlData): Collected page content and metadata
+        completed_at (datetime | None): Completion timestamp (UTC)
+        error_message (str | None): Error details if job failed
+        filename (str | None): Name of saved results file
+        method (str): API method used ("crawl" by default)
 
-    Methods:
-        validate_data_length(cls, v, values): Ensures the total_pages matches the length of the data list.
-
-    Config:
-        json_encoders (dict): Allows converting datetime to ISO format in JSON.
-        extra (str): Allows extra fields in input data. Set to "allow".
-        validate_assignment (bool): Validates whenever a field is set. Set to True.
+    Example:
+        ```python
+        result = CrawlResult(
+            job_status=CrawlJobStatus.COMPLETED,
+            input_url="https://example.com",
+            total_pages=42,
+            data=crawl_data,
+            completed_at=datetime.now(UTC),
+        )
+        ```
     """
 
-    job_status: "CrawlJobStatus" = Field(...)
+    job_status: CrawlJobStatus = Field(..., description="Enum status of the crawl job")
     input_url: str = Field(..., description="The original URL that was crawled")
     total_pages: int = Field(..., ge=0, description="Total number of pages successfully crawled")
     unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")
@@ -222,16 +369,22 @@ class CrawlResult(BaseModel):
     filename: str | None = Field(None, description="Filename of the saved results")
     method: str = Field(default="crawl", description="Firecrawl API method used")
 
-    # @field_validator("data")
-    # def validate_data_length(cls, v: list[CrawlData], values: dict) -> list[CrawlData]:
-    #     """Ensure total_pages matches data length"""
-    #     if len(v) != values.get("total_pages", 0):
-    #         raise ValueError(f"Data length {len(v)} does not match total_pages {values.get('total_pages')}")
-    #     return v
-
     class Config:
         """Configuration class for CrawlResult model."""
 
         json_encoders = {datetime: lambda v: v.isoformat()}
         extra = "allow"
         validate_assignment = True
+
+
+class FireCrawlResponse(BaseModel):
+    """Object encapsulating response from FireCrawl async_crawl_url."""
+
+    success: bool = Field(..., description="Indicates if the crawl initiation was successful.")
+    job_id: str = Field(..., description="The unique identifier for the crawl job.")
+    url: str = Field(..., description="The URL to check the status of the crawl job.")
+
+    @classmethod
+    def from_firecrawl_response(cls, response: dict[str, Any]) -> "FireCrawlResponse":
+        """Converts a Firecrawl API response dictionary to a FireCrawlResponse object."""
+        return cls(success=response["success"], job_id=response["id"], url=response["url"])
