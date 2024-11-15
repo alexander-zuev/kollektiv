@@ -56,6 +56,7 @@ async def handle_firecrawl_webhook(
         try:
             # Call ContentService with CrawlEvent
             await content_service.handle_event(event=event)
+            logger.debug("Successfully sent event to the ContentService")
         except Exception as e:
             logger.error(f"Error processing webhook event: {str(e)}")
             raise HTTPException(

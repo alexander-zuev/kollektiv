@@ -28,6 +28,7 @@ chromadb = "^0.5.16"
 chainlit = "^1.3.1"
 langchain = "^0.3.6"
 pydantic-settings = "^2.6.1"
+supabase = "^2.10.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

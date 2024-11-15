@@ -1,105 +1,93 @@
 # job_manager.py
-import json
-from pathlib import Path
-from typing import Any
 from uuid import UUID
 
-import aiofiles
-
-from src.core._exceptions import JobNotFoundError
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.models.common.jobs import CrawlJob
+from src.services.data_service import DataService
 
 logger = get_logger()
 
 
 class JobManager:
-    """Manages crawl job lifecycle and storage.
+    """Manages crawl job lifecycle and operations.
 
     This class handles the creation, retrieval, and updating of crawl jobs,
-    including their persistence to storage.
+    delegating persistence operations to the DataService.
 
     Args:
-        storage_dir (Union[str, Path]): Directory path for storing job data. Can be string or Path.
-
-    Attributes:
-        storage_dir (Path): Path object for the storage directory.
-        jobs_file (Path): Path object for the jobs JSON file.
+        data_service (DataService): Service for handling data persistence
     """
 
-    def __init__(self, storage_dir: str | Path):
-        """
-        Initialize JobManager.
-
-        Args:
-            storage_dir: Directory path for storing job data. Can be string or Path.
-        """
-        self.storage_dir = Path(storage_dir)
-        self.jobs_file = self.storage_dir / "jobs.json"
-        self._ensure_storage()
-
-    def _ensure_storage(self) -> None:
-        """Ensure storage directory exists and initialize jobs file if needed."""
-        self.storage_dir.mkdir(parents=True, exist_ok=True)
-        if not self.jobs_file.exists():
-            self.jobs_file.write_text("{}")
+    def __init__(self, data_service: DataService):
+        """Initialize JobManager with data service."""
+        self.data_service = data_service
+        logger.debug("Initialized JobManager")
 
     @base_error_handler
     async def create_job(self, source_id: UUID, start_url: str) -> CrawlJob:
-        """Create new job."""
+        """Create and persist a new job.
+
+        Args:
+            source_id: ID of the associated source
+            start_url: URL to start crawling from
+
+        Returns:
+            CrawlJob: The created job
+        """
         job = CrawlJob(source_id=source_id, start_url=start_url)
-        await self._save_job(job)
+        await self.data_service.save_job(job=job)
+        logger.debug(f"Created job {job.job_id} for source {source_id}")
         return job
 
     @base_error_handler
-    async def get_job(self, job_id: str) -> CrawlJob:
-        """Get job by ID."""
-        jobs = await self._load_jobs()
-        job_data = jobs.get(job_id)
-        if not job_data:
-            raise JobNotFoundError(job_id)
-        return CrawlJob(**job_data)
+    async def get_job(self, job_id: UUID) -> CrawlJob:
+        """Get job by ID.
+
+        Args:
+            job_id: ID of the job to retrieve
+
+        Returns:
+            CrawlJob: The retrieved job
+
+        Raises:
+            JobNotFoundError: If job doesn't exist
+        """
+        return await self.data_service.retrieve_job(job_id=job_id)
 
     @base_error_handler
     async def update_job(self, job: CrawlJob) -> None:
-        """Update job state."""
-        await self._save_job(job)
-
-    @base_error_handler
-    async def _save_job(self, job: CrawlJob) -> None:
-        """Save job with basic validation.
+        """Update existing job.
 
         Args:
-            job (CrawlJob): The job to save.
+            job: Job with updated data
         """
-        jobs = await self._load_jobs()
-        job_id = str(job.job_id)
-        jobs[job_id] = job.model_dump(mode="json")
-        async with aiofiles.open(self.jobs_file, "w") as f:
-            await f.write(json.dumps(jobs, indent=2))
-        logger.debug(f"Saved job {job.job_id} with status {job.status}")
-
-    @base_error_handler
-    async def _load_jobs(self) -> dict[Any, Any]:
-        """Load jobs from storage.
-
-        Returns:
-            dict: Dictionary of jobs keyed by job ID.
-        """
-        try:
-            async with aiofiles.open(self.jobs_file) as f:
-                content = await f.read()
-                return json.loads(content)
-        except Exception as e:
-            logger.error(f"Error loading jobs: {e}")
-            return {}
+        await self.data_service.update_job(job=job)
+        logger.debug(f"Updated job {job.job_id}")
 
     @base_error_handler
     async def get_job_by_firecrawl_id(self, firecrawl_id: str) -> CrawlJob:
-        """Get job by FireCrawl ID."""
-        jobs = await self._load_jobs()
-        for job_data in jobs.values():
-            if job_data["firecrawl_id"] == firecrawl_id:
-                return CrawlJob(**job_data)
-        raise JobNotFoundError(f"No job found for FireCrawl ID: {firecrawl_id}")
+        """Get job by FireCrawl ID.
+
+        Args:
+            firecrawl_id: FireCrawl job identifier
+
+        Returns:
+            CrawlJob: The retrieved job
+
+        Raises:
+            JobNotFoundError: If no job exists with the FireCrawl ID
+        """
+        return await self.data_service.get_job_by_firecrawl_id(firecrawl_id=firecrawl_id)
+
+    @base_error_handler
+    async def list_jobs(self, source_id: UUID | None = None) -> list[CrawlJob]:
+        """List all jobs, optionally filtered by source.
+
+        Args:
+            source_id: Optional source ID to filter jobs
+
+        Returns:
+            list[CrawlJob]: List of matching jobs
+        """
+        return await self.data_service.list_jobs(source_id=source_id)

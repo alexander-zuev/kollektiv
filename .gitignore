@@ -454,3 +454,6 @@ id_rsa.pub
 # poetry.lock
 src/infrastructure/storage/vector/chroma/chroma.sqlite3
 src/core/content/crawler/*.json
+
+# === Internal docs ===
+docs/internal/*

@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from src.models.content.content_source_models import DataSourceType, Source, SourceStatus
+from src.models.content.content_source_models import DataSourceType, DataSource, SourceStatus
 
 
 class ContentSourceType(str, Enum):
@@ -67,16 +67,24 @@ class ContentSourceConfig(BaseModel):
 class AddContentSourceRequest(BaseModel):
     """Request to add a new content source."""
 
+    request_id: UUID = Field(default_factory=lambda: uuid4(), description="System-generated id of a user request.")
     source_type: ContentSourceType = Field(
         ..., description="Type of content source (currently only 'web' is supported)."
     )
-    config: ContentSourceConfig
+    request_config: ContentSourceConfig = Field(..., description="Holds main configuration parameters of the request")
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Timestamp of creation, set by the application"
+    )
+    completed_at: datetime | None = Field(
+        None, description="Timestamp of when the request is successfully completed. If request failed, left empty."
+    )
 
     class Config:
         """Example config."""
 
         json_schema_extra = {
             "example": {
+                "request_ud": "uuid4",
                 "source_type": "web",
                 "config": {
                     "url": "https://docs.example.com",
@@ -97,7 +105,7 @@ class SourceAPIResponse(BaseModel):
     error: str | None = Field(None, description="Error message, null if no error")
 
     @classmethod
-    def from_source(cls, source: Source) -> "SourceAPIResponse":
+    def from_source(cls, source: DataSource) -> "SourceAPIResponse":
         return cls(
             source_id=source.source_id,
             status=source.status,

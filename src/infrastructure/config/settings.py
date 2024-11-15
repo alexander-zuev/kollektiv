@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     # Base directory is src/
     src_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent)
 
+    # Supabase
+    supabase_url: str = Field(..., description="Supabase URL", alias="SUPABASE_URL")
+    supabase_key: str = Field(..., description="Supabase API Key", alias="SUPABASE_KEY")
+
     # All paths are now relative to src_dir
     log_dir: Path = Field(default_factory=lambda: Path("src/logs"))
     eval_dir: Path = Field(default_factory=lambda: Path("src/core/evaluation"))

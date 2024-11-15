@@ -40,12 +40,12 @@ class ColoredFormatter(logging.Formatter):
         logging.CRITICAL: "🔥",  # Critical
     }
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         """
         Format the log record with emoji and color based on log level.
 
         Args:
-            record (LogRecord): The log record to format.
+            record (logging.LogRecord): The log record to format.
 
         Returns:
             str: The formatted log message including color and emoji.
@@ -67,7 +67,7 @@ class ColoredFormatter(logging.Formatter):
         return f"{color}{log_message}{Style.RESET_ALL}"
 
 
-def configure_logging(debug=False, log_file="app.log"):
+def configure_logging(debug: bool = False, log_file: str = "app.log") -> None:
     """
     Configure the application's logging system.
 
@@ -109,12 +109,9 @@ def configure_logging(debug=False, log_file="app.log"):
     app_logger.propagate = False
 
 
-def get_logger():
+def get_logger() -> logging.Logger:
     """
     Retrieve a logger named after the calling module.
-
-    Args:
-        None
 
     Returns:
         logging.Logger: A logger specifically named for the module calling the function.

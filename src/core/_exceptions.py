@@ -1,4 +1,37 @@
 from requests.exceptions import HTTPError, Timeout
+from uuid import UUID
+
+
+class NotImplementedError(Exception):
+    """Not implemented yet. Stay tuned."""
+
+    pass
+
+
+class AppError(Exception):
+    """Base class for application-specific exceptions."""
+
+
+class DatabaseError(AppError):
+    """Raised when a database operation fails."""
+
+
+class ValidationError(AppError):
+    """Raised when input validation fails."""
+
+
+class ExternalServiceError(AppError):
+    """Raised when an external service call fails."""
+
+
+class DataSourceError(AppError):
+    """Exception raised for errors related to Data Source operations."""
+
+    def __init__(self, source_id: UUID, message: str, original_exception: Exception = None):
+        self.source_id = source_id
+        self.message = message
+        self.original_exception = original_exception
+        super().__init__(f"DataSourceError for source_id={source_id}: {message}")
 
 
 class CrawlerError(Exception):
@@ -38,6 +71,12 @@ class EmptyContentError(CrawlerError):
 
 class FireCrawlAPIError(CrawlerError):
     """Base for FireCrawl API errors."""
+
+    pass
+
+
+class FireCrawlJobNotFound(CrawlerError):
+    """Job with given firecrawl ids not found"""
 
     pass
 
@@ -107,3 +146,24 @@ def is_retryable_error(exception: Exception) -> tuple[bool, int | None]:
         return True, None
 
     return False, None
+
+
+class JobUpdateError(JobError):
+    """Exception raised when a job update fails."""
+
+    def __init__(self, job_id: str, reason: str):
+        super().__init__(job_id, f"update failed: {reason}")
+
+
+class JobValidationError(JobError):
+    """Exception raised when job data is invalid."""
+
+    def __init__(self, job_id: str, reason: str):
+        super().__init__(job_id, f"validation failed: {reason}")
+
+
+class JobStateError(JobError):
+    """Exception raised when job state transition is invalid."""
+
+    def __init__(self, job_id: str, current_state: str, attempted_state: str):
+        super().__init__(job_id, f"invalid state transition from {current_state} to {attempted_state}")

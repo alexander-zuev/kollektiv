@@ -839,6 +839,20 @@ wrapt = ">=1.10,<2"
 dev = ["PyTest", "PyTest-Cov", "bump2version (<1)", "sphinx (<2)", "tox"]
 
 [[package]]
+name = "deprecation"
+version = "2.1.0"
+description = "A library to handle automated deprecations"
+optional = false
+python-versions = "*"
+files = [
+    {file = "deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a"},
+    {file = "deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff"},
+]
+
+[package.dependencies]
+packaging = "*"
+
+[[package]]
 name = "dill"
 version = "0.3.7"
 description = "serialize all of Python"
@@ -1488,6 +1502,21 @@ protobuf = ">=3.20.2,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4
 grpc = ["grpcio (>=1.44.0,<2.0.0.dev0)"]
 
 [[package]]
+name = "gotrue"
+version = "2.10.0"
+description = "Python Client Library for Supabase Auth"
+optional = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "gotrue-2.10.0-py3-none-any.whl", hash = "sha256:768e58207488e5184ffbdc4351b7280d913daf97962f4e9f2cca05c80004b042"},
+    {file = "gotrue-2.10.0.tar.gz", hash = "sha256:4edf4c251da3535f2b044e23deba221e848ca1210c17d0c7a9b19f79a1e3f3c0"},
+]
+
+[package.dependencies]
+httpx = {version = ">=0.26,<0.28", extras = ["http2"]}
+pydantic = ">=1.10,<3"
+
+[[package]]
 name = "gql"
 version = "3.5.0"
 description = "GraphQL client for Python"
@@ -1726,6 +1755,32 @@ files = [
 ]
 
 [[package]]
+name = "h2"
+version = "4.1.0"
+description = "HTTP/2 State-Machine based protocol implementation"
+optional = false
+python-versions = ">=3.6.1"
+files = [
+    {file = "h2-4.1.0-py3-none-any.whl", hash = "sha256:03a46bcf682256c95b5fd9e9a99c1323584c3eec6440d379b9903d709476bc6d"},
+    {file = "h2-4.1.0.tar.gz", hash = "sha256:a83aca08fbe7aacb79fec788c9c0bac936343560ed9ec18b82a13a12c28d2abb"},
+]
+
+[package.dependencies]
+hpack = ">=4.0,<5"
+hyperframe = ">=6.0,<7"
+
+[[package]]
+name = "hpack"
+version = "4.0.0"
+description = "Pure-Python HPACK header compression"
+optional = false
+python-versions = ">=3.6.1"
+files = [
+    {file = "hpack-4.0.0-py3-none-any.whl", hash = "sha256:84a076fad3dc9a9f8063ccb8041ef100867b1878b25ef0ee63847a5d53818a6c"},
+    {file = "hpack-4.0.0.tar.gz", hash = "sha256:fc41de0c63e687ebffde81187a948221294896f6bdc0ae2312708df339430095"},
+]
+
+[[package]]
 name = "httpcore"
 version = "1.0.6"
 description = "A minimal low-level HTTP client."
@@ -1815,6 +1870,7 @@ files = [
 [package.dependencies]
 anyio = "*"
 certifi = "*"
+h2 = {version = ">=3,<5", optional = true, markers = "extra == \"http2\""}
 httpcore = "==1.*"
 idna = "*"
 sniffio = "*"
@@ -1884,6 +1940,17 @@ files = [
 
 [package.dependencies]
 pyreadline3 = {version = "*", markers = "sys_platform == \"win32\" and python_version >= \"3.8\""}
+
+[[package]]
+name = "hyperframe"
+version = "6.0.1"
+description = "HTTP/2 framing layer for Python"
+optional = false
+python-versions = ">=3.6.1"
+files = [
+    {file = "hyperframe-6.0.1-py3-none-any.whl", hash = "sha256:0ec6bafd80d8ad2195c4f03aacba3a8265e57bc4cff261e802bf39970ed02a15"},
+    {file = "hyperframe-6.0.1.tar.gz", hash = "sha256:ae510046231dc8e9ecb1a6586f63d2347bf4c8905914aa84ba585ae85f28a914"},
+]
 
 [[package]]
 name = "identify"
@@ -3316,6 +3383,22 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "postgrest"
+version = "0.18.0"
+description = "PostgREST client for Python. This library provides an ORM interface to PostgREST."
+optional = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "postgrest-0.18.0-py3-none-any.whl", hash = "sha256:200baad0d23fee986b3a0ffd3e07bfe0cdd40e09760f11e8e13a6c0c2376d5fa"},
+    {file = "postgrest-0.18.0.tar.gz", hash = "sha256:29c1a94801a17eb9ad590189993fe5a7a6d8c1bfc11a3c9d0ce7ba146454ebb3"},
+]
+
+[package.dependencies]
+deprecation = ">=2.1.0,<3.0.0"
+httpx = {version = ">=0.26,<0.28", extras = ["http2"]}
+pydantic = ">=1.9,<3.0"
+
+[[package]]
 name = "posthog"
 version = "3.7.0"
 description = "Integrate PostHog into any python application."
@@ -4087,6 +4170,23 @@ all = ["datacompy", "llama-index", "nltk", "pandas", "rapidfuzz", "rouge-score",
 docs = ["mkdocs (>=1.6.1)", "mkdocs-autorefs", "mkdocs-gen-files", "mkdocs-git-committers-plugin-2", "mkdocs-git-revision-date-localized-plugin", "mkdocs-glightbox", "mkdocs-literate-nav", "mkdocs-material", "mkdocs-material[imaging]", "mkdocs-section-index", "mkdocstrings[python]"]
 
 [[package]]
+name = "realtime"
+version = "2.0.6"
+description = ""
+optional = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "realtime-2.0.6-py3-none-any.whl", hash = "sha256:9aab6009c11883197386a0a9dc8c2b6939e62dddda734cfb77594727ac9ae0ce"},
+    {file = "realtime-2.0.6.tar.gz", hash = "sha256:ced37686a77a546571029ecc74cfb31fff1404a5159d1198fa882af545843a6f"},
+]
+
+[package.dependencies]
+aiohttp = ">=3.10.10,<4.0.0"
+python-dateutil = ">=2.8.1,<3.0.0"
+typing-extensions = ">=4.12.2,<5.0.0"
+websockets = ">=11,<14"
+
+[[package]]
 name = "regex"
 version = "2024.11.6"
 description = "Alternative regular expression module, to replace re."
@@ -4706,6 +4806,54 @@ anyio = ">=3.4.0,<5"
 
 [package.extras]
 full = ["httpx (>=0.22.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.7)", "pyyaml"]
+
+[[package]]
+name = "storage3"
+version = "0.9.0"
+description = "Supabase Storage client for Python."
+optional = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "storage3-0.9.0-py3-none-any.whl", hash = "sha256:8b2fb91f0c61583a2f4eac74a8bae67e00d41ff38095c8a6cd3f2ce5e0ab76e7"},
+    {file = "storage3-0.9.0.tar.gz", hash = "sha256:e16697f60894c94e1d9df0d2e4af783c1b3f7dd08c9013d61978825c624188c4"},
+]
+
+[package.dependencies]
+httpx = {version = ">=0.26,<0.28", extras = ["http2"]}
+python-dateutil = ">=2.8.2,<3.0.0"
+
+[[package]]
+name = "supabase"
+version = "2.10.0"
+description = "Supabase client for Python."
+optional = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "supabase-2.10.0-py3-none-any.whl", hash = "sha256:183fb23c04528593f8f81c24ceb8178f3a56bff40fec7ed873b6c55ebc2e420a"},
+    {file = "supabase-2.10.0.tar.gz", hash = "sha256:9ac095f8947bf60780e67c0edcbab53e2db3f6f3f022329397b093500bf2607c"},
+]
+
+[package.dependencies]
+gotrue = ">=2.10.0,<3.0.0"
+httpx = ">=0.26,<0.28"
+postgrest = ">=0.18,<0.19"
+realtime = ">=2.0.0,<3.0.0"
+storage3 = ">=0.9.0,<0.10.0"
+supafunc = ">=0.7.0,<0.8.0"
+
+[[package]]
+name = "supafunc"
+version = "0.7.0"
+description = "Library for Supabase Functions"
+optional = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "supafunc-0.7.0-py3-none-any.whl", hash = "sha256:4160260dc02bdd906be1e2ffd7cb3ae8b74ae437c892bb475352b6a99d9ff8eb"},
+    {file = "supafunc-0.7.0.tar.gz", hash = "sha256:5b1c415fba1395740b2b4eedd1d786384bd58b98f6333a11ba7889820a48b6a7"},
+]
+
+[package.dependencies]
+httpx = {version = ">=0.26,<0.28", extras = ["http2"]}
 
 [[package]]
 name = "sympy"
@@ -5866,4 +6014,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "7261610558247d880ceeded8ac08799a2082fd14b6323fe33416e15baf5c7121"
+content-hash = "c5cfaebc1fef7727b85e12a2bc18b8e9afd47a192bab8a31ff31ed3782f37eb9"

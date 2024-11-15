@@ -27,15 +27,20 @@ class SourceStatus(str, Enum):
     FAILED = "failed"  # if addition failed
 
 
-class Source(BaseModel):
+class DataSource(BaseModel):
     """Base model for all raw data sources loaded into the system."""
 
     source_id: UUID = Field(default_factory=uuid4)
     source_type: DataSourceType = Field(
         ..., description="Type of the data source corresponding to supported data source types"
     )
-    data: dict[str, Any] | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime | None = None
     status: SourceStatus = Field(..., description="Status of the content source in the system.")
-    job_id: str | None = Field(None, description="Job id in the system.")
+    metadata: dict[str, Any] = Field(
+        ..., description="Source-specific configuration and metadata. Schema depends on source_type"
+    )
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC), description="Timestamp of creation by the application."
+    )
+    updated_at: datetime | None = None
+    request_id: UUID = Field(..., description="Request id of the user request to add content")
+    job_id: UUID | None = Field(None, description="UUID of the job in the system.")

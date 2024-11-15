@@ -9,8 +9,6 @@ from src.core.system.job_manager import JobManager
 from src.infrastructure.service_container import ServiceContainer
 from src.services.content_service import ContentService
 
-print("Starting to import dependencies.")
-
 
 def get_container(request: Request) -> ServiceContainer:
     """Retrieve the ServiceContainer instance from app.state."""
@@ -18,9 +16,6 @@ def get_container(request: Request) -> ServiceContainer:
     if not isinstance(container, ServiceContainer):
         raise RuntimeError("ServiceContainer not initialized")
     return container
-
-
-print("Here we are.")
 
 
 def get_job_manager(container: Annotated[ServiceContainer, Depends(get_container)]) -> JobManager:
@@ -49,5 +44,3 @@ ContainerDep = Annotated[ServiceContainer, Depends(get_container)]
 ContentServiceDep = Annotated[ContentService, Depends(get_content_service)]
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager)]
 FireCrawlerDep = Annotated[FireCrawler, Depends(get_crawler)]
-
-print("All dependencies have been imported")

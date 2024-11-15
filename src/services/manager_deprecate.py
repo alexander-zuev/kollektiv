@@ -13,7 +13,9 @@ from src.core.system.job_manager import JobManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.common.file_manager import FileManager
 from src.infrastructure.config.logger import get_logger
-from src.infrastructure.config.settings import JOB_FILE_DIR, PROCESSED_DATA_DIR, RAW_DATA_DIR
+from src.infrastructure.external.supabase_client import supabase_client
+from src.infrastructure.storage.supabase.supabase_operations import DataRepository
+from src.services.data_service import DataService
 
 logger = get_logger()
 
@@ -51,7 +53,7 @@ class Kollektiv:
         files: list[str] | None = None,
     ):
         self.reset_db = reset_db
-        self.chunked_docs_dir = PROCESSED_DATA_DIR
+        self.chunked_docs_dir: str
         self.files = files if files is not None else []
         self.load_all = load_all_docs
         self.crawler = crawler
@@ -131,7 +133,10 @@ class Kollektiv:
         docs_to_load = [f for f in listdir(PROCESSED_DATA_DIR) if isfile(join(PROCESSED_DATA_DIR, f))]
 
         # Initialize components
-        job_manager = JobManager(storage_dir=JOB_FILE_DIR)
+        db_client = supabase_client
+        data_repo = DataRepository(db_client=self.db_client)
+        data_service = DataService(datasource_repo=self.data_repo)
+        job_manager = JobManager(data_service=data_service)
         file_manager = FileManager(raw_data_dir=RAW_DATA_DIR)
         crawler = FireCrawler(job_manager=job_manager, file_manager=file_manager)
         chunker = MarkdownChunker()

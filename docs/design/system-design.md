@@ -78,7 +78,6 @@ This section describes the key domains, their components, and how they interact 
         * Handling system events and notifications.
         * Managing application configuration and settings.
 
-
 ### 3.2 Domain Interactions
 
 The domains interact to provide the core functionality of Kollektiv:
@@ -93,10 +92,31 @@ The domains interact to provide the core functionality of Kollektiv:
 
 Consider adding a diagram here to visually represent the domain interactions and data flow.  A simple diagram can significantly improve understanding.  For example, you could use a sequence diagram or a context diagram.
 
+## 4. Main Use Cases
 
-## 4. Development View: Package Structure and Implementation
+### 4.1 Research and Information Gathering
+- **Description:** Users can crawl specific websites, databases, and online resources to gather the latest information and insights.
+- **Benefits:** Provides access to up-to-date and relevant information, supporting research, decision-making, and staying informed on industry trends.
 
-### 4.1 Architectural Pattern: Layered Architecture and Design Patterns
+### 4.2 Custom Knowledge Base Creation
+- **Description:** Users can build a customized knowledge base by selecting specific documents, websites, and data sources relevant to their domain or interests.
+- **Benefits:** Offers a tailored experience that aligns with user needs, enhancing the chatbot's ability to provide accurate and contextually relevant responses.
+
+### 4.3 Domain-Specific Expertise
+- **Description:** Users can enhance the chatbot's expertise in a particular field by crawling authoritative sources and documents.
+- **Benefits:** Improves the chatbot's ability to provide detailed and accurate responses in specialized domains, such as healthcare, finance, or technology.
+
+### 4.4 Dynamic Content Updates
+- **Description:** The app can continuously crawl and update content, ensuring the chatbot's knowledge base reflects the latest information and developments.
+- **Benefits:** Keeps the chatbot's responses current and relevant, providing users with the most up-to-date information available.
+
+### 4.5 Integration with Business Workflows
+- **Description:** The app can be integrated into existing business workflows, providing seamless access to information and insights.
+- **Benefits:** Enhances productivity and decision-making by delivering relevant information directly within the context of business processes.
+
+## 5. Development View: Package Structure and Implementation
+
+### 5.1 Architectural Pattern: Layered Architecture and Design Patterns
 
 Kollektiv follows a layered architecture to promote separation of concerns and maintainability. This architecture is further enhanced by incorporating specific design patterns within each layer:
 
@@ -117,7 +137,7 @@ Kollektiv follows a layered architecture to promote separation of concerns and m
 
 This combination of layered architecture and design patterns ensures a clear separation of concerns, promotes code reusability, and enhances maintainability.
 
-### 4.2 Layer Definitions and Implementation Guide
+### 5.2 Layer Definitions and Implementation Guide
 
 The layers are further broken down into specific packages:
 
@@ -159,7 +179,7 @@ The layers are further broken down into specific packages:
     * `config`: Configuration management.
     * `common`: Shared utilities and helpers.
 
-### 4.3 API Design and Management
+### 5.3 API Design and Management
 
 API endpoints are versioned and organized by domain within the `api/v0` directory. Each domain has its own subdirectory containing routes and schemas. This modular approach promotes maintainability and scalability.
 
@@ -190,12 +210,58 @@ API endpoints are versioned and organized by domain within the `api/v0` director
 
 * **Webhook Integration:**  Firecrawl webhooks are handled by the `/system/webhooks/firecrawl` endpoint.  This endpoint updates the job status and triggers subsequent processing steps.
 
+### 5.4 Database Setup
 
-## 5. Process View: Data Flow and Key Considerations
+1. **Overall Database Setup**
+   - The database setup for Kollektiv should align with the layered architecture and support the application's core functionalities, such as content management, knowledge retrieval, and chat interactions. The database acts as a storage layer, with all business logic and data manipulation handled at the application level.
+
+2. **Projects and Environment Management**
+   - **Projects:**
+     - **Development Project:** For testing and development purposes. This environment allows for experimentation and testing of new features without affecting production data.
+     - **Staging Project:** A pre-production environment that mirrors the production setup. It is used for final testing and validation before deployment.
+     - **Production Project:** The live environment where the application serves end-users. It should be highly secure and optimized for performance.
+   - **Environment Configuration:**
+     - Use environment variables to manage database URLs, API keys, and other sensitive information for each environment.
+     - Implement a configuration management tool to handle environment-specific settings.
+
+3. **Schema Design**
+   - **Recommended Schemas:**
+     - **`public`:** The default schema for general application data. This schema can include tables that are not domain-specific or are shared across multiple domains.
+     - **`content`:** Contains tables related to content management, such as sources and crawl results.
+     - **`jobs`:** Manages job-related data, including job statuses and logs.
+     - **`auth`:** Handles user authentication and authorization data, leveraging Supabase's built-in auth features.
+
+4. **Table Structure within Schemas**
+   - **`public` Schema:**
+     - **General Settings Table:** Stores application-wide settings and configurations.
+   - **`content` Schema:**
+     - **Sources Table:** Manages content sources, including metadata and configuration details.
+     - **Crawl Results Table:** Stores results from web crawling operations, including raw content and metadata.
+   - **`jobs` Schema:**
+     - **Jobs Table:** Tracks job statuses, start and completion times, and any associated errors.
+     - **Job Logs Table:** (Optional) Stores detailed logs for each job, useful for debugging and auditing.
+   - **`auth` Schema:**
+     - **Users Table:** Manages user accounts and profiles.
+     - **Roles Table:** Defines roles and permissions for access control.
+
+5. **Key Design Considerations**
+   - **Application-Driven Design:** All IDs should be generated by the application (UUID v4), and timestamps should be managed by application logic.
+   - **Data Integrity:** Use foreign keys and NOT NULL constraints to maintain data integrity. Avoid database-level defaults or transformations to keep the logic within the application.
+   - **Performance Optimization:** Implement strategic indexes on frequently queried fields to enhance performance. Use JSONB fields for flexible data storage when the structure is not fixed.
+   - **Security:** Ensure data encryption at rest and in transit. Use Supabase's Row Level Security (RLS) to enforce access policies at the database level.
+
+6. **Operational Best Practices**
+   - **Backup and Recovery:** Regularly back up your database and test your recovery process to ensure data can be restored in case of failure.
+   - **Monitoring and Logging:** Set up comprehensive logging and monitoring to track database performance and detect anomalies. Use Supabase's built-in analytics and logs for insights.
+   - **Scalability:** Plan for scalability by defining clear scaling triggers and performance budgets. Consider separating the vector store when document count exceeds 100K or when concurrent users exceed 1000.
+
+By following these guidelines, you can create a robust and scalable database setup that supports Kollektiv's growth and ensures data integrity and security across different environments. This setup aligns with your application's architecture and design principles, providing a solid foundation for future enhancements.
+
+## 6. Process View: Data Flow and Key Considerations
 
 This section outlines the key processes and runtime components within Kollektiv, highlighting important considerations for data flow, asynchronous operations, and error handling. Detailed process flows for specific features will be documented separately.
 
-### 5.1 Runtime Components
+### 6.1 Runtime Components
 
 Kollektiv consists of the following key runtime components:
 
@@ -209,11 +275,11 @@ Kollektiv consists of the following key runtime components:
 
 * **Firecrawl, Anthropic, Cohere (External Services):**  Respectively handle web crawling, LLM response generation, and NLP services.  Interacted with via their APIs.
 
-### 5.2 Asynchronous Processing with Redis Queues
+### 6.2 Asynchronous Processing with Redis Queues
 
 Kollektiv leverages asynchronous processing for long-running tasks such as web crawling and embedding generation. This ensures that the application remains responsive to user requests while these tasks are being executed in the background. Redis queues are used to manage these asynchronous operations.  A worker process consumes tasks from the queue and executes them.
 
-### 5.3 Key Process Considerations
+### 6.3 Key Process Considerations
 
 * **Content Acquisition:**  The process begins with a user providing a URL. The crawler fetches the content, which is then chunked and embedded.  These steps are executed asynchronously.
 * **Knowledge Storage:**  Chunks and their corresponding embeddings are stored in the vector database (ChromaDB) for efficient retrieval. Metadata and versioning information are stored in a persistent data store (Supabase).
@@ -221,7 +287,7 @@ Kollektiv leverages asynchronous processing for long-running tasks such as web c
 * **Response Generation:**  The chatbot generates responses based on the ranked results and the conversation context.  Responses are streamed back to the user in real-time.
 * **Webhook Handling:**  Webhooks from external services (e.g., Firecrawl) are processed asynchronously to update job statuses and trigger subsequent processing steps.
 
-### 5.4 Error Handling, Logging, Monitoring, and Alerting
+### 6.4 Error Handling, Logging, Monitoring, and Alerting
 
 Kollektiv employs a comprehensive approach to error handling, logging, monitoring, and alerting to ensure system reliability and maintainability.
 
@@ -233,8 +299,7 @@ Kollektiv employs a comprehensive approach to error handling, logging, monitorin
 
 * **Alerting:**  Automated alerts are triggered for critical errors and performance degradations.  Alerts are sent to administrators via appropriate channels (e.g., email, Slack) to enable timely intervention and resolution.
 
-
-## 6. Use Case View
+## 7. Use Case View
 
 This section describes a few key use cases to illustrate how users interact with Kollektiv:
 
@@ -244,18 +309,9 @@ This section describes a few key use cases to illustrate how users interact with
 
 * **Chatting with the AI Assistant:** A user interacts with the AI assistant in a chat interface.  The assistant uses the knowledge base to provide context-aware responses to the user's queries.
 
-## 7. Physical View
+## 8. Physical View
 
-### 7.1 Application Architecture
-
-Kollektiv is deployed on Railway.  The infrastructure consists of:
-
-* **FastAPI Application:**  Handles API requests, background tasks, and communication with other services.
-* **Redis:**  Used for job queues, caching, and real-time updates.
-* **ChromaDB:**  Stores vector embeddings and facilitates similarity search.  Currently embedded within the FastAPI application, but can be separated for scalability.
-* **Supabase:**  Provides authentication and persistent data storage.
-
-### 7.2 Infrastructure
+### 8.1 Application Architecture
 
 Kollektiv is deployed on Railway.  The infrastructure consists of:
 
@@ -264,13 +320,22 @@ Kollektiv is deployed on Railway.  The infrastructure consists of:
 * **ChromaDB:**  Stores vector embeddings and facilitates similarity search.  Currently embedded within the FastAPI application, but can be separated for scalability.
 * **Supabase:**  Provides authentication and persistent data storage.
 
-### 7.3 Deployment Process
+### 8.2 Infrastructure
+
+Kollektiv is deployed on Railway.  The infrastructure consists of:
+
+* **FastAPI Application:**  Handles API requests, background tasks, and communication with other services.
+* **Redis:**  Used for job queues, caching, and real-time updates.
+* **ChromaDB:**  Stores vector embeddings and facilitates similarity search.  Currently embedded within the FastAPI application, but can be separated for scalability.
+* **Supabase:**  Provides authentication and persistent data storage.
+
+### 8.3 Deployment Process
 
 ... (Add details about your deployment process, including CI/CD, environment configuration, etc.)
 
-## 8. Cross-Cutting Concerns
+## 9. Cross-Cutting Concerns
 
-### 8.1 Error Handling and Logging
+### 9.1 Error Handling and Logging
 
 ... (Expand on error handling strategies, logging levels, and monitoring tools.)
 
@@ -306,9 +371,9 @@ Implementation:
 - Regular security audits
 - Clear data retention policies
 
-## 9. Performance and Scalability
+## 10. Performance and Scalability
 
-### 9.1 Performance Strategy
+### 10.1 Performance Strategy
 
 **Response Time Targets**
 - Chat responses: <1s for initial tokens
@@ -329,13 +394,13 @@ Implementation:
    - Resource monitoring
    - Performance budgets
 
-### 9.2 Scalability
+### 10.2 Scalability
 
 **Vector Store Separation:**  >100K documents
 **Service Extraction:**  >1000 concurrent users
 **Load Balancing:**  >100 req/s
 
-## 10. Quality Assurance
+## 11. Quality Assurance
 
 **Testing Strategy**
 Decision: Focus on domain logic and RAG quality
@@ -353,7 +418,7 @@ Primary:
 - Response coherence
 Implementation: Ragas-based evaluation suite
 
-## 11. Future Enhancements
+## 12. Future Enhancements
 
 **Near-term Focus**
 - RAG quality improvements
@@ -370,9 +435,9 @@ Implementation: Ragas-based evaluation suite
 2. Processing: Sync → Async queue
 3. Search: Single → Distributed
 
-## 12. Implementation Details
+## 13. Implementation Details
 
-### 12.1 Modules and Responsibilities
+### 13.1 Modules and Responsibilities
 
 This section details the key modules and their responsibilities within Kollektiv's layered architecture.  The structure follows the domain-driven design principles and the chosen design patterns (see Section 4.1).
 
@@ -397,7 +462,7 @@ This section details the key modules and their responsibilities within Kollektiv
     * `common/logging.py`:  Logging setup and configuration.
 
 
-### 12.2 Asynchronous Task and Job Management
+### 13.2 Asynchronous Task and Job Management
 
 Asynchronous tasks (crawling, embedding, webhooks) are managed using Redis queues.  The `JobManager` (System Core) handles task creation, queuing, monitoring, and status tracking.  Results are stored for retrieval.  This asynchronous approach ensures application responsiveness during long-running operations.
 

@@ -17,6 +17,7 @@ from src.core._exceptions import (
     FireCrawlConnectionError,
     FireCrawlTimeoutError,
     is_retryable_error,
+    FireCrawlJobNotFound,
 )
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
@@ -66,7 +67,7 @@ class FireCrawler:
     def initialize_firecrawl(self) -> FirecrawlApp:
         """Initialize and return the Firecrawl app."""
         app = FirecrawlApp(api_key=self.api_key)
-        logger.info("FireCrawler app initialized successfully.")
+        logger.debug("Initialized firecrawler")
         return app
 
     def _build_params(self, request: CrawlRequest) -> CrawlParams:
@@ -133,6 +134,8 @@ class FireCrawler:
         """Get final results for a completed job."""
         # Get firecrawl id
         firecrawl_id = crawl_job.firecrawl_id
+        if not firecrawl_id:
+            raise FireCrawlJobNotFound
 
         # Get the crawl data by firecrawl id
         crawl_data = await self._accumulate_crawl_results(firecrawl_id)

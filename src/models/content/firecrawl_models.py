@@ -1,13 +1,13 @@
 from datetime import UTC, datetime
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.infrastructure.config.settings import settings
-from src.models.common.jobs import CrawlJobStatus
+from src.models.common.jobs import JobStatus
 
 
-# Scrape Options
 class ScrapeOptions(BaseModel):
     """
     Configuration model for web scraping options in the Firecrawl API.
@@ -54,7 +54,6 @@ class ScrapeOptions(BaseModel):
         }
 
 
-# Crawl Params
 class CrawlParams(BaseModel):
     """
     Parameter model for configuring web crawling behavior in the Firecrawl API.
@@ -139,7 +138,6 @@ class CrawlParams(BaseModel):
         }
 
 
-# Crawl Request
 class CrawlRequest(BaseModel):
     """CrawlRequest model for initiating a web crawl.
 
@@ -259,7 +257,6 @@ class CrawlRequest(BaseModel):
         arbitrary_types_allowed = True
 
 
-# Crawl Data
 class CrawlData(BaseModel):
     r"""
     Model for storing and validating crawled page data.
@@ -357,7 +354,9 @@ class CrawlResult(BaseModel):
         ```
     """
 
-    job_status: CrawlJobStatus = Field(..., description="Enum status of the crawl job")
+    result_id: UUID = Field(default_factory=lambda: uuid4(), description="System generated UUID of the crawl result.")
+    # TODO: deprecate Job Status
+    job_status: JobStatus = Field(..., description="Enum status of the crawl job")
     input_url: str = Field(..., description="The original URL that was crawled")
     total_pages: int = Field(..., ge=0, description="Total number of pages successfully crawled")
     unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")
