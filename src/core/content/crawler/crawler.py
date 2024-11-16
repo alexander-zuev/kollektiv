@@ -16,13 +16,13 @@ from src.core._exceptions import (
     FireCrawlAPIError,
     FireCrawlConnectionError,
     FireCrawlTimeoutError,
+    JobNotFoundError,
     is_retryable_error,
-    FireCrawlJobNotFound,
 )
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.config.settings import settings
-from src.models.common.jobs import CrawlJob
+from src.models.common.job_models import Job
 from src.models.content.firecrawl_models import (
     CrawlData,
     CrawlParams,
@@ -130,12 +130,12 @@ class FireCrawler:
             raise FireCrawlConnectionError(f"Connection error: {err}") from err
 
     @base_error_handler
-    async def get_results(self, crawl_job: CrawlJob) -> CrawlResult:
+    async def get_results(self, crawl_job: Job) -> CrawlResult:
         """Get final results for a completed job."""
         # Get firecrawl id
-        firecrawl_id = crawl_job.firecrawl_id
+        firecrawl_id = crawl_job.details.get("firecrawl_id")
         if not firecrawl_id:
-            raise FireCrawlJobNotFound
+            raise JobNotFoundError(f"Job {crawl_job.job_id} not found")
 
         # Get the crawl data by firecrawl id
         crawl_data = await self._accumulate_crawl_results(firecrawl_id)
@@ -150,7 +150,6 @@ class FireCrawler:
 
         # Create result with proper structure
         result = CrawlResult(
-            job_status=crawl_job.status,
             input_url=crawl_job.start_url,
             total_pages=len(crawl_data.data),
             unique_links=list(unique_links),

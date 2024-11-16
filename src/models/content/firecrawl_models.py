@@ -1,11 +1,10 @@
 from datetime import UTC, datetime
 from typing import Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.infrastructure.config.settings import settings
-from src.models.common.jobs import JobStatus
 
 
 class ScrapeOptions(BaseModel):
@@ -345,7 +344,7 @@ class CrawlResult(BaseModel):
     Example:
         ```python
         result = CrawlResult(
-            job_status=CrawlJobStatus.COMPLETED,
+            job_status=JobStatus.COMPLETED,
             input_url="https://example.com",
             total_pages=42,
             data=crawl_data,
@@ -355,8 +354,6 @@ class CrawlResult(BaseModel):
     """
 
     result_id: UUID = Field(default_factory=lambda: uuid4(), description="System generated UUID of the crawl result.")
-    # TODO: deprecate Job Status
-    job_status: JobStatus = Field(..., description="Enum status of the crawl job")
     input_url: str = Field(..., description="The original URL that was crawled")
     total_pages: int = Field(..., ge=0, description="Total number of pages successfully crawled")
     unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")

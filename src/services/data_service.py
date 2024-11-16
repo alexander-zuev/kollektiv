@@ -5,7 +5,7 @@ from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
 from src.infrastructure.common.decorators import generic_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.storage.supabase.supabase_operations import DataRepository
-from src.models.common.jobs import Job
+from src.models.common.job_models import Job
 from src.models.content.content_source_models import DataSource
 from src.models.content.firecrawl_models import CrawlResult
 
@@ -68,24 +68,19 @@ class DataService:
         await self.datasource_repo.save_user_request(request=request)
 
     @generic_error_handler
-    async def save_job(self, job: Job) -> None:
-        """Persists job object in the database."""
-        logger.debug(f"Saving job {job.job_id}")
-        await self.datasource_repo.save_job(job=job)
+    async def save_job(self, job: Job) -> Job:
+        """Insert a new job."""
+        return await self.datasource_repo.save_job(job=job)
 
     @generic_error_handler
-    async def retrieve_job(self, job_id: UUID) -> Job:
-        """Retrieves job from the database."""
-        logger.debug(f"Retrieving job {job_id}")
-        result = await self.datasource_repo.retrieve_job(job_id=job_id)
-        return Job.model_validate(result)
+    async def get_job(self, job_id: UUID) -> Job | None:
+        """Get job by ID."""
+        return await self.datasource_repo.get_job(job_id)
 
     @generic_error_handler
-    async def get_job_by_firecrawl_id(self, firecrawl_id: str) -> Job:
-        """Retrieves job by FireCrawl ID."""
-        logger.debug(f"Retrieving job with FireCrawl ID {firecrawl_id}")
-        result = await self.datasource_repo.get_job_by_firecrawl_id(firecrawl_id=firecrawl_id)
-        return Job.model_validate(result)
+    async def get_by_firecrawl_id(self, firecrawl_id: str) -> Job | None:
+        """Get job by FireCrawl ID."""
+        return await self.datasource_repo.get_by_firecrawl_id(firecrawl_id)
 
     @generic_error_handler
     async def list_jobs(self, source_id: UUID | None = None) -> list[Job]:

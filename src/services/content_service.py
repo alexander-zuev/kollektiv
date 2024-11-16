@@ -9,13 +9,13 @@ from src.api.v0.schemas.sources_schemas import (
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent
 from src.core._exceptions import DataSourceError, JobNotFoundError
 from src.core.content.crawler.crawler import FireCrawler
-from src.core.system.job_manager import JobManager
 from src.infrastructure.common.decorators import base_error_handler, generic_error_handler
 from src.infrastructure.config.logger import get_logger
-from src.models.common.jobs import CrawlJob, JobStatus
+from src.models.common.job_models import Job, JobStatus, JobType
 from src.models.content.content_source_models import DataSource, SourceStatus
 from src.models.content.firecrawl_models import CrawlRequest, CrawlResult
 from src.services.data_service import DataService
+from src.services.job_manager import JobManager
 
 logger = get_logger()
 
@@ -46,7 +46,6 @@ class ContentService:
             logger.info(f"Starting to add source for request {request.request_id}")
 
             # 1. Save user request
-
             await self._save_user_request(request=request)
             logger.debug("STEP 1 USER REQUEST SAVED")
 
@@ -60,8 +59,8 @@ class ContentService:
 
             # 4. Create Job
             job = await self.job_manager.create_job(
+                job_type=JobType.CRAWL,
                 source_id=data_source.source_id,
-                start_url=crawl_request.url,
             )
             logger.debug("STEP 4 Job saved")
 
@@ -190,7 +189,7 @@ class ContentService:
             raise
 
     @base_error_handler
-    async def _handle_started(self, job: CrawlJob) -> None:
+    async def _handle_started(self, job: Job) -> None:
         """Handle crawl.started event"""
         # Update job
         job.status = JobStatus.IN_PROGRESS
@@ -200,7 +199,7 @@ class ContentService:
         await self.update_source(source_id=job.source_id, updates={"status": SourceStatus.CRAWLING})
 
     @base_error_handler
-    async def _handle_page_crawled(self, job: CrawlJob, event: FireCrawlWebhookEvent) -> None:
+    async def _handle_page_crawled(self, job: Job, event: FireCrawlWebhookEvent) -> None:
         """Handle crawl.page event - increment page count"""
         # Update job count
         job.pages_crawled += 1
@@ -208,7 +207,7 @@ class ContentService:
         await self.job_manager.update_job(job)
 
     @base_error_handler
-    async def _handle_completed(self, job: CrawlJob) -> None:
+    async def _handle_completed(self, job: Job) -> None:
         """Handle crawl.completed event"""
         try:
             # Update job data
@@ -231,7 +230,7 @@ class ContentService:
             raise
 
     @base_error_handler
-    async def _handle_failure(self, job: CrawlJob, error: str) -> None:
+    async def _handle_failure(self, job: Job, error: str) -> None:
         """Handle crawl.failed event"""
         # Update job
         job.status = JobStatus.FAILED
@@ -243,7 +242,7 @@ class ContentService:
         await self.update_source(source_id=job.source_id, updates={"status": SourceStatus.FAILED})
 
     @base_error_handler
-    async def _get_crawl_results(self, job: CrawlJob) -> CrawlResult:
+    async def _get_crawl_results(self, job: Job) -> CrawlResult:
         """Get crawl results and validate them."""
         crawl_result = await self.crawler.get_results(crawl_job=job)
         return CrawlResult.model_validate(crawl_result)

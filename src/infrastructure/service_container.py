@@ -1,11 +1,10 @@
 from src.core.content.crawler.crawler import FireCrawler
-from src.core.system.job_manager import JobManager
 from src.infrastructure.config.logger import get_logger
-from src.infrastructure.config.settings import settings
 from src.infrastructure.external.supabase_client import SupabaseClient, supabase_client
 from src.infrastructure.storage.supabase.supabase_operations import DataRepository
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
+from src.services.job_manager import JobManager
 
 logger = get_logger()
 
