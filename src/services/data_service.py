@@ -2,10 +2,10 @@ from typing import Any
 from uuid import UUID
 
 from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
-from src.infrastructure.common.decorators import base_error_handler
+from src.infrastructure.common.decorators import generic_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.storage.supabase.supabase_operations import DataRepository
-from src.models.common.jobs import CrawlJob
+from src.models.common.jobs import Job
 from src.models.content.content_source_models import DataSource
 from src.models.content.firecrawl_models import CrawlResult
 
@@ -31,12 +31,12 @@ class DataService:
         self.datasource_repo = datasource_repo
         logger.debug("Initialized data service")
 
-    @base_error_handler
+    @generic_error_handler
     async def save_datasource(self, data_source: DataSource) -> None:
         """Persists data source entry. Uses datasource repo."""
         await self.datasource_repo.save_datasource(data_source=data_source)
 
-    @base_error_handler
+    @generic_error_handler
     async def update_datasource(self, source_id: UUID, updates: dict[str, Any]) -> DataSource:
         """Updates a given datasource with provided field updates."""
         # Get current source first
@@ -50,7 +50,7 @@ class DataService:
 
         return DataSource.model_validate(updated_source)
 
-    @base_error_handler
+    @generic_error_handler
     async def retrieve_datasource(self, source_id: UUID) -> DataSource:
         """Retrieves a data source object."""
         result = await self.datasource_repo.retrieve_datasource(source_id)
@@ -67,38 +67,32 @@ class DataService:
         """Saves user request to add content."""
         await self.datasource_repo.save_user_request(request=request)
 
-    @base_error_handler
-    async def save_job(self, job: CrawlJob) -> None:
+    @generic_error_handler
+    async def save_job(self, job: Job) -> None:
         """Persists job object in the database."""
         logger.debug(f"Saving job {job.job_id}")
         await self.datasource_repo.save_job(job=job)
 
-    @base_error_handler
-    async def update_job(self, job: CrawlJob) -> None:
-        """Updates existing job in the database."""
-        logger.debug(f"Updating job {job.job_id}")
-        await self.datasource_repo.update_job(job=job)
-
-    @base_error_handler
-    async def retrieve_job(self, job_id: UUID) -> CrawlJob:
+    @generic_error_handler
+    async def retrieve_job(self, job_id: UUID) -> Job:
         """Retrieves job from the database."""
         logger.debug(f"Retrieving job {job_id}")
         result = await self.datasource_repo.retrieve_job(job_id=job_id)
-        return CrawlJob.model_validate(result)
+        return Job.model_validate(result)
 
-    @base_error_handler
-    async def get_job_by_firecrawl_id(self, firecrawl_id: str) -> CrawlJob:
+    @generic_error_handler
+    async def get_job_by_firecrawl_id(self, firecrawl_id: str) -> Job:
         """Retrieves job by FireCrawl ID."""
         logger.debug(f"Retrieving job with FireCrawl ID {firecrawl_id}")
         result = await self.datasource_repo.get_job_by_firecrawl_id(firecrawl_id=firecrawl_id)
-        return CrawlJob.model_validate(result)
+        return Job.model_validate(result)
 
-    @base_error_handler
-    async def list_jobs(self, source_id: UUID | None = None) -> list[CrawlJob]:
+    @generic_error_handler
+    async def list_jobs(self, source_id: UUID | None = None) -> list[Job]:
         """Lists all jobs, optionally filtered by source_id."""
         logger.debug(f"Listing jobs{' for source ' + str(source_id) if source_id else ''}")
         results = await self.datasource_repo.list_jobs(source_id=source_id)
-        return [CrawlJob.model_validate(result) for result in results]
+        return [Job.model_validate(result) for result in results]
 
     async def save_crawl_result(self, crawl_result: CrawlResult) -> None:
         """Persists crawl results in the database."""

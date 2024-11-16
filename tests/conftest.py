@@ -11,9 +11,9 @@ from src.core.chat.claude_assistant import ClaudeAssistant, ConversationMessage
 from src.core.content.crawler.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
 from src.core.system.job_manager import JobManager
-from src.infrastructure.config.settings import settings
 from src.infrastructure.service_container import ServiceContainer
 from src.services.content_service import ContentService
+from src.services.data_service import DataService
 
 
 class MockEmbeddingFunction(EmbeddingFunction):
@@ -151,8 +151,11 @@ def integration_app():
     mock_firecrawler.api_key = "test-key"  # Set the api_key attribute
     mock_firecrawler.firecrawl_app = mock_firecrawler.initialize_firecrawl()
 
+    # Mock DataService
+    mock_data_service = MagicMock(spec=DataService)
+
     # Mock specific services while keeping container structure
-    container.job_manager = JobManager(storage_dir=settings.job_file_dir)
+    container.job_manager = JobManager(data_service=mock_data_service)
     container.firecrawler = mock_firecrawler
     container.content_service = ContentService(job_manager=container.job_manager, crawler=container.firecrawler)
 

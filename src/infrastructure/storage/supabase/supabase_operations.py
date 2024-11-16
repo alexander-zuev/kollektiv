@@ -5,7 +5,7 @@ from src.core._exceptions import JobNotFoundError, NotImplementedError
 from src.infrastructure.common.decorators import supabase_operation
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.external.supabase_client import SupabaseClient
-from src.models.common.jobs import CrawlJob
+from src.models.common.jobs import Job
 from src.models.content.content_source_models import DataSource
 from src.models.content.firecrawl_models import CrawlResult
 
@@ -80,7 +80,7 @@ class DataRepository:
         logger.debug(f"Returned the result: {result.data}")
 
     @supabase_operation
-    async def save_job(self, job: CrawlJob) -> None:
+    async def save_job(self, job: Job) -> None:
         """Creates a new job entry in the database."""
         data = job.model_dump(mode="json")
         logger.debug(f"Saving job data: {data}")
@@ -91,7 +91,7 @@ class DataRepository:
         logger.info(f"Job {job.job_id} saved successfully")
 
     @supabase_operation
-    async def update_job(self, job: CrawlJob) -> None:
+    async def update_job(self, job: Job) -> None:
         """Updates existing job in the database."""
         data = job.model_dump(mode="json")
         logger.debug(f"Updating job {job.job_id} with data: {data}")
@@ -102,7 +102,7 @@ class DataRepository:
         logger.info(f"Job {job.job_id} updated successfully")
 
     @supabase_operation
-    async def retrieve_job(self, job_id: UUID) -> CrawlJob:
+    async def retrieve_job(self, job_id: UUID) -> Job:
         """Retrieves a job from the database."""
         logger.debug(f"Retrieving job {job_id}")
 
@@ -112,10 +112,10 @@ class DataRepository:
         if not result.data:
             raise JobNotFoundError(f"Job {job_id} not found")
 
-        return CrawlJob.model_validate(result.data[0])
+        return Job.model_validate(result.data[0])
 
     @supabase_operation
-    async def get_job_by_firecrawl_id(self, firecrawl_id: str) -> CrawlJob:
+    async def get_job_by_firecrawl_id(self, firecrawl_id: str) -> Job:
         """Retrieves a job by its FireCrawl ID."""
         logger.debug(f"Retrieving job with FireCrawl ID {firecrawl_id}")
 
@@ -125,10 +125,10 @@ class DataRepository:
         if not result.data:
             raise JobNotFoundError(f"No job found for FireCrawl ID: {firecrawl_id}")
 
-        return CrawlJob.model_validate(result.data[0])
+        return Job.model_validate(result.data[0])
 
     @supabase_operation
-    async def list_jobs(self, source_id: UUID | None = None) -> list[CrawlJob]:
+    async def list_jobs(self, source_id: UUID | None = None) -> list[Job]:
         """Lists all jobs, optionally filtered by source_id."""
         client = await self.db_client.get_client()
         query = client.schema("infra").table("jobs").select("*")
@@ -137,7 +137,7 @@ class DataRepository:
             query = query.eq("source_id", str(source_id))
 
         result = await query.execute()
-        return [CrawlJob.model_validate(job_data) for job_data in result.data]
+        return [Job.model_validate(job_data) for job_data in result.data]
 
     # Content Operations
     async def save_crawl_result(self, crawl_result: CrawlResult) -> None:
