@@ -1,10 +1,12 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
+from typing import ClassVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from src.models.content.content_source_models import DataSourceType, DataSource, SourceStatus
+from src.models.base_models import BaseDbModel
+from src.models.content.content_source_models import DataSource, DataSourceType, SourceStatus
 
 
 class ContentSourceType(str, Enum):
@@ -64,33 +66,54 @@ class ContentSourceConfig(BaseModel):
         return v
 
 
-class AddContentSourceRequest(BaseModel):
-    """Request to add a new content source."""
+class AddContentSourceRequest(BaseDbModel):
+    """
+    Request model for adding a new content source.
 
-    request_id: UUID = Field(default_factory=lambda: uuid4(), description="System-generated id of a user request.")
+    Attributes:
+        request_id: System-generated UUID for tracking the request. Auto-generated if not provided.
+        source_type: Type of content source (currently only 'web' is supported).
+        request_config: Configuration parameters for the content source.
+        completed_at: Optional timestamp when request was completed.
+
+    Example:
+        ```json
+        {
+            "request_config": {
+                "url": "https://docs.example.com",
+                "page_limit": 50,
+                "exclude_patterns": ["/blog/*"],
+                "include_patterns": ["/api/*"]
+            },
+            "source_type": "web"  # Optional, defaults to "web"
+        }
+        ```
+    """
+
+    _db_config: ClassVar[dict] = {"schema": "content", "table": "user_requests", "primary_key": "request_id"}
+    request_id: UUID = Field(default_factory=uuid4, description="System-generated id of a user request.")
     source_type: ContentSourceType = Field(
-        ..., description="Type of content source (currently only 'web' is supported)."
+        default=ContentSourceType.WEB,  # Make web the default
+        description="Type of content source (currently only 'web' is supported).",
     )
-    request_config: ContentSourceConfig = Field(..., description="Holds main configuration parameters of the request")
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC), description="Timestamp of creation, set by the application"
+    request_config: ContentSourceConfig = Field(
+        ...,  # Required
+        description="Configuration parameters for the content source",
     )
-    completed_at: datetime | None = Field(
-        None, description="Timestamp of when the request is successfully completed. If request failed, left empty."
-    )
+    completed_at: datetime | None = Field(None, description="Timestamp of when the request is successfully completed.")
 
     class Config:
-        """Example config."""
+        """Example configuration."""
 
         json_schema_extra = {
             "example": {
-                "request_ud": "uuid4",
-                "source_type": "web",
-                "config": {
+                "request_config": {
                     "url": "https://docs.example.com",
-                    "max_pages": 50,
-                    "exclude_paths": ["/blog/*"],
+                    "page_limit": 50,
+                    "exclude_patterns": ["/blog/*"],
+                    "include_patterns": ["/api/*"],
                 },
+                "source_type": "web",
             }
         }
 

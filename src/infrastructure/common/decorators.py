@@ -1,8 +1,6 @@
 import asyncio
 import functools
 import sys
-import time
-from ast import TypeVar
 from collections.abc import Callable
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
@@ -19,8 +17,8 @@ from anthropic import (
     RateLimitError,
 )
 from anthropic import APIError as AnthropicAPIError  # Anthropic's APIError
-from postgrest import APIError as PostgrestAPIError  # Postgrest's APIError
 
+from src.core._exceptions import DatabaseError
 from src.infrastructure.config.logger import get_logger
 
 logger = get_logger()
@@ -163,77 +161,29 @@ def anthropic_error_handler(func: Callable) -> Callable[..., T]:
     return wrapper
 
 
-def performance_logger(func: Callable) -> Callable[..., T]:
+def supabase_operation(func: Callable[P, T]) -> Callable[P, T]:
     """
-    Decorate a function to log its execution time.
+    Decorator to handle Supabase database operation errors.
+
+    Catches exceptions during Supabase operations, logs the error,
+    and raises a custom DatabaseError.
 
     Args:
-        func (Callable): The function to be decorated.
+        func: The function to be decorated.
 
     Returns:
-        Callable: The wrapped function with logging of execution time.
+        The decorated function.
+
+    Raises:
+        DatabaseError: If any exception occurs during the Supabase operation.
     """
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        # Access the logger
-        logger = get_logger()
-
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        logger.debug(f"{func.__name__} took {end_time - start_time:.2f} seconds to execute")
-        return result
-
-    return wrapper
-
-
-def supabase_operation(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Decorator for handling Supabase database operations.
-
-    Provides detailed error handling and logging for:
-    - Database connection issues
-    - Query execution errors
-    - Data validation failures
-    - General operational errors
-    """
-
-    @wraps(func)
-    async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        operation_name = func.__name__
+    async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         try:
-            logger.debug(f"Starting database operation: {operation_name}")
-            result = await func(*args, **kwargs)
-            logger.debug(f"Successfully completed operation: {operation_name}")
-            return result
-
-        except PostgrestAPIError as e:
-            # Handle specific Supabase/Postgrest errors
-            error_context = {
-                "operation": operation_name,
-                "code": e.code,
-                "error_message": e.message,
-                "details": e.details,
-                "hint": e.hint,
-            }
-            logger.error(
-                f"Database operation failed: {operation_name}\n"
-                f"Error Code: {e.code}\n"
-                f"Message: {e.message}\n"
-                f"Details: {e.details}\n"
-                f"Hint: {e.hint}",
-                extra=error_context,
-            )
-            raise
-
+            return await func(*args, **kwargs)
         except Exception as e:
-            # Handle unexpected errors
-            logger.error(
-                f"Unexpected error in database operation: {operation_name}\n"
-                f"Error Type: {type(e).__name__}\n"
-                f"Error Message: {str(e)}",
-                exc_info=True,  # Include stack trace
-            )
-            raise
+            logger.error(f"Database operation failed in {func.__name__}: {e}", exc_info=True)
+            raise DatabaseError(message=str(e), operation=func.__name__, entity_type="Supabase", cause=e) from e
 
-    return wrapper
+    return async_wrapper

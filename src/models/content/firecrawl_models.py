@@ -1,10 +1,11 @@
-from datetime import UTC, datetime
-from typing import Any, Literal
+from datetime import datetime
+from typing import Any, ClassVar, Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.infrastructure.config.settings import settings
+from src.models.base_models import BaseDbModel
 
 
 class ScrapeOptions(BaseModel):
@@ -323,46 +324,29 @@ class CrawlData(BaseModel):
 
 
 # Crawl Result
-class CrawlResult(BaseModel):
+class CrawlResult(BaseDbModel):
     """
-    Model representing the complete result of a web crawl operation.
-
-    This model contains all information about a completed crawl job,
-    including status, statistics, and collected data.
+    Model representing the result of a web crawl operation.
 
     Attributes:
-        job_status (CrawlJobStatus): Current status of the crawl job
-        input_url (str): Original URL that was crawled
-        total_pages (int): Number of successfully crawled pages
-        unique_links (list[str]): All unique URLs discovered
-        data (CrawlData): Collected page content and metadata
-        completed_at (datetime | None): Completion timestamp (UTC)
-        error_message (str | None): Error details if job failed
-        filename (str | None): Name of saved results file
-        method (str): API method used ("crawl" by default)
-
-    Example:
-        ```python
-        result = CrawlResult(
-            job_status=JobStatus.COMPLETED,
-            input_url="https://example.com",
-            total_pages=42,
-            data=crawl_data,
-            completed_at=datetime.now(UTC),
-        )
-        ```
+        result_id: System-generated UUID of the crawl result.
+        input_url: The original URL that was crawled.
+        total_pages: Total number of pages successfully crawled (defaults to 0).
+        unique_links: List of unique URLs discovered during crawling (defaults to an empty list).
+        data: Crawled data (defaults to an empty CrawlData object).
+        completed_at: Timestamp of completion (optional).
+        error_message: Error message if the crawl failed (optional).
+        method: Firecrawl API method used (defaults to "crawl").
     """
 
+    _db_config: ClassVar[dict] = {"schema": "content", "table": "crawl_results", "primary_key": "result_id"}
     result_id: UUID = Field(default_factory=lambda: uuid4(), description="System generated UUID of the crawl result.")
     input_url: str = Field(..., description="The original URL that was crawled")
-    total_pages: int = Field(..., ge=0, description="Total number of pages successfully crawled")
+    total_pages: int = Field(default=0, ge=0, description="Total number of pages successfully crawled")
     unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")
-    data: CrawlData = Field(...)
-    completed_at: datetime | None = Field(
-        default_factory=lambda: datetime.now(UTC), description="When the crawl job completed"
-    )
+    data: CrawlData = Field(default_factory=CrawlData, description="Crawl data collected from FireCrawl")
+    completed_at: datetime | None = Field(None, description="When full crawl results are available")
     error_message: str | None = Field(None, description="Error message if the crawl failed")
-    filename: str | None = Field(None, description="Filename of the saved results")
     method: str = Field(default="crawl", description="Firecrawl API method used")
 
     class Config:

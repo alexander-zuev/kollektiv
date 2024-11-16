@@ -16,13 +16,11 @@ from src.core._exceptions import (
     FireCrawlAPIError,
     FireCrawlConnectionError,
     FireCrawlTimeoutError,
-    JobNotFoundError,
     is_retryable_error,
 )
-from src.infrastructure.common.decorators import base_error_handler
+from src.infrastructure.common.decorators import generic_error_handler
 from src.infrastructure.config.logger import get_logger
 from src.infrastructure.config.settings import settings
-from src.models.common.job_models import Job
 from src.models.content.firecrawl_models import (
     CrawlData,
     CrawlParams,
@@ -63,7 +61,7 @@ class FireCrawler:
         self.api_url = api_url
         self.firecrawl_app = self.initialize_firecrawl()
 
-    @base_error_handler
+    @generic_error_handler
     def initialize_firecrawl(self) -> FirecrawlApp:
         """Initialize and return the Firecrawl app."""
         app = FirecrawlApp(api_key=self.api_key)
@@ -115,7 +113,6 @@ class FireCrawler:
             api_params = params.dict()
 
             response = self.firecrawl_app.async_crawl_url(str(request.url), api_params)
-
             firecrawl_response = FireCrawlResponse.from_firecrawl_response(response)
             logger.info(f"Received response from FireCrawl: {firecrawl_response}")
             return firecrawl_response
@@ -129,48 +126,48 @@ class FireCrawler:
         except RequestException as err:
             raise FireCrawlConnectionError(f"Connection error: {err}") from err
 
-    @base_error_handler
-    async def get_results(self, crawl_job: Job) -> CrawlResult:
-        """Get final results for a completed job."""
-        # Get firecrawl id
-        firecrawl_id = crawl_job.details.get("firecrawl_id")
-        if not firecrawl_id:
-            raise JobNotFoundError(f"Job {crawl_job.job_id} not found")
+    @generic_error_handler
+    async def get_results(self, firecrawl_id: str, input_url: str) -> CrawlResult:
+        """Get final results for a completed job.
 
-        # Get the crawl data by firecrawl id
-        crawl_data = await self._accumulate_crawl_results(firecrawl_id)
+        Args:
+            firecrawl_id: The FireCrawl job ID
+            input_url: The original URL that was crawled
+
+        Returns:
+            CrawlResult: The complete crawl results
+        """
+        # Get the crawl data
+        crawl_data = await self._accumulate_crawl_results(firecrawl_id=firecrawl_id)
 
         # Extract unique URLs from metadata
         unique_links = set()
         for page in crawl_data.data:
             metadata = page.get("metadata", {})
-            # Add og:url if present
             if og_url := metadata.get("og:url"):
                 unique_links.add(og_url)
 
-        # Create result with proper structure
-        result = CrawlResult(
-            input_url=crawl_job.start_url,
+        # Return the result (no saving!)
+        return CrawlResult(
+            input_url=input_url,
             total_pages=len(crawl_data.data),
             unique_links=list(unique_links),
             data=crawl_data,
             completed_at=datetime.now(UTC),
         )
 
-        return result
-
-    @base_error_handler
-    async def _accumulate_crawl_results(self, job_id: str) -> CrawlData:
+    @generic_error_handler
+    async def _accumulate_crawl_results(self, firecrawl_id: str) -> CrawlData:
         """
         Accumulate all crawling results for a given job ID.
 
         Args:
-            job_id (str): The unique identifier of the crawling job.
+            firecrawl_id (str): The unique identifier of the crawling job.
 
         Returns:
             CrawlData: CrawlData object containing the accumulated crawl results.
         """
-        next_url: str | None = f"https://api.firecrawl.dev/v1/crawl/{job_id}"
+        next_url: str | None = f"https://api.firecrawl.dev/v1/crawl/{firecrawl_id}"
         crawl_data = []
 
         while next_url is not None:
@@ -180,8 +177,8 @@ class FireCrawler:
 
             # Only checks at the end if data exists
             if not crawl_data:
-                logger.error(f"No data accumulated for job {job_id}")
-                raise EmptyContentError(f"No content found for job {job_id}")
+                logger.error(f"No data accumulated for job {firecrawl_id}")
+                raise EmptyContentError(f"No content found for job {firecrawl_id}")
 
         logger.info("No more pages to fetch. Returning results")
 

@@ -38,33 +38,32 @@ async def handle_firecrawl_webhook(
 
         # Get raw payload
         raw_payload = await request.json()
-        logger.debug(f"Received FireCrawl webhook data: {raw_payload}")
+        logger.debug(f"Received FireCrawl webhook payload: {raw_payload}")
 
         try:
-            # Create FireCrawl event - this may raise ValueError for validation
-            event_data = handler._create_firecrawl_event(data=raw_payload)
+            # Parse the webhook payload
+            parsed_payload = handler._parse_firecrawl_payload(data=raw_payload)
         except ValueError as ve:
-            # Handle validation errors with 400
             logger.warning(f"Invalid webhook payload: {str(ve)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid webhook payload: {str(ve)}"
             ) from ve
 
-        # Create FireCrawlWebhookEvent
-        event = handler._create_webhook_event(event_data=event_data, raw_payload=raw_payload)
+        # Create internal event object
+        webhook_event = handler._create_webhook_event(event_data=parsed_payload, raw_payload=raw_payload)
 
+        # Process the event
         try:
-            # Call ContentService with CrawlEvent
-            await content_service.handle_event(event=event)
-            logger.debug("Successfully sent event to the ContentService")
+            await content_service.handle_event(event=webhook_event)
+            logger.debug("Successfully processed webhook event")
         except Exception as e:
             logger.error(f"Error processing webhook event: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error processing webhook: {str(e)}"
             ) from e
 
-        # Construct and return WebhookResponse
-        return handler._create_webhook_response(event=event)
+        # Return response to webhook sender
+        return handler._create_webhook_response(event=webhook_event)
 
     except HTTPException:
         # Re-raise HTTP exceptions

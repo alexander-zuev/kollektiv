@@ -1,5 +1,7 @@
-from requests.exceptions import HTTPError, Timeout
+from typing import Self
 from uuid import UUID
+
+from requests.exceptions import HTTPError, Timeout
 
 
 class NotImplementedError(Exception):
@@ -15,6 +17,26 @@ class AppError(Exception):
 class DatabaseError(AppError):
     """Raised when a database operation fails."""
 
+    def __init__(
+        self,
+        message: str,
+        operation: str,
+        entity_type: str,
+        details: dict | None = None,
+        cause: Exception | None = None,
+    ):
+        self.operation = operation
+        self.entity_type = entity_type
+        self.details = details or {}
+        self.cause = cause
+        super().__init__(message)
+
+    def add_context(self, operation: str, entity_type: str) -> Self:
+        """Adds context information to the exception."""
+        self.operation = operation or self.operation  # Don't overwrite if already set
+        self.entity_type = entity_type or self.entity_type  # Don't overwrite if already set
+        return self
+
 
 class ValidationError(AppError):
     """Raised when input validation fails."""
@@ -27,7 +49,7 @@ class ExternalServiceError(AppError):
 class DataSourceError(AppError):
     """Exception raised for errors related to Data Source operations."""
 
-    def __init__(self, source_id: UUID, message: str, original_exception: Exception = None):
+    def __init__(self, source_id: UUID, message: str, original_exception: Exception | None = None):
         self.source_id = source_id
         self.message = message
         self.original_exception = original_exception
@@ -167,3 +189,32 @@ class JobStateError(JobError):
 
     def __init__(self, job_id: str, current_state: str, attempted_state: str):
         super().__init__(job_id, f"invalid state transition from {current_state} to {attempted_state}")
+
+
+class EntityNotFoundError(AppError):
+    """Raised when an entity is not found in the database."""
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
+
+
+class EntityValidationError(AppError):
+    """Raised when entity validation fails."""
+
+    def __init__(self, entity_type: str, validation_errors: dict):
+        self.entity_type = entity_type
+        self.validation_errors = validation_errors
+        message = f"Validation failed for {entity_type}: {validation_errors}"
+        super().__init__(message)
+
+
+class BulkOperationError(DatabaseError):
+    """Raised when a bulk database operation fails."""
+
+    def __init__(self, operation: str, failed_items: list, error: Exception | None = None):
+        self.operation = operation
+        self.failed_items = failed_items
+        self.original_error = error
+        message = f"Bulk {operation} failed for {len(failed_items)} items"
+        super().__init__(message)
