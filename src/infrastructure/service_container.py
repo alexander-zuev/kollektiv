@@ -1,5 +1,5 @@
-from src.core.content.crawler.crawler import FireCrawler
-from src.infrastructure.config.logger import get_logger
+from src.core.content.crawler import FireCrawler
+from src.infrastructure.common.logger import get_logger
 from src.infrastructure.external.supabase_client import SupabaseClient, supabase_client
 from src.infrastructure.storage.data_repository import DataRepository
 from src.services.content_service import ContentService

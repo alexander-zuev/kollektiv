@@ -18,7 +18,7 @@ from weave import Model
 from src.core.chat.tool_definitions import tool_manager
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
-from src.infrastructure.config.logger import get_logger
+from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
 
 logger = get_logger()

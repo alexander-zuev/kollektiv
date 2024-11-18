@@ -13,7 +13,7 @@ from typing import Any
 import tiktoken
 
 from src.infrastructure.common.decorators import base_error_handler
-from src.infrastructure.config.logger import configure_logging, get_logger
+from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
 
 logger = get_logger()

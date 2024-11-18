@@ -16,7 +16,7 @@ class BaseDbModel(BaseModel):
     )
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Creation timestamp")
-    updated_at: datetime | None = Field(None, description="Last updated timestamp")
+    updated_at: datetime | None = Field(default=None, description="Last updated timestamp")
 
     def update(self, **kwargs: Any) -> Self:
         """Generic update method preserving model constraints."""

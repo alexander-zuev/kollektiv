@@ -5,8 +5,8 @@ from uuid import UUID
 
 from src.core._exceptions import JobNotFoundError, ValidationError
 from src.infrastructure.common.decorators import generic_error_handler
-from src.infrastructure.config.logger import get_logger
-from src.models.common.job_models import (
+from src.infrastructure.common.logger import get_logger
+from src.models.job_models import (
     CrawlJobDetails,
     Job,
     JobStatus,

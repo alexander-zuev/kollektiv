@@ -58,8 +58,8 @@ class FireCrawlWebhookResponse(BaseModel):
     """
 
     # Aligned with FireCrawl Webhook Response https://docs.firecrawl.dev/features/crawl#webhook-events
-    success: bool = Field(True, description="If the webhook was successful in crawling the page correctly.")
-    event_type: FireCrawlEventType = Field(..., description="The type of event that occurred")
+    success: bool = Field(..., description="If the webhook was successful in crawling the page correctly.")
+    event_type: FireCrawlEventType = Field(..., alias="type", description="The type of event that occurred")
     firecrawl_id: str = Field(..., alias="id", description="The ID of the crawl")
     data: list[dict[str, Any]] = Field(
         default_factory=list,

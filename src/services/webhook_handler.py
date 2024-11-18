@@ -1,7 +1,6 @@
 from typing import Any
 
 from src.api.v0.schemas.webhook_schemas import (
-    FireCrawlEventType,
     FireCrawlWebhookEvent,
     FireCrawlWebhookResponse,
     WebhookProvider,
@@ -25,7 +24,7 @@ class FireCrawlWebhookHandler:
         try:
             return FireCrawlWebhookResponse(
                 success=data["success"],
-                event_type=FireCrawlEventType(data["event_type"]),
+                event_type=data["type"],
                 firecrawl_id=data["id"],
                 data=data.get("data", []),
                 error=data.get("error"),

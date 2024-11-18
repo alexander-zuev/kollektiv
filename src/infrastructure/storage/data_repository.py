@@ -2,7 +2,7 @@ from typing import Any, TypeVar
 from uuid import UUID
 
 from src.infrastructure.common.decorators import supabase_operation
-from src.infrastructure.config.logger import get_logger
+from src.infrastructure.common.logger import get_logger
 from src.infrastructure.external.supabase_client import SupabaseClient
 from src.models.base_models import BaseDbModel
 
@@ -52,17 +52,17 @@ class DataRepository:
         logger.debug("Initialized data repository")
 
     @supabase_operation
-    async def save(self, entity: T) -> T:
+    async def save(self, entity: T | list[T]) -> T | list[T]:
         """Save or update an entity in the database.
 
         This method handles both insert and update operations through upsert.
         The operation is determined by the presence of the primary key value.
 
         Args:
-            entity: Any model inheriting from BaseDbModel
+            entity: Single entity or list of entities to save
 
         Returns:
-            The saved entity with updated fields (e.g., created_at, updated_at)
+            T | list[T]: Saved entity/entities with updated fields
 
         Examples:
             # Save new source
@@ -74,18 +74,27 @@ class DataRepository:
             updated = await repo.save(job)
         """
         client = await self.db_client.get_client()
-        data = entity.model_dump(mode="json")
 
-        logger.debug(f"Entity: {data}")
+        # Handle both single and batch cases
+        entities = [entity] if not isinstance(entity, list) else entity
+        if not entities:
+            return []
 
+        # All entities must be same type
+        entity_type = type(entities[0])
+        data = [e.model_dump(mode="json") for e in entities]
+
+        # Single transaction for all entities
         result = await (
-            client.schema(entity._db_config["schema"])
-            .table(entity._db_config["table"])
-            .upsert(data, on_conflict=entity._db_config["primary_key"])
+            client.schema(entity_type._db_config["schema"])
+            .table(entity_type._db_config["table"])
+            .upsert(data, on_conflict=entity_type._db_config["primary_key"])
             .execute()
         )
 
-        return type(entity).model_validate(result.data[0])
+        # Return in same format as input
+        saved = [entity_type.model_validate(item) for item in result.data]
+        return saved if isinstance(entity, list) else saved[0]
 
     @supabase_operation
     async def get_by_id(self, model_class: type[T], id: UUID) -> T | None:
@@ -156,13 +165,7 @@ class DataRepository:
 
         if filters:
             for field, value in filters.items():
-                if "->" in field:  # Handle JSONB queries
-                    if isinstance(value, list):
-                        query = query.contains(field, value)
-                    else:
-                        query = query.eq(field, str(value))
-                else:
-                    query = query.eq(field, value)
+                query = query.eq(field, value)
 
         if order_by:
             query = query.order(order_by)
@@ -172,6 +175,9 @@ class DataRepository:
 
         if offset:
             query = query.offset(offset)
+
+        # Debugging: Log the query and filters
+        logger.debug(f"Executing query with filters: {filters}")
 
         result = await query.execute()
         return [model_class.model_validate(item) for item in result.data]

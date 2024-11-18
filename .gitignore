@@ -457,3 +457,4 @@ src/core/content/crawler/*.json
 
 # === Internal docs ===
 docs/internal/*
+output_chunks/

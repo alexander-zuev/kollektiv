@@ -9,7 +9,7 @@ from src.api.middleware.rate_limit import HealthCheckRateLimit
 from src.api.system.health import router as health_router
 from src.api.v0.endpoints.sources import router as content_router
 from src.api.v0.endpoints.webhooks import router as webhook_router
-from src.infrastructure.config.logger import configure_logging, get_logger
+from src.infrastructure.common.logger import configure_logging, get_logger
 from src.infrastructure.config.settings import Environment, settings
 from src.infrastructure.service_container import ServiceContainer
 

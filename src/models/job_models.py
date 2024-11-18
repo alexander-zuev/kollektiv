@@ -45,7 +45,7 @@ class CrawlJobDetails(BaseModel):
         description="Maps each crawl job to the Source object.",
     )
     firecrawl_id: str | None = Field(
-        None, description="Job id returned by FireCrawl. Added only if a jobs starts successfully"
+        default=None, description="Job id returned by FireCrawl. Added only if a jobs starts successfully"
     )
     pages_crawled: int = Field(default=0, description="Number of pages crawled")
     url: str = Field(..., description="URL that was crawled")
@@ -53,9 +53,6 @@ class CrawlJobDetails(BaseModel):
 
 class Job(BaseDbModel):
     """Track crawl job status and progress"""
-
-    _db_config: ClassVar[dict] = {"schema": "infra", "table": "jobs", "primary_key": "job_id"}
-    _protected_fields: set[str] = PrivateAttr(default={"job_id", "job_type", "created_at"})
 
     # General job info
     job_id: UUID = Field(default_factory=uuid4, description="Internal job id in the system")
@@ -69,8 +66,10 @@ class Job(BaseDbModel):
     completed_at: datetime | None = Field(None, description="Completion timestamp")
 
     # Results
-    result_id: UUID | None = Field(default=None, description="ID of the result file in the storage")
     error: str | None = None
+
+    _db_config: ClassVar[dict] = {"schema": "infra", "table": "jobs", "primary_key": "job_id"}
+    _protected_fields: set[str] = PrivateAttr(default={"job_id", "job_type", "created_at"})
 
     def update(self, **kwargs: Any) -> Job:
         """

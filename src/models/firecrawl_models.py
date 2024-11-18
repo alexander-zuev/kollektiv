@@ -325,19 +325,7 @@ class CrawlData(BaseModel):
 
 # Crawl Result
 class CrawlResult(BaseDbModel):
-    """
-    Model representing the result of a web crawl operation.
-
-    Attributes:
-        result_id: System-generated UUID of the crawl result.
-        input_url: The original URL that was crawled.
-        total_pages: Total number of pages successfully crawled (defaults to 0).
-        unique_links: List of unique URLs discovered during crawling (defaults to an empty list).
-        data: Crawled data (defaults to an empty CrawlData object).
-        completed_at: Timestamp of completion (optional).
-        error_message: Error message if the crawl failed (optional).
-        method: Firecrawl API method used (defaults to "crawl").
-    """
+    """Model representing the result of a web crawl operation."""
 
     _db_config: ClassVar[dict] = {"schema": "content", "table": "crawl_results", "primary_key": "result_id"}
     result_id: UUID = Field(default_factory=lambda: uuid4(), description="System generated UUID of the crawl result.")

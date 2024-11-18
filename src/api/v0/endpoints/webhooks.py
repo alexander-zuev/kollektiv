@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from src.api.dependencies import ContentServiceDep
 from src.api.routes import Routes
 from src.api.v0.schemas.webhook_schemas import WebhookResponse
-from src.infrastructure.config.logger import get_logger
+from src.infrastructure.common.logger import get_logger
 from src.services.webhook_handler import FireCrawlWebhookHandler
 
 logger = get_logger()
@@ -38,13 +38,13 @@ async def handle_firecrawl_webhook(
 
         # Get raw payload
         raw_payload = await request.json()
-        logger.debug(f"Received FireCrawl webhook payload: {raw_payload}")
+        logger.debug("Received FireCrawl webhook payload")
 
         try:
             # Parse the webhook payload
             parsed_payload = handler._parse_firecrawl_payload(data=raw_payload)
         except ValueError as ve:
-            logger.warning(f"Invalid webhook payload: {str(ve)}")
+            logger.error(f"Invalid webhook payload: {str(ve)}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid webhook payload: {str(ve)}"
             ) from ve

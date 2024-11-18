@@ -7,13 +7,12 @@ from src.core._exceptions import (
     EntityNotFoundError,
     EntityValidationError,
 )
-from src.infrastructure.common.decorators import generic_error_handler
-from src.infrastructure.config.logger import get_logger
+from src.infrastructure.common.logger import get_logger
 from src.infrastructure.storage.data_repository import DataRepository
 from src.models.base_models import BaseDbModel
-from src.models.common.job_models import Job
-from src.models.content.content_source_models import DataSource
-from src.models.content.firecrawl_models import CrawlResult
+from src.models.chat_models import SourceSummary
+from src.models.content_models import DataSource, Document
+from src.models.job_models import Job
 
 logger = get_logger()
 
@@ -101,7 +100,6 @@ class DataService:
             logger.error(f"Database error querying entities: {e}")
             raise  # Re-raise DatabaseError
 
-    @generic_error_handler
     async def update_entity(self, model_class: type[T], entity_id: UUID, updates: dict[str, Any]) -> T:
         """Generic update operation for any entity."""
         # Get and validate current entity
@@ -117,7 +115,6 @@ class DataService:
 
     # Convenience methods with proper type safety
 
-    @generic_error_handler
     async def save_job(self, job: Job) -> Job:
         """Save or update a job."""
         logger.debug(f"Saving job {job.job_id}")
@@ -125,58 +122,75 @@ class DataService:
         # Explicit type cast to satisfy mypy
         return Job.model_validate(result.model_dump())
 
-    @generic_error_handler
     async def get_job(self, job_id: UUID) -> Job:
         """Get job by ID with proper type casting."""
         result = await self.get_entity(Job, job_id)
         # Explicit type cast to satisfy mypy
         return Job.model_validate(result.model_dump())
 
-    @generic_error_handler
     async def get_by_firecrawl_id(self, firecrawl_id: str) -> Job | None:
         """Get job by FireCrawl ID with proper type casting."""
-        jobs = await self.query_entities(Job, filters={"details->firecrawl_id": firecrawl_id})
+        jobs = await self.query_entities(Job, filters={"details->>firecrawl_id": firecrawl_id})
         if not jobs:
             return None
-        # Explicit type cast to satisfy mypy
         return Job.model_validate(jobs[0].model_dump())
 
-    @generic_error_handler
     async def save_datasource(self, data_source: DataSource) -> DataSource:
         """Save or update a data source."""
         logger.debug(f"Saving data source {data_source.source_id}")
         result = await self.save_entity(data_source)
         return DataSource.model_validate(result)
 
-    @generic_error_handler
     async def update_datasource(self, source_id: UUID, updates: dict[str, Any]) -> DataSource:
         """Update a data source with new data."""
         result = await self.update_entity(DataSource, source_id, updates)
         return DataSource.model_validate(result)
 
-    @generic_error_handler
     async def save_user_request(self, request: AddContentSourceRequest) -> AddContentSourceRequest:
         """Save user request."""
         logger.debug(f"Saving user request {request.request_id}")
         result = await self.save_entity(request)
         return AddContentSourceRequest.model_validate(result)
 
-    @generic_error_handler
-    async def save_crawl_result(self, result: CrawlResult) -> CrawlResult:
-        """Save or update a crawl result."""
-        logger.debug(f"Saving crawl result for crawl result id {result.result_id}")
-        saved = await self.save_entity(result)
-        return CrawlResult.model_validate(saved)
+    async def save_documents(self, documents: list[Document]) -> list[Document]:
+        """Saves list of crawled documents."""
+        logger.debug(f"Saving list of documents {len(documents)}")
+        saved_documents = await self.repository.save(entity=documents)
 
-    @generic_error_handler
+        return [Document.model_validate(document) for document in saved_documents]
+
     async def list_datasources(self) -> list[DataSource]:
         """List all data sources."""
         results = await self.query_entities(DataSource)
         # Ensure each result is properly validated and type-cast
         return [DataSource.model_validate(result.model_dump()) for result in results]
 
-    @generic_error_handler
     async def retrieve_datasource(self, source_id: UUID) -> DataSource:
         """Get data source by ID."""
         result = await self.get_entity(DataSource, source_id)
         return DataSource.model_validate(result)
+
+    async def load_summaries(self) -> list[SourceSummary]:
+        """Load document summaries from Supabase storage."""
+        pass
+
+    async def save_summaries(self, summaries: list[SourceSummary]) -> list[SourceSummary]:
+        """Save document summaries to Supabase storage."""
+        pass
+
+    async def get_all_summaries(self) -> list[SourceSummary]:
+        """Get all document summaries."""
+        pass
+
+    async def clear_summaries(self) -> None:
+        """Clear all document summaries."""
+        pass
+
+    async def get_documents_by_source(self, source_id: UUID) -> list[Document]:
+        """Get documents by source ID."""
+        documents = await self.query_entities(Document, filters={"source_id": source_id})
+        return [Document.model_validate(document) for document in documents]
+
+    async def update_document_status(self, document_id: UUID, error: str | None = None) -> None:
+        """Update document status."""
+        await self.update_entity(Document, document_id, {"error": error})

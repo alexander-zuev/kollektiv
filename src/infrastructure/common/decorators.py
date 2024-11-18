@@ -19,7 +19,7 @@ from anthropic import (
 from anthropic import APIError as AnthropicAPIError  # Anthropic's APIError
 
 from src.core._exceptions import DatabaseError
-from src.infrastructure.config.logger import get_logger
+from src.infrastructure.common.logger import get_logger
 
 logger = get_logger()
 

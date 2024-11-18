@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # Supabase
     supabase_url: str = Field(..., description="Supabase URL", alias="SUPABASE_URL")
-    supabase_key: str = Field(..., description="Supabase API Key", alias="SUPABASE_KEY")
+    supabase_key: str = Field(..., description="Supabase Service Key", alias="SUPABASE_SERVICE_KEY")
 
     # All paths are now relative to src_dir
     log_dir: Path = Field(default_factory=lambda: Path("src/logs"))
@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     use_ngrok: bool = Field(True, description="Whether to use ngrok in local development")
     ngrok_auth_token: str | None = Field(None, alias="NGROK_AUTH_TOKEN")
     _ngrok_url: str | None = None
+
+    # Unstructured
+    unstructured_api_key: str = Field(..., alias="UNSTRUCTURED_API_KEY", description="Unstructured API key")
+    unstructured_api_url: str = Field(
+        ..., alias="UNSTRUCTURED_API_URL", description="Unstructured API URL for free API"
+    )
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),

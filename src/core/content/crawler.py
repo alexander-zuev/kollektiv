@@ -1,5 +1,5 @@
-from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
 import requests
 from firecrawl import FirecrawlApp
@@ -19,13 +19,12 @@ from src.core._exceptions import (
     is_retryable_error,
 )
 from src.infrastructure.common.decorators import generic_error_handler
-from src.infrastructure.config.logger import get_logger
+from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
-from src.models.content.firecrawl_models import (
-    CrawlData,
+from src.models.content_models import Document, DocumentMetadata
+from src.models.firecrawl_models import (
     CrawlParams,
     CrawlRequest,
-    CrawlResult,
     FireCrawlResponse,
     ScrapeOptions,
 )
@@ -126,63 +125,58 @@ class FireCrawler:
         except RequestException as err:
             raise FireCrawlConnectionError(f"Connection error: {err}") from err
 
-    @generic_error_handler
-    async def get_results(self, firecrawl_id: str, input_url: str) -> CrawlResult:
+    async def get_results(self, firecrawl_id: str, source_id: UUID) -> list[Document]:
         """Get final results for a completed job.
 
         Args:
             firecrawl_id: The FireCrawl job ID
-            input_url: The original URL that was crawled
+            source_id: UUID of DataSource object mapped to the crawl
 
         Returns:
-            CrawlResult: The complete crawl results
-        """
-        # Get the crawl data
-        crawl_data = await self._accumulate_crawl_results(firecrawl_id=firecrawl_id)
-
-        # Extract unique URLs from metadata
-        unique_links = set()
-        for page in crawl_data.data:
-            metadata = page.get("metadata", {})
-            if og_url := metadata.get("og:url"):
-                unique_links.add(og_url)
-
-        # Return the result (no saving!)
-        return CrawlResult(
-            input_url=input_url,
-            total_pages=len(crawl_data.data),
-            unique_links=list(unique_links),
-            data=crawl_data,
-            completed_at=datetime.now(UTC),
-        )
-
-    @generic_error_handler
-    async def _accumulate_crawl_results(self, firecrawl_id: str) -> CrawlData:
-        """
-        Accumulate all crawling results for a given job ID.
-
-        Args:
-            firecrawl_id (str): The unique identifier of the crawling job.
-
-        Returns:
-            CrawlData: CrawlData object containing the accumulated crawl results.
+            list[Document]: list of Document objects containing crawl results
         """
         next_url: str | None = f"https://api.firecrawl.dev/v1/crawl/{firecrawl_id}"
-        crawl_data = []
+        documents: list[Document] = []
 
         while next_url is not None:
             logger.info("Accumulating job results.")
             batch_data, next_url = await self._fetch_results_from_url(next_url)
-            crawl_data.extend(batch_data["data"])
 
-            # Only checks at the end if data exists
-            if not crawl_data:
-                logger.error(f"No data accumulated for job {firecrawl_id}")
-                raise EmptyContentError(f"No content found for job {firecrawl_id}")
+            # Extract new list of documents
+            document_batch = await self._get_documents_from_batch(batch=batch_data, source_id=source_id)
+            documents.extend(document_batch)
 
-        logger.info("No more pages to fetch. Returning results")
+        # Only checks at the end if data exists
+        if not documents:
+            logger.error(f"No data accumulated for job {firecrawl_id}")
+            raise EmptyContentError(f"No content found for job {firecrawl_id}")
 
-        return CrawlData(data=crawl_data)
+        logger.info(f"Accumulated {len(documents)} documents from firecrawl.")
+
+        return documents
+
+    async def _get_documents_from_batch(self, batch: dict[str, Any], source_id: UUID) -> list[Document]:
+        """Iterates over batch data and returns a list of documents."""
+        document_batch: list[Document] = []
+        for page in batch["data"]:
+            # Create metadata
+            metadata = await self._create_metadata(data=page)
+
+            # Create Document
+            document = Document(source_id=source_id, content=page.get("markdown"), metadata=metadata.model_dump())
+
+            document_batch.append(document)
+
+        return document_batch
+
+    async def _create_metadata(self, data: dict[str, Any]) -> DocumentMetadata:
+        """Returns DocumentMetadata object based on data dict from firecrawl."""
+        return DocumentMetadata(
+            title=data["metadata"].get("title", ""),
+            description=data["metadata"].get("description", ""),
+            source_url=data["metadata"].get("sourceURL", ""),
+            og_url=data["metadata"].get("og:url", " "),
+        )
 
     @retry(
         stop=stop_after_attempt(settings.max_retries),

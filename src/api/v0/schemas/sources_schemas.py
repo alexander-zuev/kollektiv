@@ -1,21 +1,11 @@
 from datetime import datetime
-from enum import Enum
 from typing import ClassVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.models.base_models import BaseDbModel
-from src.models.content.content_source_models import DataSource, DataSourceType, SourceStatus
-
-
-class ContentSourceType(str, Enum):
-    """Supported content source types."""
-
-    WEB = "web"  # Web crawling
-    # Future: CONFLUENCE = "confluence"  # Future: Confluence integration
-    # Future: JIRA = "jira"  # Future: Jira integration
-    # Future: GITHUB = "github"  # Future: GitHub docs/wikis
+from src.models.content_models import DataSource, DataSourceType, SourceStatus
 
 
 class ContentSourceConfig(BaseModel):
@@ -25,10 +15,12 @@ class ContentSourceConfig(BaseModel):
     page_limit: int = Field(default=50, gt=0, description="Maximum number of pages to crawl.")
     exclude_patterns: list[str] = Field(
         default_factory=list,
+        alias="excludePaths",
         description="The list of patterns to exclude, e.g., '/blog/*', '/author/*'.",
     )
     include_patterns: list[str] = Field(
         default_factory=list,
+        alias="includePaths",
         description="The list of patterns to include, e.g., '/blog/*', '/api/*'.",
     )
 
@@ -74,7 +66,6 @@ class AddContentSourceRequest(BaseDbModel):
         request_id: System-generated UUID for tracking the request. Auto-generated if not provided.
         source_type: Type of content source (currently only 'web' is supported).
         request_config: Configuration parameters for the content source.
-        completed_at: Optional timestamp when request was completed.
 
     Example:
         ```json
@@ -92,15 +83,14 @@ class AddContentSourceRequest(BaseDbModel):
 
     _db_config: ClassVar[dict] = {"schema": "content", "table": "user_requests", "primary_key": "request_id"}
     request_id: UUID = Field(default_factory=uuid4, description="System-generated id of a user request.")
-    source_type: ContentSourceType = Field(
-        default=ContentSourceType.WEB,  # Make web the default
+    source_type: DataSourceType = Field(
+        default=DataSourceType.WEB,  # Make web the default
         description="Type of content source (currently only 'web' is supported).",
     )
     request_config: ContentSourceConfig = Field(
         ...,  # Required
         description="Configuration parameters for the content source",
     )
-    completed_at: datetime | None = Field(None, description="Timestamp of when the request is successfully completed.")
 
     class Config:
         """Example configuration."""

@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from src.core.content.crawler.crawler import FireCrawler
+from src.core.content.crawler import FireCrawler
 from src.infrastructure.service_container import ServiceContainer
 from src.services.content_service import ContentService
 from src.services.job_manager import JobManager

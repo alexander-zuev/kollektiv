@@ -5,9 +5,9 @@ from requests.exceptions import HTTPError
 from tenacity import RetryError
 
 from src.core._exceptions import EmptyContentError, FireCrawlAPIError, FireCrawlConnectionError
-from src.core.content.crawler.crawler import FireCrawler
+from src.core.content.crawler import FireCrawler
 from src.infrastructure.config.settings import settings
-from src.models.content.firecrawl_models import CrawlParams, CrawlRequest
+from src.models.firecrawl_models import CrawlParams, CrawlRequest
 
 
 # 1. Initialization Tests
