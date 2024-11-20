@@ -1,3 +1,4 @@
+# TODO: not used in production because chunks do not preserve headings, code blocks, break mid-sentence.
 import asyncio
 import os
 from uuid import UUID
@@ -33,24 +34,25 @@ class UnstructuredChunker:
 
     def _process_batch(self, documents: list[Document]) -> None:
         """Process a batch of documents using unstructured API."""
-        # Update status to processing
-        # for doc in documents:
-        #     await self.data_service.update_document_status(doc.document_id, DocumentStatus.PROCESSING)
-
-        # Use a fixed directory instead of a temporary one
-        output_dir = "output_chunks"  # This will create in your current working directory
+        # Create separate directories for input and output
+        input_dir = "input_docs"
+        output_dir = "output_chunks"
+        os.makedirs(input_dir, exist_ok=True)
         os.makedirs(output_dir, exist_ok=True)
 
-        # Save documents as files
+        # Save all documents as markdown files
         for doc in documents:
-            file_path = f"{output_dir}/{doc.document_id}.md"
-            with open(file_path, "w") as f:
+            file_path = f"{input_dir}/{doc.document_id}.md"
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(doc.content)
 
         # Configure and run unstructured pipeline
         pipeline = Pipeline.from_configs(
             context=ProcessorConfig(tqdm=True),
-            indexer_config=LocalIndexerConfig(input_path=output_dir),
+            indexer_config=LocalIndexerConfig(
+                input_path=input_dir,
+                filename_filter="*.md",  # Only process .md files
+            ),
             downloader_config=LocalDownloaderConfig(),
             source_connection_config=LocalConnectionConfig(),
             partitioner_config=PartitionerConfig(
@@ -61,18 +63,15 @@ class UnstructuredChunker:
             ),
             chunker_config=ChunkerConfig(
                 chunking_strategy="by_title",
-                chunk_max_characters=512,
-                chunk_overlap=20,
+                chunk_max_characters=1000,
+                chunk_new_after_n_chars=900,
+                chunk_overlap=100,
                 chunk_combine_text_under_n_chars=150,
             ),
-            uploader_config=LocalUploaderConfig(output_dir=f"{output_dir}/chunks"),
+            uploader_config=LocalUploaderConfig(output_dir=output_dir),
         )
 
         pipeline.run()
-
-        # Update document status
-        # for doc in documents:
-        # await self.document_repository.update_document_status(doc.document_id, DocumentStatus.CHUNKED)
 
     # async def _store_chunks(self, documents: list[Document], output_dir: str) -> None:
     #     """Store chunks for a list of documents."""
@@ -100,7 +99,7 @@ async def run_chunker(source_id: UUID) -> None:
 
 if __name__ == "__main__":
     # Define the source_id you want to test with
-    source_id = UUID("8cdb7c3a-51e3-4aba-b778-5ff3bf6292f8")
+    source_id = UUID("31a4e0b3-813a-484a-b2d1-86896dd7220e")
 
     # Run the chunker
     asyncio.run(run_chunker(source_id))

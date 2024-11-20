@@ -7,7 +7,7 @@ from src.infrastructure.external.supabase_client import SupabaseClient
 from src.models.base_models import BaseDbModel
 
 logger = get_logger()
-T = TypeVar("T", bound=BaseDbModel)
+T = TypeVar("T", bound=BaseDbModel)  # define a generic type for the repository
 
 
 class DataRepository:

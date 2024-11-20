@@ -162,7 +162,7 @@ class ContentService:
 
                     case FireCrawlEventType.CRAWL_COMPLETED:
                         logger.info(f"Crawl completed for job {job.job_id}")
-                        await self._handle_completed(job)
+                        await self._handle_crawl_completed(job)
                         return
 
                     case FireCrawlEventType.CRAWL_FAILED:
@@ -213,7 +213,7 @@ class ContentService:
             raise
 
     @generic_error_handler
-    async def _handle_completed(self, job: Job) -> None:
+    async def _handle_crawl_completed(self, job: Job) -> None:
         """Handle crawl.completed event"""
         try:
             # Get documents
@@ -245,6 +245,20 @@ class ContentService:
                 },
             )
             logger.debug(f"Updated job {job.job_id} status to COMPLETED")
+
+            # Create a new processing job
+            processing_job = await self.job_manager.create_job(
+                job_type=JobType.PROCESS,
+                source_id=job.source_id,
+                details={"document_ids": [d.id for d in documents]},
+            )
+
+            # Update source status
+            await self.data_service.update_datasource(
+                source_id=job.source_id,
+                updates={"status": SourceStatus.PROCESSING, "job_id": processing_job.job_id},
+            )
+            logger.debug(f"Updated source {job.source_id} status to PROCESSING")
 
         except Exception as e:
             logger.error(f"Failed to handle completion for job {job.job_id}: {e}")
