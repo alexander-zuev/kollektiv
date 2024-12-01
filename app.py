@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import logfire
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,6 +55,9 @@ def create_app() -> FastAPI:
         description="RAG-powered documentation chat application",
         lifespan=lifespan,
     )
+
+    # instrument with logfire
+    logfire.instrument_fastapi(app)
 
     # Configure CORS
     app.add_middleware(

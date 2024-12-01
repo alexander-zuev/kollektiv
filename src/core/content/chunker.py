@@ -18,9 +18,12 @@ from src.infrastructure.config.settings import settings
 
 logger = get_logger()
 
+
 class PreProcessor:
     """Pre-processes data before chunking."""
+
     pass
+
 
 class MarkdownChunker:
     """Processes markdown, removes boilerplate, images, and validates chunks.
@@ -1074,24 +1077,23 @@ class Validator:
 
         if not any(incorrect.values()):
             logger.info("No incorrect chunks found.")
-            
-            
 
-class ChunkOrchestrator:
-    """Orchestrates the chunking process end to end efficiently."""
 
-    def __init__(self, validator: Validator, chunker: Chunker):
-        self.validator = validator
-        self.chunker = chunker
-        
-    
-    async def process_documents(self, list[Document] -> list[Chunk]:
-        """Efficient processes documents in batches"""
-        pass
-        
-    async def _process_batch(self, batch: list[Document]) -> list[Chunk]:
-        """Process a single batch of documents."""
-        pass
+# class ChunkOrchestrator:
+#     """Orchestrates the chunking process end to end efficiently."""
+
+#     def __init__(self, validator: Validator, chunker: Chunker):
+#         self.validator = validator
+#         self.chunker = chunker
+
+
+#     async def process_documents(self, documents: list[Document]) -> list[Chunk]:
+#         """Efficient processes documents in batches"""
+#         pass
+
+#     async def _process_batch(self, batch: list[Document]) -> list[Chunk]:
+#         """Process a single batch of documents."""
+#         pass
 
 
 # Test usage

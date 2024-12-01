@@ -26,6 +26,9 @@ class Environment(str, Enum):
 class Settings(BaseSettings):
     """Application-wide settings."""
 
+    # General
+    project_name: str = Field("kollektiv", description="Project name")
+
     # Environment configuration
     environment: Environment = Field(Environment.LOCAL, alias="ENVIRONMENT", description="Application environment")
 
@@ -76,11 +79,11 @@ class Settings(BaseSettings):
     ngrok_auth_token: str | None = Field(None, alias="NGROK_AUTH_TOKEN")
     _ngrok_url: str | None = None
 
-    # Unstructured
-    unstructured_api_key: str = Field(..., alias="UNSTRUCTURED_API_KEY", description="Unstructured API key")
-    unstructured_api_url: str = Field(
-        ..., alias="UNSTRUCTURED_API_URL", description="Unstructured API URL for free API"
-    )
+    # Monitoring
+    logfire_write_token: str = Field(..., alias="LOGFIRE_TOKEN", description="Logfire write token")
+
+    # Redis
+    redis_url: str = Field(..., alias="REDIS_URL", description="Redis URL")
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),

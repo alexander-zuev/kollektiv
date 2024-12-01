@@ -2,12 +2,18 @@ import logging
 import os
 import sys
 
+import logfire
 from colorama import Fore, Style, init
 
 from src.infrastructure.config.settings import settings
 
 # Initialize colorama
 init(autoreset=True)
+
+# Configure logfire with your settings
+logfire.configure(
+    token=settings.logfire_write_token, environment=settings.environment, service_name=settings.project_name
+)
 
 
 class ColoredFormatter(logging.Formatter):
@@ -69,7 +75,7 @@ class ColoredFormatter(logging.Formatter):
 
 def configure_logging(debug: bool = False, log_file: str = "app.log") -> None:
     """
-    Configure the application's logging system.
+    Configure the application's logging system with both local handlers and Logfire.
 
     Args:
         debug (bool): Whether to set the logging level to debug. Defaults to False.
@@ -88,6 +94,11 @@ def configure_logging(debug: bool = False, log_file: str = "app.log") -> None:
     # Remove existing handlers to prevent duplication
     if app_logger.handlers:
         app_logger.handlers.clear()
+
+    # Add Logfire handler
+    logfire_handler = logfire.LogfireLoggingHandler()
+    logfire_handler.setLevel(log_level)
+    app_logger.addHandler(logfire_handler)
 
     # Console handler with colored output
     console_handler = logging.StreamHandler(sys.stdout)

@@ -33,6 +33,9 @@ langchain-community = "^0.3.7"
 unstructured-ingest = {extras = ["remote"], version = "^0.3.0"}
 unstructured = "^0.16.5"
 libmagic = "^1.0"
+redis = "^5.2.0"
+rq = "^2.0.0"
+logfire = {extras = ["fastapi"], version = "^2.5.0"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"

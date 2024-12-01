@@ -26,6 +26,10 @@ class JobStatus(str, Enum):
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
+    # Updated
+    CRAWLING = "crawling"
+    PROCESSING = "processing"
+    LOADING = "loading"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
