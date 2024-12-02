@@ -4,17 +4,31 @@ from uuid import UUID
 from requests.exceptions import HTTPError, Timeout
 
 
+class KollektivError(Exception):
+    """Base class for Kollektiv exceptions."""
+
+    pass
+
+
+class RetryableError(KollektivError):
+    """Base class for retryable errors."""
+
+    pass
+
+
+class NonRetryableError(KollektivError):
+    """Base class for non-retryable errors."""
+
+    pass
+
+
 class NotImplementedError(Exception):
     """Not implemented yet. Stay tuned."""
 
     pass
 
 
-class AppError(Exception):
-    """Base class for application-specific exceptions."""
-
-
-class DatabaseError(AppError):
+class DatabaseError(KollektivError):
     """Raised when a database operation fails."""
 
     def __init__(
@@ -38,15 +52,15 @@ class DatabaseError(AppError):
         return self
 
 
-class ValidationError(AppError):
+class ValidationError(KollektivError):
     """Raised when input validation fails."""
 
 
-class ExternalServiceError(AppError):
+class ExternalServiceError(KollektivError):
     """Raised when an external service call fails."""
 
 
-class DataSourceError(AppError):
+class DataSourceError(KollektivError):
     """Exception raised for errors related to Data Source operations."""
 
     def __init__(self, source_id: UUID, message: str, original_exception: Exception | None = None):
@@ -191,7 +205,7 @@ class JobStateError(JobError):
         super().__init__(job_id, f"invalid state transition from {current_state} to {attempted_state}")
 
 
-class EntityNotFoundError(AppError):
+class EntityNotFoundError(KollektivError):
     """Raised when an entity is not found in the database."""
 
     def __init__(self, message: str):
@@ -199,7 +213,7 @@ class EntityNotFoundError(AppError):
         super().__init__(message)
 
 
-class EntityValidationError(AppError):
+class EntityValidationError(KollektivError):
     """Raised when entity validation fails."""
 
     def __init__(self, entity_type: str, validation_errors: dict):

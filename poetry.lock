@@ -5032,6 +5032,25 @@ files = [
 ]
 
 [[package]]
+name = "sentry-cli"
+version = "2.39.1"
+description = "A command line utility to work with Sentry."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "sentry_cli-2.39.1-py3-none-macosx_10_15_x86_64.whl", hash = "sha256:cfc48a7df30cc078b5ce17f60abca6bb4a451f7e659b91056de1cea183a2e75a"},
+    {file = "sentry_cli-2.39.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:22391df7da539788fbca9a12213e148bd3ed5dff5d470d2a2f1ec76783a01e7a"},
+    {file = "sentry_cli-2.39.1-py3-none-macosx_11_0_universal2.whl", hash = "sha256:bad290af11dd85eac585098f25c42d0b071f1d685923637e10833f3d8513984e"},
+    {file = "sentry_cli-2.39.1-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_2_aarch64.whl", hash = "sha256:19bd9967d015ba695b8b79cb6c9bea45f1e1310fe65fbf0d7a5af1d23208f99d"},
+    {file = "sentry_cli-2.39.1-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.musllinux_1_2_armv7l.whl", hash = "sha256:4fd73091532991b8d17e52982f6b7b93512fc58c8f6da672ab6d1e969eb12994"},
+    {file = "sentry_cli-2.39.1-py3-none-manylinux_2_17_i686.manylinux2014_i686.musllinux_1_2_i686.whl", hash = "sha256:eb4c150e270c12717f259de7e3682beba818b70c278a18cd1829470df670081d"},
+    {file = "sentry_cli-2.39.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.musllinux_1_2_x86_64.whl", hash = "sha256:29a8c655c37344f3a8adaa60d5ae6636cea14c0584be1f7ce1b163fd19aef598"},
+    {file = "sentry_cli-2.39.1-py3-none-win32.whl", hash = "sha256:30d1855ae76fae41358ac12f464e1e669f598570bc43aea9e6c2017ee428117a"},
+    {file = "sentry_cli-2.39.1-py3-none-win_amd64.whl", hash = "sha256:9868247ed86c0ed5137228f9c7aad40ab3025917f79a6d024bf3679a530c735b"},
+    {file = "sentry_cli-2.39.1.tar.gz", hash = "sha256:85d295f47b175ab72e256f502ce3328c9a8ba9ead9479fdea22c5ae37176be42"},
+]
+
+[[package]]
 name = "sentry-sdk"
 version = "2.19.0"
 description = "Python client for Sentry (https://sentry.io)"
@@ -5044,6 +5063,7 @@ files = [
 
 [package.dependencies]
 certifi = "*"
+fastapi = {version = ">=0.79.0", optional = true, markers = "extra == \"fastapi\""}
 urllib3 = ">=1.26.11"
 
 [package.extras]
@@ -6767,4 +6787,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "0930946e2b04d2aaf969817939b2efb6011ebbe76bf3b7300c319ab5ae17d0df"
+content-hash = "ca8ae8d9d379aa0c592190dfb0e19eb8b6fa533077a0bc3449df975c830f6f34"

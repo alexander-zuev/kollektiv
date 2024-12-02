@@ -13,6 +13,7 @@ class Routes:
         """System routes (non-versioned)."""
 
         HEALTH = "/health"
+        SENTRY_DEBUG = "/sentry-debug"
 
         class Webhooks:
             """Webhook routes."""

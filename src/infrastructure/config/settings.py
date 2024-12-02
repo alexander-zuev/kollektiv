@@ -81,6 +81,11 @@ class Settings(BaseSettings):
 
     # Monitoring
     logfire_write_token: str = Field(..., alias="LOGFIRE_TOKEN", description="Logfire write token")
+    sentry_dsn: str = Field(
+        "https://c2f1acc0646d1578b572e318b6b118d5@o4508393623257088.ingest.us.sentry.io/4508393650847744",
+        alias="SENTRY_DSN",
+        description="Sentry DSN",
+    )
 
     # Redis
     redis_url: str = Field(..., alias="REDIS_URL", description="Redis URL")
