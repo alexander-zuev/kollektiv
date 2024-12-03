@@ -41,6 +41,8 @@ class ContentService:
         Raises:
             CrawlerError: If crawler fails to start
         """
+        # TODO: ensure this uses a transaction with context manager
+        # TODO: refactor into smaller items so that I can remove one large try-except from here
         data_source = None  # Initialize to None
         try:
             logger.info(f"Starting to add source for request {request.request_id}")
@@ -212,58 +214,54 @@ class ContentService:
             await self._handle_failure(job, str(e))
             raise
 
+    # TODO: de-couple and move to job management via Redis. It should just enqueu the processing job instead of
+    # handling it itself.
     @generic_error_handler
     async def _handle_crawl_completed(self, job: Job) -> None:
         """Handle crawl.completed event"""
-        try:
-            # Get documents
-            documents = await self.crawler.get_results(
-                firecrawl_id=job.details["firecrawl_id"],
-                source_id=job.details["source_id"],
-            )
+        # Get documents
+        documents = await self.crawler.get_results(
+            firecrawl_id=job.details["firecrawl_id"],
+            source_id=job.details["source_id"],
+        )
 
-            # Save documents
-            await self.data_service.save_documents(documents=documents)
-            logger.debug(f"Successfully saved crawl results for job {job.job_id}")
+        # Save documents
+        await self.data_service.save_documents(documents=documents)
+        logger.debug(f"Successfully saved crawl results for job {job.job_id}")
 
-            # Update source
-            crawl_metadata = await self._create_source_metadata(documents=documents)
-            await self.data_service.update_datasource(
-                source_id=job.details["source_id"],
-                updates={
-                    "status": SourceStatus.COMPLETED,
-                    "metadata": crawl_metadata,
-                },
-            )
+        # Update source
+        crawl_metadata = await self._create_source_metadata(documents=documents)
+        await self.data_service.update_datasource(
+            source_id=job.details["source_id"],
+            updates={
+                "status": SourceStatus.COMPLETED,
+                "metadata": crawl_metadata,
+            },
+        )
 
-            # Update job
-            await self.job_manager.update_job(
-                job_id=job.job_id,
-                updates={
-                    "status": JobStatus.COMPLETED,
-                    "completed_at": datetime.now(UTC),
-                },
-            )
-            logger.debug(f"Updated job {job.job_id} status to COMPLETED")
+        # Update job
+        await self.job_manager.update_job(
+            job_id=job.job_id,
+            updates={
+                "status": JobStatus.COMPLETED,
+                "completed_at": datetime.now(UTC),
+            },
+        )
+        logger.debug(f"Updated job {job.job_id} status to COMPLETED")
 
-            # Create a new processing job
-            processing_job = await self.job_manager.create_job(
-                job_type=JobType.PROCESS,
-                source_id=job.source_id,
-                details={"document_ids": [d.id for d in documents]},
-            )
+        # Create a new processing job
+        processing_job = await self.job_manager.create_job(
+            job_type=JobType.PROCESS,
+            source_id=job.source_id,
+            details={"document_ids": [d.id for d in documents]},
+        )
 
-            # Update source status
-            await self.data_service.update_datasource(
-                source_id=job.source_id,
-                updates={"status": SourceStatus.PROCESSING, "job_id": processing_job.job_id},
-            )
-            logger.debug(f"Updated source {job.source_id} status to PROCESSING")
-
-        except Exception as e:
-            logger.error(f"Failed to handle completion for job {job.job_id}: {e}")
-            await self._handle_failure(job, str(e))
-            raise
+        # Update source status
+        await self.data_service.update_datasource(
+            source_id=job.source_id,
+            updates={"status": SourceStatus.PROCESSING, "job_id": processing_job.job_id},
+        )
+        logger.debug(f"Updated source {job.source_id} status to PROCESSING")
 
     async def _create_source_metadata(self, documents: list[Document]) -> dict[str, Any]:
         """Create updated source metadata after crawl completion.

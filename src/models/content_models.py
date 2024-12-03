@@ -59,6 +59,9 @@ class DataSource(BaseDbModel):
 
     _db_config: ClassVar[dict] = {"schema": "content", "table": "data_sources", "primary_key": "source_id"}
 
+    # User-related
+    # user_id: UUID = Field(..., description="User id, FK, provided by Supabase base after auth.")
+
     source_id: UUID = Field(default_factory=uuid4)
     source_type: DataSourceType = Field(
         ..., description="Type of the data source corresponding to supported data source types"

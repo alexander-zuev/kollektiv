@@ -482,6 +482,8 @@ class ClaudeAssistant(Model):
                 if not tool_use_block:
                     break
 
+            # This should not be a broad exception but specific Anthropic API errors
+            # I no longer need broad exceptions as they will be caught be global exception handler
             except Exception as e:
                 logger.error(f"Error generating response: {str(e)}")
                 self.conversation_history.remove_last_message()

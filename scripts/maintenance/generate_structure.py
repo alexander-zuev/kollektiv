@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 
-def generate_project_structure(root_dir, output_file, ignore_dirs=None, ignore_files=None):
+def generate_project_structure(root_dir: Path, output_file: Path) -> None:
     """
     Generate a text representation of the directory structure.
 
@@ -18,10 +18,8 @@ def generate_project_structure(root_dir, output_file, ignore_dirs=None, ignore_f
     Raises:
         IOError: If there is an error opening or writing to the output file.
     """
-    if ignore_dirs is None:
-        ignore_dirs = {"__pycache__", "venv", "env", ".idea", ".pytest_cache", ".git", ".ruff_cache"}
-    if ignore_files is None:
-        ignore_files = set()
+    ignore_dirs = {"__pycache__", "venv", "env", ".idea", ".pytest_cache", ".git", ".ruff_cache"}
+    ignore_files = set()
 
     project_root = Path(root_dir).resolve()
     with open(output_file, "w", encoding="utf-8") as f:

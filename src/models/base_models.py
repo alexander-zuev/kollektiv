@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 
 class BaseDbModel(BaseModel):
-    """Base class for all database models."""
+    """Base class for all models stored in the database."""
 
     _db_config: ClassVar[dict] = PrivateAttr(
         default={

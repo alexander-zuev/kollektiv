@@ -50,7 +50,7 @@ def generic_error_handler(func: Callable[..., T]) -> Callable[..., T]:
         try:
             return await func(*args, **kwargs)
         except Exception as e:
-            logger.error(
+            logger.critical(
                 f"Unhandled exception in {func.__name__}: {str(e)}",
                 exc_info=True,  # Include traceback in the log
             )
@@ -61,7 +61,7 @@ def generic_error_handler(func: Callable[..., T]) -> Callable[..., T]:
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            logger.error(f"Unhandled exception in {func.__name__}: {str(e)}", exc_info=True)
+            logger.critical(f"Unhandled exception in {func.__name__}: {str(e)}", exc_info=True)
             raise
 
     # Determine if the function is async or not
