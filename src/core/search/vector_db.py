@@ -196,7 +196,7 @@ class VectorDB(VectorDBInterface):
 
         self._init()
 
-    def _init(self):
+    def _init(self) -> None:
         """Initialize ChromaDB client and embedding function."""
         self.client = chromadb.PersistentClient(path=str(settings.chroma_db_dir))
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
@@ -253,7 +253,7 @@ class VectorDB(VectorDBInterface):
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
     @base_error_handler
-    async def add_documents(self, json_data: list[dict], file_name: str) -> dict[str, str]:
+    def add_documents(self, json_data: list[dict], file_name: str) -> dict[str, str]:
         """
         Add documents from a given JSON list to the database, handling duplicates and generating summaries.
 

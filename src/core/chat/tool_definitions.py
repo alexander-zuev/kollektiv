@@ -42,7 +42,7 @@ class ToolManager:
         """Initialize an empty tool collection."""
         self.tools: dict[str, Tool] = {}
 
-    def add_tool(self, tool: Tool) -> None:
+    async def add_tool(self, tool: Tool) -> None:
         """
         Add a tool to the tools collection.
 
@@ -51,7 +51,7 @@ class ToolManager:
         """
         self.tools[tool.name] = tool
 
-    def get_tool(self, name: str) -> Tool:
+    async def get_tool(self, name: str) -> Tool:
         """
         Retrieve a tool by its name.
 
@@ -141,4 +141,8 @@ rag_search_tool = Tool(
 )
 
 tool_manager = ToolManager()
-tool_manager.add_tool(rag_search_tool)
+
+
+async def initialize_tools():
+    """Initialize tool manager with tools."""
+    await tool_manager.add_tool(rag_search_tool)

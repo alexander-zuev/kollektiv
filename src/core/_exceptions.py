@@ -241,3 +241,25 @@ class JobStateError(JobError):
 
 
 ## Queue and workers
+
+
+class LLMError(KollektivError):
+    """Base class for LLM-related errors."""
+
+    pass
+
+
+class RetryableLLMError(RetryableError, LLMError):
+    """Base class for retryable LLM errors."""
+
+    def __init__(self, message: str, original_error: Exception, retry_after: int | None = None):
+        super().__init__(f"Temporary error in chat: {message}. Please try again.", retry_after)
+        self.original_error = original_error
+
+
+class NonRetryableLLMError(NonRetryableError, LLMError):
+    """Base class for non-retryable LLM errors."""
+
+    def __init__(self, message: str, original_error: Exception):
+        super().__init__(f"A non-retryable error occured in Anthropic chat: {message}")
+        self.original_error = original_error

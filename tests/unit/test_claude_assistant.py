@@ -10,11 +10,11 @@ def test_claude_assistant_initialization(claude_assistant_with_mock):
     assert isinstance(assistant.conversation_history, ConversationHistory)
 
 
-def test_add_message_to_conversation_history(claude_assistant_with_mock):
+async def test_add_message_to_conversation_history(claude_assistant_with_mock):
     """Test adding a message to the conversation history."""
     assistant = claude_assistant_with_mock
     initial_count = len(assistant.conversation_history.messages)
-    assistant.conversation_history.add_message(role="user", content="New message")
+    await assistant.conversation_history.add_message(role="user", content="New message")
     assert len(assistant.conversation_history.messages) == initial_count + 1
 
 

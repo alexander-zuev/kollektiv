@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from src.api.middleware.rate_limit import HealthCheckRateLimit
 from src.api.system.health import router as health_router
 from src.api.system.sentry_debug import router as sentry_debug_router
+from src.api.v0.endpoints.chat import chat_router, conversations_router
 from src.api.v0.endpoints.sources import router as content_router
 from src.api.v0.endpoints.webhooks import router as webhook_router
 from src.core._exceptions import NonRetryableError
@@ -87,6 +88,8 @@ def create_app() -> FastAPI:
     app.include_router(sentry_debug_router, tags=["system"])
     app.include_router(webhook_router, tags=["webhooks"])
     app.include_router(content_router, tags=["content"])
+    app.include_router(chat_router, tags=["chat"])
+    app.include_router(conversations_router, tags=["chat"])
 
     # Add global exception handlers
     @app.exception_handler(Exception)
@@ -122,7 +125,12 @@ def run() -> None:
     try:
         logger.info(f"Starting API server on {settings.api_host}:{settings.api_port}")
         app = create_app()
-        uvicorn.run(app, host=settings.api_host, port=settings.api_port, log_level=settings.log_level)
+        uvicorn.run(
+            app,
+            host=settings.api_host,
+            port=settings.api_port,
+            log_level=settings.log_level,
+        )
     except KeyboardInterrupt:
         logger.info("Shutting down server...")
         logger.info("Server shut down successfully")

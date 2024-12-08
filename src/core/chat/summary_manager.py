@@ -3,7 +3,9 @@ import json
 import os
 from typing import Any
 
+import aiofiles
 import anthropic
+from anthropic import AsyncAnthropic
 import weave
 from anthropic.types import Message
 
@@ -21,18 +23,17 @@ class SummaryManager:
     """Manages document summaries, including generation."""
 
     def __init__(self, data_service: DataService | None = None, model_name: str = settings.main_model):
-        # Only initialize weave if project name is set and non-empty
         if settings.weave_project_name and settings.weave_project_name.strip():
             weave.init(project_name=settings.weave_project_name)
 
-        self.client = anthropic.Anthropic(api_key=settings.main_model, max_retries=MAX_RETRIES)
+        self.client = anthropic.AsyncAnthropic(api_key=settings.main_model, max_retries=MAX_RETRIES)
         self.model_name = model_name
         self.data_service = data_service
-        self.summaries = self.data_service.load_summaries()
+        self.summaries = self.load_summaries()
 
     @anthropic_error_handler
     @weave.op()
-    def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
+    async def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
         """Generates a document summary and keywords based on provided chunks.
 
         Args:
@@ -190,35 +191,26 @@ class SummaryManager:
         return summary, [k.strip() for k in keywords]
 
     @base_error_handler
-    # TODO: deprecate this
     def load_summaries(self) -> dict[str, dict[str, Any]]:
-        """Loads document summaries from a JSON file.
-
-        Returns:
-            A dictionary where keys are document IDs and values are dictionaries
-            containing the summary and keywords for each document.
-            Returns an empty dictionary if the summaries file does not exist or
-            if there is an error loading the file.
-        """
+        """Loads document summaries from a JSON file."""
         summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
         if os.path.exists(summaries_file):
             try:
                 with open(summaries_file) as f:
-                    return json.load(f)
+                    return json.loads(f.read())
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to load document summaries: {e}")
                 return {}
-        else:
-            return {}
+        return {}
 
     @base_error_handler
-    def save_summaries(self) -> None:
+    async def save_summaries(self) -> None:
         """Saves the document summaries to a JSON file."""
         summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
         try:
-            with open(summaries_file, "w") as f:
-                json.dump(self.summaries, f, indent=2)
-                logger.info(f"Successfully saved new document summary to {summaries_file}")
+            async with aiofiles.open(summaries_file, "w") as f:
+                await f.write(json.dumps(self.summaries, indent=2))
+            logger.info(f"Successfully saved new document summary to {summaries_file}")
         except Exception as e:
             logger.error(f"Failed to save document summaries: {e}")
 

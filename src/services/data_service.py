@@ -170,7 +170,7 @@ class DataService:
         result = await self.get_entity(DataSource, source_id)
         return DataSource.model_validate(result)
 
-    async def load_summaries(self) -> list[SourceSummary]:
+    async def _load_summaries(self) -> list[SourceSummary]:
         """Load document summaries from Supabase storage."""
         pass
 

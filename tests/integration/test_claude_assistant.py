@@ -46,7 +46,7 @@ def test_claude_assistant(real_vector_db: VectorDB) -> Generator[ClaudeAssistant
 
 
 @pytest.mark.integration
-def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant):
+async def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant):
     """Test the complete conversation flow with tool use."""
     print(f"\nAssistant client type: {type(test_claude_assistant.client)}")
     print(f"Vector DB type: {type(test_claude_assistant.vector_db)}")
@@ -57,7 +57,7 @@ def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant):
 
     # 2. Send initial user message
     user_query = "What do the docs say about Python?"
-    test_claude_assistant.conversation_history.add_message(role="user", content=user_query)
+    await test_claude_assistant.conversation_history.add_message(role="user", content=user_query)
 
     # 3. Simulate Claude's tool use response
     tool_use_block = ToolUseBlock(
@@ -89,7 +89,7 @@ def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant):
         assert "Here is context retrieved by RAG search" in tool_result["content"][0]["content"]
 
     # 5. Verify conversation history has correct sequence
-    history = test_claude_assistant.conversation_history.get_conversation_history()
+    history = await test_claude_assistant.conversation_history.get_conversation_history()
     assert len(history) == 2  # Initial message + tool result
 
     # Initial user message

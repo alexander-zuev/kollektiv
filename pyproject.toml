@@ -60,6 +60,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 crawl = "src.core.content.crawler.crawler:run_crawler"
+# For production use (no reload)
 kollektiv = "app:run"
 
 

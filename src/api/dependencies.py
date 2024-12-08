@@ -6,6 +6,7 @@ from fastapi import Depends, Request
 
 from src.core.content.crawler import FireCrawler
 from src.infrastructure.service_container import ServiceContainer
+from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.job_manager import JobManager
 
@@ -39,8 +40,16 @@ def get_content_service(container: Annotated[ServiceContainer, Depends(get_conta
     return container.content_service
 
 
+def get_chat_service(container: Annotated[ServiceContainer, Depends(get_container)]) -> ChatService:
+    """Get ChatService from app state."""
+    if container.chat_service is None:
+        raise RuntimeError("ChatService is not initialized")
+    return container.chat_service
+
+
 # Type aliases for cleaner dependency injection
 ContainerDep = Annotated[ServiceContainer, Depends(get_container)]
 ContentServiceDep = Annotated[ContentService, Depends(get_content_service)]
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager)]
 FireCrawlerDep = Annotated[FireCrawler, Depends(get_crawler)]
+ChatServiceDep = Annotated[ChatService, Depends(get_chat_service)]

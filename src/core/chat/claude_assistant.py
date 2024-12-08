@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 from typing import Any, TypedDict
 
 import anthropic
@@ -15,11 +15,13 @@ from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 from pydantic import ConfigDict, Field
 from weave import Model
 
+from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 from src.core.chat.tool_definitions import tool_manager
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
+from src.models.event_models import StandardEvent, StandardEventType
 
 logger = get_logger()
 
@@ -72,7 +74,7 @@ class ConversationHistory:
         self.total_tokens = 0
         self.tokenizer = tiktoken.get_encoding(tokenizer)
 
-    def add_message(self, role: str, content: str | list[dict[str, Any]]) -> None:
+    async def add_message(self, role: str, content: str | list[dict[str, Any]]) -> None:
         """
         Add a message to the conversation and adjust for token limits.
 
@@ -94,12 +96,12 @@ class ConversationHistory:
 
         # estimate tokens for user messages
         if role == "user":
-            estimated_tokens = self._estimate_tokens(content)
+            estimated_tokens = await self._estimate_tokens(content)
             if self.total_tokens + estimated_tokens > self.max_tokens:
-                self._prune_history(estimated_tokens)
+                await self._prune_history(estimated_tokens)
             self.total_tokens += estimated_tokens
 
-    def update_token_count(self, input_tokens: int, output_tokens: int) -> None:
+    async def update_token_count(self, input_tokens: int, output_tokens: int) -> None:
         """
         Update the total token count and prune history if maximum is exceeded.
 
@@ -115,9 +117,9 @@ class ConversationHistory:
         """
         self.total_tokens = input_tokens + output_tokens
         if self.total_tokens > self.max_tokens:
-            self._prune_history(0)
+            await self._prune_history(0)
 
-    def _estimate_tokens(self, content: str | list[dict[str, Any]]) -> int:
+    async def _estimate_tokens(self, content: str | list[dict[str, Any]]) -> int:
         if isinstance(content, str):
             return len(self.tokenizer.encode(content))
         elif isinstance(content, list):
@@ -128,11 +130,11 @@ class ConversationHistory:
             )
         return 0
 
-    def _prune_history(self, new_tokens: int) -> None:
+    async def _prune_history(self, new_tokens: int) -> None:
         while self.total_tokens + new_tokens > self.max_tokens * 0.9 and len(self.messages) > 1:
             removed_message = self.messages.pop(0)
             # We don't know the exact token count of the removed message, so we estimate
-            self.total_tokens -= self._estimate_tokens(removed_message.content)
+            self.total_tokens -= await self._estimate_tokens(removed_message.content)
 
     def remove_last_message(self) -> None:
         """
@@ -151,7 +153,7 @@ class ConversationHistory:
             removed_message = self.messages.pop()
             logger.info(f"Removed message: {removed_message.role}")
 
-    def get_conversation_history(self, debug: bool = False) -> list[dict[str, Any]]:
+    async def get_conversation_history(self, debug: bool = False) -> list[dict[str, Any]]:
         """
         Retrieve the conversation history.
 
@@ -206,7 +208,7 @@ class ClaudeAssistant(Model):
 
     """
 
-    client: anthropic.Anthropic | None = None
+    client: anthropic.AsyncAnthropic | None = None
     vector_db: VectorDB
     api_key: str | None = Field(default=settings.anthropic_api_key)
     model_name: str = Field(default=settings.main_model)
@@ -316,24 +318,14 @@ class ClaudeAssistant(Model):
     @anthropic_error_handler
     def _init(self) -> None:
         """Initialize the Claude Assistant with API client and tools."""
-        self.client = anthropic.Anthropic(api_key=self.api_key, max_retries=2)
+        self.client = anthropic.AsyncAnthropic(api_key=self.api_key, max_retries=2)
         self.conversation_history = ConversationHistory()
         self.tools = self.tool_manager.get_all_tools()
         logger.debug("Claude assistant successfully initialized.")
 
     @base_error_handler
-    def update_system_prompt(self, document_summaries: list[dict[str, Any]]) -> None:
-        """
-        Update the system prompt with document summaries.
-
-        Args:
-            document_summaries (list[dict[str, Any]]): A list of dictionaries where each dictionary
-                contains 'filename', 'summary', and 'keywords' keys.
-
-        Raises:
-            KeyError: If any of the dictionaries in document_summaries does not contain the required keys.
-            Exception: For other unexpected errors.
-        """
+    async def update_system_prompt(self, document_summaries: list[dict[str, Any]]) -> None:
+        """Update the system prompt with document summaries."""
         logger.info(f"Loading {len(document_summaries)} summaries")
         summaries_text = "\n\n".join(
             f"* file: {summary['filename']}:\n"
@@ -345,34 +337,13 @@ class ClaudeAssistant(Model):
         logger.debug(f"Updated system prompt: {self.system_prompt}")
 
     @base_error_handler
-    def cached_system_prompt(self) -> list[dict[str, Any]]:
-        """
-        Retrieve the cached system prompt.
-
-        Args:
-            self: Instance of the class containing the system prompt.
-
-        Returns:
-            list[dict[str, Any]]: A list with a single dictionary containing the system prompt and its cache control
-            type.
-        """
+    async def cached_system_prompt(self) -> list[dict[str, Any]]:
+        """Retrieve the cached system prompt."""
         return [{"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}]
 
     @base_error_handler
-    def cached_tools(self) -> list[dict[str, Any]]:
-        """
-        Return a list of cached tools with specific attributes.
-
-        Args:
-            None
-
-        Returns:
-            list[dict[str, Any]]: A list of dictionaries where each dictionary represents a cached tool with `name`,
-            `description`, `input_schema`, and `cache_control` fields.
-
-        Raises:
-            None
-        """
+    async def cached_tools(self) -> list[dict[str, Any]]:
+        """Return a list of cached tools with specific attributes."""
         return [
             {
                 "name": tool["name"],
@@ -384,7 +355,7 @@ class ClaudeAssistant(Model):
         ]
 
     @base_error_handler
-    def preprocess_user_input(self, input_text: str) -> str:
+    async def preprocess_user_input(self, input_text: str) -> str:
         """
         Preprocess user input by removing whitespace and replacing newlines.
 
@@ -401,193 +372,96 @@ class ClaudeAssistant(Model):
         return cleaned_input
 
     @anthropic_error_handler
-    def get_response(self, user_input: str, stream: bool = True) -> Generator[str] | str:
-        """
-        Get the response from the assistant.
+    async def stream_response(self, user_input: str) -> AsyncGenerator[StandardEvent, None]:
+        """Stream responses from a conversation, handle tool use, and process assistant replies."""
+        try:
+            user_input = await self.preprocess_user_input(user_input)
+            await self.conversation_history.add_message(role="user", content=user_input)
+            logger.debug(f"Conversation history: {await self.conversation_history.get_conversation_history()}")
 
-        Args:
-            user_input (str): The input provided by the user.
-            stream (bool): Indicator whether to stream the response. Defaults to True.
-
-        Returns:
-            Generator[str] | str: Stream of responses if streaming is enabled, otherwise a single response.
-
-        Raises:
-            anthropic_error_handler: Handles any exceptions during the response generation.
-        """
-        if stream:
-            assistant_response_stream = self.stream_response(user_input)
-            return assistant_response_stream
-
-        else:
-            assistant_response = self.not_stream_response(user_input)
-            return assistant_response
-
-    @anthropic_error_handler
-    def stream_response(self, user_input: str) -> Generator[str]:
-        """
-        Stream responses from a conversation, handle tool use, and process assistant replies.
-
-        Args:
-            user_input (str): The input provided by the user.
-
-        Returns:
-            Generator[dict]: A generator yielding dictionaries with 'type' and content keys.
-
-        Raises:
-            Exception: If an error occurs while generating the response.
-        """
-        # iteration = 0
-        user_input = self.preprocess_user_input(user_input)
-        self.conversation_history.add_message(role="user", content=user_input)
-        logger.debug(
-            f"Printing conversation history for debugging: {self.conversation_history.get_conversation_history()}"
-        )
-
-        while True:
-            try:
-                messages = self.conversation_history.get_conversation_history()
-                with self.client.messages.stream(
+            while True:
+                messages = await self.conversation_history.get_conversation_history()
+                async with self.client.messages.stream(
                     messages=messages,
-                    system=self.cached_system_prompt(),
+                    system=await self.cached_system_prompt(),
                     max_tokens=8192,
                     model=self.model_name,
-                    tools=self.cached_tools(),
+                    tools=await self.cached_tools(),
                     extra_headers=self.extra_headers,
                 ) as stream:
-                    for event in stream:
-                        # logger.debug(event) enable for debugging
+                    async for event in stream:
+                        # EVENT: message token
                         if event.type == "text":
-                            # yield event.text
-                            yield {"type": "text", "content": event.text}
+                            yield StandardEvent(event_type=StandardEventType.MESSAGE_TOKEN, content=event.text)
 
                         elif event.type == "content_block_stop":
+                            # EVENT: tool use start
                             if event.content_block.type == "tool_use":
                                 logger.debug(f"Tool use detected: {event.content_block.name}")
-                                yield {"type": "tool_use", "tool": event.content_block.name}
+                                yield StandardEvent(
+                                    event_type=StandardEventType.TOOL_START,
+                                    content={
+                                        "type": "tool_use",
+                                        "tool": event.content_block.name,
+                                    },
+                                )
                         elif event.type == "message_stop":
+                            # EVENT: message end
                             logger.debug("===== Stream message ended =====")
+                            yield StandardEvent(event_type=StandardEventType.MESSAGE_END, content="")
 
-                # Get the final message after consuming the entire stream
-                assistant_response = stream.get_final_message()
-                self._process_assistant_response(assistant_response)
+                    # Your existing tool result handling stays the same
+                    assistant_response = await stream.get_final_message()
+                    logger.debug(f"Final message: {assistant_response}")
+                    await self._process_assistant_response(assistant_response)
 
-                # Handle tool use if present in the final message
-                tool_use_block = next((block for block in assistant_response.content if block.type == "tool_use"), None)
-                if tool_use_block:
-                    tool_result = self.handle_tool_use(tool_use_block.name, tool_use_block.input, tool_use_block.id)
-                    logger.debug(f"Tool result: {tool_result}")
+                    tool_use_block = next(
+                        (block for block in assistant_response.content if block.type == "tool_use"), None
+                    )
+                    if tool_use_block:
+                        tool_result = await self.handle_tool_use(
+                            tool_use_block.name, tool_use_block.input, tool_use_block.id
+                        )
+                        logger.debug(f"Tool result: {tool_result}")
 
-                # Only break if no tool was used
-                if not tool_use_block:
-                    break
+                    if not tool_use_block:
+                        break
 
-            # This should not be a broad exception but specific Anthropic API errors
-            # I no longer need broad exceptions as they will be caught be global exception handler
-            except Exception as e:
-                logger.error(f"Error generating response: {str(e)}")
-                self.conversation_history.remove_last_message()
-                raise Exception(f"An error occurred: {str(e)}") from e
-
-    @anthropic_error_handler
-    def not_stream_response(self, user_input: str) -> str:
-        """
-        Process user input and generate an assistant response without streaming.
-
-        Args:
-            user_input (str): The input string from the user.
-
-        Returns:
-            str: The assistant's response.
-
-        Raises:
-            Exception: If an error occurs during processing or response generation.
-        """
-        user_input = self.preprocess_user_input(user_input)
-        self.conversation_history.add_message(role="user", content=user_input)
-        logger.debug(
-            f"Printing conversation history for debugging: {self.conversation_history.get_conversation_history()}"
-        )
-
-        try:
-            while True:
-                messages = self.conversation_history.get_conversation_history()
-                response = self.client.beta.prompt_caching.messages.create(
-                    messages=messages,
-                    system=self.cached_system_prompt(),
-                    max_tokens=8192,
-                    model=self.model_name,
-                    tools=self.cached_tools(),
-                )
-
-                # tool use
-                if response.stop_reason == "tool_use":
-                    assistant_response = self._process_assistant_response(response)  # save the first response
-                    print(f"Assistant: Using a 🔨tool: {assistant_response}")
-
-                    tool_use = next(block for block in response.content if block.type == "tool_use")
-
-                    tool_result = self.handle_tool_use(tool_use.name, tool_use.input, tool_use.id)
-                    logger.debug(f"Tool result: {tool_result}")
-
-                # not a tool use
-                else:
-                    assistant_response = self._process_assistant_response(response)
-                    return assistant_response
+        except (RetryableLLMError, NonRetryableLLMError) as e:
+            logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
+            await self.conversation_history.remove_last_message()
+            yield StandardEvent(event_type=StandardEventType.ERROR, content=str(e))
+            raise
 
         except Exception as e:
-            logger.error(f"Error generating response: {str(e)}")
-            self.conversation_history.remove_last_message()
-            raise Exception(f"An error occurred: {str(e)}") from e
+            logger.error(f"Unexpected error in stream response: {str(e)}", exc_info=True)
+            await self.conversation_history.remove_last_message()
+            yield StandardEvent(event_type=StandardEventType.ERROR, content=str(e))
+            raise
 
     @base_error_handler
-    def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:
-        """
-        Process the assistant's response and update the conversation history.
-
-        Args:
-            response (PromptCachingBetaMessage | Message): The response object from the assistant.
-
-        Returns:
-            str: The text content of the assistant's response.
-
-        Raises:
-            Exception: Any exception that can be raised by the base_error_handler.
-        """
+    async def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:
+        """Process the assistant's response and update the conversation history."""
         logger.debug(
             f"Cached {response.usage.cache_creation_input_tokens} input tokens. \n"
             f"Read {response.usage.cache_read_input_tokens} tokens from cache"
         )
-        self.conversation_history.add_message(role="assistant", content=response.content)
-        self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
+        await self.conversation_history.add_message(role="assistant", content=response.content)
+        await self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
         logger.debug(
             f"Processed assistant response. Updated conversation history: "
-            f"{self.conversation_history.get_conversation_history()}"
+            f"{await self.conversation_history.get_conversation_history()}"
         )
 
         # Access the text from the first content block
         return response.content[0].text
 
     @base_error_handler
-    def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any]:
-        """
-        Handle tool use for specified tools.
-
-        Args:
-            tool_name (str): The name of the tool to be used.
-            tool_input (dict[str, Any]): The input parameters required by the tool.
-            tool_use_id (str): The unique identifier for this specific tool use.
-
-        Returns:
-            dict[str, Any]: A dictionary containing the tool result.
-
-        Raises:
-            Exception: If there is any error while executing the tool.
-        """
+    async def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any]:
+        """Handle tool use for specified tools."""
         try:
             if tool_name == "rag_search":
-                search_results = self.use_rag_search(tool_input=tool_input)
-
+                search_results = await self.use_rag_search(tool_input=tool_input)
                 tool_result = {
                     "role": "user",
                     "content": [
@@ -599,12 +473,10 @@ class ClaudeAssistant(Model):
                         }
                     ],
                 }
-
-                # save message to conversation history
-                self.conversation_history.add_message(**tool_result)
+                await self.conversation_history.add_message(**tool_result)
                 logger.debug(
                     f"Debugging conversation history after tool use: "
-                    f"{self.conversation_history.get_conversation_history()}"
+                    f"{await self.conversation_history.get_conversation_history()}"
                 )
                 return tool_result
 

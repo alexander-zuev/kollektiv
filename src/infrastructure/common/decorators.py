@@ -12,13 +12,11 @@ from anthropic import (
     AuthenticationError,
     BadRequestError,
     InternalServerError,
-    NotFoundError,
     PermissionDeniedError,
     RateLimitError,
 )
-from anthropic import APIError as AnthropicAPIError  # Anthropic's APIError
 
-from src.core._exceptions import DatabaseError
+from src.core._exceptions import DatabaseError, NonRetryableLLMError, RetryableLLMError
 from src.infrastructure.common.logger import get_logger
 
 logger = get_logger()
@@ -28,7 +26,7 @@ T = TypeVar("T")
 
 
 def base_error_handler(func: Callable[P, T]) -> Callable[P, T]:
-    """Base error handling decorator."""
+    """Base async error handling decorator."""
 
     @wraps(func)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
@@ -54,7 +52,7 @@ def generic_error_handler(func: Callable[..., T]) -> Callable[..., T]:
                 f"Unhandled exception in {func.__name__}: {str(e)}",
                 exc_info=True,  # Include traceback in the log
             )
-            raise  # Optionally re-raise the exception if you want it to propagate
+            raise
 
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs) -> T:
@@ -118,47 +116,36 @@ def anthropic_error_handler(func: Callable) -> Callable[..., T]:
     """
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        # Access the logger
-        logger = get_logger()
+    async def async_wrapper(*args, **kwargs) -> Any:
+        try:
+            return await func(*args, **kwargs)
+        except (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError) as e:
+            # Retryable errors
+            retry_after = getattr(e.response.headers, "retry-after", 30) if hasattr(e, "response") else None
+            logger.warning(f"Retryable error in {func.__name__}: {str(e)}")
+            raise RetryableLLMError(str(e), e, retry_after=retry_after) from e
+        except (AuthenticationError, BadRequestError, PermissionDeniedError, AnthropicError) as e:
+            # Non-retryable errors
+            logger.error(f"Non-retryable error in {func.__name__}: {str(e)}")
+            raise NonRetryableLLMError(str(e), e) from e
 
+    @functools.wraps(func)
+    def sync_wrapper(*args, **kwargs) -> Any:
         try:
             return func(*args, **kwargs)
-        except AuthenticationError as e:
-            logger.error(f"Authentication failed in {func.__name__}: {str(e)}")
-            raise
-        except BadRequestError as e:
-            logger.error(f"Invalid request in {func.__name__}: {str(e)}")
-            raise
-        except PermissionDeniedError as e:
-            logger.error(f"Permission denied in {func.__name__}: {str(e)}")
-            raise
-        except NotFoundError as e:
-            logger.error(f"Resource not found in {func.__name__}: {str(e)}")
-            raise
-        except RateLimitError as e:
-            logger.warning(f"Rate limit exceeded in {func.__name__}: {str(e)}")
-            raise
-        except APIConnectionError as e:
-            if isinstance(e, APITimeoutError):
-                logger.error(f"Request timed out in {func.__name__}: {str(e)}")
-            else:
-                logger.error(f"Connection error in {func.__name__}: {str(e)}")
-            raise
-        except InternalServerError as e:
-            logger.error(f"Anthropic internal server error in {func.__name__}: {str(e)}")
-            raise
-        except AnthropicAPIError as e:
-            logger.error(f"Unexpected API error in {func.__name__}: {str(e)}")
-            raise
-        except AnthropicError as e:
-            logger.error(f"Unexpected Anthropic error in {func.__name__}: {str(e)}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error in {func.__name__}: {str(e)}")
-            raise
+        except (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError) as e:
+            # Retryable errors
+            retry_after = getattr(e.response.headers, "retry-after", 30) if hasattr(e, "response") else None
+            logger.warning(f"Retryable error in {func.__name__}: {str(e)}")
+            raise RetryableLLMError(str(e), e, retry_after=retry_after) from e
+        except (AuthenticationError, BadRequestError, PermissionDeniedError, AnthropicError) as e:
+            # Non-retryable errors
+            logger.error(f"Non-retryable error in {func.__name__}: {str(e)}")
+            raise NonRetryableLLMError(str(e), e) from e
 
-    return wrapper
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    return sync_wrapper
 
 
 def supabase_operation(func: Callable[P, T]) -> Callable[P, T]:
