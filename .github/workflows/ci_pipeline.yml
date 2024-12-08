@@ -2,13 +2,13 @@ name: 10x CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 env:
   PYTHON_VERSION: "3.12"
-  POETRY_VERSION: "1.8.3"
+  POETRY_VERSION: "1.8.5"
   PYTHONPATH: ${{ github.workspace }}
   ENVIRONMENT: "staging"
   PYTHONUNBUFFERED: 1
@@ -19,7 +19,6 @@ env:
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
   COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
-
 
 jobs:
   quality:
@@ -35,7 +34,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'poetry'
+          cache: "poetry"
 
       - name: Install dependencies
         run: |
@@ -75,7 +74,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'poetry'
+          cache: "poetry"
 
       - name: Install dependencies
         run: |

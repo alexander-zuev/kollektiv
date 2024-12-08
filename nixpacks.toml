@@ -1,0 +1,22 @@
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.12.7"
+NIXPACKS_POETRY_VERSION = "1.8.5"  
+
+[phases.setup]
+# Specifies the required Python version
+nixpkgs = ["..."]
+
+[phases.install]
+# Set up a virtual environment and install dependencies
+commands = [
+  "echo '🚀 Starting Kollektiv installation...'",
+  "echo '📦 Creating virtual environment...'",
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate",
+  "pip install poetry",
+  "poetry install --no-dev --no-interaction --no-ansi"
+]
+
+[phases.start]
+# Command to start the application
+cmd = "poetry run kollektiv"
