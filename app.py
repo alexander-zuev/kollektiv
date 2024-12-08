@@ -53,6 +53,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ngrok.kill()
 
 
+def get_allowed_origins() -> list[str]:
+    """Get the allowed origins based on the environment."""
+    if settings.environment == Environment.LOCAL:
+        return ["*"]
+    return [
+        "https://thekollektiv.ai",  # Main domain
+        "https://bountiful-truth-staging.up.railway.app",  # Railway frontend URL
+        "https://bountiful-truth.railway.internal",  # Railway internal URL
+    ]
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     sentry_sdk.init(
@@ -74,7 +85,7 @@ def create_app() -> FastAPI:
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=get_allowed_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -124,6 +135,7 @@ def run() -> None:
 
     try:
         logger.info(f"Starting API server on {settings.api_host}:{settings.api_port}")
+        logger.info(f"Environment: {settings.environment.value}")
         app = create_app()
         uvicorn.run(
             app,

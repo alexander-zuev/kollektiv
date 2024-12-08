@@ -41,8 +41,16 @@ class Settings(BaseSettings):
     weave_project_name: str | None = Field(None, alias="WEAVE_PROJECT_NAME")
 
     # Server configuration
-    api_host: str = Field("127.0.0.1", description="API host")
-    api_port: int = Field(8000, description="API port")
+    api_host: str = Field(
+        "127.0.0.1" if Environment.LOCAL else "0.0.0.0",  # Local uses localhost, others use 0.0.0.0
+        alias="API_HOST",
+        description="API host - 127.0.0.1 for local, 0.0.0.0 for staging/prod",
+    )
+    api_port: int = Field(
+        default=8000,
+        alias="PORT",  # Railway injects PORT environment variable
+        description="API port - defaults to 8000, but can be overridden by Railway's PORT variable",
+    )
     chainlit_host: str = Field("127.0.0.1", description="Chainlit host")
     chainlit_port: int = Field(8001, description="Chainlit port")
     log_level: str = Field("debug", description="Logging level")
