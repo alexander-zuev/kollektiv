@@ -25,6 +25,7 @@ class TestSupabaseClient:
         # Assert
         mock_create_client.assert_called_once_with(
             supabase_url=settings.supabase_url, supabase_key=settings.supabase_key
+        )
         assert client._client is not None
 
     async def test_connection_failure(self, mock_create_async_client):

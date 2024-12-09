@@ -1,4 +1,5 @@
 from src.core.chat.claude_assistant import ClaudeAssistant
+from src.core.chat.conversation_manager import ConversationManager
 from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.logger import get_logger
@@ -26,6 +27,7 @@ class ServiceContainer:
         self.claude_assistant: ClaudeAssistant | None = None
         self.vector_db: VectorDB | None = None
         self.chat_service: ChatService | None = None
+        self.conversation_manager: ConversationManager | None = None
 
     def initialize_services(self) -> None:
         """Initialize all services."""
@@ -45,7 +47,13 @@ class ServiceContainer:
 
             self.claude_assistant = ClaudeAssistant(vector_db=self.vector_db)
 
-            self.chat_service = ChatService(claude_assistant=self.claude_assistant, data_service=self.data_service)
+            self.conversation_manager = ConversationManager()
+
+            self.chat_service = ChatService(
+                claude_assistant=self.claude_assistant,
+                data_service=self.data_service,
+                conversation_manager=self.conversation_manager,
+            )
 
         except Exception:
             logger.error("Error during service initialization")

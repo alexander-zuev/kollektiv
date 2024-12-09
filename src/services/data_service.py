@@ -10,8 +10,7 @@ from src.core._exceptions import (
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.storage.data_repository import DataRepository
 from src.models.base_models import BaseDbModel
-from src.models.chat_models import SourceSummary
-from src.models.content_models import DataSource, Document
+from src.models.content_models import DataSource, Document, SourceSummary
 from src.models.job_models import Job
 
 logger = get_logger()

@@ -6,9 +6,9 @@ from sse_starlette.sse import EventSourceResponse
 from src.api.dependencies import ChatServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.chat_schemas import (
-    ChatRequest,
     ConversationListResponse,
     ConversationMessages,
+    UserMessage,
 )
 
 # Define routers with base prefix only
@@ -17,13 +17,15 @@ conversations_router = APIRouter(prefix=V0_PREFIX)
 
 
 @chat_router.post(Routes.V0.Chat.CHAT)
-async def chat(request: ChatRequest, chat_service: ChatServiceDep) -> EventSourceResponse:
+async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourceResponse:
     """
     Sends a user message and gets a streaming response.
 
     Returns Server-Sent Events with tokens.
     """
-    return EventSourceResponse(chat_service.stream_response(request), media_type="text/event-stream")
+    return EventSourceResponse(
+        chat_service.get_response(user_id=request.user_id, message=request.message), media_type="text/event-stream"
+    )
 
 
 # Get all conversations

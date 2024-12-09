@@ -1,14 +1,13 @@
 # TODO: Add user-specific session handling so multiple users can interact with the assistant concurrently.
 # TODO: Implement async handling for document indexing, embedding, and summarizing to avoid blocking operations.
 # TODO: Add a queue for managing multiple user requests (e.g., submitting multiple documents).
+# TODO: Explore langgraph as a basis for the LLM chatbot with a RAG tool + persistence.L
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
-from typing import Any, TypedDict
+from typing import Any
 
 import anthropic
-import tiktoken
 import weave
 from anthropic.types import Message
 from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
@@ -21,170 +20,11 @@ from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
-from src.models.event_models import StandardEvent, StandardEventType
+from src.models.chat_models import ConversationHistory, StandardEvent, StandardEventType
 
 logger = get_logger()
 
 
-class MessageContent(TypedDict):
-    """Type definition for message content."""
-
-    type: str
-    content: str
-    tool_use_id: str | None
-
-
-class ConversationMessage:
-    """
-    Represent a conversation message with an ID, role, and content.
-
-    Args:
-        role (str): The role of the message sender (e.g., 'user', 'system').
-        content (Union[str, list[MessageContent]]): The content of the message.
-    """
-
-    def __init__(self, role: str, content: str | list[MessageContent]) -> None:
-        self.id: str = str(uuid.uuid4())
-        self.role: str = role
-        self.content: str | list[MessageContent] = content
-
-    def to_dict(self, include_id: bool = False) -> dict[str, Any]:
-        """Convert the message object to a dictionary."""
-        message_dict: dict[str, Any] = {"role": self.role, "content": self.content}
-        if include_id:
-            message_dict["id"] = self.id
-        return message_dict
-
-
-class ConversationHistory:
-    """
-    Manage the history of a conversation, including token counts and message handling.
-
-    Args:
-        max_tokens (int): Maximum number of tokens allowed in the conversation history (default is 200000).
-        tokenizer (str): The tokenizer encoding to use (default is "cl100k_base").
-
-    class ConversationHistory:
-        def __init__(self, max_tokens: int = 200000, tokenizer: str = "cl100k_base"):
-    """
-
-    def __init__(self, max_tokens: int = 200000, tokenizer: str = "cl100k_base"):
-        self.max_tokens = max_tokens  # specifically for Sonnet 3.5
-        self.messages: list[ConversationMessage] = []
-        self.total_tokens = 0
-        self.tokenizer = tiktoken.get_encoding(tokenizer)
-
-    async def add_message(self, role: str, content: str | list[dict[str, Any]]) -> None:
-        """
-        Add a message to the conversation and adjust for token limits.
-
-        Args:
-            role (str): The role of the sender, e.g., 'user', 'system', or 'assistant'.
-            content (str or list[dict[str, Any]]): The content of the message, which can be a string or a list of
-            dictionaries.
-
-        Returns:
-            None
-
-        Raises:
-            ValueError: If the role is not recognized.
-            MemoryError: If the total tokens exceed the maximum allowed even after pruning.
-        """
-        message = ConversationMessage(role, content)
-        self.messages.append(message)
-        logger.debug(f"Added message for role={message.role}")
-
-        # estimate tokens for user messages
-        if role == "user":
-            estimated_tokens = await self._estimate_tokens(content)
-            if self.total_tokens + estimated_tokens > self.max_tokens:
-                await self._prune_history(estimated_tokens)
-            self.total_tokens += estimated_tokens
-
-    async def update_token_count(self, input_tokens: int, output_tokens: int) -> None:
-        """
-        Update the total token count and prune history if maximum is exceeded.
-
-        Args:
-            input_tokens (int): The number of input tokens.
-            output_tokens (int): The number of output tokens.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        self.total_tokens = input_tokens + output_tokens
-        if self.total_tokens > self.max_tokens:
-            await self._prune_history(0)
-
-    async def _estimate_tokens(self, content: str | list[dict[str, Any]]) -> int:
-        if isinstance(content, str):
-            return len(self.tokenizer.encode(content))
-        elif isinstance(content, list):
-            return sum(
-                len(self.tokenizer.encode(item["text"]))
-                for item in content
-                if isinstance(item, dict) and "text" in item
-            )
-        return 0
-
-    async def _prune_history(self, new_tokens: int) -> None:
-        while self.total_tokens + new_tokens > self.max_tokens * 0.9 and len(self.messages) > 1:
-            removed_message = self.messages.pop(0)
-            # We don't know the exact token count of the removed message, so we estimate
-            self.total_tokens -= await self._estimate_tokens(removed_message.content)
-
-    def remove_last_message(self) -> None:
-        """
-        Remove the last message from the messages list and log its role.
-
-        Args:
-            self: The instance of the class containing the messages list.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        if self.messages:
-            removed_message = self.messages.pop()
-            logger.info(f"Removed message: {removed_message.role}")
-
-    async def get_conversation_history(self, debug: bool = False) -> list[dict[str, Any]]:
-        """
-        Retrieve the conversation history.
-
-        Args:
-            debug (bool): If True, include message IDs in the output.
-
-        Returns:
-            list[dict[str, Any]]: A list of dictionaries representing the messages.
-
-        Raises:
-            None
-        """
-        return [msg.to_dict(include_id=debug) for msg in self.messages]
-
-    def log_conversation_state(self) -> None:
-        """
-        Log the current state of the conversation.
-
-        Args:
-            self: Instance of the class containing the current conversation state.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        logger.debug(f"Conversation state: messages={len(self.messages)}, " f"Total tokens={self.total_tokens}, ")
-
-
-# Client Class
 class ClaudeAssistant(Model):
     """
     Define the ClaudeAssistant class for managing AI assistant functionalities with various tools and configurations.
@@ -214,6 +54,7 @@ class ClaudeAssistant(Model):
     model_name: str = Field(default=settings.main_model)
     base_system_prompt: str = Field(default="")
     system_prompt: str = Field(default="")
+    # TODO: no longer needed?
     conversation_history: ConversationHistory | None = None
     retrieved_contexts: list[str] = Field(default_factory=list)
     tool_manager: Any = Field(default_factory=lambda: tool_manager)
@@ -303,6 +144,7 @@ class ClaudeAssistant(Model):
                     the user's level of understanding and the complexity of the topic at hand.
                     """,
             system_prompt="",  # Will format below
+            # TODO: no longer needed?
             conversation_history=None,  # Will initialize in _init()
             retrieved_contexts=[],
             tool_manager=tool_manager,
@@ -319,6 +161,7 @@ class ClaudeAssistant(Model):
     def _init(self) -> None:
         """Initialize the Claude Assistant with API client and tools."""
         self.client = anthropic.AsyncAnthropic(api_key=self.api_key, max_retries=2)
+        # TODO: no longer needed?
         self.conversation_history = ConversationHistory()
         self.tools = self.tool_manager.get_all_tools()
         logger.debug("Claude assistant successfully initialized.")
@@ -372,15 +215,19 @@ class ClaudeAssistant(Model):
         return cleaned_input
 
     @anthropic_error_handler
-    async def stream_response(self, user_input: str) -> AsyncGenerator[StandardEvent, None]:
+    async def stream_response(self, conv_history: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
         """Stream responses from a conversation, handle tool use, and process assistant replies."""
         try:
-            user_input = await self.preprocess_user_input(user_input)
-            await self.conversation_history.add_message(role="user", content=user_input)
-            logger.debug(f"Conversation history: {await self.conversation_history.get_conversation_history()}")
+            # user_input = await self.preprocess_user_input(user_input)
+            # TODO: no longer needed?
+            # await self.conversation_history.add_message(role="user", content=user_input)
+            # logger.debug(f"Conversation history: {await self.conversation_history.get_conversation_history()}")
+            logger.debug(f"Conversation history: {len(conv_history.messages)} messages.")
 
             while True:
-                messages = await self.conversation_history.get_conversation_history()
+                # messages = await self.conversation_history.get_conversation_history()
+                messages = conv_history.to_anthropic_messages()
+                logger.debug(f"Messages: {messages}")
                 async with self.client.messages.stream(
                     messages=messages,
                     system=await self.cached_system_prompt(),
@@ -390,9 +237,10 @@ class ClaudeAssistant(Model):
                     extra_headers=self.extra_headers,
                 ) as stream:
                     async for event in stream:
+                        logger.debug(f"Received event type: {event.type}")
                         # EVENT: message token
                         if event.type == "text":
-                            yield StandardEvent(event_type=StandardEventType.MESSAGE_TOKEN, content=event.text)
+                            yield StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=event.text)
 
                         elif event.type == "content_block_stop":
                             # EVENT: tool use start
@@ -408,7 +256,7 @@ class ClaudeAssistant(Model):
                         elif event.type == "message_stop":
                             # EVENT: message end
                             logger.debug("===== Stream message ended =====")
-                            yield StandardEvent(event_type=StandardEventType.MESSAGE_END, content="")
+                            yield StandardEvent(event_type=StandardEventType.MESSAGE_STOP, content="")
 
                     # Your existing tool result handling stays the same
                     assistant_response = await stream.get_final_message()
@@ -429,12 +277,14 @@ class ClaudeAssistant(Model):
 
         except (RetryableLLMError, NonRetryableLLMError) as e:
             logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
+            # TODO: no longer needed?
             await self.conversation_history.remove_last_message()
             yield StandardEvent(event_type=StandardEventType.ERROR, content=str(e))
             raise
 
         except Exception as e:
             logger.error(f"Unexpected error in stream response: {str(e)}", exc_info=True)
+            # TODO: no longer needed?
             await self.conversation_history.remove_last_message()
             yield StandardEvent(event_type=StandardEventType.ERROR, content=str(e))
             raise
@@ -446,6 +296,7 @@ class ClaudeAssistant(Model):
             f"Cached {response.usage.cache_creation_input_tokens} input tokens. \n"
             f"Read {response.usage.cache_read_input_tokens} tokens from cache"
         )
+        # TODO: no longer needed?
         await self.conversation_history.add_message(role="assistant", content=response.content)
         await self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
         logger.debug(
@@ -469,7 +320,7 @@ class ClaudeAssistant(Model):
                             "type": "tool_result",
                             "tool_use_id": tool_use_id,
                             "content": f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
-                            f"Now please try to answer my original request.",
+                            f"Please use this context to answer my original request, if it's relevant.",
                         }
                     ],
                 }
@@ -733,6 +584,7 @@ class ClaudeAssistant(Model):
             "contexts": contexts,
         }
 
+    # TODO: refactor to conversation history
     def reset_conversation(self) -> None:
         """
         Reset the conversation state to its initial state.
