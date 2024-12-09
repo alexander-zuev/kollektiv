@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -7,6 +8,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.api.middleware.rate_limit import HealthCheckRateLimit
 from src.api.system.health import router as health_router
@@ -28,7 +30,6 @@ logger = get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events."""
-    logger.info("Starting up Kollektiv API...")
     try:
         # Initialize ngrok for local development
         if settings.environment == Environment.LOCAL:
@@ -64,6 +65,43 @@ def get_allowed_origins() -> list[str]:
     ]
 
 
+# Add debug middleware
+class RequestDebugMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        """Debug middleware to log request details."""
+        try:
+            # Log detailed request info
+            logger.debug(
+                f"\n{'='*50}\n"
+                f"REQUEST DETAILS:\n"
+                f"Method: {request.method}\n"
+                f"Path: {request.url.path}\n"
+                f"Client: {request.client.host if request.client else 'Unknown'}\n"
+                f"Headers: {json.dumps(dict(request.headers), indent=2)}\n"
+                f"Environment: {settings.environment}"
+            )
+
+            # Get request body for POST/PUT requests
+            if request.method in ["POST", "PUT"]:
+                try:
+                    body = await request.body()
+                    if body:
+                        logger.debug(f"Request Body: {body.decode()}")
+                except Exception as e:
+                    logger.debug(f"Could not read body: {str(e)}")
+
+            # Process request
+            response = await call_next(request)
+
+            # Log response info
+            logger.debug(f"\nRESPONSE DETAILS:\n" f"Status: {response.status_code}\n" f"{'='*50}")
+
+            return response
+        except Exception as e:
+            logger.error(f"Error in debug middleware: {str(e)}")
+            return await call_next(request)
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     sentry_sdk.init(
@@ -81,13 +119,15 @@ def create_app() -> FastAPI:
 
     # instrument with logfire
     logfire.instrument_fastapi(app)
+    # Add debug middleware first
+    app.add_middleware(RequestDebugMiddleware)
 
     # Configure CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=get_allowed_origins(),
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],  # Be explicit about methods
         allow_headers=["*"],
     )
 
@@ -134,7 +174,7 @@ def run() -> None:
         )
 
     try:
-        logger.info(f"Starting API server on {settings.api_host}:{settings.api_port}")
+        logger.info(f"Starting Kollektiv API on {settings.api_host}:{settings.api_port}")
         logger.info(f"Environment: {settings.environment.value}")
         app = create_app()
         uvicorn.run(

@@ -5,21 +5,7 @@ from pydantic import BaseModel, Field
 
 from src.models.chat_models import ConversationMessage
 
-
-class MessageType(str, Enum):
-    """Client-facing event types."""
-
-    TOKEN = "token"
-    TOOL_USE = "tool_use"
-    DONE = "done"
-    ERROR = "error"
-
-
-class ChatEvent(BaseModel):
-    """Client-facing event structure."""
-
-    event_type: MessageType
-    content: str | dict  # token text or tool info
+# Chat models
 
 
 class ChatRequest(BaseModel):
@@ -31,6 +17,24 @@ class ChatRequest(BaseModel):
     data_sources: list[UUID] = Field(..., description="List of data sources IDs enabaled in this conversation")
 
 
+class MessageType(str, Enum):
+    """Client-facing event types."""
+
+    TOKEN = "token"
+    TOOL_USE = "tool_use"
+    TOOL_RESULT = "tool_result"
+    DONE = "done"
+    ERROR = "error"
+
+
+class ChatResponse(BaseModel):
+    """Client-facing event structure."""
+
+    event_type: MessageType
+    content: str | dict  # token text or tool info
+
+
+# Conversation models
 class ConversationSummary(BaseModel):
     """Single conversation summary for the list view."""
 

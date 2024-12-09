@@ -1,6 +1,7 @@
 # TODO: Add user-specific session handling so multiple users can interact with the assistant concurrently.
 # TODO: Implement async handling for document indexing, embedding, and summarizing to avoid blocking operations.
 # TODO: Add a queue for managing multiple user requests (e.g., submitting multiple documents).
+# TODO: Explore langgraph as a basis for the LLM chatbot with a RAG tool + persistence.L
 from __future__ import annotations
 
 import uuid
@@ -21,39 +22,9 @@ from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
-from src.models.event_models import StandardEvent, StandardEventType
+from src.models.chat_models import ConversationMessage, StandardEvent, StandardEventType, ConversationMessage
 
 logger = get_logger()
-
-
-class MessageContent(TypedDict):
-    """Type definition for message content."""
-
-    type: str
-    content: str
-    tool_use_id: str | None
-
-
-class ConversationMessage:
-    """
-    Represent a conversation message with an ID, role, and content.
-
-    Args:
-        role (str): The role of the message sender (e.g., 'user', 'system').
-        content (Union[str, list[MessageContent]]): The content of the message.
-    """
-
-    def __init__(self, role: str, content: str | list[MessageContent]) -> None:
-        self.id: str = str(uuid.uuid4())
-        self.role: str = role
-        self.content: str | list[MessageContent] = content
-
-    def to_dict(self, include_id: bool = False) -> dict[str, Any]:
-        """Convert the message object to a dictionary."""
-        message_dict: dict[str, Any] = {"role": self.role, "content": self.content}
-        if include_id:
-            message_dict["id"] = self.id
-        return message_dict
 
 
 class ConversationHistory:
@@ -390,9 +361,10 @@ class ClaudeAssistant(Model):
                     extra_headers=self.extra_headers,
                 ) as stream:
                     async for event in stream:
+                        logger.debug(f"Received event type: {event.type}")
                         # EVENT: message token
                         if event.type == "text":
-                            yield StandardEvent(event_type=StandardEventType.MESSAGE_TOKEN, content=event.text)
+                            yield StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=event.text)
 
                         elif event.type == "content_block_stop":
                             # EVENT: tool use start
@@ -408,7 +380,7 @@ class ClaudeAssistant(Model):
                         elif event.type == "message_stop":
                             # EVENT: message end
                             logger.debug("===== Stream message ended =====")
-                            yield StandardEvent(event_type=StandardEventType.MESSAGE_END, content="")
+                            yield StandardEvent(event_type=StandardEventType.MESSAGE_STOP, content="")
 
                     # Your existing tool result handling stays the same
                     assistant_response = await stream.get_final_message()

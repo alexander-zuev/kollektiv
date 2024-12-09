@@ -4,17 +4,20 @@ NIXPACKS_POETRY_VERSION = "1.8.5"
 
 [phases.setup]
 # Specifies the required Python version
-nixpkgs = ["..."]
+nixpkgs = ["python312", "gcc"]
 
 [phases.install]
 # Set up a virtual environment and install dependencies
+# Cache dependencies layer
+cache_directories = ["/root/.cache/pip", "/opt/venv"]
 commands = [
   "echo '🚀 Starting Kollektiv installation...'",
   "echo '📦 Creating virtual environment...'",
   "python -m venv /opt/venv",
   ". /opt/venv/bin/activate",
   "pip install poetry",
-  "poetry install --no-dev --no-interaction --no-ansi"
+  "poetry config virtualenvs.create false",
+  "poetry install --only main --no-interaction --no-ansi"
 ]
 
 [phases.start]
