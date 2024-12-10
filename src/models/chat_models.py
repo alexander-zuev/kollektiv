@@ -138,6 +138,30 @@ class ConversationHistory(BaseModel):
         """Convert entire history to Anthropic format"""
         return [msg.to_anthropic() for msg in self.messages]
 
+    def append(self, role: Role | str, content: str | MessageContent) -> None:
+        """
+        Append a new message to the conversation history.
+
+        Args:
+            role: The role of the message sender (user or assistant)
+            content: The content of the message, either as string or MessageContent
+        """
+        if isinstance(role, str):
+            role = Role(role)
+
+        if isinstance(content, str):
+            content = MessageContent.from_str(content)
+        elif not isinstance(content, MessageContent):
+            raise ValueError("Content must be either string or MessageContent")
+
+        message = ConversationMessage(
+            conversation_id=self.conversation_id,
+            role=role,
+            content=content
+        )
+        self.messages.append(message)
+        self.updated_at = datetime.now(UTC)
+
 
 # TODO: to refactor
 # class ConversationMessage:

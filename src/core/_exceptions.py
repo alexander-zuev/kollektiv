@@ -267,6 +267,12 @@ class ConnectionError(StreamingError):
     pass
 
 
+class ClientDisconnectError(StreamingError):
+    """Raised when client disconnects during streaming."""
+
+    pass
+
+
 class RetryableLLMError(RetryableError, LLMError):
     """Base class for retryable LLM errors."""
 

@@ -8,37 +8,33 @@ import logging
 from typing import Any, AsyncGenerator, Optional
 
 import aiohttp
-from anthropic import AsyncAnthropic, RateLimitError, AnthropicError
-from anthropic._types import NOT_GIVEN
-from anthropic.types import (
-    Message,
-    MessageParam,
-    MessageStreamEvent,
-    ContentBlockDeltaEvent,
-    ContentBlockStartEvent,
-    ContentBlockStopEvent,
-    MessageDeltaEvent,
-    MessageStartEvent,
-    MessageStopEvent,
+import weave
+from anthropic import (
+    APIError,
+    APIStatusError,
+    APITimeoutError,
+    AsyncAnthropic,
+    RateLimitError,
 )
+from anthropic.types import Message, MessageParam
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.core._exceptions import ConnectionError, StreamingError, TokenLimitError
-from src.core.chat.exceptions import ClientDisconnectError
+from src.core._exceptions import (
+    ClientDisconnectError,
+    ConnectionError,
+    StreamingError,
+    TokenLimitError,
+)
+from src.core.chat.events import StandardEvent, StandardEventType
 from src.core.decorators import anthropic_error_handler, base_error_handler
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.config.settings import settings
 from src.models.chat_models import (
     ConversationHistory,
+    ConversationMessage,
+    MessageContent,
     Role,
-    StandardEvent,
-    StandardEventType,
 )
-
-try:
-    import weave
-except ImportError:
-    weave = None
 
 logger = logging.getLogger("kollektiv.src.core.chat.claude_assistant")
 
@@ -78,7 +74,10 @@ class ClaudeAssistant(BaseModel):
     client: AsyncAnthropic | None = Field(default=None)
     vector_db: VectorDB
     model: str = Field(default=settings.main_model)
-    system_prompt: str = Field(default=DEFAULT_SYSTEM_PROMPT)
+    system_prompt: MessageContent = Field(
+        default_factory=lambda: MessageContent.from_str(DEFAULT_SYSTEM_PROMPT),
+        description="System prompt with document context"
+    )
     conversation_history: ConversationHistory = Field(default_factory=ConversationHistory)
     max_tokens: int = Field(default=4096)
     api_key: str = Field(default=settings.anthropic_api_key)
@@ -103,84 +102,88 @@ class ClaudeAssistant(BaseModel):
             max_retries=2
         )
 
-    async def stream_response(self, message: str) -> AsyncGenerator[StandardEvent, None]:
+    async def update_system_prompt(self, document_summaries: list[dict[str, Any]] | None = None) -> None:
+        """Update system prompt with document summaries."""
+        if document_summaries:
+            summaries_text = "\n".join(
+                f"- {summary['filename']}: {summary['summary']}"
+                for summary in document_summaries
+            )
+            new_prompt = DEFAULT_SYSTEM_PROMPT.format(document_summaries=summaries_text)
+        else:
+            new_prompt = DEFAULT_SYSTEM_PROMPT.format(document_summaries="No documents loaded.")
+
+        self.system_prompt = MessageContent.from_str(new_prompt)
+
+    async def stream_response(self, conversation: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
         """
         Stream a response from the assistant.
 
         Args:
-            message: The user message to respond to
+            conversation: The conversation history to use for generating the response.
 
-        Returns:
-            AsyncGenerator[StandardEvent, None]: A stream of events containing the assistant's response
+        Yields:
+            StandardEvent: Events containing response content or error information.
 
         Raises:
-            ConnectionError: If there's an issue connecting to the Anthropic API
-            StreamingError: If there's an error during streaming
-            TokenLimitError: If the response exceeds token limits
-            ClientDisconnectError: If the client disconnects during streaming
+            StreamingError: If there is an error during streaming.
+            TokenLimitError: If the token limit is exceeded.
+            ClientDisconnectError: If the client disconnects during streaming.
         """
-        try:
-            # Add message to conversation history
-            self.conversation_history.append(Role.USER, message)
+        if not self.client:
+            raise StreamingError("Anthropic client not initialized")
 
-            # Create streaming response
+        try:
+            messages = conversation.to_anthropic_messages()
+            if not messages:
+                raise ValueError("No messages in conversation history")
+
+            # Add system prompt if it exists
+            if self.system_prompt:
+                messages.insert(0, {"role": "system", "content": self.system_prompt.to_anthropic()})
+
             stream = await self.client.messages.create(
-                messages=self.conversation_history.to_list(),
                 model=self.model,
                 max_tokens=self.max_tokens,
+                messages=messages,
                 stream=True,
-                system=self.system_prompt
             )
 
-            # Stream the response
-            current_message = ""
             async for chunk in stream:
                 if chunk.type == "message_start":
                     yield StandardEvent(
                         event_type=StandardEventType.MESSAGE_START,
-                        content=None
+                        content={"usage": chunk.usage}
                     )
                 elif chunk.type == "content_block_start":
-                    yield StandardEvent(
-                        event_type=StandardEventType.CONTENT_BLOCK_START,
-                        content=None
-                    )
+                    # Handle content block start if needed
+                    continue
                 elif chunk.type == "content_block_delta":
-                    current_message += chunk.delta.text
-                    yield StandardEvent(
-                        event_type=StandardEventType.CONTENT_BLOCK_DELTA,
-                        content=chunk.delta.text
-                    )
-                elif chunk.type == "content_block_stop":
-                    yield StandardEvent(
-                        event_type=StandardEventType.CONTENT_BLOCK_STOP,
-                        content=None
-                    )
+                    if chunk.delta.text:
+                        yield StandardEvent(
+                            event_type=StandardEventType.TEXT_TOKEN,
+                            content=chunk.delta.text
+                        )
                 elif chunk.type == "message_delta":
-                    yield StandardEvent(
-                        event_type=StandardEventType.MESSAGE_DELTA,
-                        content=chunk.delta
-                    )
+                    # Handle message delta if needed
+                    continue
                 elif chunk.type == "message_stop":
-                    # Add assistant's response to conversation history
-                    self.conversation_history.append(Role.ASSISTANT, current_message)
                     yield StandardEvent(
                         event_type=StandardEventType.MESSAGE_STOP,
-                        content=None
+                        content={"usage": chunk.usage}
                     )
 
-        except aiohttp.ClientError as e:
-            logger.error(f"Connection error during streaming: {str(e)}")
-            raise ConnectionError("Failed to connect to Anthropic API") from e
-        except RateLimitError as e:
-            logger.error(f"Rate limit exceeded: {str(e)}")
-            raise TokenLimitError("Rate limit exceeded") from e
-        except AnthropicError as e:
-            logger.error(f"Anthropic API error: {str(e)}")
-            raise StreamingError(f"Error during streaming: {str(e)}") from e
         except Exception as e:
-            logger.error(f"Unexpected error during streaming: {str(e)}")
-            raise StreamingError(f"Unexpected error during streaming: {str(e)}") from e
+            if isinstance(e, RateLimitError):
+                raise TokenLimitError(f"Token limit exceeded: {str(e)}")
+            elif isinstance(e, (APIStatusError, APITimeoutError)):
+                raise StreamingError(f"API error during streaming: {str(e)}")
+            elif isinstance(e, ClientDisconnectError):
+                raise
+            elif isinstance(e, (ConnectionError, aiohttp.ClientError)):
+                raise StreamingError(f"Connection error during streaming: {str(e)}")
+            else:
+                raise StreamingError(f"Unexpected error during streaming: {str(e)}")
 
     def reset_conversation(self) -> None:
         """Reset the conversation history."""

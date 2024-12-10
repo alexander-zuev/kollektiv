@@ -1,14 +1,38 @@
 import os
 import sys
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+
+# Set test environment variables before any imports
+os.environ.update({
+    "ENVIRONMENT": "local",
+    "FIRECRAWL_API_KEY": "test-key",
+    "ANTHROPIC_API_KEY": "test-key",
+    "OPENAI_API_KEY": "test-key",
+    "COHERE_API_KEY": "test-key",
+    "SUPABASE_URL": "https://test.supabase.co",
+    "SUPABASE_SERVICE_KEY": "test-key",
+    "LOGFIRE_TOKEN": "test-key",
+    "REDIS_URL": "redis://localhost:6379",
+    "LOG_LEVEL": "DEBUG"
+})
+
+from typing import Any, Generic, List, Optional, TypeVar
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 import pytest_asyncio
+from anthropic.types import (
+    MessageStartEvent,
+    MessageDeltaEvent,
+    MessageStopEvent,
+)
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fastapi.testclient import TestClient
+
+from src.core.search.vector_db import VectorDB
+from src.infrastructure.config.settings import Environment, settings
+from tests.test_settings import TestSettings
 
 # Create comprehensive settings mock before any imports
 settings_mock = Mock()
@@ -116,23 +140,41 @@ def mock_openai_embeddings(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def mock_environment_variables():
-    """Set required environment variables for tests."""
-    # Store original environment
-    original_env = dict(os.environ)
+def mock_settings():
+    """Mock settings for testing."""
+    test_env = {
+        "ENVIRONMENT": Environment.LOCAL.value,
+        "FIRECRAWL_API_KEY": "test-key",
+        "ANTHROPIC_API_KEY": "test-key",
+        "OPENAI_API_KEY": "test-key",
+        "COHERE_API_KEY": "test-key",
+        "SUPABASE_URL": "https://test.supabase.co",
+        "SUPABASE_SERVICE_KEY": "test-key",
+        "LOGFIRE_TOKEN": "test-key",
+        "REDIS_URL": "redis://localhost:6379",
+        "LOG_LEVEL": "DEBUG"
+    }
 
-    # Environment variables are already set at module level
-    yield
-
-    # Restore original environment
-    os.environ.clear()
-    os.environ.update(original_env)
+    with patch.dict(os.environ, test_env, clear=True):
+        test_settings = TestSettings()
+        with patch("src.infrastructure.config.settings.settings", test_settings):
+            yield test_settings
 
 
 @pytest.fixture
-def mock_vector_db():
-    """Create a mock object for VectorDB."""
-    return MagicMock(spec=VectorDB)
+async def mock_vector_db():
+    """Create a mock vector database."""
+    class MockVectorDB(VectorDB):
+        async def search(self, query: str, limit: int = 5) -> List[Document]:
+            return []
+
+        async def add_documents(self, documents: Documents) -> None:
+            pass
+
+        async def delete_documents(self, ids: List[str]) -> None:
+            pass
+
+    return MockVectorDB()
 
 
 @pytest.fixture
@@ -141,37 +183,72 @@ def real_vector_db():
     return VectorDB()
 
 
-@pytest.fixture
-async def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
-    """Create a mock Claude Assistant instance."""
-    from src.core.chat.claude_assistant import ClaudeAssistant
+@pytest_asyncio.fixture
+async def claude_assistant_with_mock(mock_vector_db: VectorDB):
+    """Create a ClaudeAssistant instance with mocked dependencies."""
+    # Create test events for streaming with proper schema
+    events = [
+        MessageStartEvent(
+            type="message_start",
+            message={
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "content": [],
+                "model": "claude-3-sonnet-20240229",
+                "usage": {
+                    "input_tokens": 0,
+                    "output_tokens": 0
+                }
+            }
+        ),
+        MessageDeltaEvent(
+            type="message_delta",
+            delta={
+                "type": "text",
+                "text": "Test response",
+            },
+            usage={
+                "input_tokens": 10,
+                "output_tokens": 5
+            }
+        ),
+        MessageStopEvent(
+            type="message_stop",
+            message={
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Test response"}],
+                "model": "claude-3-sonnet-20240229",
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 10, "output_tokens": 5}
+            }
+        )
+    ]
 
-    # Create a mock AsyncAnthropic client
+    # Create async generator for streaming
+    async def mock_stream():
+        for event in events:
+            yield event
+
+    # Mock the Anthropic client
     mock_client = AsyncMock()
+    mock_client.messages.create = AsyncMock(side_effect=mock_stream)
 
-    # Mock message response with proper structure
-    mock_message = Mock()
-    mock_message.content = [Mock(text="Test response")]
-    mock_message.usage = Mock(
-        input_tokens=10,
-        output_tokens=5,
-        cache_creation_input_tokens=0,
-        cache_read_input_tokens=0
-    )
-
-    # Set up the mock response
-    mock_client.messages.create = AsyncMock(return_value=mock_message)
-
-    # Create the assistant with mocked dependencies
-    assistant = ClaudeAssistant(
-        vector_db=mock_vector_db,
-        api_key="test-key"
-    )
-
-    # Replace the real client with our mock
-    assistant.client = mock_client
-
-    return assistant
+    # Initialize the assistant with mocks
+    with patch("anthropic.AsyncAnthropic", return_value=mock_client):
+        from src.core.chat.claude_assistant import ClaudeAssistant
+        assistant = ClaudeAssistant(
+            vector_db=mock_vector_db,
+            api_key="test-key",
+            model="claude-3-sonnet-20240229",
+            max_tokens=4096,
+        )
+        # Set up the mocked client
+        assistant.client = mock_client
+        yield assistant
 
 
 @pytest.fixture

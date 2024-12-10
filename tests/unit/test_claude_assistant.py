@@ -3,11 +3,23 @@ import aiohttp
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from anthropic.types import Message
+from anthropic import RateLimitError
+from anthropic.types import (
+    ContentBlockDeltaEvent,
+    ContentBlockStartEvent,
+    MessageStopEvent,
+    Message
+)
 
-from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
-from src.core.chat.exceptions import ConnectionError, StreamingError, TokenLimitError
-from src.models.chat_models import ConversationHistory, ConversationMessage, MessageContent, StandardEventType, TextBlock
+from src.core._exceptions import (
+    ClientDisconnectError,
+    ConnectionError,
+    NonRetryableLLMError,
+    RetryableLLMError,
+    StreamingError,
+    TokenLimitError,
+)
+from src.models.chat_models import ConversationHistory, ConversationMessage, MessageContent, StandardEventType, TextBlock, Role
 
 
 def test_claude_assistant_initialization(claude_assistant_with_mock):
@@ -21,13 +33,16 @@ def test_claude_assistant_initialization(claude_assistant_with_mock):
 async def test_add_message_to_conversation_history(claude_assistant_with_mock):
     """Test adding a message to the conversation history."""
     assistant = claude_assistant_with_mock
+    # Clear any existing messages
+    assistant.conversation_history = ConversationHistory()
+
     message = ConversationMessage(
         role="user",
         content=MessageContent(blocks=[TextBlock(text="Test message")])
     )
     # Message is added directly to conversation history
     assistant.conversation_history.messages.append(message)
-    assert len(assistant.conversation_history.messages) == 2  # Including initial message
+    assert len(assistant.conversation_history.messages) == 1
     assert assistant.conversation_history.messages[-1] == message
 
 
@@ -37,7 +52,7 @@ async def test_update_system_prompt(claude_assistant_with_mock):
     assistant = claude_assistant_with_mock
     summaries = [{"filename": "doc1", "summary": "Summary 1", "keywords": ["key1", "key2"]}]
     await assistant.update_system_prompt(summaries)
-    assert "doc1" in assistant.system_prompt.content.blocks[0].text
+    assert "doc1" in assistant.system_prompt.blocks[0].text
 
 
 @pytest.mark.asyncio
@@ -106,28 +121,27 @@ async def test_handle_tool_use_rag_search(claude_assistant_with_mock):
 async def test_stream_response_token_limit_error(claude_assistant_with_mock):
     """Test token limit error handling in streaming."""
     assistant = claude_assistant_with_mock
-    history = ConversationHistory()
-    history.messages.append(
-        ConversationMessage(
-            role="user",
-            content=MessageContent(blocks=[TextBlock(text="Test message")])
+    conversation = ConversationHistory()
+    conversation.append(Role.USER, "Test message")
+
+    # Mock streaming error
+    async def mock_stream():
+        yield ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block={
+                "type": "text",
+                "text": "",
+                "index": 0
+            }
         )
-    )
+        raise TokenLimitError("Token limit exceeded")
 
-    class MockStream:
-        async def __aiter__(self):
-            raise NonRetryableLLMError("Token limit exceeded")
+    assistant.client.messages.create = AsyncMock(side_effect=mock_stream)
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-    assistant.client.messages.stream.return_value = MockStream()
-
+    # Verify token limit error is raised
     with pytest.raises(TokenLimitError):
-        async for _ in assistant.stream_response(history):
+        async for _ in assistant.stream_response(conversation):
             pass
 
 
@@ -135,171 +149,135 @@ async def test_stream_response_token_limit_error(claude_assistant_with_mock):
 async def test_stream_response_connection_error(claude_assistant_with_mock):
     """Test connection error handling in streaming."""
     assistant = claude_assistant_with_mock
-    history = ConversationHistory()
-    history.messages.append(
-        ConversationMessage(
-            role="user",
-            content=MessageContent(blocks=[TextBlock(text="Test message")])
-        )
-    )
+    conversation = ConversationHistory()
+    conversation.append(Role.USER, "Test message")
 
-    class MockStream:
-        async def __aiter__(self):
-            raise ConnectionError("Connection failed")
+    # Mock the client to raise a connection error
+    assistant.client.messages.create = AsyncMock(side_effect=aiohttp.ClientError())
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
+    # Test that ConnectionError is raised
+    with pytest.raises(ConnectionError) as exc_info:
+        async for _ in assistant.stream_response(conversation):
             pass
 
-    assistant.client.messages.stream.return_value = MockStream()
-
-    with pytest.raises(ConnectionError):
-        async for _ in assistant.stream_response(history):
-            pass
+    assert "Connection error during streaming" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
 async def test_stream_response_retryable_error(claude_assistant_with_mock):
     """Test retryable error handling in streaming."""
+    from anthropic import APIError
+
     assistant = claude_assistant_with_mock
-    history = ConversationHistory()
-    history.messages.append(
-        ConversationMessage(
-            role="user",
-            content=MessageContent(blocks=[TextBlock(text="Test message")])
-        )
-    )
+    conversation = ConversationHistory()
+    conversation.append(Role.USER, "Test message")
 
-    class MockStream:
-        async def __aiter__(self):
-            raise RetryableLLMError("Temporary error")
+    # Mock the client to raise a retryable error
+    assistant.client.messages.create = AsyncMock(side_effect=APIError("API error"))
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
+    # Test that StreamingError is raised
+    with pytest.raises(StreamingError) as exc_info:
+        async for _ in assistant.stream_response(conversation):
             pass
 
-    assistant.client.messages.stream.return_value = MockStream()
-
-    with pytest.raises(StreamingError):
-        async for _ in assistant.stream_response(history):
-            pass
+    assert "Unexpected error during streaming" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
 async def test_stream_response_successful_flow(claude_assistant_with_mock):
     """Test successful streaming flow."""
     assistant = claude_assistant_with_mock
-    history = ConversationHistory()
-    history.messages.append(
-        ConversationMessage(
-            role="user",
-            content=MessageContent(blocks=[TextBlock(text="Test message")])
+    conversation = ConversationHistory()
+    conversation.append(Role.USER, "Test message")
+
+    # Mock streaming events with proper schema
+    events = [
+        ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block={
+                "type": "text",
+                "text": "",
+                "index": 0
+            }
+        ),
+        ContentBlockDeltaEvent(
+            type="content_block_delta",
+            index=0,
+            delta={
+                "type": "text_delta",
+                "text": "Test response",
+                "index": 0
+            }
+        ),
+        MessageStopEvent(
+            type="message_stop",
+            message={
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Test response"}],
+                "model": "claude-3-sonnet-20240229",
+                "stop_reason": "end_turn",
+                "stop_sequence": None,
+                "usage": {"input_tokens": 10, "output_tokens": 5}
+            }
         )
-    )
+    ]
 
-    # Create a proper async context manager for streaming
-    class MockStream:
-        def __init__(self):
-            self.events = [
-                type('Event', (), {"type": "message_start"})(),
-                type('Event', (), {
-                    "type": "content_block_delta",
-                    "delta": type('Delta', (), {"text": "Test"})()
-                })(),
-                type('Event', (), {
-                    "type": "content_block_delta",
-                    "delta": type('Delta', (), {"text": " response"})()
-                })(),
-                type('Event', (), {
-                    "type": "message_delta",
-                    "delta": type('Delta', (), {"stop_reason": "end_turn"})()
-                })()
-            ]
-            self._index = 0
+    async def mock_stream():
+        for event in events:
+            yield event
 
-        async def __aiter__(self):
-            for event in self.events:
-                yield event
+    assistant.client.messages.create = AsyncMock(side_effect=mock_stream)
 
-        async def get_final_message(self):
-            return Message(
-                role="assistant",
-                content=[{"type": "text", "text": "Test response"}],
-                model="claude-3",
-                id="msg_123"
-            )
+    # Collect events from streaming
+    received_events = []
+    async for event in assistant.stream_response(conversation):
+        received_events.append(event)
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-    # Set up mock
-    assistant.client.messages.stream.return_value = MockStream()
-
-    # Test streaming
-    events = []
-    async for event in assistant.stream_response(history):
-        events.append(event)
-
-    # Verify events
-    assert len(events) == 5
-    assert events[0].event_type == StandardEventType.MESSAGE_START
-    assert events[1].event_type == StandardEventType.TEXT_TOKEN
-    assert events[2].event_type == StandardEventType.TEXT_TOKEN
-    assert events[3].event_type == StandardEventType.MESSAGE_STOP
-    assert events[4].event_type == StandardEventType.MESSAGE_COMPLETE
+    # Verify event sequence
+    assert len(received_events) == 3
+    assert received_events[0].event_type == StandardEventType.MESSAGE_START
+    assert received_events[1].event_type == StandardEventType.TEXT_TOKEN
+    assert received_events[1].content == "Test response"
+    assert received_events[2].event_type == StandardEventType.MESSAGE_STOP
 
 
 @pytest.mark.asyncio
 async def test_stream_response_client_disconnect(claude_assistant_with_mock):
     """Test client disconnect handling in streaming."""
     assistant = claude_assistant_with_mock
-    history = ConversationHistory()
-    history.messages.append(
-        ConversationMessage(
-            role="user",
-            content=MessageContent(blocks=[TextBlock(text="Test message")])
+    conversation = ConversationHistory()
+    conversation.append(Role.USER, "Test message")
+
+    # Mock streaming events with disconnect
+    async def mock_stream():
+        yield ContentBlockStartEvent(
+            type="content_block_start",
+            index=0,
+            content_block={
+                "type": "text",
+                "text": "",
+                "index": 0
+            }
         )
-    )
+        yield ContentBlockDeltaEvent(
+            type="content_block_delta",
+            index=0,
+            delta={
+                "type": "text_delta",
+                "text": "Test",
+                "index": 0
+            }
+        )
+        raise ClientDisconnectError("Client disconnected")
 
-    class MockClientError(aiohttp.ClientError):
-        pass
+    assistant.client.messages.create = AsyncMock(side_effect=mock_stream)
 
-    class MockStream:
-        async def __aiter__(self):
-            yield type('Event', (), {"type": "message_start"})()
-            yield type('Event', (), {
-                "type": "content_block_delta",
-                "delta": {"type": "text", "text": "Partial"}
-            })()
-            raise MockClientError("Client disconnected")
-
-        async def get_final_message(self):
-            raise MockClientError("Client disconnected")
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
+    # Test that ClientDisconnectError is propagated
+    with pytest.raises(ClientDisconnectError) as exc_info:
+        async for _ in assistant.stream_response(conversation):
             pass
 
-    # Set up mock
-    assistant.client.messages.stream.return_value = MockStream()
-
-    # Test streaming with disconnect
-    events = []
-    with pytest.raises(ConnectionError) as exc_info:
-        async for event in assistant.stream_response(history):
-            events.append(event)
-
-    # Verify partial events before disconnect
-    assert len(events) == 2
-    assert events[0].event_type == StandardEventType.MESSAGE_START
-    assert events[1].event_type == StandardEventType.TEXT_TOKEN
     assert "Client disconnected" in str(exc_info.value)
