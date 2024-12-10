@@ -4,393 +4,177 @@
 # TODO: Explore langgraph as a basis for the LLM chatbot with a RAG tool + persistence.L
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-from typing import Any, Optional
+import logging
+from typing import Any, AsyncGenerator, Optional
 
 import aiohttp
-from anthropic import Anthropic, AsyncAnthropic
-from anthropic.types import Message
+from anthropic import AsyncAnthropic, RateLimitError, AnthropicError
+from anthropic._types import NOT_GIVEN
+from anthropic.types import Message, MessageParam, PromptCachingBetaMessage
 from pydantic import BaseModel, ConfigDict, Field
-import weave
 
-from src.core._exceptions import (
-    ConnectionError,
-    NonRetryableLLMError,
-    RetryableLLMError,
-    StreamingError,
-    TokenLimitError,
-)
-from src.core.chat.tool_definitions import tool_manager
-from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config import settings
+from src.core._exceptions import ConnectionError, StreamingError, TokenLimitError
+from src.core.chat.exceptions import ClientDisconnectError
+from src.core.decorators import anthropic_error_handler, base_error_handler
+from src.core.search.vector_db import VectorDB
+from src.infrastructure.config.settings import settings
 from src.models.chat_models import (
     ConversationHistory,
-    ConversationMessage,
-    MessageContent,
+    MessageRole,
     StandardEvent,
     StandardEventType,
-    TextBlock,
 )
 
-logger = get_logger()
+try:
+    import weave
+except ImportError:
+    weave = None
 
-logger = get_logger()
+logger = logging.getLogger("kollektiv.src.core.chat.claude_assistant")
+
+# Default system prompt for the assistant
+DEFAULT_SYSTEM_PROMPT = """
+You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval
+Augmented Generation) system. Your primary function is to provide accurate, relevant, and helpful
+information to users by leveraging your broad knowledge base, analytical capabilities, and the specific
+information available through the RAG tool.
+
+Key guidelines:
+1. Use RAG tool for queries requiring loaded documents or recent data
+2. Analyze questions and context before using RAG
+3. Formulate precise queries for relevant information
+4. Integrate retrieved information with proper citations
+5. Use general knowledge when RAG isn't relevant
+6. Maintain accuracy and clarity
+7. Be transparent about information sources
+8. Express uncertainty when appropriate
+9. Break down complex topics
+10. Offer follow-up suggestions
+
+Currently loaded document summaries:
+{document_summaries}
+
+Remember to use your tools judiciously and always prioritize providing accurate, helpful, and
+contextually relevant information.
+"""
 
 
 class ClaudeAssistant(BaseModel):
-    """
-    Define the ClaudeAssistant class for managing AI assistant functionalities with various tools and configurations.
-
-    Args:
-        vector_db (VectorDB): The vector database instance for retrieving contextual information.
-        api_key (str, optional): The API key for the Anthropic client. Defaults to ANTHROPIC_API_KEY.
-        model_name (str, optional): The name of the model to use. Defaults to MAIN_MODEL.
-
-    Raises:
-        anthropic.exceptions.AnthropicError: If there's an error initializing the Anthropic client.
-
-    Methods:
-        _init: Initialize the assistant's client and tools.
-        update_system_prompt: Update the system prompt with document summaries.
-        cached_system_prompt: Get the cached system prompt as a list.
-        cached_tools: Get the cached tools as a list.
-        preprocess_user_input: Preprocess the user input to remove whitespace and newlines.
-        get_response: Generate a response based on user input, either as a stream or a single string.
-        stream_response: Handle the streaming response from the assistant and manage conversation flow.
-
-    """
-
-    client: anthropic.AsyncAnthropic | None = None
-    vector_db: VectorDB
-    api_key: str | None = Field(default=settings.anthropic_api_key)
-    model_name: str = Field(default=settings.main_model)
-    base_system_prompt: str = Field(default="")
-    system_prompt: str = Field(default="")
-    # TODO: no longer needed?
-    conversation_history: ConversationHistory | None = None
-    retrieved_contexts: list[str] = Field(default_factory=list)
-    tool_manager: Any = Field(default_factory=lambda: tool_manager)
-    tools: list[dict[str, Any]] = Field(default_factory=list)
-    extra_headers: dict[str, str] = Field(default_factory=lambda: {"anthropic-beta": "prompt-caching-2024-07-31"})
-    retriever: Any | None = None
+    """Claude Assistant for chat interactions."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def __init__(
-        self,
-        vector_db: VectorDB,
-        api_key: str | None = None,
-        model_name: str | None = None,
-    ):
-        # Initialize weave only if project name is set and non-empty
-        if settings.weave_project_name and settings.weave_project_name.strip():
-            try:
+    # Required attributes
+    client: AsyncAnthropic | None = Field(default=None)
+    vector_db: VectorDB
+    model: str = Field(default=settings.main_model)
+    system_prompt: str = Field(default=DEFAULT_SYSTEM_PROMPT)
+    conversation_history: ConversationHistory = Field(default_factory=ConversationHistory)
+    max_tokens: int = Field(default=4096)
+    api_key: str = Field(default=settings.anthropic_api_key)
+
+    def __init__(self, vector_db: VectorDB, **kwargs):
+        """Initialize the Claude Assistant."""
+        try:
+            if weave and settings.weave_project_name:
                 weave.init(settings.weave_project_name)
-            except Exception as e:
-                logger.warning(f"Failed to initialize weave: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize weave: {str(e)}")
 
-        # Initialize fields via super().__init__()
+        # Initialize with all attributes
         super().__init__(
-            client=None,
             vector_db=vector_db,
-            api_key=api_key or settings.anthropic_api_key,
-            model_name=model_name or settings.main_model,
-            base_system_prompt="""
-                    You are an advanced AI assistant with access to various tools, including a powerful RAG (Retrieval
-                    Augmented Generation) system. Your primary function is to provide accurate, relevant, and helpful
-                    information to users by leveraging your broad knowledge base, analytical capabilities,
-                    and the specific information available
-                    through the RAG tool.
-                    Key guidelines:
-
-                    Use the RAG tool when queries likely require information from loaded documents or recent data not
-                    in your training.
-                    Carefully analyze the user's question and conversation context before deciding whether to use the
-                    RAG tool.
-                    When using RAG, formulate precise and targeted queries to retrieve the most relevant information.
-                    Seamlessly integrate retrieved information into your responses, citing sources when appropriate.
-                    If the RAG tool doesn't provide relevant information, rely on your general knowledge and analytical
-                    skills.
-                    Always strive for accuracy, clarity, and helpfulness in your responses.
-                    Be transparent about the source of your information (general knowledge vs. RAG-retrieved data).
-                    If you're unsure about information or if it's not in the loaded documents, clearly state your
-                     uncertainty.
-                    Provide context and explanations for complex topics, breaking them down into understandable parts.
-                    Offer follow-up questions or suggestions to guide the user towards more comprehensive understanding.
-
-                    Do not:
-
-                    Invent or hallucinate information not present in your knowledge base or the RAG-retrieved data.
-                    Use the RAG tool for general knowledge questions that don't require specific document retrieval.
-                    Disclose sensitive details about the RAG system's implementation or the document loading process.
-                    Provide personal opinions or biases; stick to factual information from your knowledge base and
-                    RAG system.
-                    Engage in or encourage any illegal, unethical, or harmful activities.
-                    Share personal information about users or any confidential data that may be in the loaded documents.
-
-                    Currently loaded document summaries:
-                    {document_summaries}
-                    Use these summaries to guide your use of the RAG tool and to provide context for the types of
-                     questions
-                    you can answer with the loaded documents.
-                    Interaction Style:
-
-                    Maintain a professional, friendly, and patient demeanor.
-                    Tailor your language and explanations to the user's apparent level of expertise.
-                    Ask for clarification when the user's query is ambiguous or lacks necessary details.
-
-                    Handling Complex Queries:
-
-                    For multi-part questions, address each part systematically.
-                    If a query requires multiple steps or a lengthy explanation, outline your approach before diving
-                    into details.
-                    Offer to break down complex topics into smaller, more manageable segments if needed.
-
-                    Continuous Improvement:
-
-                    Learn from user interactions to improve your query formulation for the RAG tool.
-                    Adapt your response style based on user feedback and follow-up questions.
-
-                    Remember to use your tools judiciously and always prioritize providing the most accurate,
-                    helpful, and contextually relevant information to the user. Adapt your communication style to
-                    the user's level of understanding and the complexity of the topic at hand.
-                    """,
-            system_prompt="",  # Will format below
-            # TODO: no longer needed?
-            conversation_history=None,  # Will initialize in _init()
-            retrieved_contexts=[],
-            tool_manager=tool_manager,
-            tools=[],
-            extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
-            retriever=None,
+            **kwargs
         )
-        # Set the formatted system prompt
-        self.system_prompt = self.base_system_prompt.format(document_summaries="No documents loaded yet.")
-        # Initialize client and conversation history
-        self._init()
 
-    @anthropic_error_handler
-    def _init(self) -> None:
-        """Initialize the Claude Assistant with API client and tools."""
-        self.client = anthropic.AsyncAnthropic(api_key=self.api_key, max_retries=2)
-        # TODO: no longer needed?
-        self.conversation_history = ConversationHistory()
-        self.tools = self.tool_manager.get_all_tools()
-        logger.debug("Claude assistant successfully initialized.")
-
-    @base_error_handler
-    async def update_system_prompt(self, document_summaries: list[dict[str, Any]]) -> None:
-        """Update the system prompt with document summaries."""
-        logger.info(f"Loading {len(document_summaries)} summaries")
-        summaries_text = "\n\n".join(
-            f"* file: {summary['filename']}:\n"
-            f"* summary: {summary['summary']}\n"
-            f"* keywords: {', '.join(summary['keywords'])}\n"
-            for summary in document_summaries
+        # Initialize anthropic client after parent init
+        self.client = AsyncAnthropic(
+            api_key=self.api_key,
+            max_retries=2
         )
-        base_text = self.base_system_prompt.format(document_summaries=summaries_text)
-        self.system_prompt = MessageContent(blocks=[TextBlock(text=base_text)])
 
-    @base_error_handler
-    async def cached_system_prompt(self) -> list[dict[str, Any]]:
-        """Retrieve the cached system prompt."""
-        return [{"type": "text", "text": self.system_prompt, "cache_control": {"type": "ephemeral"}}]
-
-    @base_error_handler
-    async def cached_tools(self) -> list[dict[str, Any]]:
-        """Return a list of cached tools with specific attributes."""
-        return [
-            {
-                "name": tool["name"],
-                "description": tool["description"],
-                "input_schema": tool["input_schema"],
-                "cache_control": {"type": "ephemeral"},
-            }
-            for tool in self.tools
-        ]
-
-    @base_error_handler
-    async def preprocess_user_input(self, input_text: str) -> str:
+    async def stream_response(self, message: str) -> AsyncGenerator[StandardEvent, None]:
         """
-        Preprocess user input by removing whitespace and replacing newlines.
-
-        Args:
-            input_text (str): The user input text to preprocess.
-
-        Returns:
-            str: The preprocessed user input with no leading/trailing whitespace and newlines replaced by spaces.
-        """
-        # Remove any leading/trailing whitespace
-        cleaned_input = input_text.strip()
-        # Replace newlines with spaces
-        cleaned_input = " ".join(cleaned_input.split())
-        return cleaned_input
-
-    @anthropic_error_handler
-    async def get_response(
-        self, message: ConversationMessage, stream: bool = True
-    ) -> AsyncGenerator[StandardEvent, None]:
-        """
-        Get a response from the assistant as a stream of events.
+        Stream a response from the assistant.
 
         Args:
             message: The user message to respond to
-            stream: Whether to stream individual tokens or return a complete message event
 
         Returns:
-            An async generator of StandardEvents. For non-streaming responses,
-            yields a single MESSAGE_COMPLETE event.
+            AsyncGenerator[StandardEvent, None]: A stream of events containing the assistant's response
 
         Raises:
-            StreamingError: For streaming-specific failures
-            ConnectionError: For network/connection issues
-            TokenLimitError: When token limits are exceeded
-        """
-        # Add message to conversation history
-        if self.conversation_history is None:
-            self.conversation_history = ConversationHistory()
-        self.conversation_history.messages.append(message)
-
-        if not stream:
-            try:
-                response = await self.client.messages.create(
-                    messages=self.conversation_history.to_anthropic_messages(),
-                    system=await self.cached_system_prompt(),
-                    max_tokens=8192,
-                    model=self.model_name,
-                    tools=await self.cached_tools(),
-                    extra_headers=self.extra_headers,
-                )
-                await self._process_assistant_response(response)
-                yield StandardEvent(
-                    event_type=StandardEventType.MESSAGE_COMPLETE,
-                    content=response
-                )
-            except Exception as e:
-                error_msg = f"Error getting response: {str(e)}"
-                logger.error(error_msg, exc_info=True)
-                raise StreamingError(error_msg, original_error=e)
-        else:
-            async for event in self.stream_response(self.conversation_history):
-                yield event
-
-    @anthropic_error_handler
-    async def stream_response(self, conv_history: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
-        """
-        Stream responses from a conversation, handle tool use, and process assistant replies.
-
-        Handles all Anthropic API event types:
-        - message_start: Initial message event
-        - content_block_start: Start of a content block
-        - content_block_delta: Content updates
-        - message_delta: Message completion info
-        - error: Error events
-
-        Args:
-            conv_history: Conversation history containing all messages
-
-        Yields:
-            StandardEvent: Standardized events for streaming responses
-
-        Raises:
-            StreamingError: For streaming-specific failures
-            ConnectionError: For network/connection issues
-            TokenLimitError: When token limits are exceeded
+            ConnectionError: If there's an issue connecting to the Anthropic API
+            StreamingError: If there's an error during streaming
+            TokenLimitError: If the response exceeds token limits
+            ClientDisconnectError: If the client disconnects during streaming
         """
         try:
-            logger.debug(f"Starting stream with {len(conv_history.messages)} messages")
+            # Add message to conversation history
+            self.conversation_history.append(MessageRole.USER, message)
 
-            async with self.client.messages.stream(
-                messages=conv_history.to_anthropic_messages(),
-                system=await self.cached_system_prompt(),
-                max_tokens=8192,
-                model=self.model_name,
-                tools=await self.cached_tools(),
-                extra_headers=self.extra_headers,
-            ) as stream:
-                async for event in stream:
-                    logger.debug(f"Received event type: {event.type}")
+            # Create streaming response
+            stream = await self.client.messages.create(
+                messages=self.conversation_history.to_list(),
+                model=self.model,
+                max_tokens=self.max_tokens,
+                stream=True,
+                system=self.system_prompt
+            )
 
-                    if event.type == "message_start":
-                        yield StandardEvent(
-                            event_type=StandardEventType.MESSAGE_START,
-                            content=""
-                        )
-
-                    elif event.type == "content_block_start":
-                        if event.content_block.type == "tool_use":
-                            yield StandardEvent(
-                                event_type=StandardEventType.TOOL_START,
-                                content={
-                                    "type": "tool_use",
-                                    "tool": event.content_block.name,
-                                    "tool_id": event.content_block.id
-                                }
-                            )
-
-                    elif event.type == "content_block_delta":
-                        if event.delta.type == "text":
-                            yield StandardEvent(
-                                event_type=StandardEventType.TEXT_TOKEN,
-                                content=event.delta.text
-                            )
-
-                    elif event.type == "message_delta":
-                        if event.delta.stop_reason:
-                            yield StandardEvent(
-                                event_type=StandardEventType.MESSAGE_STOP,
-                                content=event.delta.stop_reason
-                            )
-
-                    elif event.type == "error":
-                        error_msg = f"Streaming error: {event.error}"
-                        logger.error(error_msg)
-                        yield StandardEvent(
-                            event_type=StandardEventType.ERROR,
-                            content=error_msg
-                        )
-                        raise StreamingError(error_msg)
-
-                # Process final message and handle tool usage
-                assistant_response = await stream.get_final_message()
-                logger.debug(f"Final message: {assistant_response}")
-                await self._process_assistant_response(assistant_response)
-
-                # Yield MESSAGE_COMPLETE event with the final message
-                yield StandardEvent(
-                    event_type=StandardEventType.MESSAGE_COMPLETE,
-                    content=assistant_response
-                )
-
-                tool_use_block = next(
-                    (block for block in assistant_response.content if block.type == "tool_use"),
-                    None
-                )
-
-                if tool_use_block:
-                    tool_result = await self.handle_tool_use(
-                        tool_use_block.name,
-                        tool_use_block.input,
-                        tool_use_block.id
+            # Stream the response
+            current_message = ""
+            async for chunk in stream:
+                if chunk.type == "message_start":
+                    yield StandardEvent(
+                        event_type=StandardEventType.MESSAGE_START,
+                        content=None
                     )
-                    logger.debug(f"Tool result: {tool_result}")
+                elif chunk.type == "content_block_start":
+                    yield StandardEvent(
+                        event_type=StandardEventType.CONTENT_BLOCK_START,
+                        content=None
+                    )
+                elif chunk.type == "content_block_delta":
+                    current_message += chunk.delta.text
+                    yield StandardEvent(
+                        event_type=StandardEventType.CONTENT_BLOCK_DELTA,
+                        content=chunk.delta.text
+                    )
+                elif chunk.type == "content_block_stop":
+                    yield StandardEvent(
+                        event_type=StandardEventType.CONTENT_BLOCK_STOP,
+                        content=None
+                    )
+                elif chunk.type == "message_delta":
+                    yield StandardEvent(
+                        event_type=StandardEventType.MESSAGE_DELTA,
+                        content=chunk.delta
+                    )
+                elif chunk.type == "message_stop":
+                    # Add assistant's response to conversation history
+                    self.conversation_history.append(MessageRole.ASSISTANT, current_message)
+                    yield StandardEvent(
+                        event_type=StandardEventType.MESSAGE_STOP,
+                        content=None
+                    )
 
-        except (RetryableLLMError, NonRetryableLLMError, aiohttp.ClientError) as e:
-            error_msg = f"LLM error in stream response: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            yield StandardEvent(event_type=StandardEventType.ERROR, content=error_msg)
-            if isinstance(e, NonRetryableLLMError):
-                raise TokenLimitError(error_msg, original_error=e)
-            elif isinstance(e, aiohttp.ClientError):
-                raise ConnectionError(error_msg, original_error=e)
-            raise StreamingError(error_msg, original_error=e)
-
+        except aiohttp.ClientError as e:
+            logger.error(f"Connection error during streaming: {str(e)}")
+            raise ConnectionError("Failed to connect to Anthropic API") from e
+        except RateLimitError as e:
+            logger.error(f"Rate limit exceeded: {str(e)}")
+            raise TokenLimitError("Rate limit exceeded") from e
+        except AnthropicError as e:
+            logger.error(f"Anthropic API error: {str(e)}")
+            raise StreamingError(f"Error during streaming: {str(e)}") from e
         except Exception as e:
-            error_msg = f"Unexpected error in stream response: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            yield StandardEvent(event_type=StandardEventType.ERROR, content=error_msg)
-            raise StreamingError(error_msg, original_error=e)
+            logger.error(f"Unexpected error during streaming: {str(e)}")
+            raise StreamingError(f"Unexpected error during streaming: {str(e)}") from e
+
+    def reset_conversation(self) -> None:
+        """Reset the conversation history."""
+        self.conversation_history = ConversationHistory()
 
     @base_error_handler
     async def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:
