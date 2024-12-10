@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 from typing import Any, Generic, TypeVar
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -20,6 +21,14 @@ settings_mock.project_name = "kollektiv"
 settings_mock.log_level = "debug"
 settings_mock.api_host = "127.0.0.1"
 settings_mock.api_port = 8000
+settings_mock.log_dir = str(Path(__file__).parent.parent / "logs")
+settings_mock.debug = True
+settings_mock.cors_origins = ["http://localhost:3000"]
+settings_mock.redis_url = "redis://localhost:6379"
+settings_mock.supabase_url = "https://test.supabase.co"
+settings_mock.supabase_service_key = "test-supabase-key"
+settings_mock.logfire_token = "test-logfire-token"
+settings_mock.sentry_dsn = None
 
 # Create the settings module mock
 settings_module = Mock()
@@ -28,7 +37,7 @@ sys.modules["src.infrastructure.config.settings"] = settings_module
 
 # Set environment variables before any imports
 os.environ.update({
-    "ENVIRONMENT": os.getenv("ENVIRONMENT", "local"),
+    "ENVIRONMENT": "test",
     "WANDB_MODE": "disabled",
     "WEAVE_PROJECT_NAME": "",
     "ANTHROPIC_API_KEY": "test-key",
@@ -44,6 +53,9 @@ os.environ.update({
     "CORS_ORIGINS": "http://localhost:3000",
 })
 
+# Create logs directory if it doesn't exist
+Path(settings_mock.log_dir).mkdir(parents=True, exist_ok=True)
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for the test session."""
@@ -52,27 +64,16 @@ def event_loop():
     yield loop
     loop.close()
 
-@pytest.fixture(autouse=True, scope="session")
+@pytest.fixture
 def mock_weave():
-    """Mock weave module and its submodules for all tests."""
-    mock = MagicMock()
-    # Mock the op decorator
-    mock.op = lambda *args, **kwargs: lambda func: func
-    mock.flow = MagicMock()
-    mock.flow.eval = MagicMock()
-    mock.flow.eval.Evaluation = MagicMock()
-    mock.flow.eval.Scorer = MagicMock()
-    mock.scorers = MagicMock()
-    mock.scorers.HallucinationFreeScorer = MagicMock()
+    """Mock weave for testing."""
+    mock = Mock()
+    mock.init = Mock()
+    mock.log = Mock()
+    mock.__len__ = Mock(return_value=0)  # Add this line to handle len() calls
 
-    with patch.dict(sys.modules, {
-        'weave': mock,
-        'weave.flow': mock.flow,
-        'weave.flow.eval': mock.flow.eval,
-        'weave.scorers': mock.scorers,
-    }):
+    with patch.dict("sys.modules", {"weave": mock}):
         yield mock
-
 
 # Import app modules after environment setup
 from app import create_app
@@ -80,7 +81,13 @@ from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.service_container import ServiceContainer
-from src.models.chat_models import ConversationMessage, MessageContent, TextBlock
+from src.models.chat_models import (
+    ConversationMessage,
+    MessageContent,
+    TextBlock,
+    StandardEvent,
+    StandardEventType,
+)
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
@@ -135,26 +142,36 @@ def real_vector_db():
 
 
 @pytest.fixture
-def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
-    """Set up a ClaudeAssistant instance with mocked dependencies."""
-    with patch("anthropic.Anthropic") as mock_anthropic:
-        # Mock Anthropic client
-        mock_client = Mock()
-        mock_client.handle_tool_use = Mock(
-            return_value={"role": "user", "content": [{"type": "tool_result", "content": "Tool response"}]}
-        )
-        mock_anthropic.return_value = mock_client
+async def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
+    """Create a mock Claude Assistant instance."""
+    from src.core.chat.claude_assistant import ClaudeAssistant
 
-        assistant = ClaudeAssistant(vector_db=mock_vector_db)
-        assistant.client = mock_client
+    # Create a mock AsyncAnthropic client
+    mock_client = AsyncMock()
 
-        assistant.conversation_history.messages = [ConversationMessage(
-            role="user",
-            content=MessageContent(blocks=[
-                TextBlock(text="Initial message")
-            ])
-        )]
-        return assistant
+    # Mock message response with proper structure
+    mock_message = Mock()
+    mock_message.content = [Mock(text="Test response")]
+    mock_message.usage = Mock(
+        input_tokens=10,
+        output_tokens=5,
+        cache_creation_input_tokens=0,
+        cache_read_input_tokens=0
+    )
+
+    # Set up the mock response
+    mock_client.messages.create = AsyncMock(return_value=mock_message)
+
+    # Create the assistant with mocked dependencies
+    assistant = ClaudeAssistant(
+        vector_db=mock_vector_db,
+        api_key="test-key"
+    )
+
+    # Replace the real client with our mock
+    assistant.client = mock_client
+
+    return assistant
 
 
 @pytest.fixture

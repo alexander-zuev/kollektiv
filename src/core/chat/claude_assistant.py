@@ -10,7 +10,17 @@ from typing import Any, AsyncGenerator, Optional
 import aiohttp
 from anthropic import AsyncAnthropic, RateLimitError, AnthropicError
 from anthropic._types import NOT_GIVEN
-from anthropic.types import Message, MessageParam, PromptCachingBetaMessage
+from anthropic.types import (
+    Message,
+    MessageParam,
+    MessageStreamEvent,
+    ContentBlockDeltaEvent,
+    ContentBlockStartEvent,
+    ContentBlockStopEvent,
+    MessageDeltaEvent,
+    MessageStartEvent,
+    MessageStopEvent,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.core._exceptions import ConnectionError, StreamingError, TokenLimitError
@@ -177,7 +187,7 @@ class ClaudeAssistant(BaseModel):
         self.conversation_history = ConversationHistory()
 
     @base_error_handler
-    async def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:
+    async def _process_assistant_response(self, response: Message) -> str:
         """Process the assistant's response and update the conversation history."""
         logger.debug(
             f"Cached {response.usage.cache_creation_input_tokens} input tokens. \n"
