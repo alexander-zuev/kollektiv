@@ -25,7 +25,12 @@ from src.core._exceptions import (
     StreamingError,
     TokenLimitError,
 )
-from src.core.chat.events import StandardEvent, StandardEventType
+from src.core.chat.events import (
+    ChatEvent,
+    ContentBlockEvent,
+    MessageEndEvent,
+    MessageStartEvent,
+)
 from src.core.decorators import anthropic_error_handler, base_error_handler
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.config.settings import settings
@@ -117,7 +122,7 @@ class ClaudeAssistant(BaseModel):
 
         self.system_prompt = MessageContent.from_str(new_prompt)
 
-    async def stream_response(self, conversation: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
+    async def stream_response(self, conversation: ConversationHistory) -> AsyncGenerator[ChatEvent, None]:
         """
         Stream a response from the assistant.
 
@@ -125,7 +130,7 @@ class ClaudeAssistant(BaseModel):
             conversation: The conversation history to use for generating the response.
 
         Yields:
-            StandardEvent: Events containing response content or error information.
+            ChatEvent: Events containing response content or error information.
 
         Raises:
             StreamingError: If there is an error during streaming.
@@ -136,6 +141,7 @@ class ClaudeAssistant(BaseModel):
             raise StreamingError("Anthropic client not initialized")
 
         try:
+            # Convert conversation history to Anthropic format
             messages = conversation.to_anthropic_messages()
             if not messages:
                 raise ValueError("No messages in conversation history")
@@ -144,36 +150,35 @@ class ClaudeAssistant(BaseModel):
             if self.system_prompt:
                 messages.insert(0, {"role": "system", "content": self.system_prompt.to_anthropic()})
 
-            stream = await self.client.messages.create(
-                model=self.model,
+            async with self.client.messages.stream(
+                model=self.model_name,
                 max_tokens=self.max_tokens,
                 messages=messages,
-                stream=True,
-            )
-
-            async for chunk in stream:
-                if chunk.type == "message_start":
-                    yield StandardEvent(
-                        event_type=StandardEventType.MESSAGE_START,
-                        content={"usage": chunk.usage}
-                    )
-                elif chunk.type == "content_block_start":
-                    # Handle content block start if needed
-                    continue
-                elif chunk.type == "content_block_delta":
-                    if chunk.delta.text:
-                        yield StandardEvent(
-                            event_type=StandardEventType.TEXT_TOKEN,
-                            content=chunk.delta.text
+            ) as stream:
+                async for chunk in stream:
+                    if chunk.type == "message_start":
+                        yield MessageStartEvent(
+                            message_id=chunk.message.id
                         )
-                elif chunk.type == "message_delta":
-                    # Handle message delta if needed
-                    continue
-                elif chunk.type == "message_stop":
-                    yield StandardEvent(
-                        event_type=StandardEventType.MESSAGE_STOP,
-                        content={"usage": chunk.usage}
-                    )
+                    elif chunk.type == "content_block_start":
+                        # Handle content block start if needed
+                        continue
+                    elif chunk.type == "content_block_delta":
+                        if chunk.delta.type == "text_delta" and chunk.delta.text:
+                            yield ContentBlockEvent(
+                                text=chunk.delta.text,
+                                message_id=chunk.message.id,
+                                content_block_id=chunk.delta.id
+                            )
+                    elif chunk.type == "message_delta":
+                        # Handle message delta if needed
+                        continue
+                    elif chunk.type == "message_stop":
+                        yield MessageEndEvent(
+                            message_id=chunk.message.id,
+                            end_reason="end_turn",
+                            model=chunk.message.model
+                        )
 
         except Exception as e:
             if isinstance(e, RateLimitError):
@@ -210,33 +215,35 @@ class ClaudeAssistant(BaseModel):
         return response.content[0].text
 
     @base_error_handler
-    async def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any]:
-        """Handle tool use for specified tools."""
+    async def handle_tool_use(self, tool_name: str, tool_input: dict, tool_use_id: str) -> dict:
+        """
+        Handle tool use requests from the assistant.
+
+        Args:
+            tool_name: Name of the tool to use
+            tool_input: Input parameters for the tool
+            tool_use_id: Unique ID for this tool use request
+
+        Returns:
+            dict: Tool result in Anthropic message format
+        """
         try:
             if tool_name == "rag_search":
-                search_results = await self.use_rag_search(tool_input=tool_input)
-                tool_result = {
+                search_results = await self.vector_db.search(query=tool_input["query"])
+                return {
                     "role": "user",
                     "content": [
                         {
                             "type": "tool_result",
                             "tool_use_id": tool_use_id,
-                            "content": f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
-                            f"Please use this context to answer my original request, if it's relevant.",
+                            "content": search_results[0] if search_results else ""
                         }
-                    ],
+                    ]
                 }
-                await self.conversation_history.add_message(**tool_result)
-                logger.debug(
-                    f"Debugging conversation history after tool use: "
-                    f"{await self.conversation_history.get_conversation_history()}"
-                )
-                return tool_result
-
-            raise ValueError(f"Unknown tool: {tool_name}")
+            else:
+                raise ValueError(f"Unknown tool: {tool_name}")
         except Exception as e:
-            logger.error(f"Error executing tool {tool_name}: {str(e)}")
-            return {"role": "system", "content": [{"type": "error", "content": f"Error: {str(e)}"}]}
+            raise StreamingError(f"Error during tool use: {str(e)}")
 
     @anthropic_error_handler
     @weave.op()

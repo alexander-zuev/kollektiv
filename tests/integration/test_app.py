@@ -56,6 +56,8 @@ class TestAppInitialization:
             (Routes.System.HEALTH, "system"),  # health router
             (Routes.System.Webhooks.BASE, "webhooks"),  # webhook router
             (f"{V0_PREFIX}{Routes.V0.CONTENT}", "content"),  # content router
+            (f"{V0_PREFIX}{Routes.V0.CHAT}", "chat"),  # chat router
+            (f"{V0_PREFIX}{Routes.V0.CONVERSATIONS}", "chat"),  # conversations router
         ],
     )
     def test_required_routers_mounted(self, integration_client: TestClient, route_info: tuple[str, str]):
@@ -137,3 +139,21 @@ class TestEndpointIntegration:
 
         # For now, just verify the basic structure until we can see sources_schemas.py
         assert isinstance(data["data"], dict), "Response data should be a dictionary"
+
+    def test_chat_endpoints_mounted(self, integration_client: TestClient):
+        """Test that chat endpoints are properly mounted and accessible."""
+        # Test chat endpoint
+        chat_response = integration_client.get(f"{V0_PREFIX}{Routes.V0.CHAT}")
+        assert chat_response.status_code in [200, 404], "Chat endpoint should be accessible"
+
+        # Test conversations endpoint
+        conv_response = integration_client.get(f"{V0_PREFIX}{Routes.V0.CONVERSATIONS}")
+        assert conv_response.status_code in [200, 404], "Conversations endpoint should be accessible"
+
+        # Verify chat router tags
+        chat_routes = [
+            route for route in integration_client.app.routes
+            if str(route.path).startswith(f"{V0_PREFIX}{Routes.V0.CHAT}")
+            or str(route.path).startswith(f"{V0_PREFIX}{Routes.V0.CONVERSATIONS}")
+        ]
+        assert any("chat" in route.tags for route in chat_routes), "Chat routes should have 'chat' tag"

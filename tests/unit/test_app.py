@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import create_app
+from src.infrastructure.config.settings import Environment, settings
 from src.infrastructure.service_container import ServiceContainer
 
 
@@ -22,9 +23,14 @@ def test_service_container_initialization():
 
 # 2. Error Handling in Lifespan
 def test_lifespan_error_handling():
-    app = create_app()
+    # Mock settings to ensure environment is properly set
+    with patch("src.infrastructure.config.settings.settings") as mock_settings:
+        mock_settings.environment = Environment.LOCAL
+        mock_settings.sentry_dsn = "https://test.sentry.io"
 
-    with patch("app.ServiceContainer.initialize_services", side_effect=Exception("Startup error")):
-        with pytest.raises(Exception, match="Startup error"):
-            with TestClient(app) as client:
-                client.get("/health")
+        app = create_app()
+
+        with patch("app.ServiceContainer.initialize_services", side_effect=Exception("Startup error")):
+            with pytest.raises(Exception, match="Startup error"):
+                with TestClient(app) as client:
+                    client.get("/health")

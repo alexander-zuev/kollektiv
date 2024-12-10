@@ -40,21 +40,27 @@ class ChatService:
 
             # Send to Claude and stream the response
             async for event in self.claude_assistant.stream_response(conversation_with_pending):
-                if event.event_type == StandardEventType.TOOL_START:
+                if event.event_type == StandardEventType.MESSAGE_START:
+                    yield LLMResponse(message_type=MessageType.MESSAGE_START, text=event.content)
+
+                elif event.event_type == StandardEventType.TEXT_TOKEN:
+                    yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text=event.content)
+
+                elif event.event_type == StandardEventType.TOOL_START:
                     # Add tool use to pending messages
                     await self.conversation_manager.add_pending_message(
                         conversation_id=conversation_id, role=Role.ASSISTANT, text=event.content
                     )
-                    yield LLMResponse(message_type=MessageType.TOOL_USE, text=event.content)
+                    yield LLMResponse(message_type=MessageType.TOOL_START, text=event.content)
+
+                elif event.event_type == StandardEventType.TOOL_END:
+                    yield LLMResponse(message_type=MessageType.TOOL_END, text=event.content)
 
                 elif event.event_type == StandardEventType.MESSAGE_STOP:
                     # Commit pending messages and save conversation
                     await self.conversation_manager.commit_pending(conversation_id)
                     await self.data_service.save_conversation(conversation_id)
-                    yield LLMResponse(message_type=MessageType.DONE, text="")
-
-                else:
-                    yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text=event.content)
+                    yield LLMResponse(message_type=MessageType.MESSAGE_STOP, text=event.content)
 
         except Exception as e:
             # On error, rollback pending messages

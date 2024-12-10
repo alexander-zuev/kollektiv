@@ -20,9 +20,11 @@ class UserMessage(BaseModel):
 class MessageType(str, Enum):
     """Client-facing event types."""
 
+    MESSAGE_START = "message_start"
     TEXT_TOKEN = "text_token"
-    TOOL_USE = "tool_use"
-    TOOL_RESULT = "tool_result"
+    TOOL_START = "tool_start"
+    TOOL_END = "tool_end"
+    MESSAGE_STOP = "message_stop"
     DONE = "done"
     ERROR = "error"
 
@@ -31,7 +33,7 @@ class LLMResponse(BaseModel):
     """Client-facing event structure."""
 
     message_type: MessageType = Field(..., description="Type of the llm message")
-    text: str = Field(..., description="Text content of the llm message")
+    text: str | dict = Field(..., description="Content of the llm message - text for tokens, structured data for other events")
     conversation_id: UUID | None = Field(None, description="UUID of the conversation, included in first response")
 
 

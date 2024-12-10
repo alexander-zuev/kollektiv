@@ -1,6 +1,7 @@
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from supabase import AsyncClient
 
 from src.infrastructure.config.settings import settings
 from src.infrastructure.external.supabase_client import SupabaseClient
@@ -8,61 +9,60 @@ from src.infrastructure.external.supabase_client import SupabaseClient
 
 @pytest.fixture
 def mock_create_client():
-    """Mock the Supabase create_client function."""
-    with patch("src.infrastructure.external.supabase_client.get_client") as mock:
-        mock.return_value = Mock()  # Return a mock client
+    """Mock the Supabase create_async_client function."""
+    with patch("src.infrastructure.external.supabase_client.create_async_client") as mock:
+        mock_client = AsyncMock(spec=AsyncClient)
+        mock.return_value = mock_client
         yield mock
 
 
 @pytest.fixture
-def mock_create_async_client():
-    """Mock the Supabase async client creation."""
-    with patch("src.infrastructure.external.supabase_client.get_client") as mock:
-        mock.return_value = AsyncMock()  # Return an async mock client
-        yield mock
+def mock_supabase_client(mock_create_client):
+    """Create a SupabaseClient instance with mocked async client."""
+    return SupabaseClient()
 
 
 class TestSupabaseClient:
     """Test suite for SupabaseClient."""
 
-    def test_successful_initialization(self, mock_create_client):
+    @pytest.mark.asyncio
+    async def test_successful_initialization(self, mock_supabase_client, mock_create_client):
         """Test that client initializes successfully with default settings."""
-        # Act
-        client = SupabaseClient()
+        # Assert initialization
+        assert mock_supabase_client._client is None
 
-        # Assert
+        # Test connection
+        await mock_supabase_client.connect()
+
+        # Verify client creation
         mock_create_client.assert_called_once_with(
-            supabase_url=settings.supabase_url, supabase_key=settings.supabase_key
+            supabase_url=settings.supabase_url,
+            supabase_key=settings.supabase_key,
         )
-        assert client._client is not None
+        assert mock_supabase_client._client is not None
 
-    async def test_connection_failure(self, mock_create_async_client):
+    @pytest.mark.asyncio
+    async def test_connection_failure(self, mock_create_client):
         """Test that connection failure is handled properly."""
         # Arrange
-        mock_create_async_client.side_effect = Exception("Connection failed")
+        mock_create_client.side_effect = Exception("Connection failed")
         client = SupabaseClient()
 
         # Act & Assert
-        with pytest.raises(Exception):
+        with pytest.raises(Exception, match="Connection failed"):
             await client.connect()
 
-    def test_initialization_failure(self, mock_create_client):
-        """Test that initialization failure is handled properly."""
-        # Arrange
-        mock_create_client.side_effect = Exception("Connection failed")
-
-        # Act & Assert
-        with pytest.raises(Exception):
-            SupabaseClient()
-
-    async def test_get_client(self, mock_create_async_client):
+    @pytest.mark.asyncio
+    async def test_get_client_connects_if_needed(self, mock_supabase_client):
         """Test that get_client connects if not already connected."""
-        # Arrange
-        client = SupabaseClient()
+        # Initial state
+        assert mock_supabase_client._client is None
 
-        # Act
-        result = await client.get_client()
+        # Get client should trigger connection
+        client = await mock_supabase_client.get_client()
+        assert client is not None
+        assert mock_supabase_client._client is client
 
-        # Assert
-        mock_create_async_client.assert_called_once()
-        assert result == client._client
+        # Second call should return existing client
+        second_client = await mock_supabase_client.get_client()
+        assert second_client is client

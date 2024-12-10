@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Any, Generic, List, Optional, TypeVar
 
 # Set test environment variables before any imports
 os.environ.update({
@@ -16,22 +17,40 @@ os.environ.update({
     "LOG_LEVEL": "DEBUG"
 })
 
-from typing import Any, Generic, List, Optional, TypeVar
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 import pytest_asyncio
+from anthropic import AsyncAnthropic, APIStatusError
 from anthropic.types import (
+    Message,
+    ContentBlock,
+    ContentBlockDeltaEvent,
+    ContentBlockStartEvent,
+    ContentBlockStopEvent,
     MessageStartEvent,
     MessageDeltaEvent,
     MessageStopEvent,
+    TextBlock,
+    TextDelta,
+    Usage,
 )
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fastapi.testclient import TestClient
 
-from src.core.search.vector_db import VectorDB
+from src.core.chat.claude_assistant import ClaudeAssistant
+from src.core.search.vector_db import ResultRetriever, VectorDB, Reranker
 from src.infrastructure.config.settings import Environment, settings
+from src.models.chat_models import (
+    ConversationHistory,
+    ConversationMessage,
+    MessageContent,
+    Role,
+    StandardEvent,
+    StandardEventType,
+    TextBlock as ChatTextBlock,
+)
 from tests.test_settings import TestSettings
 
 # Create comprehensive settings mock before any imports
@@ -40,7 +59,7 @@ settings_mock.anthropic_api_key = "test-key"
 settings_mock.main_model = "claude-3-5-sonnet-20241022"
 settings_mock.evaluator_model_name = "gpt-4o-mini"
 settings_mock.embedding_model = "text-embedding-3-small"
-settings_mock.environment = "local"
+settings_mock.environment = Environment.LOCAL  # Use Environment enum
 settings_mock.project_name = "kollektiv"
 settings_mock.log_level = "debug"
 settings_mock.api_host = "127.0.0.1"
@@ -80,9 +99,9 @@ os.environ.update({
 # Create logs directory if it doesn't exist
 Path(settings_mock.log_dir).mkdir(parents=True, exist_ok=True)
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def event_loop():
-    """Create an instance of the default event loop for the test session."""
+    """Create an instance of the default event loop for each test."""
     import asyncio
     loop = asyncio.new_event_loop()
     yield loop
@@ -90,14 +109,14 @@ def event_loop():
 
 @pytest.fixture
 def mock_weave():
-    """Mock weave for testing."""
-    mock = Mock()
-    mock.init = Mock()
-    mock.log = Mock()
-    mock.__len__ = Mock(return_value=0)  # Add this line to handle len() calls
-
-    with patch.dict("sys.modules", {"weave": mock}):
-        yield mock
+    """Mock weave initialization."""
+    with patch("wandb.init") as mock_init, \
+         patch("wandb.login") as mock_login, \
+         patch("wandb.sdk.lib.disabled") as mock_disabled:
+        mock_disabled.return_value = True  # Disable wandb completely
+        mock_init.return_value = MagicMock()
+        mock_login.return_value = True
+        yield mock_init
 
 # Import app modules after environment setup
 from app import create_app
@@ -162,17 +181,22 @@ def mock_settings():
 
 
 @pytest.fixture
-async def mock_vector_db():
-    """Create a mock vector database."""
-    class MockVectorDB(VectorDB):
-        async def search(self, query: str, limit: int = 5) -> List[Document]:
-            return []
+def mock_vector_db():
+    """Create a mock VectorDB instance."""
+    class MockVectorDB:
+        def __init__(self):
+            self.reranker = MagicMock()
+            self.result_retriever = MagicMock()
+            self.collection_name = "test_collection"
 
-        async def add_documents(self, documents: Documents) -> None:
-            pass
+        async def search(self, query: str, **kwargs):
+            return [{"text": "Mock search result", "score": 0.9}]
 
-        async def delete_documents(self, ids: List[str]) -> None:
-            pass
+        async def add_documents(self, documents: List[Document], **kwargs):
+            return ["doc_id_1"]
+
+        async def delete_documents(self, document_ids: List[str], **kwargs):
+            return True
 
     return MockVectorDB()
 
@@ -184,77 +208,99 @@ def real_vector_db():
 
 
 @pytest_asyncio.fixture
-async def claude_assistant_with_mock(mock_vector_db: VectorDB):
-    """Create a ClaudeAssistant instance with mocked dependencies."""
-    # Create test events for streaming with proper schema
-    events = [
-        MessageStartEvent(
-            type="message_start",
-            message={
-                "id": "msg_test",
-                "type": "message",
-                "role": "assistant",
-                "content": [],
-                "model": "claude-3-sonnet-20240229",
-                "usage": {
-                    "input_tokens": 0,
-                    "output_tokens": 0
-                }
-            }
-        ),
-        MessageDeltaEvent(
-            type="message_delta",
-            delta={
-                "type": "text",
-                "text": "Test response",
-            },
-            usage={
-                "input_tokens": 10,
-                "output_tokens": 5
-            }
-        ),
-        MessageStopEvent(
-            type="message_stop",
-            message={
-                "id": "msg_test",
-                "type": "message",
-                "role": "assistant",
-                "content": [{"type": "text", "text": "Test response"}],
-                "model": "claude-3-sonnet-20240229",
-                "stop_reason": "end_turn",
-                "stop_sequence": None,
-                "usage": {"input_tokens": 10, "output_tokens": 5}
-            }
-        )
+async def claude_assistant_with_mock():
+    """Create a mock Claude assistant for testing."""
+    mock_client = AsyncMock()
+    mock_vector_db = AsyncMock(spec=VectorDB)
+    mock_result_retriever = AsyncMock(spec=ResultRetriever)
+
+    # Mock search results
+    mock_result_retriever.get_results.return_value = [
+        {"text": "Test result", "metadata": {"source": "test.md"}}
     ]
 
-    # Create async generator for streaming
+    # Create the assistant with mocks
+    assistant = ClaudeAssistant(
+        client=mock_client,
+        vector_db=mock_vector_db,
+        retriever=mock_result_retriever,
+        model_name="claude-3-sonnet-20240229",
+        max_tokens=1000
+    )
+
+    # Set up default mock behavior for streaming
     async def mock_stream():
+        events = [
+            {
+                "type": "message_start",
+                "message": {
+                    "id": "msg_test",
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": ""}],
+                    "model": "claude-3-sonnet-20240229",
+                    "usage": {"input_tokens": 10, "output_tokens": 0}
+                }
+            },
+            {
+                "type": "content_block_delta",
+                "index": 0,
+                "delta": {"type": "text_delta", "text": "Test response"}
+            },
+            {
+                "type": "message_stop",
+                "message": {
+                    "id": "msg_test",
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "Test response"}],
+                    "model": "claude-3-sonnet-20240229",
+                    "usage": {"input_tokens": 10, "output_tokens": 5}
+                }
+            }
+        ]
         for event in events:
             yield event
 
-    # Mock the Anthropic client
-    mock_client = AsyncMock()
-    mock_client.messages.create = AsyncMock(side_effect=mock_stream)
+    # Create async context manager for streaming
+    class AsyncStreamContextManager:
+        async def __aenter__(self):
+            return self
 
-    # Initialize the assistant with mocks
-    with patch("anthropic.AsyncAnthropic", return_value=mock_client):
-        from src.core.chat.claude_assistant import ClaudeAssistant
-        assistant = ClaudeAssistant(
-            vector_db=mock_vector_db,
-            api_key="test-key",
-            model="claude-3-sonnet-20240229",
-            max_tokens=4096,
-        )
-        # Set up the mocked client
-        assistant.client = mock_client
-        yield assistant
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            return None
+
+        async def __aiter__(self):
+            async for event in mock_stream():
+                yield event
+
+    # Set up the mock client's stream method
+    mock_client.messages.stream.return_value = AsyncStreamContextManager()
+
+    return assistant
 
 
 @pytest.fixture
-def claude_assistant_with_real_db(real_vector_db):
-    """Set up a ClaudeAssistant instance with real VectorDB."""
-    assistant = ClaudeAssistant(vector_db=real_vector_db)
+async def claude_assistant_with_real_db():
+    """Create a Claude Assistant instance with real VectorDB."""
+    # Create real VectorDB instance
+    real_vector_db = VectorDB(
+        reranker=Reranker(),
+        result_retriever=ResultRetriever(
+            collection_name="test_collection",
+            embedding_function=MagicMock()
+        ),
+        collection_name="test_collection"
+    )
+
+    # Create test assistant
+    assistant = ClaudeAssistant(
+        client=AsyncMock(),
+        model_name="claude-3-sonnet-20240229",
+        max_tokens=1000,
+        vector_db=real_vector_db
+    )
+
     return assistant
 
 

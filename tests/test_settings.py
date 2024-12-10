@@ -11,15 +11,15 @@ class TestSettings(Settings):
     def __init__(self, **values: Any):
         """Initialize test settings with default values."""
         test_values = {
-            "ENVIRONMENT": Environment.LOCAL.value,  # Use environment variable name with enum value
-            "FIRECRAWL_API_KEY": "test-key",
-            "ANTHROPIC_API_KEY": "test-key",
-            "OPENAI_API_KEY": "test-key",
-            "COHERE_API_KEY": "test-key",
-            "SUPABASE_URL": "https://test.supabase.co",
-            "SUPABASE_SERVICE_KEY": "test-key",
-            "LOGFIRE_TOKEN": "test-key",
-            "REDIS_URL": "redis://localhost:6379",
+            "environment": Environment.LOCAL,  # Use Environment enum directly
+            "firecrawl_api_key": "test-key",
+            "anthropic_api_key": "test-key",
+            "openai_api_key": "test-key",
+            "cohere_api_key": "test-key",
+            "supabase_url": "https://test.supabase.co",
+            "supabase_service_key": "test-key",
+            "logfire_token": "test-key",
+            "redis_url": "redis://localhost:6379",
             "log_level": "DEBUG",
             "src_dir": Path(__file__).parent,
             "use_ngrok": False,
