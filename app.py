@@ -11,11 +11,6 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.api.middleware.rate_limit import HealthCheckRateLimit
-from src.api.system.health import router as health_router
-from src.api.system.sentry_debug import router as sentry_debug_router
-from src.api.v0.endpoints.chat import chat_router, conversations_router
-from src.api.v0.endpoints.sources import router as content_router
-from src.api.v0.endpoints.webhooks import router as webhook_router
 from src.core._exceptions import NonRetryableError
 from src.infrastructure.common.logger import configure_logging, get_logger
 from src.infrastructure.config.settings import Environment, settings
@@ -133,6 +128,13 @@ def create_app() -> FastAPI:
 
     # Add rate limiting for health endpoint
     app.add_middleware(HealthCheckRateLimit, requests_per_minute=60)
+
+    # Import routers here to avoid circular imports
+    from src.api.system.health import router as health_router
+    from src.api.system.sentry_debug import router as sentry_debug_router
+    from src.api.v0.endpoints.chat import chat_router, conversations_router
+    from src.api.v0.endpoints.sources import router as content_router
+    from src.api.v0.endpoints.webhooks import router as webhook_router
 
     # Add routes
     app.include_router(health_router, tags=["system"])

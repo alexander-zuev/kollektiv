@@ -13,16 +13,16 @@ class StandardEventType(str, Enum):
     """Standardized event types mapped from Anthropic events."""
 
     # Regular message events
-    MESSAGE_START = "message_start"
-    TEXT_TOKEN = "text_event"  # maps from text event
-    MESSAGE_STOP = "message_stop"  # maps from message_stop
+    MESSAGE_START = "message_start"  # Initial message event
+    TEXT_TOKEN = "text_token"  # Content block delta with text
+    MESSAGE_STOP = "message_stop"  # Message completion
 
     # Tool-related events
-    TOOL_START = "tool_start"  # maps from content_block_start with tool_use
-    TOOL_RESULT = "tool_result"  # when tool execution completes
+    TOOL_START = "tool_start"  # Tool use content block
+    TOOL_RESULT = "tool_result"  # Tool execution result
 
     # Error events
-    ERROR = "error"  # any error during processing
+    ERROR = "error"  # Any error during processing
 
 
 class StandardEvent(BaseModel):

@@ -1,4 +1,5 @@
-from src.core.chat.claude_assistant import ClaudeAssistant
+from typing import TYPE_CHECKING
+
 from src.core.chat.conversation_manager import ConversationManager
 from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
@@ -9,6 +10,9 @@ from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
+
+if TYPE_CHECKING:
+    from src.core.chat.claude_assistant import ClaudeAssistant
 
 logger = get_logger()
 

@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, AsyncMock, patch
 
 import pytest
 
@@ -11,6 +11,14 @@ def mock_create_client():
     """Mock the Supabase create_client function."""
     with patch("src.infrastructure.external.supabase_client.get_client") as mock:
         mock.return_value = Mock()  # Return a mock client
+        yield mock
+
+
+@pytest.fixture
+def mock_create_async_client():
+    """Mock the Supabase async client creation."""
+    with patch("src.infrastructure.external.supabase_client.get_client") as mock:
+        mock.return_value = AsyncMock()  # Return an async mock client
         yield mock
 
 
@@ -29,13 +37,22 @@ class TestSupabaseClient:
         assert client._client is not None
 
     async def test_connection_failure(self, mock_create_async_client):
+        """Test that connection failure is handled properly."""
+        # Arrange
+        mock_create_async_client.side_effect = Exception("Connection failed")
+        client = SupabaseClient()
+
+        # Act & Assert
+        with pytest.raises(Exception):
+            await client.connect()
+
     def test_initialization_failure(self, mock_create_client):
         """Test that initialization failure is handled properly."""
-        mock_create_async_client.side_effect = Exception("Connection failed")
+        # Arrange
         mock_create_client.side_effect = Exception("Connection failed")
+
         # Act & Assert
-        with pytest.raises(Exception) as exc_info:
-            await client.connect()
+        with pytest.raises(Exception):
             SupabaseClient()
 
     async def test_get_client(self, mock_create_async_client):

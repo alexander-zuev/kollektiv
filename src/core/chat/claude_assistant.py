@@ -5,27 +5,40 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, Optional
 
-import anthropic
-import weave
+import aiohttp
+from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message
-from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
-from pydantic import ConfigDict, Field
-from weave import Model
+from pydantic import BaseModel, ConfigDict, Field
+import weave
 
-from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
+from src.core._exceptions import (
+    ConnectionError,
+    NonRetryableLLMError,
+    RetryableLLMError,
+    StreamingError,
+    TokenLimitError,
+)
 from src.core.chat.tool_definitions import tool_manager
-from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
 from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
-from src.models.chat_models import ConversationHistory, StandardEvent, StandardEventType
+from src.infrastructure.config import settings
+from src.models.chat_models import (
+    ConversationHistory,
+    ConversationMessage,
+    MessageContent,
+    StandardEvent,
+    StandardEventType,
+    TextBlock,
+)
+
+logger = get_logger()
 
 logger = get_logger()
 
 
-class ClaudeAssistant(Model):
+class ClaudeAssistant(BaseModel):
     """
     Define the ClaudeAssistant class for managing AI assistant functionalities with various tools and configurations.
 
@@ -176,8 +189,8 @@ class ClaudeAssistant(Model):
             f"* keywords: {', '.join(summary['keywords'])}\n"
             for summary in document_summaries
         )
-        self.system_prompt = self.base_system_prompt.format(document_summaries=summaries_text)
-        logger.debug(f"Updated system prompt: {self.system_prompt}")
+        base_text = self.base_system_prompt.format(document_summaries=summaries_text)
+        self.system_prompt = MessageContent(blocks=[TextBlock(text=base_text)])
 
     @base_error_handler
     async def cached_system_prompt(self) -> list[dict[str, Any]]:
@@ -215,79 +228,169 @@ class ClaudeAssistant(Model):
         return cleaned_input
 
     @anthropic_error_handler
-    async def stream_response(self, conv_history: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
-        """Stream responses from a conversation, handle tool use, and process assistant replies."""
-        try:
-            # user_input = await self.preprocess_user_input(user_input)
-            # TODO: no longer needed?
-            # await self.conversation_history.add_message(role="user", content=user_input)
-            # logger.debug(f"Conversation history: {await self.conversation_history.get_conversation_history()}")
-            logger.debug(f"Conversation history: {len(conv_history.messages)} messages.")
+    async def get_response(
+        self, message: ConversationMessage, stream: bool = True
+    ) -> AsyncGenerator[StandardEvent, None]:
+        """
+        Get a response from the assistant as a stream of events.
 
-            while True:
-                # messages = await self.conversation_history.get_conversation_history()
-                messages = conv_history.to_anthropic_messages()
-                logger.debug(f"Messages: {messages}")
-                async with self.client.messages.stream(
-                    messages=messages,
+        Args:
+            message: The user message to respond to
+            stream: Whether to stream individual tokens or return a complete message event
+
+        Returns:
+            An async generator of StandardEvents. For non-streaming responses,
+            yields a single MESSAGE_COMPLETE event.
+
+        Raises:
+            StreamingError: For streaming-specific failures
+            ConnectionError: For network/connection issues
+            TokenLimitError: When token limits are exceeded
+        """
+        # Add message to conversation history
+        if self.conversation_history is None:
+            self.conversation_history = ConversationHistory()
+        self.conversation_history.messages.append(message)
+
+        if not stream:
+            try:
+                response = await self.client.messages.create(
+                    messages=self.conversation_history.to_anthropic_messages(),
                     system=await self.cached_system_prompt(),
                     max_tokens=8192,
                     model=self.model_name,
                     tools=await self.cached_tools(),
                     extra_headers=self.extra_headers,
-                ) as stream:
-                    async for event in stream:
-                        logger.debug(f"Received event type: {event.type}")
-                        # EVENT: message token
-                        if event.type == "text":
-                            yield StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=event.text)
+                )
+                await self._process_assistant_response(response)
+                yield StandardEvent(
+                    event_type=StandardEventType.MESSAGE_COMPLETE,
+                    content=response
+                )
+            except Exception as e:
+                error_msg = f"Error getting response: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                raise StreamingError(error_msg, original_error=e)
+        else:
+            async for event in self.stream_response(self.conversation_history):
+                yield event
 
-                        elif event.type == "content_block_stop":
-                            # EVENT: tool use start
-                            if event.content_block.type == "tool_use":
-                                logger.debug(f"Tool use detected: {event.content_block.name}")
-                                yield StandardEvent(
-                                    event_type=StandardEventType.TOOL_START,
-                                    content={
-                                        "type": "tool_use",
-                                        "tool": event.content_block.name,
-                                    },
-                                )
-                        elif event.type == "message_stop":
-                            # EVENT: message end
-                            logger.debug("===== Stream message ended =====")
-                            yield StandardEvent(event_type=StandardEventType.MESSAGE_STOP, content="")
+    @anthropic_error_handler
+    async def stream_response(self, conv_history: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
+        """
+        Stream responses from a conversation, handle tool use, and process assistant replies.
 
-                    # Your existing tool result handling stays the same
-                    assistant_response = await stream.get_final_message()
-                    logger.debug(f"Final message: {assistant_response}")
-                    await self._process_assistant_response(assistant_response)
+        Handles all Anthropic API event types:
+        - message_start: Initial message event
+        - content_block_start: Start of a content block
+        - content_block_delta: Content updates
+        - message_delta: Message completion info
+        - error: Error events
 
-                    tool_use_block = next(
-                        (block for block in assistant_response.content if block.type == "tool_use"), None
-                    )
-                    if tool_use_block:
-                        tool_result = await self.handle_tool_use(
-                            tool_use_block.name, tool_use_block.input, tool_use_block.id
+        Args:
+            conv_history: Conversation history containing all messages
+
+        Yields:
+            StandardEvent: Standardized events for streaming responses
+
+        Raises:
+            StreamingError: For streaming-specific failures
+            ConnectionError: For network/connection issues
+            TokenLimitError: When token limits are exceeded
+        """
+        try:
+            logger.debug(f"Starting stream with {len(conv_history.messages)} messages")
+
+            async with self.client.messages.stream(
+                messages=conv_history.to_anthropic_messages(),
+                system=await self.cached_system_prompt(),
+                max_tokens=8192,
+                model=self.model_name,
+                tools=await self.cached_tools(),
+                extra_headers=self.extra_headers,
+            ) as stream:
+                async for event in stream:
+                    logger.debug(f"Received event type: {event.type}")
+
+                    if event.type == "message_start":
+                        yield StandardEvent(
+                            event_type=StandardEventType.MESSAGE_START,
+                            content=""
                         )
-                        logger.debug(f"Tool result: {tool_result}")
 
-                    if not tool_use_block:
-                        break
+                    elif event.type == "content_block_start":
+                        if event.content_block.type == "tool_use":
+                            yield StandardEvent(
+                                event_type=StandardEventType.TOOL_START,
+                                content={
+                                    "type": "tool_use",
+                                    "tool": event.content_block.name,
+                                    "tool_id": event.content_block.id
+                                }
+                            )
 
-        except (RetryableLLMError, NonRetryableLLMError) as e:
-            logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
-            # TODO: no longer needed?
-            await self.conversation_history.remove_last_message()
-            yield StandardEvent(event_type=StandardEventType.ERROR, content=str(e))
-            raise
+                    elif event.type == "content_block_delta":
+                        if event.delta.type == "text":
+                            yield StandardEvent(
+                                event_type=StandardEventType.TEXT_TOKEN,
+                                content=event.delta.text
+                            )
+
+                    elif event.type == "message_delta":
+                        if event.delta.stop_reason:
+                            yield StandardEvent(
+                                event_type=StandardEventType.MESSAGE_STOP,
+                                content=event.delta.stop_reason
+                            )
+
+                    elif event.type == "error":
+                        error_msg = f"Streaming error: {event.error}"
+                        logger.error(error_msg)
+                        yield StandardEvent(
+                            event_type=StandardEventType.ERROR,
+                            content=error_msg
+                        )
+                        raise StreamingError(error_msg)
+
+                # Process final message and handle tool usage
+                assistant_response = await stream.get_final_message()
+                logger.debug(f"Final message: {assistant_response}")
+                await self._process_assistant_response(assistant_response)
+
+                # Yield MESSAGE_COMPLETE event with the final message
+                yield StandardEvent(
+                    event_type=StandardEventType.MESSAGE_COMPLETE,
+                    content=assistant_response
+                )
+
+                tool_use_block = next(
+                    (block for block in assistant_response.content if block.type == "tool_use"),
+                    None
+                )
+
+                if tool_use_block:
+                    tool_result = await self.handle_tool_use(
+                        tool_use_block.name,
+                        tool_use_block.input,
+                        tool_use_block.id
+                    )
+                    logger.debug(f"Tool result: {tool_result}")
+
+        except (RetryableLLMError, NonRetryableLLMError, aiohttp.ClientError) as e:
+            error_msg = f"LLM error in stream response: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            yield StandardEvent(event_type=StandardEventType.ERROR, content=error_msg)
+            if isinstance(e, NonRetryableLLMError):
+                raise TokenLimitError(error_msg, original_error=e)
+            elif isinstance(e, aiohttp.ClientError):
+                raise ConnectionError(error_msg, original_error=e)
+            raise StreamingError(error_msg, original_error=e)
 
         except Exception as e:
-            logger.error(f"Unexpected error in stream response: {str(e)}", exc_info=True)
-            # TODO: no longer needed?
-            await self.conversation_history.remove_last_message()
-            yield StandardEvent(event_type=StandardEventType.ERROR, content=str(e))
-            raise
+            error_msg = f"Unexpected error in stream response: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            yield StandardEvent(event_type=StandardEventType.ERROR, content=error_msg)
+            raise StreamingError(error_msg, original_error=e)
 
     @base_error_handler
     async def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:

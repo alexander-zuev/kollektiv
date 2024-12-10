@@ -48,11 +48,9 @@ class ChatService:
                     yield LLMResponse(message_type=MessageType.TOOL_USE, text=event.content)
 
                 elif event.event_type == StandardEventType.MESSAGE_STOP:
-                    # 5. On successful completion:
-                    # - Commit pending to stable conversation
-                    # - Save to DB
-                    # await self.conversation_manager.commit_pending(conversation_id)
-                    # await self.data_service.save_conversation(conversation)
+                    # Commit pending messages and save conversation
+                    await self.conversation_manager.commit_pending(conversation_id)
+                    await self.data_service.save_conversation(conversation_id)
                     yield LLMResponse(message_type=MessageType.DONE, text="")
 
                 else:

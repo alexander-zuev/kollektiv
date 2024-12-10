@@ -31,7 +31,8 @@ class LLMResponse(BaseModel):
     """Client-facing event structure."""
 
     message_type: MessageType = Field(..., description="Type of the llm message")
-    text: str = Field(..., description="Text contetn of the llm message")
+    text: str = Field(..., description="Text content of the llm message")
+    conversation_id: UUID | None = Field(None, description="UUID of the conversation, included in first response")
 
 
 # Conversation models

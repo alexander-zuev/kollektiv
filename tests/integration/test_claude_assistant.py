@@ -8,6 +8,7 @@ from anthropic.types import ToolUseBlock
 
 from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.search.vector_db import Reranker, ResultRetriever, VectorDB
+from src.models.chat_models import MessageContent, TextBlock
 
 
 @pytest.fixture(scope="function")
@@ -65,7 +66,7 @@ async def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant
     )
 
     # 4. Handle tool use and get tool result
-    tool_result = test_claude_assistant.handle_tool_use(
+    tool_result = await test_claude_assistant.handle_tool_use(
         tool_name=tool_use_block.name, tool_input=tool_use_block.input, tool_use_id=tool_use_block.id
     )
 
@@ -105,7 +106,8 @@ async def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant
 
 
 @pytest.mark.integration
-def test_system_prompt_update_and_cache(test_claude_assistant: ClaudeAssistant):
+@pytest.mark.asyncio
+async def test_system_prompt_update_and_cache(test_claude_assistant: ClaudeAssistant):
     """
     Test system prompt updates and caching behavior:
     1. Update system prompt with summaries
@@ -117,15 +119,15 @@ def test_system_prompt_update_and_cache(test_claude_assistant: ClaudeAssistant):
     ]
 
     # Update system prompt
-    test_claude_assistant.update_system_prompt(test_summaries)
+    await test_claude_assistant.update_system_prompt(test_summaries)
 
     # Verify prompt content
-    assert isinstance(test_claude_assistant.system_prompt, str)
-    assert "test_doc.md" in test_claude_assistant.system_prompt
-    assert "Test document about Python" in test_claude_assistant.system_prompt
+    assert isinstance(test_claude_assistant.system_prompt, MessageContent)
+    assert "test_doc.md" in test_claude_assistant.system_prompt.blocks[0].text
+    assert "Test document about Python" in test_claude_assistant.system_prompt.blocks[0].text
 
     # Verify cached prompt format for Anthropic API
-    cached_prompt = test_claude_assistant.cached_system_prompt()
+    cached_prompt = await test_claude_assistant.cached_system_prompt()
     assert isinstance(cached_prompt, list)
     assert len(cached_prompt) == 1
 
@@ -137,9 +139,10 @@ def test_system_prompt_update_and_cache(test_claude_assistant: ClaudeAssistant):
 
 
 @pytest.mark.integration
-def test_handle_tool_use_error(test_claude_assistant: ClaudeAssistant):
+@pytest.mark.asyncio
+async def test_handle_tool_use_error(test_claude_assistant: ClaudeAssistant):
     """Test error handling in tool use."""
-    tool_result = test_claude_assistant.handle_tool_use(
+    tool_result = await test_claude_assistant.handle_tool_use(
         tool_name="rag_search", tool_input={"important_context": "test"}, tool_use_id="test_id"
     )
 

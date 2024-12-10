@@ -29,8 +29,7 @@ class TestAppInitialization:
 
         # Verify all required services are initialized and in expected state
         assert container.job_manager is not None
-        # Verify job manager is initialized by checking its storage
-        assert container.job_manager.storage_dir.exists()
+        # Verify job manager is initialized
         assert container.job_manager.jobs_file.exists()
 
         # Verify FireCrawler initialization

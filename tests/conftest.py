@@ -1,22 +1,94 @@
 import os
+import sys
+from typing import Any, Generic, TypeVar
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import numpy as np
 import pytest
+import pytest_asyncio
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fastapi.testclient import TestClient
 
+# Create comprehensive settings mock before any imports
+settings_mock = Mock()
+settings_mock.anthropic_api_key = "test-key"
+settings_mock.main_model = "claude-3-5-sonnet-20241022"
+settings_mock.evaluator_model_name = "gpt-4o-mini"
+settings_mock.embedding_model = "text-embedding-3-small"
+settings_mock.environment = "local"
+settings_mock.project_name = "kollektiv"
+settings_mock.log_level = "debug"
+settings_mock.api_host = "127.0.0.1"
+settings_mock.api_port = 8000
+
+# Create the settings module mock
+settings_module = Mock()
+settings_module.settings = settings_mock
+sys.modules["src.infrastructure.config.settings"] = settings_module
+
+# Set environment variables before any imports
+os.environ.update({
+    "ENVIRONMENT": os.getenv("ENVIRONMENT", "local"),
+    "WANDB_MODE": "disabled",
+    "WEAVE_PROJECT_NAME": "",
+    "ANTHROPIC_API_KEY": "test-key",
+    "COHERE_API_KEY": "test-key",
+    "OPENAI_API_KEY": "test-key",
+    "FIRECRAWL_API_KEY": "test-key",
+    "SUPABASE_URL": "https://test.supabase.co",
+    "SUPABASE_SERVICE_KEY": "test-supabase-key",
+    "LOGFIRE_TOKEN": "test-logfire-token",
+    "REDIS_URL": "redis://localhost:6379",
+    "LOG_LEVEL": "DEBUG",
+    "API_HOST": "http://localhost:8000",
+    "CORS_ORIGINS": "http://localhost:3000",
+})
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create an instance of the default event loop for the test session."""
+    import asyncio
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture(autouse=True, scope="session")
+def mock_weave():
+    """Mock weave module and its submodules for all tests."""
+    mock = MagicMock()
+    # Mock the op decorator
+    mock.op = lambda *args, **kwargs: lambda func: func
+    mock.flow = MagicMock()
+    mock.flow.eval = MagicMock()
+    mock.flow.eval.Evaluation = MagicMock()
+    mock.flow.eval.Scorer = MagicMock()
+    mock.scorers = MagicMock()
+    mock.scorers.HallucinationFreeScorer = MagicMock()
+
+    with patch.dict(sys.modules, {
+        'weave': mock,
+        'weave.flow': mock.flow,
+        'weave.flow.eval': mock.flow.eval,
+        'weave.scorers': mock.scorers,
+    }):
+        yield mock
+
+
+# Import app modules after environment setup
 from app import create_app
-from src.core.chat.claude_assistant import ClaudeAssistant, ConversationMessage
+from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.service_container import ServiceContainer
+from src.models.chat_models import ConversationMessage, MessageContent, TextBlock
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
 
 
-class MockEmbeddingFunction(EmbeddingFunction):
+T = TypeVar('T')
+
+class MockEmbeddingFunction(EmbeddingFunction[T]):
     """Mock embedding function that follows ChromaDB's interface."""
 
     def __call__(self, input: Document | Documents) -> list[Embedding]:
@@ -42,29 +114,8 @@ def mock_environment_variables():
     # Store original environment
     original_env = dict(os.environ)
 
-    # Get environment from actual env var, default to LOCAL
-    test_env = os.getenv("ENVIRONMENT", "local")
-
-    env_vars = {
-        "ENVIRONMENT": test_env,
-        "WANDB_MODE": "disabled",
-        "WEAVE_PROJECT_NAME": "",
-        "ANTHROPIC_API_KEY": "test-key",
-        "COHERE_API_KEY": "test-key",
-        "OPENAI_API_KEY": "test-key",
-        "FIRECRAWL_API_KEY": "test-key",
-    }
-
-    # If we're in staging, add required staging vars
-    if test_env == "staging":
-        env_vars.update(
-            {
-                "BASE_URL": "http://mock-api:8000",  # Mock staging URL
-            }
-        )
-
-    with patch.dict(os.environ, env_vars, clear=True):
-        yield
+    # Environment variables are already set at module level
+    yield
 
     # Restore original environment
     os.environ.clear()
@@ -87,6 +138,7 @@ def real_vector_db():
 def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
     """Set up a ClaudeAssistant instance with mocked dependencies."""
     with patch("anthropic.Anthropic") as mock_anthropic:
+        # Mock Anthropic client
         mock_client = Mock()
         mock_client.handle_tool_use = Mock(
             return_value={"role": "user", "content": [{"type": "tool_result", "content": "Tool response"}]}
@@ -96,7 +148,12 @@ def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
         assistant = ClaudeAssistant(vector_db=mock_vector_db)
         assistant.client = mock_client
 
-        assistant.conversation_history.messages = [ConversationMessage(role="user", content="Initial message")]
+        assistant.conversation_history.messages = [ConversationMessage(
+            role="user",
+            content=MessageContent(blocks=[
+                TextBlock(text="Initial message")
+            ])
+        )]
         return assistant
 
 

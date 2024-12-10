@@ -157,7 +157,7 @@ class DatabaseError(NonRetryableError):
         self.entity_type = entity_type
         self.details = details or {}
         self.cause = cause
-        super().__init__(error_message, **kwargs)
+        super().__init__(error_message)
 
     def add_context(self, operation: str, entity_type: str) -> Self:
         """Adds context information to the exception."""
@@ -245,6 +245,24 @@ class JobStateError(JobError):
 
 class LLMError(KollektivError):
     """Base class for LLM-related errors."""
+
+    pass
+
+
+class StreamingError(LLMError):
+    """Raised when streaming operations fail."""
+
+    pass
+
+
+class TokenLimitError(StreamingError):
+    """Raised when token limit is exceeded during streaming."""
+
+    pass
+
+
+class ConnectionError(StreamingError):
+    """Raised when streaming connection is interrupted."""
 
     pass
 
