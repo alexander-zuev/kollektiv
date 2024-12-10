@@ -30,7 +30,7 @@ from src.core.search.vector_db import VectorDB
 from src.infrastructure.config.settings import settings
 from src.models.chat_models import (
     ConversationHistory,
-    MessageRole,
+    Role,
     StandardEvent,
     StandardEventType,
 )
@@ -121,7 +121,7 @@ class ClaudeAssistant(BaseModel):
         """
         try:
             # Add message to conversation history
-            self.conversation_history.append(MessageRole.USER, message)
+            self.conversation_history.append(Role.USER, message)
 
             # Create streaming response
             stream = await self.client.messages.create(
@@ -163,7 +163,7 @@ class ClaudeAssistant(BaseModel):
                     )
                 elif chunk.type == "message_stop":
                     # Add assistant's response to conversation history
-                    self.conversation_history.append(MessageRole.ASSISTANT, current_message)
+                    self.conversation_history.append(Role.ASSISTANT, current_message)
                     yield StandardEvent(
                         event_type=StandardEventType.MESSAGE_STOP,
                         content=None
