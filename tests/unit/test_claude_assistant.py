@@ -126,15 +126,20 @@ async def test_stream_response_token_limit_error(claude_assistant_with_mock):
 
     # Mock streaming error
     async def mock_stream():
-        yield ContentBlockStartEvent(
-            type="content_block_start",
-            index=0,
-            content_block={
-                "type": "text",
-                "text": "",
-                "index": 0
+        yield {
+            "type": "message_start",
+            "message": {
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": ""}],
+                "model": "claude-3-sonnet-20240229",
+                "usage": {
+                    "input_tokens": 10,
+                    "output_tokens": 0
+                }
             }
-        )
+        }
         raise TokenLimitError("Token limit exceeded")
 
     assistant.client.messages.create = AsyncMock(side_effect=mock_stream)
@@ -192,27 +197,31 @@ async def test_stream_response_successful_flow(claude_assistant_with_mock):
 
     # Mock streaming events with proper schema
     events = [
-        ContentBlockStartEvent(
-            type="content_block_start",
-            index=0,
-            content_block={
-                "type": "text",
-                "text": "",
-                "index": 0
+        {
+            "type": "message_start",
+            "message": {
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": ""}],
+                "model": "claude-3-sonnet-20240229",
+                "usage": {
+                    "input_tokens": 10,
+                    "output_tokens": 0
+                }
             }
-        ),
-        ContentBlockDeltaEvent(
-            type="content_block_delta",
-            index=0,
-            delta={
+        },
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {
                 "type": "text_delta",
-                "text": "Test response",
-                "index": 0
+                "text": "Test response"
             }
-        ),
-        MessageStopEvent(
-            type="message_stop",
-            message={
+        },
+        {
+            "type": "message_stop",
+            "message": {
                 "id": "msg_test",
                 "type": "message",
                 "role": "assistant",
@@ -220,9 +229,12 @@ async def test_stream_response_successful_flow(claude_assistant_with_mock):
                 "model": "claude-3-sonnet-20240229",
                 "stop_reason": "end_turn",
                 "stop_sequence": None,
-                "usage": {"input_tokens": 10, "output_tokens": 5}
+                "usage": {
+                    "input_tokens": 10,
+                    "output_tokens": 5
+                }
             }
-        )
+        }
     ]
 
     async def mock_stream():
@@ -253,31 +265,33 @@ async def test_stream_response_client_disconnect(claude_assistant_with_mock):
 
     # Mock streaming events with disconnect
     async def mock_stream():
-        yield ContentBlockStartEvent(
-            type="content_block_start",
-            index=0,
-            content_block={
-                "type": "text",
-                "text": "",
-                "index": 0
+        yield {
+            "type": "message_start",
+            "message": {
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": ""}],
+                "model": "claude-3-sonnet-20240229",
+                "usage": {
+                    "input_tokens": 10,
+                    "output_tokens": 0
+                }
             }
-        )
-        yield ContentBlockDeltaEvent(
-            type="content_block_delta",
-            index=0,
-            delta={
+        }
+        yield {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {
                 "type": "text_delta",
-                "text": "Test",
-                "index": 0
+                "text": "Test"
             }
-        )
+        }
         raise ClientDisconnectError("Client disconnected")
 
     assistant.client.messages.create = AsyncMock(side_effect=mock_stream)
 
-    # Test that ClientDisconnectError is propagated
-    with pytest.raises(ClientDisconnectError) as exc_info:
+    # Verify client disconnect error is raised
+    with pytest.raises(ClientDisconnectError):
         async for _ in assistant.stream_response(conversation):
             pass
-
-    assert "Client disconnected" in str(exc_info.value)

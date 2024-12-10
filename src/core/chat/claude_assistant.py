@@ -73,7 +73,8 @@ class ClaudeAssistant(BaseModel):
     # Required attributes
     client: AsyncAnthropic | None = Field(default=None)
     vector_db: VectorDB
-    model: str = Field(default=settings.main_model)
+    retriever: Any = Field(default=None)  # Type will be specified in a future PR
+    model_name: str = Field(default=settings.main_model)
     system_prompt: MessageContent = Field(
         default_factory=lambda: MessageContent.from_str(DEFAULT_SYSTEM_PROMPT),
         description="System prompt with document context"
@@ -81,6 +82,7 @@ class ClaudeAssistant(BaseModel):
     conversation_history: ConversationHistory = Field(default_factory=ConversationHistory)
     max_tokens: int = Field(default=4096)
     api_key: str = Field(default=settings.anthropic_api_key)
+    retrieved_contexts: list[str] = Field(default_factory=list)
 
     def __init__(self, vector_db: VectorDB, **kwargs):
         """Initialize the Claude Assistant."""

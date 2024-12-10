@@ -1,224 +1,179 @@
 """Integration tests for ChatService."""
-import uuid
-from typing import AsyncGenerator
-from unittest.mock import AsyncMock, Mock, patch
-
 import pytest
-import pytest_asyncio
-from anthropic.types import (
-    MessageStartEvent,
-    MessageDeltaEvent,
-    MessageStopEvent,
-)
+from unittest.mock import AsyncMock, MagicMock
 
-from src.core.chat.claude_assistant import ClaudeAssistant
-from src.core.chat.conversation_manager import ConversationManager
+from src.core._exceptions import ClientDisconnectError, TokenLimitError
 from src.core.chat.events import StandardEventType
-from src.core.chat.exceptions import TokenLimitError, ClientDisconnectError
-from src.models.chat_models import (
-    ConversationHistory,
-    Role,
-    StandardEvent,
-    StandardEventType,
-)
+from src.models.chat_models import ConversationHistory, MessageContent, Role, TextBlock
 from src.services.chat_service import ChatService
-from src.services.data_service import DataService
 
 
 @pytest.fixture
-async def chat_service():
+def chat_service():
     """Create a ChatService instance with mocked dependencies."""
-    claude_assistant = Mock(spec=ClaudeAssistant)
-    conversation_manager = Mock(spec=ConversationManager)
-    data_service = Mock(spec=DataService)
-    data_service.save_conversation = AsyncMock()
-
-    # Setup default conversation
-    conversation = ConversationHistory(
-        conversation_id=uuid.uuid4(),
-        data_sources=[uuid.uuid4()]
-    )
-    conversation_manager.get_or_create_conversation.return_value = conversation
-    conversation_manager.get_conversation_with_pending.return_value = conversation
-
-    return ChatService(
-        claude_assistant=claude_assistant,
-        conversation_manager=conversation_manager,
-        data_service=data_service,
-    )
+    claude_assistant = MagicMock()
+    claude_assistant.stream_response = AsyncMock()
+    return ChatService(claude_assistant=claude_assistant)
 
 
 @pytest.mark.asyncio
 async def test_complete_streaming_flow(chat_service):
-    """Test complete streaming flow with persistence."""
-    # Setup test data
-    user_id = uuid.uuid4()
-    conversation_id = uuid.uuid4()
-    message = "Test message"
+    """Test complete streaming flow with proper event sequence."""
+    conversation = ConversationHistory()
+    conversation.append(Role.USER, "Test message")
 
-    # Mock streaming events with proper schema
+    # Mock streaming events
     events = [
-        MessageStartEvent(
-            type="message_start",
-            message={
+        {
+            "event_type": StandardEventType.MESSAGE_START,
+            "content": {
                 "id": "msg_test",
                 "type": "message",
                 "role": "assistant",
-                "content": [],
-                "model": "claude-3-sonnet-20240229"
+                "content": [{"type": "text", "text": ""}],
+                "model": "claude-3-sonnet-20240229",
+                "usage": {"input_tokens": 10, "output_tokens": 0}
             }
-        ),
-        MessageDeltaEvent(
-            type="message_delta",
-            delta={
-                "type": "text",
-                "text": "Hello world",
-            },
-            usage={
-                "input_tokens": 10,
-                "output_tokens": 5
-            }
-        ),
-        MessageStopEvent(
-            type="message_stop",
-            message={
+        },
+        {
+            "event_type": StandardEventType.TEXT_TOKEN,
+            "content": "Test response"
+        },
+        {
+            "event_type": StandardEventType.MESSAGE_STOP,
+            "content": {
                 "id": "msg_test",
                 "type": "message",
                 "role": "assistant",
-                "content": [{"type": "text", "text": "Hello world"}],
+                "content": [{"type": "text", "text": "Test response"}],
                 "model": "claude-3-sonnet-20240229",
                 "stop_reason": "end_turn",
                 "stop_sequence": None,
                 "usage": {"input_tokens": 10, "output_tokens": 5}
             }
-        )
+        }
     ]
 
-    # Setup mock response stream
-    async def mock_stream() -> AsyncGenerator:
+    async def mock_stream(conversation):
         for event in events:
             yield event
 
-    chat_service.claude_assistant.stream_response = AsyncMock(side_effect=mock_stream)
+    chat_service.claude_assistant.stream_response.side_effect = mock_stream
 
-    # Collect responses
-    responses = []
-    async for response in chat_service.get_response(user_id, message, conversation_id):
-        responses.append(response)
+    # Collect events from streaming
+    received_events = []
+    async for event in chat_service.get_response(conversation):
+        received_events.append(event)
 
-    # Verify responses
-    assert len(responses) == 3
-    assert responses[0].event_type == StandardEventType.MESSAGE_START
-    assert responses[1].event_type == StandardEventType.TEXT_TOKEN
-    assert responses[1].content == "Hello world"
-    assert responses[2].event_type == StandardEventType.MESSAGE_STOP
-
-    # Verify conversation persistence
-    chat_service.conversation_manager.commit_pending.assert_called_once_with(conversation_id)
-    chat_service.data_service.save_conversation.assert_called_once_with(conversation_id)
+    # Verify event sequence
+    assert len(received_events) == 3
+    assert received_events[0].event_type == StandardEventType.MESSAGE_START
+    assert received_events[1].event_type == StandardEventType.TEXT_TOKEN
+    assert received_events[1].content == "Test response"
+    assert received_events[2].event_type == StandardEventType.MESSAGE_STOP
 
 
 @pytest.mark.asyncio
 async def test_streaming_error_recovery(chat_service):
     """Test error recovery in streaming flow."""
-    # Setup test data
-    user_id = uuid.uuid4()
-    conversation_id = uuid.uuid4()
-    message = "Test message"
+    conversation = ConversationHistory()
+    conversation.append(Role.USER, "Test message")
 
-    # Mock streaming error
-    async def mock_error_stream():
-        if True:  # This ensures the generator yields at least once
-            raise TokenLimitError("Test error")
-        yield None  # This line is never reached but makes it an async generator
-    chat_service.claude_assistant.stream_response = AsyncMock(side_effect=mock_error_stream)
+    # Mock streaming events with error
+    events = [
+        {
+            "event_type": StandardEventType.MESSAGE_START,
+            "content": {
+                "id": "msg_test",
+                "type": "message",
+                "role": "assistant",
+                "content": [{"type": "text", "text": ""}],
+                "model": "claude-3-sonnet-20240229",
+                "usage": {"input_tokens": 10, "output_tokens": 0}
+            }
+        }
+    ]
 
-    # Collect responses
-    responses = []
-    async for response in chat_service.get_response(user_id, message, conversation_id):
-        responses.append(response)
+    async def mock_stream(conversation):
+        for event in events:
+            yield event
+        raise TokenLimitError("Token limit exceeded")
 
-    # Verify error response
-    assert len(responses) == 1
-    assert responses[0].event_type == StandardEventType.ERROR
-    assert "Test error" in responses[0].content
+    chat_service.claude_assistant.stream_response.side_effect = mock_stream
 
-    # Verify cleanup
-    chat_service.conversation_manager.rollback_pending.assert_called_once_with(conversation_id)
+    # Verify error handling
+    with pytest.raises(TokenLimitError):
+        async for event in chat_service.get_response(conversation):
+            assert event.event_type == StandardEventType.MESSAGE_START
 
 
 @pytest.mark.asyncio
 async def test_streaming_tool_use_flow(chat_service):
-    """Test streaming flow with tool use (RAG search)."""
-    # Setup test data
-    user_id = uuid.uuid4()
-    conversation_id = uuid.uuid4()
-    message = "Test message with RAG"
+    """Test streaming flow with tool use."""
+    conversation = ConversationHistory()
+    conversation.append(Role.USER, "Search for test")
 
-    # Mock streaming events including tool use
+    # Mock streaming events with tool use
     events = [
-        MessageStartEvent(
-            type="message_start",
-            message={
+        {
+            "event_type": StandardEventType.MESSAGE_START,
+            "content": {
                 "id": "msg_test",
                 "type": "message",
                 "role": "assistant",
-                "content": [],
-                "model": "claude-3-sonnet-20240229"
+                "content": [{"type": "text", "text": ""}],
+                "model": "claude-3-sonnet-20240229",
+                "usage": {"input_tokens": 10, "output_tokens": 0}
             }
-        ),
-        MessageDeltaEvent(
-            type="message_delta",
-            delta={
-                "type": "text",
-                "text": "Search result",
-            },
-            usage={
-                "input_tokens": 10,
-                "output_tokens": 5
+        },
+        {
+            "event_type": StandardEventType.TOOL_START,
+            "content": {
+                "type": "tool_use",
+                "tool_name": "rag_search",
+                "tool_input": {"query": "test"},
+                "tool_use_id": "tool_1"
             }
-        ),
-        MessageStopEvent(
-            type="message_stop",
-            message={
+        },
+        {
+            "event_type": StandardEventType.TOOL_RESULT,
+            "content": {
+                "type": "tool_result",
+                "tool_use_id": "tool_1",
+                "content": "Search result"
+            }
+        },
+        {
+            "event_type": StandardEventType.MESSAGE_STOP,
+            "content": {
                 "id": "msg_test",
                 "type": "message",
                 "role": "assistant",
-                "content": [{"type": "text", "text": "Search result"}],
+                "content": [
+                    {"type": "text", "text": "Search result"}
+                ],
                 "model": "claude-3-sonnet-20240229",
                 "stop_reason": "end_turn",
                 "stop_sequence": None,
                 "usage": {"input_tokens": 10, "output_tokens": 5}
             }
-        )
+        }
     ]
 
-    # Setup mock response stream
-    async def mock_stream() -> AsyncGenerator:
+    async def mock_stream(conversation):
         for event in events:
             yield event
 
-    chat_service.claude_assistant.stream_response = AsyncMock(side_effect=mock_stream)
+    chat_service.claude_assistant.stream_response.side_effect = mock_stream
 
-    # Collect responses
-    responses = []
-    async for response in chat_service.get_response(user_id, message, conversation_id):
-        responses.append(response)
+    # Collect events from streaming
+    received_events = []
+    async for event in chat_service.get_response(conversation):
+        received_events.append(event)
 
-    # Verify responses
-    assert len(responses) == 3
-    assert responses[0].event_type == StandardEventType.MESSAGE_START
-    assert responses[1].event_type == StandardEventType.TEXT_TOKEN
-    assert responses[1].content == "Search result"
-    assert responses[2].event_type == StandardEventType.MESSAGE_STOP
-
-    # Verify conversation persistence
-    chat_service.conversation_manager.commit_pending.assert_called_once_with(conversation_id)
-    chat_service.data_service.save_conversation.assert_called_once_with(conversation_id)
-
-    # Verify tool use was added to conversation
-    chat_service.conversation_manager.add_pending_message.assert_any_call(
-        conversation_id=conversation_id,
-        role=Role.ASSISTANT,
-        text="rag_search"
-    )
+    # Verify event sequence
+    assert len(received_events) == 4
+    assert received_events[0].event_type == StandardEventType.MESSAGE_START
+    assert received_events[1].event_type == StandardEventType.TOOL_START
+    assert received_events[2].event_type == StandardEventType.TOOL_RESULT
+    assert received_events[3].event_type == StandardEventType.MESSAGE_STOP

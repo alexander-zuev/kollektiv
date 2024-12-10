@@ -1,28 +1,29 @@
 """Event types for chat operations."""
 from enum import Enum
+from typing import Any
 
 
 class StandardEventType(str, Enum):
     """Standard event types for chat operations."""
 
     MESSAGE_START = "message_start"
+    TEXT_TOKEN = "text_token"
     MESSAGE_DELTA = "message_delta"
     MESSAGE_STOP = "message_stop"
+    MESSAGE_COMPLETE = "message_complete"
     ERROR = "error"
     DONE = "done"
 
 
-class StreamEvent:
-    """Base class for stream events."""
+class StandardEvent:
+    """Standard event for chat operations."""
 
-    def __init__(self, event_type: StandardEventType, data: dict):
-        """Initialize stream event."""
+    def __init__(self, event_type: StandardEventType, content: Any):
+        """Initialize standard event.
+
+        Args:
+            event_type: Type of the event.
+            content: Event content, can be any type depending on the event type.
+        """
         self.event_type = event_type
-        self.data = data
-
-    def to_dict(self) -> dict:
-        """Convert event to dictionary."""
-        return {
-            "type": self.event_type,
-            "data": self.data
-        }
+        self.content = content
