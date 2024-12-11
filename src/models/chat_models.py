@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Union
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.models.base_models import BaseDbModel
 
@@ -21,6 +21,9 @@ class StandardEventType(str, Enum):
     TOOL_START = "tool_start"  # maps from content_block_start with tool_use
     TOOL_RESULT = "tool_result"  # when tool execution completes
 
+    # Final message
+    FULL_MESSAGE = "full_message"
+
     # Error events
     ERROR = "error"  # any error during processing
 
@@ -29,7 +32,9 @@ class StandardEvent(BaseModel):
     """Standard event structure for internal use."""
 
     event_type: StandardEventType
-    content: str | dict[str, Any] = Field(description="Event content - text for tokens, structured data for tools")
+    content: Union[str, dict, "MessageContent"] = Field(
+        description="Event content - text tokens, tool data, or full message content"
+    )
     tool_info: dict[str, Any] | None = Field(None, description="Tool-specific information when relevant")
 
 
@@ -55,15 +60,14 @@ class ContentBlock(BaseModel):
 
     block_type: ContentBlockType = Field(..., description="Type of the content block", alias="type")
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict({"populate_by_name": True, "from_attributes": True})
 
 
 class TextBlock(ContentBlock):
     """Simple text content"""
 
     block_type: ContentBlockType = Field(ContentBlockType.TEXT, description="Type of the content block", alias="type")
-    text: str
+    text: str = Field(..., description="Text content of the block")
 
 
 class ToolUseBlock(ContentBlock):
@@ -137,29 +141,6 @@ class ConversationHistory(BaseModel):
     def to_anthropic_messages(self) -> list[dict]:
         """Convert entire history to Anthropic format"""
         return [msg.to_anthropic() for msg in self.messages]
-
-
-# TODO: to refactor
-# class ConversationMessage:
-#     """
-#     Represent a conversation message with an ID, role, and content.
-
-#     Args:
-#         role (str): The role of the message sender (e.g., 'user', 'system').
-#         content (Union[str, list[MessageContent]]): The content of the message.
-#     """
-
-#     def __init__(self, role: str, content: str | list[MessageContent]) -> None:
-#         self.id: str = str(uuid.uuid4())
-#         self.role: str = role
-#         self.content: str | list[MessageContent] = content
-
-#     def to_dict(self, include_id: bool = False) -> dict[str, Any]:
-#         """Convert the message object to a dictionary."""
-#         message_dict: dict[str, Any] = {"role": self.role, "content": self.content}
-#         if include_id:
-#             message_dict["id"] = self.id
-#         return message_dict
 
 
 class ConversationRecency(str, Enum):

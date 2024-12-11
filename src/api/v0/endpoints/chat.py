@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
 from src.api.dependencies import ChatServiceDep
@@ -10,6 +10,7 @@ from src.api.v0.schemas.chat_schemas import (
     ConversationMessages,
     UserMessage,
 )
+from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 
 # Define routers with base prefix only
 chat_router = APIRouter(prefix=V0_PREFIX)
@@ -23,9 +24,18 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
 
     Returns Server-Sent Events with tokens.
     """
-    return EventSourceResponse(
-        chat_service.get_response(user_id=request.user_id, message=request.message), media_type="text/event-stream"
-    )
+    try:
+        return EventSourceResponse(
+            chat_service.get_response(user_id=request.user_id, message=request.message), media_type="text/event-stream"
+        )
+    except NonRetryableLLMError as e:
+        raise HTTPException(
+            status_code=500, detail=f"A non-retryable error occurred in the system:: {str(e)}. We are on it."
+        ) from e
+    except RetryableLLMError as e:
+        raise HTTPException(
+            status_code=500, detail=f"An error occurred in the system:: {str(e)}. Can you please try again?"
+        ) from e
 
 
 # Get all conversations

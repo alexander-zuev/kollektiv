@@ -23,6 +23,7 @@ class MessageType(str, Enum):
     TEXT_TOKEN = "text_token"
     TOOL_USE = "tool_use"
     TOOL_RESULT = "tool_result"
+    CONVERSATION_ID = "conversation_id"
     DONE = "done"
     ERROR = "error"
 

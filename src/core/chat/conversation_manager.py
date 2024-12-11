@@ -1,7 +1,9 @@
+# TODO: refactor token counting https://github.com/anthropics/anthropic-sdk-python?tab=readme-ov-file#token-counting
 from typing import Any
 from uuid import UUID
 
 import tiktoken
+from pydantic import ValidationError
 
 from src.infrastructure.common.logger import get_logger
 from src.models.chat_models import ConversationHistory, ConversationMessage, MessageContent, Role
@@ -50,21 +52,28 @@ class ConversationManager:
         self.conversations[conversation.conversation_id] = conversation
         return conversation
 
-    async def add_message(self, conversation_id: UUID, role: str, content: Any) -> None:
+    async def add_message(self, conversation_id: UUID, role: str, content: MessageContent) -> None:
         """Add a message directly to conversation history."""
-        conversation = self.conversations.get(conversation_id)
-        if not conversation:
-            raise ValueError(f"Conversation {conversation_id} not found")
+        try:
+            conversation = self.conversations.get(conversation_id)
+            if not conversation:
+                logger.error(f"No conversation found for {conversation_id}", exc_info=True)
+                raise ValueError(f"Conversation {conversation_id} not found")
 
-        message = ConversationMessage(conversation_id=conversation_id, role=role, content=content)
-        conversation.messages.append(message)
+            message = ConversationMessage(conversation_id=conversation_id, role=role, content=content)
+            conversation.messages.append(message)
 
-        # Update token count
-        token_count = await self._estimate_tokens(content)
-        conversation.token_count += token_count
+            # Update token count
+            token_count = await self._estimate_tokens(content)
+            conversation.token_count += token_count
 
-        # Prune if needed
-        await self._prune_history(conversation)
+            # Prune if needed
+            await self._prune_history(conversation)
+
+            logger.debug(f"Conversation length after adding a message: {len(conversation.messages)}")
+        except ValidationError as e:
+            logger.error(f"Error adding message: {e}, {conversation_id}, {role}, {content}", exc_info=True)
+            raise
 
     async def add_pending_message(self, conversation_id: UUID, role: Role, content: Any) -> None:
         """Add message to pending state during tool use."""
@@ -78,6 +87,8 @@ class ConversationManager:
 
     async def commit_pending(self, conversation_id: UUID) -> None:
         """Commit pending messages to conversation history."""
+        logger.debug(f"Number of pending messages: {len(self.pending_messages)}")
+
         if pending := self.pending_messages.pop(conversation_id, None):
             conversation = self.conversations.get(conversation_id)
             if conversation:
@@ -86,6 +97,9 @@ class ConversationManager:
                 for message in pending:
                     conversation.token_count += await self._estimate_tokens(message.content)
                 await self._prune_history(conversation)
+
+        logger.debug(f"Number of pending messages: {len(self.pending_messages)}")
+        logger.debug(f"Number of messages in current conversation: {len(self.conversations[conversation_id].messages)}")
 
     async def rollback_pending(self, conversation_id: UUID) -> None:
         """Discard pending messages."""

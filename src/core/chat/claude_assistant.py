@@ -9,8 +9,6 @@ from typing import Any
 
 import anthropic
 import weave
-from anthropic.types import Message
-from anthropic.types.beta.prompt_caching import PromptCachingBetaMessage
 from pydantic import ConfigDict, Field
 from weave import Model
 
@@ -20,7 +18,7 @@ from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
-from src.models.chat_models import ConversationHistory, StandardEvent, StandardEventType
+from src.models.chat_models import ConversationHistory, MessageContent, StandardEvent, StandardEventType
 
 logger = get_logger()
 
@@ -218,14 +216,9 @@ class ClaudeAssistant(Model):
     async def stream_response(self, conv_history: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
         """Stream responses from a conversation, handle tool use, and process assistant replies."""
         try:
-            # user_input = await self.preprocess_user_input(user_input)
-            # TODO: no longer needed?
-            # await self.conversation_history.add_message(role="user", content=user_input)
-            # logger.debug(f"Conversation history: {await self.conversation_history.get_conversation_history()}")
             logger.debug(f"Conversation history: {len(conv_history.messages)} messages.")
 
             while True:
-                # messages = await self.conversation_history.get_conversation_history()
                 messages = conv_history.to_anthropic_messages()
                 logger.debug(f"Messages: {messages}")
                 async with self.client.messages.stream(
@@ -238,74 +231,77 @@ class ClaudeAssistant(Model):
                 ) as stream:
                     async for event in stream:
                         logger.debug(f"Received event type: {event.type}")
-                        # EVENT: message token
-                        if event.type == "text":
-                            yield StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=event.text)
 
-                        elif event.type == "content_block_stop":
-                            # EVENT: tool use start
-                            if event.content_block.type == "tool_use":
-                                logger.debug(f"Tool use detected: {event.content_block.name}")
-                                yield StandardEvent(
-                                    event_type=StandardEventType.TOOL_START,
-                                    content={
-                                        "type": "tool_use",
-                                        "tool": event.content_block.name,
-                                    },
-                                )
-                        elif event.type == "message_stop":
-                            # EVENT: message end
-                            logger.debug("===== Stream message ended =====")
-                            yield StandardEvent(event_type=StandardEventType.MESSAGE_STOP, content="")
+                        # Match conditions
+                        match event.type:
+                            case "message_start":
+                                logger.debug("===== Stream message started =====")
+                                yield StandardEvent(event_type=StandardEventType.MESSAGE_START, content="")
+                            case "text":
+                                logger.debug(f"===== Stream text token: {event.text} =====")
+                                yield StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=event.text)
 
-                    # Your existing tool result handling stays the same
-                    assistant_response = await stream.get_final_message()
-                    logger.debug(f"Final message: {assistant_response}")
-                    await self._process_assistant_response(assistant_response)
+                            case "content_block_start":
+                                logger.debug("===== Stream content block started =====")
+                                if event.content_block.type == "tool_use":
+                                    yield StandardEvent(
+                                        event_type=StandardEventType.TOOL_START,
+                                        content={
+                                            "type": "tool_use",
+                                            "tool": event.content_block.name,
+                                        },
+                                    )
+                            case "content_block_stop":
+                                logger.debug("===== Stream content block ended =====")
+                            case "message_stop":
+                                logger.debug("===== Stream message ended =====")
+                                yield StandardEvent(event_type=StandardEventType.MESSAGE_STOP, content="")
+                            case "error":
+                                logger.error(f"===== Stream error: {event.error} =====")
+                                # TODO: handle error -> raise
 
-                    tool_use_block = next(
-                        (block for block in assistant_response.content if block.type == "tool_use"), None
+                    # Get final message
+                    full_response = await stream.get_final_message()
+                    logger.debug(f"Full response: {full_response}")
+                    yield StandardEvent(
+                        event_type=StandardEventType.FULL_MESSAGE, content=MessageContent(blocks=full_response.content)
                     )
+                    # logger.debug(f"Final message: {assistant_response}")
+                    # await self._process_assistant_response(assistant_response)
+
+                    # Handle tool use and get results
+                    tool_use_block = next((block for block in full_response.content if block.type == "tool_use"), None)
                     if tool_use_block:
                         tool_result = await self.handle_tool_use(
                             tool_use_block.name, tool_use_block.input, tool_use_block.id
                         )
-                        logger.debug(f"Tool result: {tool_result}")
-
+                        yield StandardEvent(
+                            event_type=StandardEventType.TOOL_RESULT, content=MessageContent(blocks=tool_result)
+                        )
+                        logger.debug(f"Tool result: {StandardEvent.content}")
                     if not tool_use_block:
                         break
-
         except (RetryableLLMError, NonRetryableLLMError) as e:
             logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
-            # TODO: no longer needed?
-            await self.conversation_history.remove_last_message()
-            yield StandardEvent(event_type=StandardEventType.ERROR, content=str(e))
             raise
 
-        except Exception as e:
-            logger.error(f"Unexpected error in stream response: {str(e)}", exc_info=True)
-            # TODO: no longer needed?
-            await self.conversation_history.remove_last_message()
-            yield StandardEvent(event_type=StandardEventType.ERROR, content=str(e))
-            raise
+    # @base_error_handler
+    # async def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:
+    #     """Process the assistant's response and update the conversation history."""
+    #     logger.debug(
+    #         f"Cached {response.usage.cache_creation_input_tokens} input tokens. \n"
+    #         f"Read {response.usage.cache_read_input_tokens} tokens from cache"
+    #     )
+    #     # TODO: no longer needed?
+    #     await self.conversation_history.add_message(role="assistant", content=response.content)
+    #     await self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
+    #     logger.debug(
+    #         f"Processed assistant response. Updated conversation history: "
+    #         f"{await self.conversation_history.get_conversation_history()}"
+    #     )
 
-    @base_error_handler
-    async def _process_assistant_response(self, response: PromptCachingBetaMessage | Message) -> str:
-        """Process the assistant's response and update the conversation history."""
-        logger.debug(
-            f"Cached {response.usage.cache_creation_input_tokens} input tokens. \n"
-            f"Read {response.usage.cache_read_input_tokens} tokens from cache"
-        )
-        # TODO: no longer needed?
-        await self.conversation_history.add_message(role="assistant", content=response.content)
-        await self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
-        logger.debug(
-            f"Processed assistant response. Updated conversation history: "
-            f"{await self.conversation_history.get_conversation_history()}"
-        )
-
-        # Access the text from the first content block
-        return response.content[0].text
+    #     # Access the text from the first content block
+    #     return response.content[0].text
 
     @base_error_handler
     async def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> dict[str, Any]:

@@ -9,10 +9,11 @@ from src.api.v0.schemas.chat_schemas import (
     LLMResponse,
     MessageType,
 )
+from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.chat.conversation_manager import ConversationManager
 from src.infrastructure.common.logger import get_logger
-from src.models.chat_models import ConversationHistory, Role, StandardEventType
+from src.models.chat_models import ConversationHistory, Role, StandardEvent, StandardEventType
 from src.services.data_service import DataService
 
 logger = get_logger()
@@ -38,31 +39,57 @@ class ChatService:
                 conversation_id=conversation_id, message=message
             )
 
+            # Get conversation_id and send it as the first event
+            conversation_id = conversation_with_pending.conversation_id
+            yield LLMResponse(message_type=MessageType.CONVERSATION_ID, text=str(conversation_id))
+
             # Send to Claude and stream the response
             async for event in self.claude_assistant.stream_response(conversation_with_pending):
-                if event.event_type == StandardEventType.TOOL_START:
-                    # Add tool use to pending messages
-                    await self.conversation_manager.add_pending_message(
-                        conversation_id=conversation_id, role=Role.ASSISTANT, text=event.content
-                    )
-                    yield LLMResponse(message_type=MessageType.TOOL_USE, text=event.content)
+                # what do we need to display
+                match event.event_type:
+                    # tokens -> stream to user
+                    case StandardEventType.TEXT_TOKEN:
+                        yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text=event.content)
+                    # tool use -> just note them for now
+                    case StandardEventType.TOOL_START:
+                        yield LLMResponse(message_type=MessageType.TOOL_USE, text=event.content)
+                    case StandardEventType.TOOL_RESULT:
+                        # add tool result to conversation
+                        await self.conversation_manager.add_message(
+                            conversation_id=conversation_id, role=Role.USER, content=event.content
+                        )
+                        logger.debug(f"Added tool result to conversation: {event.content}")
+                    # message stop -> this is just a signal
+                    case StandardEventType.MESSAGE_STOP:
+                        logger.debug("Message stop")
+                    # final message -> add to conversation
+                    case StandardEventType.FULL_MESSAGE:
+                        # add assistant message to conversation
+                        await self.conversation_manager.add_message(
+                            conversation_id=conversation_id, role=Role.ASSISTANT, content=event.content
+                        )
+                        logger.debug(f"Added assistant message to conversation: {event.content}")
 
-                elif event.event_type == StandardEventType.MESSAGE_STOP:
-                    # 5. On successful completion:
-                    # - Commit pending to stable conversation
-                    # - Save to DB
-                    # await self.conversation_manager.commit_pending(conversation_id)
-                    # await self.data_service.save_conversation(conversation)
-                    yield LLMResponse(message_type=MessageType.DONE, text="")
+            # Once all is done and said, commit pending messages
+            await self.conversation_manager.commit_pending(conversation_id)
 
-                else:
-                    yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text=event.content)
-
-        except Exception as e:
+        except RetryableLLMError as e:
             # On error, rollback pending messages
             await self.conversation_manager.rollback_pending(conversation_id)
+            # Log the error
             logger.error(f"Error processing message: {str(e)}", exc_info=True)
-            yield LLMResponse(message_type=MessageType.ERROR, text=str(e))
+            # Add context and re-raise
+            raise RetryableLLMError(f"Error in chat service processing message: {str(e)} for user {user_id}") from e
+        except NonRetryableLLMError as e:
+            # On error, rollback pending messages
+            await self.conversation_manager.rollback_pending(conversation_id)
+            # Log the error
+            logger.error(f"Error processing message: {str(e)}", exc_info=True)
+            # Add context and re-raise
+            raise NonRetryableLLMError(f"Error in chat service processing message: {str(e)} for user {user_id}") from e
+
+    async def _handle_stream_events(self, event: StandardEvent) -> LLMResponse:
+        yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text=event.content)
 
     async def _prepare_conversation(self, conversation_id: UUID | None, message: str) -> ConversationHistory:
         # 1. Get or create empty stable conversation
