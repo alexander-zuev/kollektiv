@@ -145,16 +145,10 @@ class TestEndpointIntegration:
         # Test chat endpoint with proper POST request
         test_message = {
             "user_id": "test-user",
-            "message": {
-                "role": "user",
-                "content": [{"type": "text", "text": "Hello"}]
-            },
-            "conversation_id": None
+            "message": {"role": "user", "content": [{"type": "text", "text": "Hello"}]},
+            "conversation_id": None,
         }
-        chat_response = integration_client.post(
-            f"{V0_PREFIX}{Routes.V0.CHAT}",
-            json=test_message
-        )
+        chat_response = integration_client.post(f"{V0_PREFIX}{Routes.V0.CHAT}", json=test_message)
         assert chat_response.status_code == 200, "Chat endpoint should accept POST requests"
 
         # Test conversations endpoint
@@ -163,7 +157,8 @@ class TestEndpointIntegration:
 
         # Verify chat router tags
         chat_routes = [
-            route for route in integration_client.app.routes
+            route
+            for route in integration_client.app.routes
             if str(route.path).startswith(f"{V0_PREFIX}{Routes.V0.CHAT}")
             or str(route.path).startswith(f"{V0_PREFIX}{Routes.V0.CONVERSATIONS}")
         ]

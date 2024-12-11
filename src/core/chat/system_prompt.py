@@ -1,4 +1,5 @@
 """System prompt management for chat functionality."""
+
 from typing import List, Optional
 
 
@@ -35,9 +36,7 @@ class SystemPrompt:
         if not self.document_summaries:
             return self.base_prompt
 
-        summaries_text = "\n\nRelevant context:\n" + "\n".join(
-            f"- {summary}" for summary in self.document_summaries
-        )
+        summaries_text = "\n\nRelevant context:\n" + "\n".join(f"- {summary}" for summary in self.document_summaries)
         return f"{self.base_prompt}{summaries_text}"
 
     def to_anthropic(self) -> str:

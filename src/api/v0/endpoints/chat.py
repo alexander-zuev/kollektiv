@@ -23,17 +23,16 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
 
     Returns Server-Sent Events with tokens.
     """
+
     async def event_generator():
         conversation_id = request.conversation_id
         try:
             response_stream = chat_service.get_response(
-                user_id=request.user_id,
-                message=request.message,
-                conversation_id=conversation_id
+                user_id=request.user_id, message=request.message, conversation_id=conversation_id
             )
             async for response in response_stream:
                 # If conversation_id wasn't provided, get it from the first response
-                if conversation_id is None and hasattr(response, 'conversation_id'):
+                if conversation_id is None and hasattr(response, "conversation_id"):
                     conversation_id = response.conversation_id
 
                 if await request.is_disconnected():
@@ -46,9 +45,7 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
                 await chat_service.conversation_manager.rollback_pending(conversation_id)
             raise
 
-    return EventSourceResponse(
-        event_generator(), media_type="text/event-stream"
-    )
+    return EventSourceResponse(event_generator(), media_type="text/event-stream")
 
 
 # Get all conversations

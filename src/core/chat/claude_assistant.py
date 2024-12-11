@@ -10,27 +10,12 @@ from uuid import UUID
 
 import aiohttp
 import weave
-from anthropic import (
-    APIError,
-    APIStatusError,
-    APITimeoutError,
-    AsyncAnthropic,
-    RateLimitError,
-)
+from anthropic import APIError, APIStatusError, APITimeoutError, AsyncAnthropic, RateLimitError
 from anthropic.types import Message, MessageParam
 from pydantic import BaseModel
 
-from src.core._exceptions import (
-    StreamingError,
-    TokenLimitError,
-    ClientDisconnectError,
-)
-from src.core.chat.events import (
-    ChatEvent,
-    ContentBlockEvent,
-    MessageStartEvent,
-    MessageStopEvent,
-)
+from src.core._exceptions import ClientDisconnectError, StreamingError, TokenLimitError
+from src.core.chat.events import ChatEvent, ContentBlockEvent, MessageStartEvent, MessageStopEvent
 from src.core.chat.system_prompt import SystemPrompt
 from src.core.decorators import anthropic_error_handler, base_error_handler
 from src.core.search.vector_db import VectorDB
@@ -43,8 +28,6 @@ from src.models.chat_models import (
     ToolUseBlock,
     ToolResultBlock,
 )
-
-logger = logging.getLogger(__name__)
 
 logger = logging.getLogger("kollektiv.src.core.chat.claude_assistant")
 
@@ -107,10 +90,7 @@ class ClaudeAssistant:
         if isinstance(prompt, str):
             self.system_prompt = SystemPrompt(prompt)
         elif isinstance(prompt, list):
-            summaries_text = "\n".join(
-                f"- {summary['filename']}: {summary['summary']}"
-                for summary in prompt
-            )
+            summaries_text = "\n".join(f"- {summary['filename']}: {summary['summary']}" for summary in prompt)
             new_prompt = DEFAULT_SYSTEM_PROMPT.format(document_summaries=summaries_text)
             self.system_prompt = SystemPrompt(new_prompt)
         else:
@@ -141,28 +121,12 @@ class ClaudeAssistant:
                 content_blocks = []
                 for block in msg.content.blocks:
                     if isinstance(block, TextBlock):
-                        content_blocks.append({
-                            "type": block.block_type.value,
-                            "text": block.text
-                        })
+                        content_blocks.append({"type": "text", "text": block.text})
                     elif isinstance(block, ToolUseBlock):
-                        content_blocks.append({
-                            "type": block.block_type.value,
-                            "name": block.tool_name,
-                            "input": block.tool_input,
-                            "id": block.tool_use_id
-                        })
-                    elif isinstance(block, ToolResultBlock):
-                        content_blocks.append({
-                            "type": block.block_type.value,
-                            "tool_use_id": block.tool_use_id,
-                            "content": block.content,
-                            "is_error": block.is_error
-                        })
-                messages.append({
-                    "role": msg.role.value.lower(),
-                    "content": content_blocks
-                })
+                        content_blocks.append(
+                            {"type": "tool_use", "name": block.name, "input": block.input, "id": block.id}
+                        )
+                messages.append({"role": msg.role.value.lower(), "content": content_blocks})
 
             if not messages:
                 raise ValueError("No messages in conversation history")
@@ -171,44 +135,34 @@ class ClaudeAssistant:
             if self.system_prompt:
                 messages.insert(0, {"role": "system", "content": self.system_prompt.to_anthropic()})
 
-            # Create stream context
-            stream = await self.client.messages.stream(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                messages=messages,
-            )
+            try:
+                # Create stream
+                stream = await self.client.messages.stream(
+                    model=self.model,
+                    max_tokens=self.max_tokens,
+                    messages=messages,
+                )
 
-            # Process stream events
-            async with stream as response_stream:
-                async for chunk in response_stream:
+                # Process stream events
+                async for event in stream:
                     try:
-                        if chunk.type == "message_start":
-                            yield MessageStartEvent(
-                                message_id=chunk.message.id,
-                                model=chunk.message.model
-                            )
-                        elif chunk.type == "content_block_start":
-                            continue
-                        elif chunk.type == "content_block_delta":
-                            if chunk.delta.type == "text_delta" and chunk.delta.text:
+                        if event.type == "message_start":
+                            yield MessageStartEvent(message_id=event.message.id, model=event.message.model)
+                        elif event.type == "content_block_delta":
+                            if event.delta.type == "text_delta" and event.delta.text:
                                 yield ContentBlockEvent(
-                                    text=chunk.delta.text,
-                                    message_id=chunk.message.id,
-                                    content_block_id=chunk.delta.id
+                                    text=event.delta.text, message_id=event.message.id, content_block_id=event.index
                                 )
-                        elif chunk.type == "message_delta":
-                            continue
-                        elif chunk.type == "message_stop":
+                        elif event.type == "message_stop":
                             usage_dict = {
-                                "input_tokens": chunk.message.usage.input_tokens,
-                                "output_tokens": chunk.message.usage.output_tokens,
-                                "multiplier": chunk.message.usage.multiplier
+                                "input_tokens": event.message.usage.input_tokens,
+                                "output_tokens": event.message.usage.output_tokens,
                             }
                             yield MessageStopEvent(
-                                message_id=chunk.message.id,
-                                end_reason=chunk.message.stop_reason or "end_turn",
-                                model=chunk.message.model,
-                                usage=usage_dict
+                                message_id=event.message.id,
+                                end_reason=event.message.stop_reason or "end_turn",
+                                model=event.message.model,
+                                usage=usage_dict,
                             )
                     except Exception as e:
                         logger.error(f"Error processing stream event: {str(e)}", exc_info=True)
@@ -217,6 +171,17 @@ class ClaudeAssistant:
                             raise e
                         raise StreamingError(f"Error processing stream event: {str(e)}")
 
+            except APIError as e:
+                if e.type == "token_limit_error":
+                    raise TokenLimitError("Token limit exceeded")
+                elif e.type == "connection_error":
+                    raise StreamingError(f"Connection error: {str(e)}")
+                elif e.type == "timeout_error":
+                    raise StreamingError(f"Request timed out: {str(e)}")
+                else:
+                    raise StreamingError(f"API error during streaming: {str(e)}")
+            except Exception as e:
+                raise StreamingError(f"Unexpected error during streaming: {str(e)}")
         except RateLimitError as e:
             raise TokenLimitError(f"Token limit exceeded: {str(e)}")
         except (APIStatusError, APITimeoutError) as e:
@@ -273,10 +238,7 @@ class ClaudeAssistant:
             content = MessageContent(blocks=[TextBlock(text=response_text)])
 
             # Create and add assistant message to conversation
-            conversation.append(
-                role=Role.ASSISTANT,
-                content=content
-            )
+            conversation.append(role=Role.ASSISTANT, content=content)
 
             # Return the last message (assistant's response)
             return conversation.messages[-1]
@@ -299,12 +261,14 @@ class ClaudeAssistant:
                 role=Role.ASSISTANT,
                 content=MessageContent.from_str(response.content[0].text),
                 message_id=UUID(response.id) if not isinstance(response.id, UUID) else response.id,
-                model=response.model
+                model=response.model,
             )
 
             # Update conversation history
             await self.conversation_history.add_message(role="assistant", content=message.content)
-            await self.conversation_history.update_token_count(response.usage.input_tokens, response.usage.output_tokens)
+            await self.conversation_history.update_token_count(
+                response.usage.input_tokens, response.usage.output_tokens
+            )
             logger.debug(
                 f"Processed assistant response. Updated conversation history: "
                 f"{await self.conversation_history.get_conversation_history()}"
@@ -336,9 +300,9 @@ class ClaudeAssistant:
                         {
                             "type": "tool_result",
                             "tool_use_id": tool_use_id,
-                            "content": search_results[0] if search_results else ""
+                            "content": search_results[0] if search_results else "",
                         }
-                    ]
+                    ],
                 }
             else:
                 raise ValueError(f"Unknown tool: {tool_name}")

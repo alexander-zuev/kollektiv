@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import create_app
-from src.infrastructure.config.settings import Environment, settings
+from src.infrastructure.config.settings import Environment
 from src.infrastructure.service_container import ServiceContainer
 
 

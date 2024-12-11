@@ -1,57 +1,45 @@
+"""Test configuration and fixtures."""
+
 import os
 import sys
 from pathlib import Path
-from typing import Any, Generic, List, Optional, TypeVar
-
-# Set test environment variables before any imports
-os.environ.update({
-    "ENVIRONMENT": "local",
-    "FIRECRAWL_API_KEY": "test-key",
-    "ANTHROPIC_API_KEY": "test-key",
-    "OPENAI_API_KEY": "test-key",
-    "COHERE_API_KEY": "test-key",
-    "SUPABASE_URL": "https://test.supabase.co",
-    "SUPABASE_SERVICE_KEY": "test-key",
-    "LOGFIRE_TOKEN": "test-key",
-    "REDIS_URL": "redis://localhost:6379",
-    "LOG_LEVEL": "DEBUG"
-})
-
+from typing import TypeVar
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 import pytest_asyncio
-from anthropic import AsyncAnthropic, APIStatusError
-from anthropic.types import (
-    Message,
-    ContentBlock,
-    ContentBlockDeltaEvent,
-    ContentBlockStartEvent,
-    ContentBlockStopEvent,
-    MessageStartEvent,
-    MessageDeltaEvent,
-    MessageStopEvent,
-    TextBlock,
-    TextDelta,
-    Usage,
-)
+from anthropic import AsyncAnthropic
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fastapi.testclient import TestClient
 
+from app import create_app
 from src.core.chat.claude_assistant import ClaudeAssistant
+from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import ResultRetriever, VectorDB, Reranker
-from src.infrastructure.config.settings import Environment, settings
-from src.models.chat_models import (
-    ConversationHistory,
-    ConversationMessage,
-    MessageContent,
-    Role,
-    StandardEvent,
-    StandardEventType,
-    TextBlock as ChatTextBlock,
+from src.infrastructure.config.settings import Environment
+from src.infrastructure.service_container import ServiceContainer
+from src.services.content_service import ContentService
+from src.services.data_service import DataService
+from src.services.job_manager import JobManager
+
+# Set test environment variables before any imports
+os.environ.update(
+    {
+        "ENVIRONMENT": "local",
+        "FIRECRAWL_API_KEY": "test-key",
+        "ANTHROPIC_API_KEY": "test-key",
+        "OPENAI_API_KEY": "test-key",
+        "COHERE_API_KEY": "test-key",
+        "SUPABASE_URL": "https://test.supabase.co",
+        "SUPABASE_SERVICE_KEY": "test-key",
+        "LOGFIRE_TOKEN": "test-key",
+        "REDIS_URL": "redis://localhost:6379",
+        "LOG_LEVEL": "DEBUG",
+    }
 )
-from tests.test_settings import TestSettings
+
+T = TypeVar("T")
 
 # Create comprehensive settings mock before any imports
 settings_mock = Mock()
@@ -79,64 +67,55 @@ settings_module.settings = settings_mock
 sys.modules["src.infrastructure.config.settings"] = settings_module
 
 # Set environment variables before any imports
-os.environ.update({
-    "ENVIRONMENT": "test",
-    "WANDB_MODE": "disabled",
-    "WEAVE_PROJECT_NAME": "",
-    "ANTHROPIC_API_KEY": "test-key",
-    "COHERE_API_KEY": "test-key",
-    "OPENAI_API_KEY": "test-key",
-    "FIRECRAWL_API_KEY": "test-key",
-    "SUPABASE_URL": "https://test.supabase.co",
-    "SUPABASE_SERVICE_KEY": "test-supabase-key",
-    "LOGFIRE_TOKEN": "test-logfire-token",
-    "REDIS_URL": "redis://localhost:6379",
-    "LOG_LEVEL": "DEBUG",
-    "API_HOST": "http://localhost:8000",
-    "CORS_ORIGINS": "http://localhost:3000",
-})
+os.environ.update(
+    {
+        "ENVIRONMENT": "test",
+        "WANDB_MODE": "disabled",
+        "WEAVE_PROJECT_NAME": "",
+        "ANTHROPIC_API_KEY": "test-key",
+        "COHERE_API_KEY": "test-key",
+        "OPENAI_API_KEY": "test-key",
+        "FIRECRAWL_API_KEY": "test-key",
+        "SUPABASE_URL": "https://test.supabase.co",
+        "SUPABASE_SERVICE_KEY": "test-supabase-key",
+        "LOGFIRE_TOKEN": "test-logfire-token",
+        "REDIS_URL": "redis://localhost:6379",
+        "LOG_LEVEL": "DEBUG",
+        "API_HOST": "http://localhost:8000",
+        "CORS_ORIGINS": "http://localhost:3000",
+    }
+)
 
 # Create logs directory if it doesn't exist
 Path(settings_mock.log_dir).mkdir(parents=True, exist_ok=True)
+
 
 @pytest.fixture
 def event_loop():
     """Create an instance of the default event loop for each test."""
     import asyncio
+
     loop = asyncio.new_event_loop()
     yield loop
     loop.close()
 
+
 @pytest.fixture
 def mock_weave():
     """Mock weave initialization."""
-    with patch("wandb.init") as mock_init, \
-         patch("wandb.login") as mock_login, \
-         patch("wandb.sdk.lib.disabled") as mock_disabled:
+    with (
+        patch("wandb.init") as mock_init,
+        patch("wandb.login") as mock_login,
+        patch("wandb.sdk.lib.disabled") as mock_disabled,
+    ):
         mock_disabled.return_value = True  # Disable wandb completely
         mock_init.return_value = MagicMock()
         mock_login.return_value = True
         yield mock_init
 
-# Import app modules after environment setup
-from app import create_app
-from src.core.chat.claude_assistant import ClaudeAssistant
-from src.core.content.crawler import FireCrawler
-from src.core.search.vector_db import VectorDB
-from src.infrastructure.service_container import ServiceContainer
-from src.models.chat_models import (
-    ConversationMessage,
-    MessageContent,
-    TextBlock,
-    StandardEvent,
-    StandardEventType,
-)
-from src.services.content_service import ContentService
-from src.services.data_service import DataService
-from src.services.job_manager import JobManager
 
+T = TypeVar("T")
 
-T = TypeVar('T')
 
 class MockEmbeddingFunction(EmbeddingFunction[T]):
     """Mock embedding function that follows ChromaDB's interface."""
@@ -216,76 +195,31 @@ def real_vector_db():
 @pytest_asyncio.fixture
 async def claude_assistant_with_mock():
     """Create a ClaudeAssistant instance with mocked client."""
-    # Mock Anthropic client
-    mock_client = AsyncMock(spec=AsyncAnthropic)
+    # Create base mock client with proper spec
+    mock_messages = AsyncMock()
+    mock_messages.stream = AsyncMock()
+    mock_messages.create = AsyncMock()
 
-    # Mock ResultRetriever
-    mock_retriever = AsyncMock(spec=ResultRetriever)
-    mock_retriever.search.return_value = [{"text": "Mock search result"}]
+    mock_client = AsyncMock(spec=AsyncAnthropic)
+    # Set messages as an attribute directly
+    mock_client.__dict__["messages"] = mock_messages
+
+    # Create mock vector db
+    mock_vector_db = AsyncMock(spec=VectorDB)
+    mock_vector_db.search = AsyncMock(
+        return_value=[{"text": "Test result 1", "score": 0.9}, {"text": "Test result 2", "score": 0.8}]
+    )
 
     # Create assistant with mocks
-    assistant = ClaudeAssistant()
-    assistant.client = mock_client
-    assistant._result_retriever = mock_retriever
+    assistant = ClaudeAssistant(
+        client=mock_client,
+        vector_db=mock_vector_db,
+        system_prompt="You are a helpful AI assistant.",
+        model="claude-3-sonnet-20240229",
+        max_tokens=4096,
+    )
 
-    # Set up streaming mock
-    class AsyncStreamContextManager:
-        """Mock async context manager for streaming."""
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            return None
-
-        async def __aiter__(self):
-            """Generate mock streaming events."""
-            # Message start
-            yield MessageStartEvent(
-                type="message_start",
-                message=Message(
-                    id="msg_123",
-                    type="message",
-                    role="assistant",
-                    content=[],
-                    model="claude-3-opus-20240229",
-                    usage=Usage(
-                        input_tokens=10,
-                        output_tokens=20,
-                        multiplier=1.0
-                    )
-                )
-            )
-
-            # Content block with text
-            yield ContentBlockDeltaEvent(
-                type="content_block_delta",
-                delta=TextDelta(type="text_delta", text="Hello"),
-                index=0
-            )
-
-            # Message stop
-            yield MessageStopEvent(
-                type="message_stop",
-                message=Message(
-                    id="msg_123",
-                    type="message",
-                    role="assistant",
-                    content=[{"type": "text", "text": "Hello"}],
-                    model="claude-3-opus-20240229",
-                    stop_reason="end_turn",
-                    usage=Usage(
-                        input_tokens=10,
-                        output_tokens=20,
-                        multiplier=1.0
-                    )
-                )
-            )
-
-    # Configure streaming mock
-    mock_stream = AsyncStreamContextManager()
-    mock_client.messages.stream = AsyncMock(return_value=mock_stream)
-
-    yield assistant
+    return assistant
 
 
 @pytest.fixture
@@ -294,19 +228,13 @@ async def claude_assistant_with_real_db():
     # Create real VectorDB instance
     real_vector_db = VectorDB(
         reranker=Reranker(),
-        result_retriever=ResultRetriever(
-            collection_name="test_collection",
-            embedding_function=MagicMock()
-        ),
-        collection_name="test_collection"
+        result_retriever=ResultRetriever(collection_name="test_collection", embedding_function=MagicMock()),
+        collection_name="test_collection",
     )
 
     # Create test assistant
     assistant = ClaudeAssistant(
-        client=AsyncMock(),
-        model_name="claude-3-sonnet-20240229",
-        max_tokens=1000,
-        vector_db=real_vector_db
+        client=AsyncMock(), model_name="claude-3-sonnet-20240229", max_tokens=1000, vector_db=real_vector_db
     )
 
     return assistant
@@ -370,7 +298,7 @@ def integration_app():
     return test_app
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def mock_client(mock_app):
     """Function-scoped fixture for the test client."""
     return TestClient(mock_app, raise_server_exceptions=True)

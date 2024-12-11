@@ -1,4 +1,5 @@
 """Chat event types for streaming responses."""
+
 from enum import Enum
 from typing import Any, Dict, Optional
 from uuid import UUID
@@ -53,8 +54,7 @@ class MessageStartEvent(ChatEvent):
 
     def to_standard_event(self) -> StandardEvent:
         return StandardEvent(
-            event_type=StandardEventType.MESSAGE_START,
-            content={"message_id": self.message_id, "model": self.model}
+            event_type=StandardEventType.MESSAGE_START, content={"message_id": self.message_id, "model": self.model}
         )
 
 
@@ -65,10 +65,7 @@ class ContentBlockEvent(ChatEvent):
     content_block_id: str = Field(..., description="ID of the content block")
 
     def to_standard_event(self) -> StandardEvent:
-        return StandardEvent(
-            event_type=StandardEventType.TEXT_TOKEN,
-            content=self.text
-        )
+        return StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=self.text)
 
 
 class MessageStopEvent(ChatEvent):
@@ -81,11 +78,7 @@ class MessageStopEvent(ChatEvent):
     def to_standard_event(self) -> StandardEvent:
         return StandardEvent(
             event_type=StandardEventType.MESSAGE_STOP,
-            content={
-                "message_id": self.message_id,
-                "model": self.model,
-                "usage": self.usage
-            }
+            content={"message_id": self.message_id, "model": self.model, "usage": self.usage},
         )
 
 
@@ -103,8 +96,8 @@ class ErrorEvent(ChatEvent):
                 "message_id": self.message_id,
                 "error_type": self.error_type,
                 "error_message": self.error_message,
-                "recoverable": self.recoverable
-            }
+                "recoverable": self.recoverable,
+            },
         )
 
 
@@ -122,8 +115,8 @@ class ToolStartEvent(ChatEvent):
                 "message_id": self.message_id,
                 "tool_name": self.tool_name,
                 "tool_input": self.tool_input,
-                "tool_use_id": self.tool_use_id
-            }
+                "tool_use_id": self.tool_use_id,
+            },
         )
 
 
@@ -144,9 +137,5 @@ class ToolEndEvent(ChatEvent):
     def to_standard_event(self) -> StandardEvent:
         return StandardEvent(
             event_type=StandardEventType.TOOL_END,
-            content={
-                "message_id": self.message_id,
-                "tool_use_id": self.tool_use_id,
-                "status": self.status
-            }
+            content={"message_id": self.message_id, "tool_use_id": self.tool_use_id, "status": self.status},
         )

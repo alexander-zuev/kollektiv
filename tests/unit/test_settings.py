@@ -30,13 +30,12 @@ def mock_settings():
         "MAX_RETRIES": "3",
         "BACKOFF_FACTOR": "2.0",
         "DEFAULT_PAGE_LIMIT": "25",
-        "DEFAULT_MAX_DEPTH": "5"
+        "DEFAULT_MAX_DEPTH": "5",
     }
     with patch.dict(os.environ, env_vars, clear=True):
         settings = Settings()
         # Ensure directories exist
-        for dir_path in [settings.log_dir, settings.raw_data_dir,
-                        settings.processed_data_dir, settings.chroma_db_dir]:
+        for dir_path in [settings.log_dir, settings.raw_data_dir, settings.processed_data_dir, settings.chroma_db_dir]:
             dir_path.mkdir(parents=True, exist_ok=True)
         return settings
 
@@ -65,7 +64,12 @@ def test_path_settings(mock_settings):
     assert mock_settings.chroma_db_dir == Path("src/infrastructure/storage/vector/chroma")
 
     # Verify directories exist
-    for dir_path in [mock_settings.log_dir, mock_settings.raw_data_dir, mock_settings.processed_data_dir, mock_settings.chroma_db_dir]:
+    for dir_path in [
+        mock_settings.log_dir,
+        mock_settings.raw_data_dir,
+        mock_settings.processed_data_dir,
+        mock_settings.chroma_db_dir,
+    ]:
         assert dir_path.exists()
         assert dir_path.is_dir()
 
@@ -113,7 +117,7 @@ def test_environment_override(mock_settings):
         "SUPABASE_URL": "test_url",
         "SUPABASE_SERVICE_KEY": "test_key",
         "LOGFIRE_TOKEN": "test_token",
-        "REDIS_URL": "redis://localhost:6379"
+        "REDIS_URL": "redis://localhost:6379",
     }
     with patch.dict(os.environ, staging_env):
         settings = Settings()

@@ -20,9 +20,11 @@ class ChatError(LLMError):
 
 class ConversationError(ChatError):
     """Raised when conversation operations fail."""
+
     pass
 
 
 class ClientDisconnectError(StreamingError):
     """Raised when the client disconnects during streaming."""
+
     pass

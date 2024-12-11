@@ -1,8 +1,9 @@
 """Test settings configuration."""
+
 from pathlib import Path
 from typing import Any
 
-from src.infrastructure.config.settings import Settings, Environment
+from src.infrastructure.config.settings import Environment, Settings
 
 
 class TestSettings(Settings):

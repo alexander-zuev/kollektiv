@@ -18,7 +18,7 @@ def test_firecrawler_initialization():
     assert crawler.api_key == "test_key"
 
     # Test initialization without API key
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="API key cannot be None"):
         FireCrawler(api_key=None)
 
 

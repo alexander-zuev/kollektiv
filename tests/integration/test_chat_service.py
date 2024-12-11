@@ -1,34 +1,39 @@
 """Integration tests for ChatService."""
-import pytest
+
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
-from src.core._exceptions import ClientDisconnectError, TokenLimitError
-from src.core.chat.events import StandardEvent, StandardEventType
+import pytest
+
+from src.api.v0.schemas.chat_schemas import MessageType
+from src.core._exceptions import TokenLimitError
 from src.core.chat.conversation_manager import ConversationManager
-from src.models.chat_models import ConversationHistory, MessageContent, Role, TextBlock
+from src.core.chat.events import StandardEvent, StandardEventType
+from src.models.chat_models import ConversationHistory
 from src.services.chat_service import ChatService
 from src.services.data_service import DataService
-from src.api.v0.schemas.chat_schemas import MessageType
 
 
 @pytest.fixture
-def chat_service():
+def chat_service() -> ChatService:
     """Create a ChatService instance with mocked dependencies."""
     claude_assistant = MagicMock()
     claude_assistant.stream_response = AsyncMock()
 
     conversation_manager = MagicMock(spec=ConversationManager)
-    conversation_manager.get_or_create_conversation.return_value = ConversationHistory(conversation_id=UUID("87654321-4321-8765-4321-876543210987"))
-    conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(conversation_id=UUID("87654321-4321-8765-4321-876543210987"))
+    conversation_manager.get_or_create_conversation.return_value = ConversationHistory(
+        conversation_id=UUID("87654321-4321-8765-4321-876543210987")
+    )
+    conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(
+        conversation_id=UUID("87654321-4321-8765-4321-876543210987")
+    )
 
     data_service = MagicMock(spec=DataService)
     data_service.save_conversation = AsyncMock()
 
     return ChatService(
-        claude_assistant=claude_assistant,
-        conversation_manager=conversation_manager,
-        data_service=data_service
+        claude_assistant=claude_assistant, conversation_manager=conversation_manager, data_service=data_service
     )
 
 
@@ -41,8 +46,12 @@ async def test_complete_streaming_flow(chat_service):
     conversation_id = UUID("87654321-4321-8765-4321-876543210987")
 
     # Mock conversation manager methods
-    chat_service.conversation_manager.get_or_create_conversation.return_value = ConversationHistory(conversation_id=conversation_id)
-    chat_service.conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(conversation_id=conversation_id)
+    chat_service.conversation_manager.get_or_create_conversation.return_value = ConversationHistory(
+        conversation_id=conversation_id
+    )
+    chat_service.conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(
+        conversation_id=conversation_id
+    )
 
     # Mock streaming events
     events = [
@@ -54,13 +63,10 @@ async def test_complete_streaming_flow(chat_service):
                 "role": "assistant",
                 "content": [{"type": "text", "text": ""}],
                 "model": "claude-3-sonnet-20240229",
-                "usage": {"input_tokens": 10, "output_tokens": 0}
-            }
+                "usage": {"input_tokens": 10, "output_tokens": 0},
+            },
         ),
-        StandardEvent(
-            event_type=StandardEventType.TEXT_TOKEN,
-            content="Test response"
-        ),
+        StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content="Test response"),
         StandardEvent(
             event_type=StandardEventType.MESSAGE_STOP,
             content={
@@ -71,19 +77,18 @@ async def test_complete_streaming_flow(chat_service):
                 "model": "claude-3-sonnet-20240229",
                 "stop_reason": "end_turn",
                 "stop_sequence": None,
-                "usage": {"input_tokens": 10, "output_tokens": 5}
-            }
-        )
+                "usage": {"input_tokens": 10, "output_tokens": 5},
+            },
+        ),
     ]
 
-    async def mock_stream(conversation):
+    async def mock_stream(conversation: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
         for event in events:
             yield event
 
     # Set up the stream_response method to return an async generator
     chat_service.claude_assistant.stream_response = AsyncMock(
-        __aiter__=lambda self: mock_stream(None),
-        side_effect=mock_stream
+        __aiter__=lambda self: mock_stream(None), side_effect=mock_stream
     )
 
     # Collect events from streaming
@@ -108,8 +113,12 @@ async def test_streaming_error_recovery(chat_service):
     conversation_id = UUID("87654321-4321-8765-4321-876543210987")
 
     # Mock conversation manager methods
-    chat_service.conversation_manager.get_or_create_conversation.return_value = ConversationHistory(conversation_id=conversation_id)
-    chat_service.conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(conversation_id=conversation_id)
+    chat_service.conversation_manager.get_or_create_conversation.return_value = ConversationHistory(
+        conversation_id=conversation_id
+    )
+    chat_service.conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(
+        conversation_id=conversation_id
+    )
 
     # Mock streaming events with error
     events = [
@@ -121,20 +130,19 @@ async def test_streaming_error_recovery(chat_service):
                 "role": "assistant",
                 "content": [{"type": "text", "text": ""}],
                 "model": "claude-3-sonnet-20240229",
-                "usage": {"input_tokens": 10, "output_tokens": 0}
-            }
+                "usage": {"input_tokens": 10, "output_tokens": 0},
+            },
         )
     ]
 
-    async def mock_stream(conversation):
+    async def mock_stream(conversation: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
         for event in events:
             yield event
         raise TokenLimitError("Token limit exceeded")
 
     # Set up the stream_response method to return an async generator
     chat_service.claude_assistant.stream_response = AsyncMock(
-        __aiter__=lambda self: mock_stream(None),
-        side_effect=mock_stream
+        __aiter__=lambda self: mock_stream(None), side_effect=mock_stream
     )
 
     # Collect events and verify error handling
@@ -158,8 +166,12 @@ async def test_streaming_tool_use_flow(chat_service):
     conversation_id = UUID("87654321-4321-8765-4321-876543210987")
 
     # Mock conversation manager methods
-    chat_service.conversation_manager.get_or_create_conversation.return_value = ConversationHistory(conversation_id=conversation_id)
-    chat_service.conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(conversation_id=conversation_id)
+    chat_service.conversation_manager.get_or_create_conversation.return_value = ConversationHistory(
+        conversation_id=conversation_id
+    )
+    chat_service.conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(
+        conversation_id=conversation_id
+    )
 
     # Mock streaming events with tool use
     events = [
@@ -171,8 +183,8 @@ async def test_streaming_tool_use_flow(chat_service):
                 "role": "assistant",
                 "content": [{"type": "text", "text": ""}],
                 "model": "claude-3-sonnet-20240229",
-                "usage": {"input_tokens": 10, "output_tokens": 0}
-            }
+                "usage": {"input_tokens": 10, "output_tokens": 0},
+            },
         ),
         StandardEvent(
             event_type=StandardEventType.TOOL_START,
@@ -180,16 +192,12 @@ async def test_streaming_tool_use_flow(chat_service):
                 "type": "tool_use",
                 "tool_name": "rag_search",
                 "tool_input": {"query": "test"},
-                "tool_use_id": "tool_1"
-            }
+                "tool_use_id": "tool_1",
+            },
         ),
         StandardEvent(
             event_type=StandardEventType.TOOL_END,
-            content={
-                "type": "tool_result",
-                "tool_use_id": "tool_1",
-                "content": "Search result"
-            }
+            content={"type": "tool_result", "tool_use_id": "tool_1", "content": "Search result"},
         ),
         StandardEvent(
             event_type=StandardEventType.MESSAGE_STOP,
@@ -197,25 +205,22 @@ async def test_streaming_tool_use_flow(chat_service):
                 "id": "msg_test",
                 "type": "message",
                 "role": "assistant",
-                "content": [
-                    {"type": "text", "text": "Search result"}
-                ],
+                "content": [{"type": "text", "text": "Search result"}],
                 "model": "claude-3-sonnet-20240229",
                 "stop_reason": "end_turn",
                 "stop_sequence": None,
-                "usage": {"input_tokens": 10, "output_tokens": 5}
-            }
-        )
+                "usage": {"input_tokens": 10, "output_tokens": 5},
+            },
+        ),
     ]
 
-    async def mock_stream(conversation):
+    async def mock_stream(conversation: ConversationHistory) -> AsyncGenerator[StandardEvent, None]:
         for event in events:
             yield event
 
     # Set up the stream_response method to return an async generator
     chat_service.claude_assistant.stream_response = AsyncMock(
-        __aiter__=lambda self: mock_stream(None),
-        side_effect=mock_stream
+        __aiter__=lambda self: mock_stream(None), side_effect=mock_stream
     )
 
     # Collect events from streaming
