@@ -1,19 +1,11 @@
 from datetime import datetime
-from enum import Enum
-from uuid import UUID
+from typing import ClassVar
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from src.models.content.content_source_models import DataSourceType, Source, SourceStatus
-
-
-class ContentSourceType(str, Enum):
-    """Supported content source types."""
-
-    WEB = "web"  # Web crawling
-    # Future: CONFLUENCE = "confluence"  # Future: Confluence integration
-    # Future: JIRA = "jira"  # Future: Jira integration
-    # Future: GITHUB = "github"  # Future: GitHub docs/wikis
+from src.models.base_models import BaseDbModel
+from src.models.content_models import DataSource, DataSourceType, SourceStatus
 
 
 class ContentSourceConfig(BaseModel):
@@ -23,10 +15,12 @@ class ContentSourceConfig(BaseModel):
     page_limit: int = Field(default=50, gt=0, description="Maximum number of pages to crawl.")
     exclude_patterns: list[str] = Field(
         default_factory=list,
+        alias="excludePaths",
         description="The list of patterns to exclude, e.g., '/blog/*', '/author/*'.",
     )
     include_patterns: list[str] = Field(
         default_factory=list,
+        alias="includePaths",
         description="The list of patterns to include, e.g., '/blog/*', '/api/*'.",
     )
 
@@ -64,25 +58,52 @@ class ContentSourceConfig(BaseModel):
         return v
 
 
-class AddContentSourceRequest(BaseModel):
-    """Request to add a new content source."""
+class AddContentSourceRequest(BaseDbModel):
+    """
+    Request model for adding a new content source.
 
-    source_type: ContentSourceType = Field(
-        ..., description="Type of content source (currently only 'web' is supported)."
+    Attributes:
+        request_id: System-generated UUID for tracking the request. Auto-generated if not provided.
+        source_type: Type of content source (currently only 'web' is supported).
+        request_config: Configuration parameters for the content source.
+
+    Example:
+        ```json
+        {
+            "request_config": {
+                "url": "https://docs.example.com",
+                "page_limit": 50,
+                "exclude_patterns": ["/blog/*"],
+                "include_patterns": ["/api/*"]
+            },
+            "source_type": "web"  # Optional, defaults to "web"
+        }
+        ```
+    """
+
+    _db_config: ClassVar[dict] = {"schema": "content", "table": "user_requests", "primary_key": "request_id"}
+    request_id: UUID = Field(default_factory=uuid4, description="System-generated id of a user request.")
+    source_type: DataSourceType = Field(
+        default=DataSourceType.WEB,  # Make web the default
+        description="Type of content source (currently only 'web' is supported).",
     )
-    config: ContentSourceConfig
+    request_config: ContentSourceConfig = Field(
+        ...,  # Required
+        description="Configuration parameters for the content source",
+    )
 
     class Config:
-        """Example config."""
+        """Example configuration."""
 
         json_schema_extra = {
             "example": {
-                "source_type": "web",
-                "config": {
+                "request_config": {
                     "url": "https://docs.example.com",
-                    "max_pages": 50,
-                    "exclude_paths": ["/blog/*"],
+                    "page_limit": 50,
+                    "exclude_patterns": ["/blog/*"],
+                    "include_patterns": ["/api/*"],
                 },
+                "source_type": "web",
             }
         }
 
@@ -97,7 +118,7 @@ class SourceAPIResponse(BaseModel):
     error: str | None = Field(None, description="Error message, null if no error")
 
     @classmethod
-    def from_source(cls, source: Source) -> "SourceAPIResponse":
+    def from_source(cls, source: DataSource) -> "SourceAPIResponse":
         return cls(
             source_id=source.source_id,
             status=source.status,

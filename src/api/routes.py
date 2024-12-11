@@ -13,6 +13,7 @@ class Routes:
         """System routes (non-versioned)."""
 
         HEALTH = "/health"
+        SENTRY_DEBUG = "/sentry-debug"
 
         class Webhooks:
             """Webhook routes."""
@@ -25,6 +26,7 @@ class Routes:
 
         CONTENT = "/content"
         CHAT = "/chat"
+        CONVERSATIONS = "/conversations"
 
         class Content:
             """Content management routes."""
@@ -36,5 +38,10 @@ class Routes:
         class Chat:
             """Chat routes."""
 
-            MESSAGE = "/message"
-            STREAM = "/stream"
+            CHAT = "/chat"  # for sending and receiving messages
+
+        class Conversations:
+            """Conversation routes."""
+
+            LIST = "/conversations"  # for getting conversation list
+            GET = "/conversations/{conversation_id}"  # for getting a single conversation

@@ -8,9 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Web Interface: Added Chainlit-based web UI for improved user experience
-- Interactive Document Management (WIP): Added support for managing documents via web interface
-- FastAPI: Added health checks and webhook handlers
+- Web UI: Added integration with web UI via API endpoints.
+- Content ingestion: Users are now able to add web content via UI.
 
 ### Changed
 - Updated documentation to reflect new startup process

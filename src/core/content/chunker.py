@@ -12,15 +12,21 @@ from typing import Any
 
 import tiktoken
 
-from src.infrastructure.common.decorators import base_error_handler
-from src.infrastructure.config.logger import configure_logging, get_logger
+from src.infrastructure.common.decorators import generic_error_handler
+from src.infrastructure.common.logger import configure_logging, get_logger
 from src.infrastructure.config.settings import settings
 
 logger = get_logger()
 
 
+class PreProcessor:
+    """Pre-processes data before chunking."""
+
+    pass
+
+
 class MarkdownChunker:
-    """Processes markdown data, removes boilerplate, images, and validates chunks.
+    """Processes markdown, removes boilerplate, images, and validates chunks.
 
     Args:
         output_dir (str): The directory to save processed data. Defaults to PROCESSED_DATA_DIR.
@@ -60,7 +66,7 @@ class MarkdownChunker:
         self.min_chunk_size = min_chunk_size  # Minimum chunk size in tokens
         self.overlap_percentage = overlap_percentage  # 5% overlap
         # Initialize the validator
-        self.validator = MarkdownChunkValidator(
+        self.validator = Validator(
             min_chunk_size=self.min_chunk_size,
             max_tokens=self.max_tokens,
             output_dir=self.output_dir,
@@ -84,7 +90,7 @@ class MarkdownChunker:
         self.code_block_start_pattern = re.compile(r"^(```|~~~)(.*)$")
         self.inline_code_pattern = re.compile(r"`([^`\n]+)`")
 
-    @base_error_handler
+    @generic_error_handler
     def load_data(self, input_filename: str) -> dict[str, Any]:
         """
         Load data from a JSON file and return as a dictionary.
@@ -114,7 +120,7 @@ class MarkdownChunker:
             logger.error(f"Invalid JSON in file: {input_filepath}")
             raise
 
-    @base_error_handler
+    @generic_error_handler
     def remove_images(self, content: str) -> str:
         """
         Remove various forms of image links and tags from a given content string.
@@ -147,7 +153,7 @@ class MarkdownChunker:
 
         return content
 
-    @base_error_handler
+    @generic_error_handler
     def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:
         """
         Process pages from JSON input and generate data chunks.
@@ -199,7 +205,7 @@ class MarkdownChunker:
         self.validator.validate(all_chunks)
         return all_chunks
 
-    @base_error_handler
+    @generic_error_handler
     def remove_boilerplate(self, content: str) -> str:
         """
         Remove boilerplate text from the given content.
@@ -219,7 +225,7 @@ class MarkdownChunker:
         cleaned_content = re.sub(r"\n{2,}", "\n\n", cleaned_content)
         return cleaned_content.strip()
 
-    @base_error_handler
+    @generic_error_handler
     def clean_header_text(self, header_text: str) -> str:
         """
         Clean header text by removing specific markdown and zero-width spaces.
@@ -245,7 +251,7 @@ class MarkdownChunker:
             cleaned_text = ""  # Empty out any shell interface mistaken as headers
         return cleaned_text
 
-    @base_error_handler
+    @generic_error_handler
     def identify_sections(self, page_content: str, page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
         """
         Identify the sections and headers in the provided page content.
@@ -330,7 +336,7 @@ class MarkdownChunker:
 
         return sections
 
-    @base_error_handler
+    @generic_error_handler
     def create_chunks(self, sections: list[dict[str, Any]], page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
         """
         Create chunks from sections and adjust them according to page metadata.
@@ -379,7 +385,7 @@ class MarkdownChunker:
         self._add_overlap(final_chunks)
         return final_chunks
 
-    @base_error_handler
+    @generic_error_handler
     def _split_section(self, content: str, headers: dict[str, str]) -> list[dict[str, Any]]:  # noqa: C901
         """
         Split the content into sections based on headers and code blocks.
@@ -495,7 +501,7 @@ class MarkdownChunker:
 
         return chunks
 
-    @base_error_handler
+    @generic_error_handler
     def _split_code_block(self, code_block_content: str, code_fence: str) -> list[str]:
         """
         Split a code block into smaller chunks based on token count.
@@ -541,7 +547,7 @@ class MarkdownChunker:
                 chunks.append(chunk_content.strip())
         return chunks
 
-    @base_error_handler
+    @generic_error_handler
     def _adjust_chunks(self, chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Adjust chunks to be within the specified token limits.
@@ -614,7 +620,7 @@ class MarkdownChunker:
                 final_chunks.append(chunk)
         return final_chunks
 
-    @base_error_handler
+    @generic_error_handler
     def _split_large_chunk(self, chunk: dict[str, Any]) -> list[dict[str, Any]]:
         """
         Split a large text chunk into smaller chunks.
@@ -655,7 +661,7 @@ class MarkdownChunker:
 
         return chunks
 
-    @base_error_handler
+    @generic_error_handler
     def _merge_headers(self, headers1: dict[str, str], headers2: dict[str, str]) -> dict[str, str]:
         """
         Merge two headers dictionaries by levels.
@@ -679,7 +685,7 @@ class MarkdownChunker:
                 merged[level] = ""
         return merged
 
-    @base_error_handler
+    @generic_error_handler
     def _add_overlap(
         self, chunks: list[dict[str, Any]], min_overlap_tokens: int = 50, max_overlap_tokens: int = 100
     ) -> None:
@@ -761,7 +767,7 @@ class MarkdownChunker:
         last_n_tokens = tokens[-n:]
         return self.tokenizer.decode(last_n_tokens)
 
-    @base_error_handler
+    @generic_error_handler
     def save_chunks(self, chunks: list[dict[str, Any]]) -> str:
         """
         Save the given chunks to a JSON file.
@@ -781,7 +787,7 @@ class MarkdownChunker:
 
         return output_filename
 
-    @base_error_handler
+    @generic_error_handler
     def _generate_chunk_id(self) -> uuid.UUID:
         """
         Generate a new UUID for chunk identification.
@@ -792,7 +798,7 @@ class MarkdownChunker:
         """
         return uuid.uuid4()
 
-    @base_error_handler
+    @generic_error_handler
     def _calculate_tokens(self, text: str) -> int:
         """
         Calculate the number of tokens in a given text.
@@ -809,7 +815,7 @@ class MarkdownChunker:
         token_count = len(self.tokenizer.encode(text))
         return token_count
 
-    @base_error_handler
+    @generic_error_handler
     def _create_metadata(self, page_metadata: dict[str, Any], token_count: int) -> dict[str, Any]:
         """
         Create metadata dictionary for a page.
@@ -832,7 +838,7 @@ class MarkdownChunker:
         return metadata
 
 
-class MarkdownChunkValidator:
+class Validator:
     """
     Validates and processes chunks of Markdown data.
 
@@ -1073,6 +1079,23 @@ class MarkdownChunkValidator:
             logger.info("No incorrect chunks found.")
 
 
+# class ChunkOrchestrator:
+#     """Orchestrates the chunking process end to end efficiently."""
+
+#     def __init__(self, validator: Validator, chunker: Chunker):
+#         self.validator = validator
+#         self.chunker = chunker
+
+
+#     async def process_documents(self, documents: list[Document]) -> list[Chunk]:
+#         """Efficient processes documents in batches"""
+#         pass
+
+#     async def _process_batch(self, batch: list[Document]) -> list[Chunk]:
+#         """Process a single batch of documents."""
+#         pass
+
+
 # Test usage
 def main() -> None:
     """
@@ -1098,8 +1121,8 @@ def main() -> None:
 
     for file in files_to_chunk:
         markdown_chunker = MarkdownChunker()  # save incorrect chunks or not
-        result = markdown_chunker.load_data(input_filename=file)
-        chunks = markdown_chunker.process_pages(result)
+        data = markdown_chunker.load_data(input_filename=file)
+        chunks = markdown_chunker.process_pages(data)
         markdown_chunker.save_chunks(chunks)
         logger.info("Chunking job for " + file + " complete!")
 

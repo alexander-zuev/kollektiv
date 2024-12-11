@@ -46,27 +46,32 @@ class FireCrawlEventType(str, Enum):
     CRAWL_FAILED = "crawl.failed"
 
 
-class FireCrawlEvent(BaseModel):
-    """FireCrawl specific webhook event model.
+class FireCrawlWebhookResponse(BaseModel):
+    """FireCrawl specific webhook response model.
 
     From FireCrawl docs:
     - success: If the webhook was successful
     - event_type: The type of event that occurred
-    - id: The ID of the crawl
+    - firecrawl_id: The ID of the crawl (mapped from 'id' in the webhook)
     - data: The data that was scraped (Array). Only non-empty on crawl.page
     - error: If the webhook failed, this will contain the error message
     """
 
     # Aligned with FireCrawl Webhook Response https://docs.firecrawl.dev/features/crawl#webhook-events
-    success: bool = Field(True, description="If the webhook was successful in crawling the page correctly.")
-    event_type: FireCrawlEventType = Field(..., description="The type of event that occurred")
-    crawl_id: str = Field(..., description="The ID of the crawl")
+    success: bool = Field(..., description="If the webhook was successful in crawling the page correctly.")
+    event_type: FireCrawlEventType = Field(..., alias="type", description="The type of event that occurred")
+    firecrawl_id: str = Field(..., alias="id", description="The ID of the crawl")
     data: list[dict[str, Any]] = Field(
         default_factory=list,
         description="The data that was scraped (Array). This will only be non empty on crawl.page and will contain 1 "
         " item if the page was scraped successfully. The response is the same as the /scrape endpoint.",
     )
     error: str | None = Field(None, description="If the webhook failed, this will contain the error message.")
+
+    class Config:
+        """Pydantic model configuration."""
+
+        populate_by_name = True
 
 
 class WebhookResponse(BaseModel):
@@ -87,7 +92,7 @@ class WebhookResponse(BaseModel):
         json_encoders = {datetime: lambda v: v.isoformat()}
 
 
-class FireCrawlWebhookEvent(WebhookEvent[FireCrawlEvent]):
+class FireCrawlWebhookEvent(WebhookEvent[FireCrawlWebhookResponse]):
     """Concrete webhook event type for FireCrawl."""
 
     pass

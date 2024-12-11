@@ -4,7 +4,7 @@ from src.api.dependencies import ContentServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse, SourceResponse
 from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
-from src.infrastructure.config.logger import get_logger
+from src.infrastructure.common.logger import get_logger
 
 logger = get_logger()
 router = APIRouter(prefix=f"{V0_PREFIX}{Routes.V0.CONTENT}")

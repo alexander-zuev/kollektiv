@@ -26,6 +26,9 @@ class Environment(str, Enum):
 class Settings(BaseSettings):
     """Application-wide settings."""
 
+    # General
+    project_name: str = Field("kollektiv", description="Project name")
+
     # Environment configuration
     environment: Environment = Field(Environment.LOCAL, alias="ENVIRONMENT", description="Application environment")
 
@@ -38,8 +41,16 @@ class Settings(BaseSettings):
     weave_project_name: str | None = Field(None, alias="WEAVE_PROJECT_NAME")
 
     # Server configuration
-    api_host: str = Field("127.0.0.1", description="API host")
-    api_port: int = Field(8000, description="API port")
+    api_host: str = Field(
+        "127.0.0.1" if Environment.LOCAL else "0.0.0.0",  # Local uses localhost, others use 0.0.0.0
+        alias="API_HOST",
+        description="API host - 127.0.0.1 for local, 0.0.0.0 for staging/prod",
+    )
+    api_port: int = Field(
+        default=8000,
+        alias="PORT",  # Railway injects PORT environment variable
+        description="API port - defaults to 8000, but can be overridden by Railway's PORT variable",
+    )
     chainlit_host: str = Field("127.0.0.1", description="Chainlit host")
     chainlit_port: int = Field(8001, description="Chainlit port")
     log_level: str = Field("debug", description="Logging level")
@@ -58,6 +69,10 @@ class Settings(BaseSettings):
     # Base directory is src/
     src_dir: Path = Field(default_factory=lambda: Path(__file__).parent.parent.parent)
 
+    # Supabase
+    supabase_url: str = Field(..., description="Supabase URL", alias="SUPABASE_URL")
+    supabase_key: str = Field(..., description="Supabase Service Key", alias="SUPABASE_SERVICE_KEY")
+
     # All paths are now relative to src_dir
     log_dir: Path = Field(default_factory=lambda: Path("src/logs"))
     eval_dir: Path = Field(default_factory=lambda: Path("src/core/evaluation"))
@@ -71,6 +86,17 @@ class Settings(BaseSettings):
     use_ngrok: bool = Field(True, description="Whether to use ngrok in local development")
     ngrok_auth_token: str | None = Field(None, alias="NGROK_AUTH_TOKEN")
     _ngrok_url: str | None = None
+
+    # Monitoring
+    logfire_write_token: str = Field(..., alias="LOGFIRE_TOKEN", description="Logfire write token")
+    sentry_dsn: str = Field(
+        "https://c2f1acc0646d1578b572e318b6b118d5@o4508393623257088.ingest.us.sentry.io/4508393650847744",
+        alias="SENTRY_DSN",
+        description="Sentry DSN",
+    )
+
+    # Redis
+    redis_url: str = Field(..., alias="REDIS_URL", description="Redis URL")
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),
