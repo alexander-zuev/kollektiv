@@ -1,8 +1,11 @@
+"""Evaluation service for RAG system performance."""
+
 import asyncio
 import json
 import os.path
 from collections.abc import Sequence
 from pprint import pprint
+from typing import Any
 
 import weave
 from datasets import Dataset
@@ -265,7 +268,7 @@ class Evaluator:
         self.anthropic_api_key = anthropic_api_key
         self.metrics = self._initialize_metrics()
 
-    def _initialize_metrics(self):
+    def _initialize_metrics(self) -> dict[str, Any]:
         return {
             "faithfulness": Faithfulness(llm=self.evaluator_llm),
             "answer_relevancy": AnswerRelevancy(llm=self.evaluator_llm),
@@ -498,7 +501,7 @@ class RAGEvaluationManager:
         return results
 
 
-def generate_new_dataset(debug: bool = False):
+def generate_new_dataset(debug: bool = False) -> None:
     """
     Initialize, generate, and upload a new dataset.
 
@@ -525,7 +528,7 @@ def generate_new_dataset(debug: bool = False):
     )
 
 
-async def run_evaluation_pipeline_async(debug: bool = False):
+async def run_evaluation_pipeline_async(debug: bool = False) -> None:
     """
     Run the evaluation pipeline asynchronously.
 
