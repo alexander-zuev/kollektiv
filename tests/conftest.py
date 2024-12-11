@@ -1,13 +1,44 @@
 import os
+import sys
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from pathlib import Path
+from typing import Generic, TypeVar
 
 import numpy as np
 import pytest
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fastapi.testclient import TestClient
 
+# Create log directory
+TEST_LOG_DIR = Path("/tmp/kollektiv_test_logs")
+TEST_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# Create settings mock before any imports
+settings_mock = MagicMock(
+    ENVIRONMENT="test",
+    FIRECRAWL_API_KEY="test-key",
+    ANTHROPIC_API_KEY="test-anthropic-key",
+    OPENAI_API_KEY="test-openai-key",
+    COHERE_API_KEY="test-cohere-key",
+    SUPABASE_URL="https://test-supabase-url",
+    SUPABASE_SERVICE_KEY="test-supabase-key",
+    LOGFIRE_TOKEN="test-logfire-token",
+    REDIS_URL="redis://localhost:6379",
+    CORS_ORIGINS="*",
+    ALLOWED_HOSTS="*",
+    LOG_LEVEL="DEBUG",
+    SENTRY_DSN="",
+    LOG_DIR=str(TEST_LOG_DIR)
+)
+
+# Mock modules before importing app
+sys.modules['logfire'] = MagicMock()
+sys.modules['src.infrastructure.config.settings'] = MagicMock(settings=settings_mock)
+sys.modules['src.infrastructure.common.logger'] = MagicMock()
+
 from app import create_app
-from src.core.chat.claude_assistant import ClaudeAssistant, ConversationMessage
+from src.core.chat.claude_assistant import ClaudeAssistant
+from src.models.chat_models import ConversationMessage
 from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.service_container import ServiceContainer
@@ -15,22 +46,16 @@ from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
 
+T = TypeVar('T')
 
-class MockEmbeddingFunction(EmbeddingFunction):
-    """Mock embedding function that follows ChromaDB's interface."""
-
+class MockEmbeddingFunction(EmbeddingFunction[T]):
     def __call__(self, input: Document | Documents) -> list[Embedding]:
-        """Return mock embeddings that match ChromaDB's expected types."""
         mock_embedding = np.array([0.1, 0.2, 0.3], dtype=np.float32)
-
-        if isinstance(input, str):
-            return [mock_embedding]
-        return [mock_embedding for _ in input]
+        return [mock_embedding] if isinstance(input, str) else [mock_embedding for _ in input]
 
 
 @pytest.fixture
 def mock_openai_embeddings(monkeypatch):
-    """Mock OpenAI embeddings for unit tests."""
     mock_func = MockEmbeddingFunction()
     monkeypatch.setattr("chromadb.utils.embedding_functions.OpenAIEmbeddingFunction", lambda **kwargs: mock_func)
     return mock_func
@@ -38,54 +63,54 @@ def mock_openai_embeddings(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def mock_environment_variables():
-    """Set required environment variables for tests."""
-    # Store original environment
     original_env = dict(os.environ)
 
-    # Get environment from actual env var, default to LOCAL
     test_env = os.getenv("ENVIRONMENT", "local")
 
     env_vars = {
         "ENVIRONMENT": test_env,
-        "WANDB_MODE": "disabled",
-        "WEAVE_PROJECT_NAME": "",
-        "ANTHROPIC_API_KEY": "test-key",
-        "COHERE_API_KEY": "test-key",
-        "OPENAI_API_KEY": "test-key",
+        "FIRECRAWL_API_KEY": "test-key",
+        "ANTHROPIC_API_KEY": "test-anthropic-key",
+        "OPENAI_API_KEY": "test-openai-key",
+        "COHERE_API_KEY": "test-cohere-key",
+        "SUPABASE_URL": "https://test-supabase-url",
+        "SUPABASE_SERVICE_KEY": "test-supabase-key",
+        "LOGFIRE_TOKEN": "test-logfire-token",
+        "REDIS_URL": "redis://localhost:6379",
+        "CORS_ORIGINS": "*",
+        "ALLOWED_HOSTS": "*",
+        "LOG_LEVEL": "DEBUG",
+        "ENVIRONMENT": "test",
+        "SENTRY_DSN": "",
         "FIRECRAWL_API_KEY": "test-key",
     }
 
-    # If we're in staging, add required staging vars
     if test_env == "staging":
         env_vars.update(
             {
-                "BASE_URL": "http://mock-api:8000",  # Mock staging URL
+                "BASE_URL": "http://mock-api:8000",
             }
         )
 
     with patch.dict(os.environ, env_vars, clear=True):
         yield
 
-    # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
 
 
 @pytest.fixture
 def mock_vector_db():
-    """Create a mock object for VectorDB."""
     return MagicMock(spec=VectorDB)
 
 
 @pytest.fixture
 def real_vector_db():
-    """Create a real VectorDB instance for testing."""
     return VectorDB()
 
 
 @pytest.fixture
 def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
-    """Set up a ClaudeAssistant instance with mocked dependencies."""
     with patch("anthropic.Anthropic") as mock_anthropic:
         mock_client = Mock()
         mock_client.handle_tool_use = Mock(
@@ -102,25 +127,21 @@ def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
 
 @pytest.fixture
 def claude_assistant_with_real_db(real_vector_db):
-    """Set up a ClaudeAssistant instance with real VectorDB."""
     assistant = ClaudeAssistant(vector_db=real_vector_db)
     return assistant
 
 
 def pytest_addoption(parser):
-    """Add custom command line options."""
     parser.addoption("--run-integration", action="store_true", default=False, help="run integration tests")
 
 
 def pytest_configure(config):
-    """Configure custom markers."""
     config.addinivalue_line("markers", "integration: mark test as integration test")
     config.addinivalue_line("markers", "e2e: mark test as end-to-end test")
 
 
 @pytest.fixture(scope="session")
 def mock_app():
-    """Session-scoped fixture for the mocked app."""
     test_app = create_app()
 
     mock_job_manager = MagicMock(spec=JobManager)
@@ -142,19 +163,15 @@ def mock_app():
 
 @pytest.fixture
 def integration_app():
-    """Integration test app with mocked external services."""
     test_app = create_app()
     container = ServiceContainer()
 
-    # Create mock FireCrawler with necessary attributes
     mock_firecrawler = MagicMock(spec=FireCrawler)
-    mock_firecrawler.api_key = "test-key"  # Set the api_key attribute
+    mock_firecrawler.api_key = "test-key"
     mock_firecrawler.firecrawl_app = mock_firecrawler.initialize_firecrawl()
 
-    # Mock DataService
     mock_data_service = MagicMock(spec=DataService)
 
-    # Mock specific services while keeping container structure
     container.job_manager = JobManager(data_service=mock_data_service)
     container.firecrawler = mock_firecrawler
     container.content_service = ContentService(
@@ -167,26 +184,22 @@ def integration_app():
 
 @pytest.fixture(scope="function")
 def mock_client(mock_app):
-    """Function-scoped fixture for the test client."""
     return TestClient(mock_app, raise_server_exceptions=True)
 
 
 @pytest.fixture
 def integration_client(integration_app):
-    """TestClient with real services for integration tests."""
     return TestClient(integration_app, raise_server_exceptions=True)
 
 
 @pytest.fixture
 def mock_content_service():
-    """Fixture to mock the content service dependency."""
     with patch("src.api.v0.endpoints.webhooks.ContentServiceDep", new_callable=MagicMock) as mock_service:
         yield mock_service
 
 
 @pytest.fixture
 def mock_webhook_content_service(mock_app):
-    """Fixture specifically for webhook testing with async support."""
     mock_job_manager = MagicMock(spec=JobManager)
     mock_firecrawler = MagicMock(spec=FireCrawler)
 
