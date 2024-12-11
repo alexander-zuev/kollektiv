@@ -1,8 +1,11 @@
-"""Event types for chat operations."""
+"""Chat event types for streaming responses."""
 from enum import Enum
-from typing import Any
-from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Dict, Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+from src.core._exceptions import StreamingError, TokenLimitError, ClientDisconnectError
 
 
 class StandardEventType(str, Enum):
@@ -33,32 +36,33 @@ class StandardEvent:
         self.content = content
 
 
-@dataclass
-class ChatEvent:
+class ChatEvent(BaseModel):
     """Base class for all chat events."""
-    message_id: str
+
+    message_id: str = Field(..., description="ID of the message this event belongs to")
 
     def to_standard_event(self) -> StandardEvent:
         """Convert to StandardEvent format for backward compatibility."""
         raise NotImplementedError
 
 
-@dataclass
 class MessageStartEvent(ChatEvent):
-    """Event emitted when a message starts."""
+    """Event indicating the start of a message."""
+
+    model: Optional[str] = Field(None, description="Model used for generating the response")
 
     def to_standard_event(self) -> StandardEvent:
         return StandardEvent(
             event_type=StandardEventType.MESSAGE_START,
-            content={"message_id": self.message_id}
+            content={"message_id": self.message_id, "model": self.model}
         )
 
 
-@dataclass
 class ContentBlockEvent(ChatEvent):
-    """Event emitted for each content block in a message."""
-    text: str
-    content_block_id: str
+    """Event containing a content block."""
+
+    text: str = Field(..., description="Text content of the block")
+    content_block_id: str = Field(..., description="ID of the content block")
 
     def to_standard_event(self) -> StandardEvent:
         return StandardEvent(
@@ -67,25 +71,30 @@ class ContentBlockEvent(ChatEvent):
         )
 
 
-@dataclass
-class MessageEndEvent(ChatEvent):
-    """Event emitted when a message ends."""
-    end_reason: str
-    model: str
+class MessageStopEvent(ChatEvent):
+    """Event indicating the end of a message."""
+
+    end_reason: str = Field(..., description="Reason for message completion")
+    model: str = Field(..., description="Model used for generating the response")
+    usage: Dict[str, Any] = Field(..., description="Token usage information")
 
     def to_standard_event(self) -> StandardEvent:
         return StandardEvent(
             event_type=StandardEventType.MESSAGE_STOP,
-            content={"message_id": self.message_id, "model": self.model}
+            content={
+                "message_id": self.message_id,
+                "model": self.model,
+                "usage": self.usage
+            }
         )
 
 
-@dataclass
 class ErrorEvent(ChatEvent):
-    """Event emitted when an error occurs."""
-    error_type: str
-    error_message: str
-    recoverable: bool = False
+    """Event indicating an error occurred."""
+
+    error_type: str = Field(..., description="Type of error that occurred")
+    error_message: str = Field(..., description="Error message")
+    recoverable: bool = Field(default=False, description="Whether the error is recoverable")
 
     def to_standard_event(self) -> StandardEvent:
         return StandardEvent(
@@ -95,5 +104,49 @@ class ErrorEvent(ChatEvent):
                 "error_type": self.error_type,
                 "error_message": self.error_message,
                 "recoverable": self.recoverable
+            }
+        )
+
+
+class ToolStartEvent(ChatEvent):
+    """Event indicating the start of tool use."""
+
+    tool_name: str = Field(..., description="Name of the tool being used")
+    tool_input: Dict[str, Any] = Field(..., description="Input parameters for the tool")
+    tool_use_id: str = Field(..., description="ID of the tool use")
+
+    def to_standard_event(self) -> StandardEvent:
+        return StandardEvent(
+            event_type=StandardEventType.TOOL_START,
+            content={
+                "message_id": self.message_id,
+                "tool_name": self.tool_name,
+                "tool_input": self.tool_input,
+                "tool_use_id": self.tool_use_id
+            }
+        )
+
+
+class ToolResultEvent(ChatEvent):
+    """Event containing tool execution result."""
+
+    tool_use_id: str = Field(..., description="ID of the tool use")
+    content: Optional[str | Dict[str, Any]] = Field(None, description="Result returned from the tool")
+    is_error: bool = Field(default=False, description="Whether the result is an error")
+
+
+class ToolEndEvent(ChatEvent):
+    """Event indicating the end of tool use."""
+
+    tool_use_id: str = Field(..., description="ID of the tool use")
+    status: str = Field(..., description="Status of tool execution")
+
+    def to_standard_event(self) -> StandardEvent:
+        return StandardEvent(
+            event_type=StandardEventType.TOOL_END,
+            content={
+                "message_id": self.message_id,
+                "tool_use_id": self.tool_use_id,
+                "status": self.status
             }
         )

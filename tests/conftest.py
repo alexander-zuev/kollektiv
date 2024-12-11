@@ -161,44 +161,50 @@ def mock_openai_embeddings(monkeypatch):
 @pytest.fixture(autouse=True)
 def mock_settings():
     """Mock settings for testing."""
-    test_env = {
-        "ENVIRONMENT": Environment.LOCAL.value,
-        "FIRECRAWL_API_KEY": "test-key",
-        "ANTHROPIC_API_KEY": "test-key",
-        "OPENAI_API_KEY": "test-key",
-        "COHERE_API_KEY": "test-key",
-        "SUPABASE_URL": "https://test.supabase.co",
-        "SUPABASE_SERVICE_KEY": "test-key",
-        "LOGFIRE_TOKEN": "test-key",
-        "REDIS_URL": "redis://localhost:6379",
-        "LOG_LEVEL": "DEBUG"
-    }
-
-    with patch.dict(os.environ, test_env, clear=True):
-        test_settings = TestSettings()
-        with patch("src.infrastructure.config.settings.settings", test_settings):
-            yield test_settings
+    with patch("src.infrastructure.config.settings.settings") as mock_settings:
+        mock_settings.environment = Environment.LOCAL
+        mock_settings.anthropic_api_key = "test-key"
+        mock_settings.openai_api_key = "test-key"
+        mock_settings.cohere_api_key = "test-key"
+        mock_settings.firecrawl_api_key = "test-key"
+        mock_settings.supabase_url = "https://test.supabase.co"
+        mock_settings.supabase_service_key = "test-key"
+        mock_settings.logfire_token = "test-key"
+        mock_settings.redis_url = "redis://localhost:6379"
+        mock_settings.log_level = "DEBUG"
+        mock_settings.main_model = "claude-3-sonnet-20240229"
+        mock_settings.api_host = "127.0.0.1"
+        mock_settings.api_port = 8000
+        mock_settings.cors_origins = ["http://localhost:3000"]
+        mock_settings.debug = True
+        yield mock_settings
 
 
 @pytest.fixture
 def mock_vector_db():
     """Create a mock VectorDB instance."""
-    class MockVectorDB:
-        def __init__(self):
-            self.reranker = MagicMock()
-            self.result_retriever = MagicMock()
-            self.collection_name = "test_collection"
+    mock_reranker = MagicMock(spec=Reranker)
+    mock_reranker.rerank = AsyncMock(return_value=[{"text": "Mock reranked result", "score": 0.95}])
 
-        async def search(self, query: str, **kwargs):
-            return [{"text": "Mock search result", "score": 0.9}]
+    mock_retriever = MagicMock(spec=ResultRetriever)
+    mock_retriever.collection_name = "test_collection"
+    mock_retriever.embedding_function = MockEmbeddingFunction()
+    mock_retriever.reranker = mock_reranker
+    mock_retriever.get_results = AsyncMock(return_value=[{"text": "Mock result", "score": 0.9}])
+    # Initialize with required arguments
+    mock_retriever.__init__ = AsyncMock(return_value=None)
+    mock_retriever.collection_name = "test_collection"
+    mock_retriever.embedding_function = MockEmbeddingFunction()
 
-        async def add_documents(self, documents: List[Document], **kwargs):
-            return ["doc_id_1"]
+    mock_db = MagicMock(spec=VectorDB)
+    mock_db.collection_name = "test_collection"
+    mock_db.reranker = mock_reranker
+    mock_db.result_retriever = mock_retriever
+    mock_db.search = AsyncMock(return_value=[{"text": "Mock search result", "score": 0.9}])
+    mock_db.add_documents = AsyncMock(return_value=["doc_id_1"])
+    mock_db.delete_documents = AsyncMock(return_value=True)
 
-        async def delete_documents(self, document_ids: List[str], **kwargs):
-            return True
-
-    return MockVectorDB()
+    return mock_db
 
 
 @pytest.fixture
@@ -209,61 +215,22 @@ def real_vector_db():
 
 @pytest_asyncio.fixture
 async def claude_assistant_with_mock():
-    """Create a mock Claude assistant for testing."""
-    mock_client = AsyncMock()
-    mock_vector_db = AsyncMock(spec=VectorDB)
-    mock_result_retriever = AsyncMock(spec=ResultRetriever)
+    """Create a ClaudeAssistant instance with mocked client."""
+    # Mock Anthropic client
+    mock_client = AsyncMock(spec=AsyncAnthropic)
 
-    # Mock search results
-    mock_result_retriever.get_results.return_value = [
-        {"text": "Test result", "metadata": {"source": "test.md"}}
-    ]
+    # Mock ResultRetriever
+    mock_retriever = AsyncMock(spec=ResultRetriever)
+    mock_retriever.search.return_value = [{"text": "Mock search result"}]
 
-    # Create the assistant with mocks
-    assistant = ClaudeAssistant(
-        client=mock_client,
-        vector_db=mock_vector_db,
-        retriever=mock_result_retriever,
-        model_name="claude-3-sonnet-20240229",
-        max_tokens=1000
-    )
+    # Create assistant with mocks
+    assistant = ClaudeAssistant()
+    assistant.client = mock_client
+    assistant._result_retriever = mock_retriever
 
-    # Set up default mock behavior for streaming
-    async def mock_stream():
-        events = [
-            {
-                "type": "message_start",
-                "message": {
-                    "id": "msg_test",
-                    "type": "message",
-                    "role": "assistant",
-                    "content": [{"type": "text", "text": ""}],
-                    "model": "claude-3-sonnet-20240229",
-                    "usage": {"input_tokens": 10, "output_tokens": 0}
-                }
-            },
-            {
-                "type": "content_block_delta",
-                "index": 0,
-                "delta": {"type": "text_delta", "text": "Test response"}
-            },
-            {
-                "type": "message_stop",
-                "message": {
-                    "id": "msg_test",
-                    "type": "message",
-                    "role": "assistant",
-                    "content": [{"type": "text", "text": "Test response"}],
-                    "model": "claude-3-sonnet-20240229",
-                    "usage": {"input_tokens": 10, "output_tokens": 5}
-                }
-            }
-        ]
-        for event in events:
-            yield event
-
-    # Create async context manager for streaming
+    # Set up streaming mock
     class AsyncStreamContextManager:
+        """Mock async context manager for streaming."""
         async def __aenter__(self):
             return self
 
@@ -271,13 +238,54 @@ async def claude_assistant_with_mock():
             return None
 
         async def __aiter__(self):
-            async for event in mock_stream():
-                yield event
+            """Generate mock streaming events."""
+            # Message start
+            yield MessageStartEvent(
+                type="message_start",
+                message=Message(
+                    id="msg_123",
+                    type="message",
+                    role="assistant",
+                    content=[],
+                    model="claude-3-opus-20240229",
+                    usage=Usage(
+                        input_tokens=10,
+                        output_tokens=20,
+                        multiplier=1.0
+                    )
+                )
+            )
 
-    # Set up the mock client's stream method
-    mock_client.messages.stream.return_value = AsyncStreamContextManager()
+            # Content block with text
+            yield ContentBlockDeltaEvent(
+                type="content_block_delta",
+                delta=TextDelta(type="text_delta", text="Hello"),
+                index=0
+            )
 
-    return assistant
+            # Message stop
+            yield MessageStopEvent(
+                type="message_stop",
+                message=Message(
+                    id="msg_123",
+                    type="message",
+                    role="assistant",
+                    content=[{"type": "text", "text": "Hello"}],
+                    model="claude-3-opus-20240229",
+                    stop_reason="end_turn",
+                    usage=Usage(
+                        input_tokens=10,
+                        output_tokens=20,
+                        multiplier=1.0
+                    )
+                )
+            )
+
+    # Configure streaming mock
+    mock_stream = AsyncStreamContextManager()
+    mock_client.messages.stream = AsyncMock(return_value=mock_stream)
+
+    yield assistant
 
 
 @pytest.fixture

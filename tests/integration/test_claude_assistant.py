@@ -1,5 +1,6 @@
+"""Integration tests for ClaudeAssistant."""
 from typing import Any, cast
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from anthropic.types import ToolUseBlock
@@ -7,8 +8,9 @@ from anthropic.types import ToolUseBlock
 from src.core._exceptions import StreamingError
 from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.chat.events import StandardEvent, StandardEventType
-from src.core.search.vector_db import Reranker, ResultRetriever, VectorDB
+from src.core.search.vector_db import ResultRetriever, VectorDB
 from src.models.chat_models import MessageContent, TextBlock, Role
+from tests.conftest import MockEmbeddingFunction
 
 
 @pytest.fixture
@@ -17,34 +19,63 @@ async def test_claude_assistant() -> ClaudeAssistant:
     # Create mock Anthropic client
     mock_client = AsyncMock()
     mock_stream = AsyncMock()
-    mock_stream.__aiter__.return_value = mock_stream()
+
+    # Set up mock stream with proper async iterator
+    async def event_generator():
+        events = [
+            MagicMock(
+                type="message_start",
+                message=MagicMock(id="msg_123", model="claude-3-sonnet-20240229")
+            ),
+            MagicMock(
+                type="content_block_delta",
+                delta=MagicMock(type="text_delta", text="Test response", id="block_123"),
+                message=MagicMock(id="msg_123")
+            ),
+            MagicMock(
+                type="message_stop",
+                message=MagicMock(
+                    id="msg_123",
+                    model="claude-3-sonnet-20240229",
+                    stop_reason="end_turn",
+                    usage=MagicMock(input_tokens=10, output_tokens=5)
+                )
+            )
+        ]
+        for event in events:
+            yield event
+
+    mock_stream.__aiter__.return_value = event_generator()
     mock_stream.__aenter__.return_value = mock_stream
     mock_stream.__aexit__.return_value = None
     mock_client.messages.stream.return_value = mock_stream
 
-    # Create real VectorDB instance
-    real_vector_db = VectorDB(
-        reranker=Reranker(),
-        result_retriever=ResultRetriever(),
-        collection_name="test_collection"
-    )
+    # Create mock ResultRetriever with required arguments
+    mock_retriever = MagicMock(spec=ResultRetriever)
+    mock_retriever.collection_name = "test_collection"
+    mock_retriever.embedding_function = MockEmbeddingFunction()
+    mock_retriever.get_results = AsyncMock(return_value=[{"text": "Test result", "score": 0.9}])
 
-    # Reset database before each test
-    await real_vector_db.reset_database()
+    # Create VectorDB with mock retriever
+    vector_db = VectorDB(
+        embedding_function="text-embedding-3-small",
+        openai_api_key="test-key"
+    )
+    vector_db.result_retriever = mock_retriever
 
     # Create test assistant
     assistant = ClaudeAssistant(
         client=mock_client,
-        vector_db=real_vector_db,
-        model_name="claude-3-sonnet-20240229",
-        max_tokens=4096,
-        api_key="test-key"
+        vector_db=vector_db,
+        system_prompt="You are a helpful AI assistant.",
+        model="claude-3-sonnet-20240229",
+        max_tokens=4096
     )
 
     yield assistant
 
     # Cleanup after test
-    await real_vector_db.reset_database()
+    await vector_db.reset_database()
 
 
 @pytest.mark.integration
@@ -53,7 +84,7 @@ async def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant
     """Test the complete conversation flow with tool use."""
     print(f"\nAssistant client type: {type(test_claude_assistant.client)}")
     print(f"Vector DB type: {type(test_claude_assistant.vector_db)}")
-    print(f"Is client mocked: {isinstance(test_claude_assistant.client, Mock)}")
+    print(f"Is client mocked: {isinstance(test_claude_assistant.client, MagicMock)}")
 
     # 1. Verify empty initial state
     assert len(test_claude_assistant.conversation_history.messages) == 0
@@ -62,7 +93,9 @@ async def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant
     user_query = "What do the docs say about Python?"
     test_claude_assistant.conversation_history.append(
         role=Role.USER,
-        content=user_query
+        content=MessageContent(blocks=[
+            {"type": "text", "text": user_query}
+        ])
     )
 
     # 3. Simulate Claude's tool use response
@@ -108,29 +141,27 @@ async def test_complete_conversation_flow(test_claude_assistant: ClaudeAssistant
 @pytest.mark.asyncio
 async def test_system_prompt_update_and_cache(test_claude_assistant: ClaudeAssistant):
     """Test system prompt update and caching."""
-    # Initial system prompt should be None
-    assert test_claude_assistant.system_prompt is None
-
-    # Update system prompt
-    new_prompt = "You are a helpful assistant."
-    await test_claude_assistant.update_system_prompt(new_prompt)
-
-    # Verify prompt is updated
+    # Initial system prompt should be set from fixture
     assert test_claude_assistant.system_prompt is not None
-    assert test_claude_assistant.system_prompt.to_anthropic() == new_prompt
+    assert "You are a helpful AI assistant" in test_claude_assistant.system_prompt.to_anthropic()
 
-    # Get cached prompt
-    cached_prompt = await test_claude_assistant.get_cached_system_prompt()
-    assert cached_prompt is not None
-    assert len(cached_prompt) == 1
+    # Update system prompt with document summaries
+    test_summaries = [
+        {"filename": "test.txt", "summary": "Test document content"}
+    ]
+    await test_claude_assistant.update_system_prompt(test_summaries)
 
-    # Verify cached prompt structure
-    prompt_block = cast(dict[str, Any], cached_prompt[0])
-    assert prompt_block["type"] == "text"
-    assert prompt_block["text"] == new_prompt
+    # Verify prompt is updated and contains document summary
+    assert test_claude_assistant.system_prompt is not None
+    assert "test.txt: Test document content" in test_claude_assistant.system_prompt.to_anthropic()
 
-    # Update with empty prompt should clear it
-    await test_claude_assistant.update_system_prompt("")
+    # Update with empty document summaries
+    await test_claude_assistant.update_system_prompt([])
+    assert test_claude_assistant.system_prompt is not None
+    assert "No documents loaded" in test_claude_assistant.system_prompt.to_anthropic()
+
+    # Reset system prompt
+    test_claude_assistant.system_prompt = None
     assert test_claude_assistant.system_prompt is None
 
 

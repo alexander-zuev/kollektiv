@@ -12,18 +12,33 @@ from src.infrastructure.config.settings import Environment, Settings
 def mock_settings():
     """Create a Settings instance with mocked environment variables."""
     env_vars = {
-        "environment": Environment.LOCAL,  # Use Environment enum
-        "firecrawl_api_key": "test_key",
-        "anthropic_api_key": "test_key",
-        "openai_api_key": "test_key",
-        "cohere_api_key": "test_key",
-        "supabase_url": "test_url",
-        "supabase_service_key": "test_key",
-        "logfire_token": "test_token",
-        "redis_url": "redis://localhost:6379"
+        "ENVIRONMENT": "local",
+        "FIRECRAWL_API_KEY": "test_key",
+        "ANTHROPIC_API_KEY": "test_key",
+        "OPENAI_API_KEY": "test_key",
+        "COHERE_API_KEY": "test_key",
+        "SUPABASE_URL": "test_url",
+        "SUPABASE_SERVICE_KEY": "test_key",
+        "LOGFIRE_TOKEN": "test_token",
+        "REDIS_URL": "redis://localhost:6379",
+        "BASE_URL": "http://127.0.0.1:8000",
+        "API_HOST": "127.0.0.1",
+        "API_PORT": "8000",
+        "CHAINLIT_HOST": "127.0.0.1",
+        "CHAINLIT_PORT": "8001",
+        "LOG_LEVEL": "debug",
+        "MAX_RETRIES": "3",
+        "BACKOFF_FACTOR": "2.0",
+        "DEFAULT_PAGE_LIMIT": "25",
+        "DEFAULT_MAX_DEPTH": "5"
     }
-    with patch.dict(os.environ, env_vars):
-        yield Settings()
+    with patch.dict(os.environ, env_vars, clear=True):
+        settings = Settings()
+        # Ensure directories exist
+        for dir_path in [settings.log_dir, settings.raw_data_dir,
+                        settings.processed_data_dir, settings.chroma_db_dir]:
+            dir_path.mkdir(parents=True, exist_ok=True)
+        return settings
 
 
 def test_environment_independent_settings(mock_settings):
@@ -111,6 +126,7 @@ def test_production_environment_validation():
     """Test that production environment requires BASE_URL."""
     with patch.dict(os.environ, {"ENVIRONMENT": "production"}, clear=True):
         settings = Settings()
+        settings.environment = Environment.PRODUCTION  # Force production environment
         with pytest.raises(ValueError, match="BASE_URL environment variable is required"):
             _ = settings.base_url
 

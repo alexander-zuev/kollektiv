@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, List, Optional, Union
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
@@ -19,6 +19,7 @@ class StandardEventType(str, Enum):
 
     # Tool-related events
     TOOL_START = "tool_start"  # Tool use content block
+    TOOL_END = "tool_end"  # Tool execution completion
     TOOL_RESULT = "tool_result"  # Tool execution result
 
     # Error events
@@ -54,6 +55,7 @@ class ContentBlock(BaseModel):
     """Base class for all content blocks"""
 
     block_type: ContentBlockType = Field(..., description="Type of the content block", alias="type")
+    text: str | None = Field(None, description="Text content if type is 'text'")
 
     class Config:
         allow_population_by_field_name = True
@@ -72,9 +74,9 @@ class ToolUseBlock(ContentBlock):
     block_type: ContentBlockType = Field(
         ContentBlockType.TOOL_USE, description="Type of the content block", alias="type"
     )
-    tool_name: str = Field(..., description="Name of the tool", alias="name")
-    tool_input: dict = Field(..., description="Input to the tool", alias="input")
-    tool_use_id: str = Field(..., description="ID of the tool use", alias="id")
+    name: str = Field(..., description="Name of the tool")
+    input: dict = Field(..., description="Input to the tool")
+    id: str = Field(..., description="ID of the tool use")
 
 
 class ToolResultBlock(ContentBlock):
@@ -89,20 +91,21 @@ class ToolResultBlock(ContentBlock):
 
 
 class MessageContent(BaseModel):
-    """Content that can be either string or structured blocks"""
+    """Content of a conversation message."""
 
-    blocks: list[ContentBlock]
+    blocks: List[Union[TextBlock, ToolUseBlock, ToolResultBlock]] = Field(
+        ...,
+        description="List of content blocks"
+    )
 
     @classmethod
     def from_str(cls, text: str) -> "MessageContent":
-        """Create MessageContent from string"""
+        """Create MessageContent from a string."""
         return cls(blocks=[TextBlock(text=text)])
 
-    def to_anthropic(self) -> str | list[dict]:
-        """Convert to Anthropic API format"""
-        if len(self.blocks) == 1 and isinstance(self.blocks[0], TextBlock):
-            return self.blocks[0].text
-        return [block.dict(exclude_none=True) for block in self.blocks]
+    def to_anthropic(self) -> list[dict[str, Any]]:
+        """Convert to Anthropic API format."""
+        return [block.model_dump(by_alias=True) for block in self.blocks]
 
 
 class ConversationMessage(BaseDbModel):

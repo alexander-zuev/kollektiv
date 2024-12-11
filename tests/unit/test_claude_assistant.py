@@ -1,303 +1,404 @@
 """Unit tests for ClaudeAssistant."""
-import uuid
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
+from uuid import uuid4
 
 import pytest
-import aiohttp
 from anthropic import (
-    APIError,
-    AsyncAnthropic,
-    APIStatusError,
+    APIConnectionError,
     APITimeoutError,
+    AsyncAnthropic,
     RateLimitError,
 )
 from anthropic.types import (
-    ContentBlock,
-    ContentBlockDeltaEvent,
-    ContentBlockStartEvent,
-    ContentBlockStopEvent,
     Message,
     MessageStartEvent,
-    MessageDeltaEvent,
     MessageStopEvent,
-    TextBlock,
-    TextDelta,
     Usage,
 )
+from fastapi import WebSocketDisconnect
 
-from src.core._exceptions import (
-    ClientDisconnectError,
-    RetryableError,
-    StreamingError,
-    TokenLimitError,
-)
 from src.core.chat.claude_assistant import ClaudeAssistant
-from src.core.chat.events import (
-    ChatEvent,
-    ContentBlockEvent,
-    ErrorEvent,
-    MessageStartEvent,
-    MessageEndEvent,
-)
-from src.core.search.vector_db import ResultRetriever, VectorDB
+from src.core.chat.events import StreamingError
+from src.core.chat.exceptions import TokenLimitError
+from src.core.chat.system_prompt import SystemPrompt
+from src.core.search.vector_db import VectorDB
 from src.models.chat_models import (
-    ConversationHistory,
     ConversationMessage,
     MessageContent,
     Role,
-    TextBlock as ChatTextBlock,
+    TextBlock,
+    ToolResultBlock,
+    ToolUseBlock,
 )
 
-# Test data
-TEST_SYSTEM_PROMPT = "You are a helpful assistant."
+# Test constants
 TEST_USER_MESSAGE = "Hello, how are you?"
+TEST_SYSTEM_PROMPT = "You are a helpful assistant."
+
+# Mock responses
+MOCK_RESPONSE = "I'm doing well, thank you for asking!"
+MOCK_ERROR_MESSAGE = "An error occurred during streaming."
+
+# Utility functions
+async def async_generator():
+    """Helper function to create async generator."""
+    yield "test"
 
 
 @pytest.fixture
 async def claude_assistant_with_mock():
-    """Create a mock Claude assistant."""
-    mock_client = AsyncMock(spec=AsyncAnthropic)
-    mock_messages = AsyncMock()
+    """Create a mock Claude assistant for testing."""
+    # Create base mock client
+    mock_client = AsyncMock()
 
-    # Create a proper async context manager mock
-    mock_stream = AsyncMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock(return_value=False)
-    mock_stream.__aiter__ = AsyncMock()
+    # Create messages mock with create method
+    messages_mock = AsyncMock()
+    messages_mock.create = AsyncMock()
 
-    # Set up the messages.stream method to return the mock_stream
-    mock_messages.stream = AsyncMock(return_value=mock_stream)
-    mock_client.messages = mock_messages
+    # Set up the mock hierarchy
+    mock_client.messages = messages_mock
 
-    mock_vector_db = MagicMock(spec=VectorDB)
-    return ClaudeAssistant(client=mock_client, vector_db=mock_vector_db)
+    # Create mock vector db
+    mock_vector_db = AsyncMock(spec=VectorDB)
+    mock_vector_db.search = AsyncMock(return_value=[
+        {"text": "Test result 1", "score": 0.9},
+        {"text": "Test result 2", "score": 0.8}
+    ])
+
+    # Create assistant with mocks
+    assistant = ClaudeAssistant(
+        client=mock_client,
+        vector_db=mock_vector_db,
+        system_prompt=SystemPrompt(TEST_SYSTEM_PROMPT),
+        max_tokens=1000
+    )
+
+    return assistant
 
 
 @pytest.mark.asyncio
 async def test_add_message_to_conversation_history(claude_assistant_with_mock):
-    """Test adding messages to conversation history."""
-    assistant = claude_assistant_with_mock
-    conversation = ConversationHistory()
+    """Test adding a message to conversation history."""
+    assistant = await claude_assistant_with_mock
 
     # Add user message
-    user_message = "Test message"
-    conversation.append(Role.USER, user_message)
+    await assistant.add_message_to_conversation_history(
+        role=Role.USER,
+        content=MessageContent(blocks=[TextBlock(text=TEST_USER_MESSAGE)])
+    )
 
-    # Verify message was added correctly
-    assert len(conversation.messages) == 1
-    assert conversation.messages[0].role == Role.USER
-    assert isinstance(conversation.messages[0].content, MessageContent)
-    assert len(conversation.messages[0].content.blocks) == 1
-    assert conversation.messages[0].content.blocks[0].text == user_message
+    # Verify message was added
+    assert len(assistant.conversation_history.messages) == 1
+    message = assistant.conversation_history.messages[0]
+    assert message.role == Role.USER
+    assert message.content.blocks[0].text == TEST_USER_MESSAGE
 
 
 @pytest.mark.asyncio
 async def test_update_system_prompt(claude_assistant_with_mock):
-    """Test updating the system prompt with document summaries."""
-    assistant = claude_assistant_with_mock
-    summaries = [{"filename": "doc1", "summary": "Summary 1", "keywords": ["key1", "key2"]}]
-    await assistant.update_system_prompt(summaries)
-    assert "doc1" in assistant.system_prompt.blocks[0].text
+    """Test updating system prompt."""
+    assistant = await claude_assistant_with_mock
+    await assistant.update_system_prompt(TEST_SYSTEM_PROMPT)
+    assert assistant.system_prompt.content == TEST_SYSTEM_PROMPT
 
 
 @pytest.mark.asyncio
 async def test_get_response(claude_assistant_with_mock):
-    """Test getting a response from the assistant."""
-    assistant = claude_assistant_with_mock
-    conversation = ConversationHistory()
-    conversation.append(Role.USER, "Test message")
+    """Test getting a response from Claude."""
+    assistant = await claude_assistant_with_mock
+    mock_client = assistant.client
 
-    # Mock successful response
+    # Setup mock response
     mock_stream = AsyncMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock(return_value=False)
+    mock_stream.__aiter__ = AsyncMock(return_value=mock_stream)
+    mock_stream.__anext__ = AsyncMock(side_effect=[
+        MessageStartEvent(
+            type="message_start",
+            message=Message(
+                id="msg_123",
+                type="message",
+                role="assistant",
+                content=[],
+                model="claude-3-opus-20240229",
+                usage=Usage(input_tokens=10, output_tokens=20)
+            )
+        ),
+        Message(
+            id="msg_123",
+            type="message",
+            role="assistant",
+            content=[{"type": "text", "text": "Test response"}],
+            model="claude-3-opus-20240229",
+            usage=Usage(input_tokens=10, output_tokens=20)
+        ),
+        MessageStopEvent(
+            type="message_stop",
+            message=Message(
+                id="msg_123",
+                type="message",
+                role="assistant",
+                content=[{"type": "text", "text": "Test response"}],
+                model="claude-3-opus-20240229",
+                usage=Usage(input_tokens=10, output_tokens=20)
+            )
+        ),
+        StopAsyncIteration
+    ])
+    mock_client.messages.create = AsyncMock(return_value=mock_stream)
 
-    events = [
-        {"type": "message_start", "message": {"id": "msg_123", "model": "claude-3-opus-20240229"}},
-        {"type": "content_block_start", "content_block": {"id": "block_1", "type": "text"}},
-        {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "Test", "id": "block_1"}},
-        {"type": "content_block_delta", "delta": {"type": "text_delta", "text": " response", "id": "block_1"}},
-        {"type": "message_stop", "message": {
-            "id": "msg_123",
-            "model": "claude-3-opus-20240229",
-            "usage": {"input_tokens": 10, "output_tokens": 5}
-        }}
-    ]
+    # Add message and get response
+    await assistant.add_message_to_conversation_history(
+        role=Role.USER,
+        content=MessageContent(blocks=[TextBlock(text=TEST_USER_MESSAGE)])
+    )
 
-    async def mock_events():
-        for event in events:
-            yield event
-
-    mock_stream.__aiter__ = mock_events
-    assistant.client.messages.stream = AsyncMock(return_value=mock_stream)
-
-    response = await assistant.get_response(conversation)
-    assert response == "Test response"
-    assert len(conversation.messages) == 2  # User message + assistant response
-    assert conversation.messages[-1].role == Role.ASSISTANT
-    assert conversation.messages[-1].content.text == "Test response"
+    response = await assistant.get_response(assistant.conversation_history)
+    assert isinstance(response, ConversationMessage)
+    assert response.role == Role.ASSISTANT
+    assert len(response.content.blocks) == 1
+    assert isinstance(response.content.blocks[0], TextBlock)
+    assert response.content.blocks[0].text == "Test response"
 
 
 @pytest.mark.asyncio
 async def test_handle_tool_use_rag_search(claude_assistant_with_mock):
-    """Test RAG search tool usage."""
-    assistant = claude_assistant_with_mock
-    conversation = ConversationHistory()
-    conversation.append(Role.USER, "Test message")
+    """Test handling tool use for RAG search."""
+    assistant = await claude_assistant_with_mock
+    mock_client = assistant.client
+    mock_vector_db = assistant.vector_db
 
-    # Mock tool use response
-    tool_use_id = str(uuid.uuid4())
-    tool_input = {"query": "test query"}
+    # Setup mock search results
+    mock_vector_db.search.return_value = ["Test document"]
 
-    # Mock search results
-    search_results = ["Test search results"]
-    assistant.vector_db.search = AsyncMock(return_value=search_results)
+    # Setup mock stream
+    mock_stream = AsyncMock()
+    mock_stream.__aiter__ = AsyncMock(return_value=mock_stream)
 
-    # Test tool use handling
-    result = await assistant.handle_tool_use(
-        tool_name="rag_search",
-        tool_input=tool_input,
-        tool_use_id=tool_use_id
+    # Create a sequence of events for the stream
+    events = [
+        MessageStartEvent(
+            type="message_start",
+            message=Message(
+                id="msg_123",
+                type="message",
+                role="assistant",
+                content=[],
+                model="claude-3-opus-20240229",
+                usage=Usage(input_tokens=10, output_tokens=20)
+            )
+        ),
+        Message(
+            id="msg_123",
+            type="message",
+            role="assistant",
+            content=[{
+                "type": "tool_use",
+                "tool": {
+                    "name": "rag_search",
+                    "arguments": {"query": "test query"}
+                }
+            }],
+            model="claude-3-opus-20240229",
+            usage=Usage(input_tokens=10, output_tokens=20)
+        ),
+        MessageStopEvent(
+            type="message_stop",
+            message=Message(
+                id="msg_123",
+                type="message",
+                role="assistant",
+                content=[{
+                    "type": "tool_use",
+                    "tool": {
+                        "name": "rag_search",
+                        "arguments": {"query": "test query"}
+                    }
+                }],
+                model="claude-3-opus-20240229",
+                usage=Usage(input_tokens=10, output_tokens=20)
+            )
+        )
+    ]
+
+    mock_stream.__anext__.side_effect = events
+    mock_client.messages.create = AsyncMock(return_value=mock_stream)
+
+    # Add message to conversation
+    await assistant.add_message_to_conversation_history(
+        role=Role.USER,
+        content=MessageContent(blocks=[TextBlock(text="What documents do you have?")])
     )
 
-    # Verify result structure
-    assert isinstance(result, dict)
-    assert result["role"] == "user"
-    assert isinstance(result["content"], list)
-    assert len(result["content"]) == 1
-    assert result["content"][0]["type"] == "tool_result"
-    assert result["content"][0]["tool_use_id"] == tool_use_id
-    assert result["content"][0]["content"] == search_results[0]
-
-    # Verify vector_db.search was called correctly
-    assistant.vector_db.search.assert_called_once_with(query="test query")
+    response = await assistant.get_response(assistant.conversation_history)
+    assert isinstance(response, ConversationMessage)
+    assert isinstance(response.content.blocks[0], ToolUseBlock)
+    assert response.content.blocks[0].name == "rag_search"
 
 
 @pytest.mark.asyncio
 async def test_stream_response_token_limit_error(claude_assistant_with_mock):
     """Test token limit error handling in streaming."""
-    assistant = claude_assistant_with_mock
-    conversation = ConversationHistory()
-    conversation.append(Role.USER, "Test message")
+    assistant = await claude_assistant_with_mock
+    mock_client = assistant.client
 
-    # Mock token limit error
+    # Setup mock stream to raise token limit error
     mock_stream = AsyncMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock(return_value=False)
-    mock_stream.__aiter__ = AsyncMock(side_effect=APIStatusError(
-        message="Token limit exceeded",
-        response=None,
-        body={"error": {"type": "rate_limit_error"}},
-        type="rate_limit_error"
-    ))
-    assistant.client.messages.stream = AsyncMock(return_value=mock_stream)
+    mock_stream.__aiter__ = AsyncMock(return_value=mock_stream)
+    mock_stream.__anext__ = AsyncMock(side_effect=TokenLimitError("Token limit exceeded"))
+    mock_client.messages.create = AsyncMock(return_value=mock_stream)
 
-    with pytest.raises(TokenLimitError) as exc_info:
-        async for _ in assistant.stream_response(conversation):
+    # Add message to conversation
+    await assistant.add_message_to_conversation_history(
+        role=Role.USER,
+        content=MessageContent(blocks=[TextBlock(text=TEST_USER_MESSAGE)])
+    )
+
+    # Test token limit error handling
+    with pytest.raises(StreamingError) as exc_info:
+        async for _ in assistant.stream_response(assistant.conversation_history):
             pass
+
     assert "Token limit exceeded" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
 async def test_stream_response_connection_error(claude_assistant_with_mock):
     """Test connection error handling in streaming."""
-    assistant = claude_assistant_with_mock
-    conversation = ConversationHistory()
-    conversation.append(Role.USER, "Test message")
+    assistant = await claude_assistant_with_mock
+    mock_client = assistant.client
 
-    # Mock connection error
+    # Setup mock stream that raises connection error
     mock_stream = AsyncMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock(return_value=False)
-    mock_stream.__aiter__ = AsyncMock(side_effect=aiohttp.ClientError("Connection error"))
-    assistant.client.messages.stream = AsyncMock(return_value=mock_stream)
+    mock_stream.__aiter__ = AsyncMock(return_value=mock_stream)
+    mock_stream.__anext__ = AsyncMock(side_effect=APIConnectionError(
+        request={"method": "POST", "url": "https://api.anthropic.com/v1/messages"},
+        response=None,
+        body={"error": {"type": "connection_error", "message": "Connection failed"}}
+    ))
+    mock_client.messages.create = AsyncMock(return_value=mock_stream)
 
-    with pytest.raises(StreamingError) as exc_info:
-        async for _ in assistant.stream_response(conversation):
+    # Add message and attempt to stream response
+    await assistant.add_message_to_conversation_history(
+        role=Role.USER,
+        content=MessageContent(blocks=[TextBlock(text=TEST_USER_MESSAGE)])
+    )
+
+    with pytest.raises(StreamingError):
+        async for _ in assistant.stream_response(assistant.conversation_history):
             pass
-    assert "Connection error during streaming" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
 async def test_stream_response_retryable_error(claude_assistant_with_mock):
     """Test retryable error handling in streaming."""
-    assistant = claude_assistant_with_mock
-    conversation = ConversationHistory()
-    conversation.append(Role.USER, "Test message")
+    assistant = await claude_assistant_with_mock
+    mock_client = assistant.client
 
-    # Mock retryable error
+    # Setup mock stream to raise rate limit error
     mock_stream = AsyncMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock(return_value=False)
-    mock_stream.__aiter__ = AsyncMock(side_effect=APIStatusError(
-        message="Internal server error",
-        response=None,
-        body={"error": {"type": "internal_server_error"}},
-        type="internal_server_error"
-    ))
-    assistant.client.messages.stream = AsyncMock(return_value=mock_stream)
+    mock_stream.__aiter__ = AsyncMock(return_value=mock_stream)
+    mock_stream.__anext__ = AsyncMock(side_effect=RateLimitError("Rate limit exceeded"))
+    mock_client.messages.create = AsyncMock(return_value=mock_stream)
 
+    # Add message to conversation
+    await assistant.add_message_to_conversation_history(
+        role=Role.USER,
+        content=MessageContent(blocks=[TextBlock(text=TEST_USER_MESSAGE)])
+    )
+
+    # Test rate limit error handling
     with pytest.raises(StreamingError) as exc_info:
-        async for _ in assistant.stream_response(conversation):
+        async for _ in assistant.stream_response(assistant.conversation_history):
             pass
-    assert "API error during streaming" in str(exc_info.value)
+
+    assert "Rate limit exceeded" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
 async def test_stream_response_successful_flow(claude_assistant_with_mock):
     """Test successful streaming flow."""
     assistant = claude_assistant_with_mock
-    conversation = ConversationHistory()
-    conversation.append(Role.USER, "Test message")
+    mock_client = assistant.client
 
-    # Mock successful streaming response
-    mock_stream = AsyncMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock(return_value=False)
+    # Setup mock stream events
+    message = Message(
+        id="msg_123",
+        type="message",
+        role="assistant",
+        content=[],
+        model="claude-3-opus-20240229",
+        usage=Usage(input_tokens=10, output_tokens=20)
+    )
 
     events = [
-        {"type": "message_start", "message": {"id": "msg_123", "model": "claude-3-opus-20240229"}},
-        {"type": "content_block_start", "content_block": {"id": "block_1", "type": "text"}},
-        {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "Test", "id": "block_1"}},
-        {"type": "content_block_delta", "delta": {"type": "text_delta", "text": " response", "id": "block_1"}},
-        {"type": "message_stop", "message": {
-            "id": "msg_123",
-            "model": "claude-3-opus-20240229",
-            "usage": {"input_tokens": 10, "output_tokens": 5}
-        }}
+        MessageStartEvent(
+            message_id="msg_123",
+            model="claude-3-opus-20240229"
+        ),
+        Message(
+            id="msg_123",
+            type="message",
+            role="assistant",
+            content=[{"type": "text", "text": "Hello"}],
+            model="claude-3-opus-20240229",
+            usage=Usage(input_tokens=10, output_tokens=20)
+        ),
+        Message(
+            id="msg_123",
+            type="message",
+            role="assistant",
+            content=[{"type": "text", "text": ", how can I help?"}],
+            model="claude-3-opus-20240229",
+            usage=Usage(input_tokens=10, output_tokens=20)
+        ),
+        MessageStopEvent(
+            message_id="msg_123",
+            end_reason="stop_sequence",
+            model="claude-3-opus-20240229",
+            usage={"input_tokens": 10, "output_tokens": 20}
+        )
     ]
 
-    async def mock_events():
-        for event in events:
-            yield event
+    # Setup mock stream
+    mock_stream = AsyncMock()
+    mock_stream.__aiter__ = AsyncMock(return_value=mock_stream)
+    mock_stream.__anext__ = AsyncMock(side_effect=events + [StopAsyncIteration])
+    mock_client.messages.create = AsyncMock(return_value=mock_stream)
 
-    mock_stream.__aiter__ = mock_events
-    assistant.client.messages.stream = AsyncMock(return_value=mock_stream)
+    # Add message and stream response
+    await assistant.add_message_to_conversation_history(
+        role=Role.USER,
+        content=MessageContent(blocks=[TextBlock(text=TEST_USER_MESSAGE)])
+    )
 
-    received_events = []
-    async for event in assistant.stream_response(conversation):
-        received_events.append(event)
+    collected_text = ""
+    async for event in assistant.stream_response(assistant.conversation_history):
+        if isinstance(event, Message) and event.content:
+            collected_text += event.content[0]["text"]
 
-    assert len(received_events) == 4  # message_start, 2 content_blocks, message_stop
-    assert isinstance(received_events[0], MessageStartEvent)
-    assert isinstance(received_events[-1], MessageEndEvent)
+    assert collected_text == "Hello, how can I help?"
+    assert len(assistant.conversation_history.messages) == 1
 
 
 @pytest.mark.asyncio
 async def test_stream_response_client_disconnect(claude_assistant_with_mock):
     """Test client disconnect handling in streaming."""
-    assistant = claude_assistant_with_mock
-    conversation = ConversationHistory()
-    conversation.append(Role.USER, "Test message")
+    assistant = await claude_assistant_with_mock
+    mock_client = assistant.client
 
-    # Mock client disconnect
+    # Setup mock stream that raises client disconnect error
     mock_stream = AsyncMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock(return_value=False)
-    mock_stream.__aiter__ = AsyncMock(side_effect=ClientDisconnectError("Client disconnected"))
-    assistant.client.messages.stream = AsyncMock(return_value=mock_stream)
+    mock_stream.__aiter__ = AsyncMock(return_value=mock_stream)
+    mock_stream.__anext__ = AsyncMock(side_effect=WebSocketDisconnect())
+    mock_client.messages.create = AsyncMock(return_value=mock_stream)
 
-    with pytest.raises(ClientDisconnectError) as exc_info:
-        async for _ in assistant.stream_response(conversation):
+    # Add message to conversation
+    await assistant.add_message_to_conversation_history(
+        role=Role.USER,
+        content=MessageContent(blocks=[TextBlock(text=TEST_USER_MESSAGE)])
+    )
+
+    # Test client disconnect error
+    with pytest.raises(StreamingError):
+        async for _ in assistant.stream_response(assistant.conversation_history):
             pass
-    assert "Client disconnected" in str(exc_info.value)

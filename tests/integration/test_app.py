@@ -142,13 +142,24 @@ class TestEndpointIntegration:
 
     def test_chat_endpoints_mounted(self, integration_client: TestClient):
         """Test that chat endpoints are properly mounted and accessible."""
-        # Test chat endpoint
-        chat_response = integration_client.get(f"{V0_PREFIX}{Routes.V0.CHAT}")
-        assert chat_response.status_code in [200, 404], "Chat endpoint should be accessible"
+        # Test chat endpoint with proper POST request
+        test_message = {
+            "user_id": "test-user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "text", "text": "Hello"}]
+            },
+            "conversation_id": None
+        }
+        chat_response = integration_client.post(
+            f"{V0_PREFIX}{Routes.V0.CHAT}",
+            json=test_message
+        )
+        assert chat_response.status_code == 200, "Chat endpoint should accept POST requests"
 
         # Test conversations endpoint
         conv_response = integration_client.get(f"{V0_PREFIX}{Routes.V0.CONVERSATIONS}")
-        assert conv_response.status_code in [200, 404], "Conversations endpoint should be accessible"
+        assert conv_response.status_code == 200, "Conversations endpoint should be accessible"
 
         # Verify chat router tags
         chat_routes = [

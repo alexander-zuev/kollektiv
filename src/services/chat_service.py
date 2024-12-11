@@ -11,6 +11,7 @@ from src.api.v0.schemas.chat_schemas import (
 )
 from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.chat.conversation_manager import ConversationManager
+from src.core.chat.exceptions import TokenLimitError, StreamingError, ClientDisconnectError
 from src.infrastructure.common.logger import get_logger
 from src.models.chat_models import ConversationHistory, Role, StandardEventType
 from src.services.data_service import DataService
@@ -38,35 +39,74 @@ class ChatService:
                 conversation_id=conversation_id, message=message
             )
 
-            # Send to Claude and stream the response
-            async for event in self.claude_assistant.stream_response(conversation_with_pending):
-                if event.event_type == StandardEventType.MESSAGE_START:
-                    yield LLMResponse(message_type=MessageType.MESSAGE_START, text=event.content)
+            # Get stream from Claude and process events
+            async for event in await self.claude_assistant.stream_response(conversation_with_pending):
+                try:
+                    if event.event_type == StandardEventType.MESSAGE_START:
+                        yield LLMResponse(
+                            message_type=MessageType.MESSAGE_START,
+                            text="",
+                            conversation_id=conversation_id
+                        )
 
-                elif event.event_type == StandardEventType.TEXT_TOKEN:
-                    yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text=event.content)
+                    elif event.event_type == StandardEventType.TEXT_TOKEN:
+                        yield LLMResponse(
+                            message_type=MessageType.TEXT_TOKEN,
+                            text=event.content,
+                            conversation_id=conversation_id
+                        )
 
-                elif event.event_type == StandardEventType.TOOL_START:
-                    # Add tool use to pending messages
-                    await self.conversation_manager.add_pending_message(
-                        conversation_id=conversation_id, role=Role.ASSISTANT, text=event.content
-                    )
-                    yield LLMResponse(message_type=MessageType.TOOL_START, text=event.content)
+                    elif event.event_type == StandardEventType.TOOL_START:
+                        # Add tool use to pending messages
+                        await self.conversation_manager.add_pending_message(
+                            conversation_id=conversation_id,
+                            role=Role.ASSISTANT,
+                            content=event.content
+                        )
+                        yield LLMResponse(
+                            message_type=MessageType.TOOL_START,
+                            text=event.content,
+                            conversation_id=conversation_id
+                        )
 
-                elif event.event_type == StandardEventType.TOOL_END:
-                    yield LLMResponse(message_type=MessageType.TOOL_END, text=event.content)
+                    elif event.event_type == StandardEventType.TOOL_END:
+                        yield LLMResponse(
+                            message_type=MessageType.TOOL_END,
+                            text=event.content,
+                            conversation_id=conversation_id
+                        )
 
-                elif event.event_type == StandardEventType.MESSAGE_STOP:
-                    # Commit pending messages and save conversation
-                    await self.conversation_manager.commit_pending(conversation_id)
-                    await self.data_service.save_conversation(conversation_id)
-                    yield LLMResponse(message_type=MessageType.MESSAGE_STOP, text=event.content)
+                    elif event.event_type == StandardEventType.MESSAGE_STOP:
+                        yield LLMResponse(
+                            message_type=MessageType.MESSAGE_STOP,
+                            text="",
+                            conversation_id=conversation_id
+                        )
+                        # Commit pending messages and save conversation after yielding the stop event
+                        await self.conversation_manager.commit_pending(conversation_id)
+                        await self.data_service.save_conversation(conversation_id)
 
-        except Exception as e:
-            # On error, rollback pending messages
-            await self.conversation_manager.rollback_pending(conversation_id)
+                except Exception as e:
+                    logger.error(f"Error processing event {event.event_type}: {str(e)}", exc_info=True)
+                    # Only yield error for non-cleanup operations
+                    if event.event_type != StandardEventType.MESSAGE_STOP:
+                        # Re-raise specific error types
+                        if isinstance(e, (TokenLimitError, StreamingError, ClientDisconnectError)):
+                            raise
+                        # Convert other errors to StreamingError
+                        raise StreamingError(f"Error processing event {event.event_type}: {str(e)}")
+
+        except (TokenLimitError, StreamingError, ClientDisconnectError) as e:
+            # Handle streaming setup errors
+            if conversation_id:
+                await self.conversation_manager.rollback_pending(conversation_id)
             logger.error(f"Error processing message: {str(e)}", exc_info=True)
-            yield LLMResponse(message_type=MessageType.ERROR, text=str(e))
+            # Yield error response
+            yield LLMResponse(
+                message_type=MessageType.ERROR,
+                text=str(e),
+                conversation_id=conversation_id
+            )
 
     async def _prepare_conversation(self, conversation_id: UUID | None, message: str) -> ConversationHistory:
         # 1. Get or create empty stable conversation

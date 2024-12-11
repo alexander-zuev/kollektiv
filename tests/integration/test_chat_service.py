@@ -17,8 +17,14 @@ def chat_service():
     """Create a ChatService instance with mocked dependencies."""
     claude_assistant = MagicMock()
     claude_assistant.stream_response = AsyncMock()
+
     conversation_manager = MagicMock(spec=ConversationManager)
+    conversation_manager.get_or_create_conversation.return_value = ConversationHistory(conversation_id=UUID("87654321-4321-8765-4321-876543210987"))
+    conversation_manager.get_conversation_with_pending.return_value = ConversationHistory(conversation_id=UUID("87654321-4321-8765-4321-876543210987"))
+
     data_service = MagicMock(spec=DataService)
+    data_service.save_conversation = AsyncMock()
+
     return ChatService(
         claude_assistant=claude_assistant,
         conversation_manager=conversation_manager,
@@ -131,10 +137,16 @@ async def test_streaming_error_recovery(chat_service):
         side_effect=mock_stream
     )
 
-    # Verify error handling
-    with pytest.raises(TokenLimitError):
-        async for event in chat_service.get_response(user_id=user_id, message=message, conversation_id=conversation_id):
-            assert event.message_type == MessageType.MESSAGE_START
+    # Collect events and verify error handling
+    received_events = []
+    async for event in chat_service.get_response(user_id=user_id, message=message, conversation_id=conversation_id):
+        received_events.append(event)
+
+    # Verify events
+    assert len(received_events) == 2
+    assert received_events[0].message_type == MessageType.MESSAGE_START
+    assert received_events[1].message_type == MessageType.ERROR
+    assert "Token limit exceeded" in received_events[1].text
 
 
 @pytest.mark.asyncio
