@@ -157,7 +157,7 @@ class DatabaseError(NonRetryableError):
         self.entity_type = entity_type
         self.details = details or {}
         self.cause = cause
-        super().__init__(error_message, **kwargs)
+        super().__init__(error_message)
 
     def add_context(self, operation: str, entity_type: str) -> Self:
         """Adds context information to the exception."""

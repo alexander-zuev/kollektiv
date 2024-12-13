@@ -29,7 +29,6 @@ class TestSupabaseClient:
         assert client._client is not None
 
     async def test_connection_failure(self, mock_create_async_client):
-    def test_initialization_failure(self, mock_create_client):
         """Test that initialization failure is handled properly."""
         mock_create_async_client.side_effect = Exception("Connection failed")
         mock_create_client.side_effect = Exception("Connection failed")

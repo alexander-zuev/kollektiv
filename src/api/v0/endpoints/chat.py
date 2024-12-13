@@ -5,19 +5,29 @@ from sse_starlette.sse import EventSourceResponse
 
 from src.api.dependencies import ChatServiceDep
 from src.api.routes import V0_PREFIX, Routes
+from src.api.v0.schemas.base_schemas import ErrorResponse
 from src.api.v0.schemas.chat_schemas import (
     ConversationListResponse,
-    ConversationMessages,
+    LLMResponse,
     UserMessage,
 )
 from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
+from src.models.chat_models import Conversation
 
 # Define routers with base prefix only
 chat_router = APIRouter(prefix=V0_PREFIX)
 conversations_router = APIRouter(prefix=V0_PREFIX)
 
 
-@chat_router.post(Routes.V0.Chat.CHAT)
+@chat_router.post(
+    Routes.V0.Chat.CHAT,
+    response_model=LLMResponse,
+    responses={
+        200: {"model": LLMResponse},
+        400: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
 async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourceResponse:
     """
     Sends a user message and gets a streaming response.
@@ -39,14 +49,14 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
 
 
 # Get all conversations
-@conversations_router.get(Routes.V0.Conversations.LIST)
-async def list_conversations(chat_service: ChatServiceDep) -> ConversationListResponse:
+@conversations_router.get(Routes.V0.Conversations.LIST, response_model=ConversationListResponse)
+async def list_conversations(user_id: UUID, chat_service: ChatServiceDep) -> ConversationListResponse:
     """Get grouped list of conversations."""
-    return await chat_service.list_conversations()
+    return await chat_service.get_conversations(user_id)
 
 
 # Get messages in a conversation
-@conversations_router.get(Routes.V0.Conversations.GET)
-async def get_conversation(conversation_id: UUID, chat_service: ChatServiceDep) -> ConversationMessages:
+@conversations_router.get(Routes.V0.Conversations.GET, response_model=Conversation)
+async def get_conversation(user_id: UUID, conversation_id: UUID, chat_service: ChatServiceDep) -> Conversation:
     """Get all messages in a conversation."""
-    return await chat_service.get_conversation(conversation_id)
+    return await chat_service.get_conversation(user_id, conversation_id)

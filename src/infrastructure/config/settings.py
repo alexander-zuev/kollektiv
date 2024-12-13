@@ -81,6 +81,10 @@ class Settings(BaseSettings):
     job_file_dir: Path = Field(default_factory=lambda: Path("src/core/content/crawler"))
     vector_storage_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/storage/vector"))
     chroma_db_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/storage/vector/chroma"))
+    prompt_dir: Path = Field(default_factory=lambda: Path("src/core/chat/prompts"))
+    prompts_file: str = Field("prompts.yaml", description="Prompt file")
+    tools_dir: Path = Field(default_factory=lambda: Path("src/core/chat/tools"))
+    tools_file: str = Field("tools.yaml", description="Tools file")
 
     # Ngrok configuration (only for local development)
     use_ngrok: bool = Field(True, description="Whether to use ngrok in local development")

@@ -92,6 +92,14 @@ class ToolResultBlock(ContentBlock):
     is_error: bool | None = Field(None, description="Error returned from the tool")
 
 
+class ToolUseInput(BaseModel):
+    """Tool use input"""
+
+    tool_name: str = Field(..., description="Name of the tool corresponding to the tool schema")
+    tool_input: dict[str, Any] = Field(..., description="Input to the tool according to schema")
+    tool_use_id: str = Field(..., description="ID of the tool use")
+
+
 class MessageContent(BaseModel):
     """Content that can be either string or structured blocks"""
 
@@ -152,11 +160,14 @@ class ConversationRecency(str, Enum):
 
 
 class Conversation(BaseDbModel):
-    """Domain model for a conversation."""
+    """Domain model for a conversation in chat.."""
 
     conversation_id: UUID = Field(default_factory=uuid4, description="UUID of the conversation")
     user_id: UUID = Field(..., description="FK reference to UUID of the user")
     title: str = Field(..., description="Title of the conversation")
+    messages: list[ConversationMessage] = Field(
+        default_factory=list, description="List of messages in the conversation"
+    )
     data_sources: list[UUID] = Field(
         default=...,
         description="FK references to UUIDs of the data sources last active for the conversation",

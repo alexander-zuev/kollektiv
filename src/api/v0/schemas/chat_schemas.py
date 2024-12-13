@@ -1,9 +1,8 @@
+from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
-from src.models.chat_models import ConversationMessage
 
 # Chat models
 
@@ -32,44 +31,21 @@ class LLMResponse(BaseModel):
     """Client-facing event structure."""
 
     message_type: MessageType = Field(..., description="Type of the llm message")
-    text: str = Field(..., description="Text contetn of the llm message")
+    text: str | dict = Field(..., description="Text or dictionary of the llm message")
 
 
-# Conversation models
 class ConversationSummary(BaseModel):
-    """Single conversation summary for the list view."""
+    """Summary of a conversation returned by GET /conversations"""
 
     conversation_id: UUID = Field(..., description="UUID of the conversation")
     title: str = Field(..., description="Title of the conversation")
     data_sources: list[UUID] = Field(
         ..., description="FK references to UUIDs of the data sources last active for the conversation"
     )
-
-
-class TimeGroup(str, Enum):
-    """Time periods for conversation grouping."""
-
-    RECENT = "Last 7 days"
-    LAST_MONTH = "Last 30 days"
-    OLDER = "Older"
-
-
-class ConversationGroup(BaseModel):
-    """Group of conversations by time period."""
-
-    time_group: TimeGroup = Field(..., description="Time period for the conversation group")
-    conversations: list[ConversationSummary] = Field(..., description="List of conversations in the group")
+    updated_at: datetime = Field(..., description="Last updated timestamp")
 
 
 class ConversationListResponse(BaseModel):
-    """API response for grouped conversations."""
+    """Object returned by GET /conversations"""
 
-    recent: ConversationGroup = Field(..., description="Group of conversations from the last 7 days")
-    last_month: ConversationGroup = Field(..., description="Group of conversations from the last 30 days")
-    older: ConversationGroup = Field(..., description="Group of conversations older than 30 days")
-
-
-class ConversationMessages(BaseModel):
-    """API response for all messages in a conversation."""
-
-    messages: list[ConversationMessage] = Field(..., description="List of messages in the conversation")
+    conversations: list[ConversationSummary] = Field(..., description="List of conversations")

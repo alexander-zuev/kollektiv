@@ -1,5 +1,5 @@
-from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.chat.conversation_manager import ConversationManager
+from src.core.chat.llm_assistant import ClaudeAssistant
 from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.logger import get_logger
@@ -24,7 +24,7 @@ class ServiceContainer:
         self.content_service: ContentService | None = None
         self.repository: DataRepository | None = None
         self.db_client: SupabaseClient | None = None
-        self.claude_assistant: ClaudeAssistant | None = None
+        self.llm_assistant: ClaudeAssistant | None = None
         self.vector_db: VectorDB | None = None
         self.chat_service: ChatService | None = None
         self.conversation_manager: ConversationManager | None = None

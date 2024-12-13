@@ -5,15 +5,23 @@ from uuid import UUID
 
 from src.api.v0.schemas.chat_schemas import (
     ConversationListResponse,
-    ConversationMessages,
     LLMResponse,
     MessageType,
 )
 from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
-from src.core.chat.claude_assistant import ClaudeAssistant
 from src.core.chat.conversation_manager import ConversationManager
+from src.core.chat.llm_assistant import ClaudeAssistant
 from src.infrastructure.common.logger import get_logger
-from src.models.chat_models import ConversationHistory, Role, StandardEvent, StandardEventType
+from src.models.chat_models import (
+    Conversation,
+    ConversationHistory,
+    Role,
+    StandardEvent,
+    StandardEventType,
+    ContentBlockType,
+    TextBlock,
+    MessageContent,
+)
 from src.services.data_service import DataService
 
 logger = get_logger()
@@ -64,11 +72,20 @@ class ChatService:
                         logger.debug("Message stop")
                     # final message -> add to conversation
                     case StandardEventType.FULL_MESSAGE:
-                        # add assistant message to conversation
-                        await self.conversation_manager.add_message(
+                        # Extract text from all TextBlocks within MessageContent
+                        full_message_text = ""
+                        for block in event.content.blocks:
+                            if isinstance(block, TextBlock):
+                                full_message_text += block.text
+
+                        # add pending assistant message to conversation
+                        await self.conversation_manager.add_pending_message(
                             conversation_id=conversation_id, role=Role.ASSISTANT, content=event.content
                         )
                         logger.debug(f"Added assistant message to conversation: {event.content}")
+
+                        # Yield the full message text
+                        yield LLMResponse(message_type=MessageType.DONE, text=full_message_text)
 
             # Once all is done and said, commit pending messages
             await self.conversation_manager.commit_pending(conversation_id)
@@ -79,7 +96,9 @@ class ChatService:
             # Log the error
             logger.error(f"Error processing message: {str(e)}", exc_info=True)
             # Add context and re-raise
-            raise RetryableLLMError(f"Error in chat service processing message: {str(e)} for user {user_id}") from e
+            raise RetryableLLMError(
+                f"Error in chat service processing message: {str(e)} for user {user_id}", original_error=e
+            ) from e
         except NonRetryableLLMError as e:
             # On error, rollback pending messages
             await self.conversation_manager.rollback_pending(conversation_id)
@@ -98,17 +117,19 @@ class ChatService:
         # 2. Add user message to pending state
         conversation_id = conversation.conversation_id
         await self.conversation_manager.add_pending_message(
-            conversation_id=conversation_id, role=Role.USER, content=message
+            conversation_id=conversation_id, role=Role.USER, content=MessageContent.from_str(message)
         )
 
         # 3. Combine stable + pending messages for Claude
         conversation_with_pending = await self.conversation_manager.get_conversation_with_pending(conversation_id)
         return conversation_with_pending
 
-    async def list_conversations(self) -> ConversationListResponse:
+    async def get_conversations(self, user_id: UUID) -> ConversationListResponse:
         """Return a list of all conversations for a users, ordered into time groups."""
-        pass
+        conversations = await self.data_service.get_conversations(user_id)
+        return ConversationListResponse(conversations=conversations)
 
-    async def get_conversation(self, conversation_id: UUID) -> ConversationMessages:
-        """Return all messages in a conversation."""
-        pass
+    async def get_conversation(self, conversation_id: UUID) -> Conversation:
+        """Return a single conversation by its ID in accordance with RLS policies."""
+        conversation = await self.data_service.get_conversation(conversation_id)
+        return Conversation.model_validate(conversation)
