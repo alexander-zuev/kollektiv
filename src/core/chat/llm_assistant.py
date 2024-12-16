@@ -5,6 +5,15 @@ from typing import Any
 
 import anthropic
 import weave
+from anthropic import AsyncStream
+from anthropic.types import (
+    ContentBlockDeltaEvent,
+    ContentBlockStartEvent,
+    ContentBlockStopEvent,
+    MessageStartEvent,
+    MessageStopEvent,
+)
+from anthropic.types.message_stream_event import MessageStreamEvent
 from pydantic import ConfigDict, Field
 from weave import Model
 
@@ -140,57 +149,35 @@ class ClaudeAssistant(Model):
                         # Match conditions
                         match event.type:
                             case "message_start":
-                                logger.debug("===== Stream message started =====")
-                                yield StandardEvent(event_type=StandardEventType.MESSAGE_START, content="")
+                                yield self.handle_message_start(event)
                             case "text":
-                                logger.debug(f"===== Stream text token: {event.text} =====")
-                                yield StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=event.text)
-
+                                yield self.handle_text_token(event)
                             case "content_block_start":
-                                logger.debug("===== Stream content block started =====")
-                                if event.content_block.type == "tool_use":
-                                    yield StandardEvent(
-                                        event_type=StandardEventType.TOOL_START,
-                                        content=MessageContent(
-                                            blocks=[
-                                                ToolUseBlock(
-                                                    id=event.content_block.id,
-                                                    name=event.content_block.name,
-                                                    input=event.content_block.input,
-                                                )
-                                            ]
-                                        ),
-                                    )
+                                self.handle_content_block_start(event)
                             case "content_block_stop":
-                                logger.debug("===== Stream content block ended =====")
+                                self.handle_content_block_stop(event)
                             case "message_stop":
-                                logger.debug("===== Stream message ended =====")
-                                yield StandardEvent(event_type=StandardEventType.MESSAGE_STOP, content="")
+                                yield self.handle_message_stop(event)
                             case "error":
-                                logger.error(f"===== Stream error: {event.error} =====")
-                                # TODO: handle error -> raise
+                                yield self.handle_error(event)
 
                     # Get final message
-                    full_response = await stream.get_final_message()
-                    logger.debug(f"Full response: {full_response}")
-                    yield StandardEvent(
-                        event_type=StandardEventType.FULL_MESSAGE,
-                        content=MessageContent(blocks=full_response.content),  # already a list of content blocks
-                    )
+                    full_response_event = await self.handle_full_message(event, stream)
+                    yield full_response_event
+                    logger.debug(f"Full response event: {full_response_event}")
 
                     # Handle tool use and get results
-                    tool_use_block = next((block for block in full_response.content if block.type == "tool_use"), None)
+                    tool_use_block = next(
+                        (
+                            block
+                            for block in full_response_event.content.blocks
+                            if hasattr(block, "type") and block.type == "tool_use"
+                        ),
+                        None,
+                    )
                     if tool_use_block:
-                        tool_result = await self.handle_tool_use(
-                            tool_use_block.name, tool_use_block.input, tool_use_block.id
-                        )
-
-                        tool_result_event = StandardEvent(
-                            event_type=StandardEventType.TOOL_RESULT,
-                            content=MessageContent(blocks=[tool_result]),
-                        )
-                        yield tool_result_event
-                        logger.debug(f"Tool result: {tool_result_event.content}")
+                        tool_result = await self.handle_tool_use(tool_use_block)
+                        yield tool_result
 
                         if tool_result.content == "No relevant context found for the original request.":
                             retries += 1
@@ -199,6 +186,7 @@ class ClaudeAssistant(Model):
 
                     if not tool_use_block:
                         break
+
         except (RetryableLLMError, NonRetryableLLMError) as e:
             logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
             raise
@@ -206,7 +194,70 @@ class ClaudeAssistant(Model):
             logger.error(f"An unexpected error occurred in stream response: {str(e)}", exc_info=True)
             raise
 
-    async def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> ToolResultBlock:
+    def handle_message_start(self, event: MessageStartEvent) -> StandardEvent:
+        """Handle message start event."""
+        logger.debug("===== Stream message started =====")
+        return StandardEvent(event_type=StandardEventType.MESSAGE_START, content="")
+
+    def handle_text_token(self, event: ContentBlockDeltaEvent) -> StandardEvent:
+        """Handle text token event."""
+        logger.debug(f"===== Stream text token: {event.text} =====")
+        return StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=event.text)
+
+    def handle_content_block_start(self, event: ContentBlockStartEvent) -> None:
+        """Handle content block start event."""
+        logger.debug("===== Stream content block started =====")
+        if event.content_block.type == "tool_use":
+            return StandardEvent(
+                event_type=StandardEventType.TOOL_START,
+                content=MessageContent(
+                    blocks=[
+                        ToolUseBlock(
+                            id=event.content_block.id,
+                            name=event.content_block.name,
+                            input=event.content_block.input,
+                        )
+                    ]
+                ),
+            )
+
+    def handle_content_block_stop(self, event: ContentBlockStopEvent) -> None:
+        """Handle content block stop event."""
+        logger.debug("===== Stream content block ended =====")
+
+    def handle_error(self, event: MessageStreamEvent) -> StandardEvent:
+        """Handle error event."""
+        logger.error(f"===== Stream error: {event.error} =====")
+        return StandardEvent(event_type=StandardEventType.ERROR, content=event.error)
+
+    def handle_message_stop(self, event: MessageStopEvent) -> StandardEvent:
+        """Handle message stop event."""
+        logger.debug("===== Stream message ended =====")
+        return StandardEvent(event_type=StandardEventType.MESSAGE_STOP, content="")
+
+    async def handle_full_message(
+        self, event: MessageStopEvent, stream: AsyncStream[MessageStreamEvent]
+    ) -> StandardEvent:
+        """Handle full message event."""
+        full_response = await stream.get_final_message()
+        logger.debug(f"Full response: {full_response}")
+        return StandardEvent(
+            event_type=StandardEventType.FULL_MESSAGE,
+            content=MessageContent(blocks=full_response.content),  # already a list of content blocks
+        )
+
+    async def handle_tool_use(self, event: ToolUseBlock) -> StandardEvent:
+        """Handle tool use event."""
+        tool_result = await self.get_tool_result(event.name, event.input, event.id)
+
+        tool_result_event = StandardEvent(
+            event_type=StandardEventType.TOOL_RESULT,
+            content=MessageContent(blocks=[tool_result]),
+        )
+        yield tool_result_event
+        logger.debug(f"Tool result: {tool_result_event.content}")
+
+    async def get_tool_result(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> ToolResultBlock:
         """Handle tool use for specified tools."""
         try:
             if tool_name == "rag_search":
