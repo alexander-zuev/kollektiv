@@ -86,7 +86,6 @@ class ConversationManager:
         message = ConversationMessage(role=role, content=content)
         self.pending_messages[conversation_id].append(message)
         logger.info(f"Added pending {role} message to conversation {conversation_id}: {message.content}")
-        # logger.debug(f"Pending messages: {self.pending_messages[conversation_id]}")
         return message
 
     async def commit_pending(self, conversation_id: UUID) -> None:

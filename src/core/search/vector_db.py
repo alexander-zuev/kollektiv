@@ -150,7 +150,7 @@ class VectorDB:
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
     @base_error_handler
-    def add_documents(self, json_data: list[dict], file_name: str) -> dict[str, str]:
+    def add_documents(self, json_data: list[dict], file_name: str) -> None:
         """
         Add documents from a given JSON list to the database, handling duplicates and generating summaries.
 
@@ -225,7 +225,7 @@ class VectorDB:
             return False, document_ids
 
     @base_error_handler
-    def query(self, user_query: str | list[str], n_results: int = 10):
+    async def query(self, user_query: str | list[str], n_results: int = 10) -> dict[str, Any]:
         """
         Query the collection to retrieve documents based on the user's query.
 
@@ -246,7 +246,7 @@ class VectorDB:
         return search_results
 
     @base_error_handler
-    def reset_database(self):
+    def reset_database(self) -> None:
         """
         Reset the database by deleting and recreating the collection, and clearing summaries.
 
@@ -270,24 +270,6 @@ class VectorDB:
         self.summary_manager.clear_summaries()
 
         logger.info("Database reset successfully. ")
-
-    def process_results_to_print(self, search_results: dict[str, Any]):
-        """
-        Process search results to a formatted string output.
-
-        Args:
-            search_results (dict[str, Any]): The search results containing documents and distances.
-
-        Returns:
-            list[str]: A list of formatted strings containing distances and corresponding documents.
-        """
-        documents = search_results["documents"][0]
-        distances = search_results["distances"][0]
-
-        output = []
-        for docs, dist in zip(documents, distances, strict=True):
-            output.append(f"Distance: {dist:.2f}\n\n{docs}")
-        return output
 
     def deduplicate_documents(self, search_results: dict[str, Any]) -> dict[str, Any]:
         """

@@ -23,7 +23,7 @@ class Retriever:
         self.db = vector_db
         self.reranker = reranker
 
-    def retrieve(self, user_query: str, combined_queries: list[str], top_n: int | None) -> list[dict[str, Any]]:
+    async def retrieve(self, user_query: str, combined_queries: list[str], top_n: int | None) -> list[dict[str, Any]]:
         """
         Retrieve and rank documents based on user query and combined queries.
 
@@ -42,7 +42,11 @@ class Retriever:
         start_time = time.time()  # Start timing
 
         # get expanded search results
-        search_results = self.db.query(combined_queries)
+        search_results = await self.db.query(combined_queries)
+        if not search_results or not search_results.get("documents")[0]:
+            logger.warning("No documents found in search results")
+            return []
+
         unique_documents = self.db.deduplicate_documents(search_results)
         logger.info(f"Search returned {len(unique_documents)} unique chunks")
 

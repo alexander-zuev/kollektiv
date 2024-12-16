@@ -68,10 +68,13 @@ class Reranker:
         # extract list of documents
         document_texts = self.extract_documents_list(documents)
 
-        # get indexed results
-        response = self.client.rerank(
-            model=self.model_name, query=query, documents=document_texts, return_documents=return_documents
-        )
+        if document_texts:
+            # get indexed results
+            response = self.client.rerank(
+                model=self.model_name, query=query, documents=document_texts, return_documents=return_documents
+            )
+        else:
+            raise ValueError("No documents to rerank")
 
         logger.debug(f"Received {len(response.results)} documents from Cohere.")
         return response

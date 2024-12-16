@@ -120,7 +120,10 @@ class ClaudeAssistant(Model):
         try:
             logger.debug(f"Conversation history: {len(conv_history.messages)} messages.")
 
-            while True:
+            max_retries = 2
+            retries = 0
+
+            while retries < max_retries:
                 messages = conv_history.to_anthropic_messages()
                 logger.debug(f"Messages: {messages}")
                 async with self.client.messages.stream(
@@ -169,7 +172,6 @@ class ClaudeAssistant(Model):
 
                     # Get final message
                     full_response = await stream.get_final_message()
-                    full_response_text = f"{full_response.content[0].text}"
                     logger.debug(f"Full response: {full_response}")
                     yield StandardEvent(
                         event_type=StandardEventType.FULL_MESSAGE,
@@ -189,6 +191,12 @@ class ClaudeAssistant(Model):
                         )
                         yield tool_result_event
                         logger.debug(f"Tool result: {tool_result_event.content}")
+
+                        if tool_result.content == "No relevant context found for the original request.":
+                            retries += 1
+                            logger.warning(f"RAG search failed. Retrying... (Attempt {retries}/{max_retries})")
+                            continue  # Retry the entire streaming process
+
                     if not tool_use_block:
                         break
         except (RetryableLLMError, NonRetryableLLMError) as e:
@@ -203,20 +211,28 @@ class ClaudeAssistant(Model):
         try:
             if tool_name == "rag_search":
                 search_results = await self.use_rag_search(tool_input=tool_input)
-                tool_result = ToolResultBlock(
-                    tool_use_id=tool_use_id,
-                    content=f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
-                    f"Please use this context to answer my original request, if it's relevant.",
-                )
+                if search_results is None:
+                    # Special tool use block for no context
+                    tool_result = ToolResultBlock(
+                        tool_use_id=tool_use_id,
+                        content="No relevant context found for the original request.",
+                    )
+                else:
+                    # Regular tool use block with context
+                    tool_result = ToolResultBlock(
+                        tool_use_id=tool_use_id,
+                        content=f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
+                        f"Please use this context to answer my original request, if it's relevant.",
+                    )
 
                 return tool_result
 
             raise ValueError(f"Unknown tool: {tool_name}")
         except Exception as e:
-            logger.error(f"Error executing tool {tool_name}: {str(e)}")
-            result = ToolResultBlock(tool_use_id=tool_use_id, content="", is_error=True)
-            logger.debug(f"Tool result: {result}")
-            return result
+            logger.error(f"Error executing tool {tool_name}: {str(e)}", exc_info=True)
+            raise NonRetryableLLMError(
+                original_error=e, message=f"An error occurred while handling tool: {str(e)}"
+            ) from e
 
     @anthropic_error_handler
     # TODO: this method belongs to retriever
@@ -262,7 +278,7 @@ class ClaudeAssistant(Model):
         messages = [{"role": "user", "content": query_generation_prompt}]
         max_tokens = 150
 
-        response = self.client.messages.create(
+        response = await self.client.messages.create(
             max_tokens=max_tokens,
             system=system_prompt,
             messages=messages,
@@ -273,7 +289,7 @@ class ClaudeAssistant(Model):
         return rag_query
 
     # TODO: this method belongs to retriever
-    async def use_rag_search(self, tool_input: dict[str, Any]) -> list[str]:
+    async def use_rag_search(self, tool_input: dict[str, Any]) -> list[str] | None:
         """
         Perform a retrieval-augmented generation (RAG) search using the provided tool input.
 
@@ -281,7 +297,8 @@ class ClaudeAssistant(Model):
             tool_input (dict[str, Any]): A dictionary containing 'important_context' key to formulate the RAG query.
 
         Returns:
-            list[str]: A list of preprocessed ranked documents resulting from the RAG search.
+            list[str] | None: A list of preprocessed ranked documents resulting from the RAG search,
+                              or None if no results are found for any query after retries.
 
         Raises:
             KeyError: If 'important_context' is not found in tool_input.
@@ -296,18 +313,21 @@ class ClaudeAssistant(Model):
         combined_queries = await self.combine_queries(rag_query, multiple_queries)
 
         # get ranked search results
-        results = self.retriever.retrieve(user_query=rag_query, combined_queries=combined_queries, top_n=3)
+        results = await self.retriever.retrieve(user_query=rag_query, combined_queries=combined_queries, top_n=3)
         logger.debug(f"Retriever results: {results}")
 
+        if not results:
+            logger.warning("No search results found.")
+            return None  # Return None if no results
+
         # Preprocess the results here
-        preprocessed_results = self.preprocess_ranked_documents(results)
-        self.retrieved_contexts = preprocessed_results  # Store the contexts for evals
-        logger.debug(f"Processed results: {results}")
+        preprocessed_results = await self.preprocess_ranked_documents(results)
+        logger.debug(f"Processed results: {preprocessed_results}")
 
         return preprocessed_results
 
     @base_error_handler
-    def preprocess_ranked_documents(self, ranked_documents: dict[str, Any]) -> list[str]:
+    async def preprocess_ranked_documents(self, ranked_documents: list[dict[str, Any]]) -> list[str]:
         """
         Preprocess ranked documents to generate a list of formatted document strings.
 
