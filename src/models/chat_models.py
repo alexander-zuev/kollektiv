@@ -32,7 +32,7 @@ class StandardEvent(BaseModel):
     """Standard event structure for internal use."""
 
     event_type: StandardEventType
-    content: Union[str, dict, "MessageContent"] = Field(
+    content: Union[str, "MessageContent"] = Field(
         description="Event content - text tokens, tool data, or full message content"
     )
     tool_info: dict[str, Any] | None = Field(None, description="Tool-specific information when relevant")
@@ -90,14 +90,6 @@ class ToolResultBlock(ContentBlock):
     tool_use_id: str = Field(..., description="ID of the tool use")
     content: str | dict | None = Field(None, description="Result returned from the tool")
     is_error: bool | None = Field(None, description="Error returned from the tool")
-
-
-class ToolUseInput(BaseModel):
-    """Tool use input"""
-
-    tool_name: str = Field(..., description="Name of the tool corresponding to the tool schema")
-    tool_input: dict[str, Any] = Field(..., description="Input to the tool according to schema")
-    tool_use_id: str = Field(..., description="ID of the tool use")
 
 
 class MessageContent(BaseModel):
@@ -174,9 +166,3 @@ class Conversation(BaseDbModel):
     )
 
     _db_config: ClassVar[dict] = {"schema": "chat", "table": "conversations", "primary_key": "conversation_id"}
-
-
-class Conversations(BaseModel):
-    """A domain model for a list of conversations that a user has."""
-
-    user_id: UUID = Field(..., description="FK reference to UUID of the user")

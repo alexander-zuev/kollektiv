@@ -1,6 +1,8 @@
 from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
 from src.core.content.crawler import FireCrawler
+from src.core.search.reranker import Reranker
+from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.external.supabase_client import SupabaseClient, supabase_client
@@ -28,6 +30,8 @@ class ServiceContainer:
         self.vector_db: VectorDB | None = None
         self.chat_service: ChatService | None = None
         self.conversation_manager: ConversationManager | None = None
+        self.retriever: Retriever | None = None
+        self.reranker: Reranker | None = None
 
     def initialize_services(self) -> None:
         """Initialize all services."""
@@ -44,8 +48,10 @@ class ServiceContainer:
 
             # Chat Services
             self.vector_db = VectorDB()
+            self.reranker = Reranker()
+            self.retriever = Retriever(vector_db=self.vector_db, reranker=self.reranker)
 
-            self.claude_assistant = ClaudeAssistant(vector_db=self.vector_db)
+            self.claude_assistant = ClaudeAssistant(vector_db=self.vector_db, retriever=self.retriever)
 
             self.conversation_manager = ConversationManager()
 

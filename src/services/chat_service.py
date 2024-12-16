@@ -15,12 +15,11 @@ from src.infrastructure.common.logger import get_logger
 from src.models.chat_models import (
     Conversation,
     ConversationHistory,
+    MessageContent,
     Role,
     StandardEvent,
     StandardEventType,
-    ContentBlockType,
     TextBlock,
-    MessageContent,
 )
 from src.services.data_service import DataService
 
@@ -49,7 +48,7 @@ class ChatService:
 
             # Get conversation_id and send it as the first event
             conversation_id = conversation_with_pending.conversation_id
-            yield LLMResponse(message_type=MessageType.CONVERSATION_ID, text=str(conversation_id))
+            yield LLMResponse(message_type=MessageType.CONVERSATION_ID, conversation_id=conversation_id)
 
             # Send to Claude and stream the response
             async for event in self.claude_assistant.stream_response(conversation_with_pending):
@@ -57,38 +56,44 @@ class ChatService:
                 match event.event_type:
                     # tokens -> stream to user
                     case StandardEventType.TEXT_TOKEN:
-                        yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text=event.content)
+                        yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text_token=event.content)
                     # tool use -> just note them for now
                     case StandardEventType.TOOL_START:
-                        yield LLMResponse(message_type=MessageType.TOOL_USE, text=event.content)
+                        yield LLMResponse(message_type=MessageType.TOOL_USE, structured_content=event.content)
                     case StandardEventType.TOOL_RESULT:
                         # add tool result to conversation
                         await self.conversation_manager.add_message(
                             conversation_id=conversation_id, role=Role.USER, content=event.content
                         )
                         logger.debug(f"Added tool result to conversation: {event.content}")
+                        yield LLMResponse(message_type=MessageType.TOOL_RESULT, structured_content=event.content)
                     # message stop -> this is just a signal
                     case StandardEventType.MESSAGE_STOP:
                         logger.debug("Message stop")
                     # final message -> add to conversation
                     case StandardEventType.FULL_MESSAGE:
-                        # Extract text from all TextBlocks within MessageContent
-                        full_message_text = ""
-                        for block in event.content.blocks:
-                            if isinstance(block, TextBlock):
-                                full_message_text += block.text
-
-                        # add pending assistant message to conversation
-                        await self.conversation_manager.add_pending_message(
+                        # Add pending assistant message to conversation
+                        assistant_message = await self.conversation_manager.add_pending_message(
                             conversation_id=conversation_id, role=Role.ASSISTANT, content=event.content
                         )
                         logger.debug(f"Added assistant message to conversation: {event.content}")
 
                         # Yield the full message text
-                        yield LLMResponse(message_type=MessageType.DONE, text=full_message_text)
+                        yield LLMResponse(
+                            message_id=assistant_message.message_id,
+                            message_type=MessageType.FULL_MESSAGE,
+                            structured_content=event.content,
+                        )
+                        # Safer logging
+                        text_blocks = [block.text for block in event.content.blocks if isinstance(block, TextBlock)]
+                        logger.debug(f"Text blocks in assistant message: {text_blocks}")
 
             # Once all is done and said, commit pending messages
             await self.conversation_manager.commit_pending(conversation_id)
+
+            # Yield DONE event
+            yield LLMResponse(message_type=MessageType.DONE, text="===Streaming complete===")
+            logger.debug("Yielded done message")
 
         except RetryableLLMError as e:
             # On error, rollback pending messages
@@ -97,7 +102,8 @@ class ChatService:
             logger.error(f"Error processing message: {str(e)}", exc_info=True)
             # Add context and re-raise
             raise RetryableLLMError(
-                f"Error in chat service processing message: {str(e)} for user {user_id}", original_error=e
+                original_error=RetryableLLMError,
+                message=f"Error in chat service processing message: {str(e)} for user {user_id}",
             ) from e
         except NonRetryableLLMError as e:
             # On error, rollback pending messages
@@ -105,7 +111,10 @@ class ChatService:
             # Log the error
             logger.error(f"Error processing message: {str(e)}", exc_info=True)
             # Add context and re-raise
-            raise NonRetryableLLMError(f"Error in chat service processing message: {str(e)} for user {user_id}") from e
+            raise NonRetryableLLMError(
+                original_error=NonRetryableLLMError,
+                message=f"Error in chat service processing message: {str(e)} for user {user_id}",
+            ) from e
 
     async def _handle_stream_events(self, event: StandardEvent) -> LLMResponse:
         yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text=event.content)
@@ -127,9 +136,9 @@ class ChatService:
     async def get_conversations(self, user_id: UUID) -> ConversationListResponse:
         """Return a list of all conversations for a users, ordered into time groups."""
         conversations = await self.data_service.get_conversations(user_id)
-        return ConversationListResponse(conversations=conversations)
+        return conversations
 
     async def get_conversation(self, conversation_id: UUID) -> Conversation:
         """Return a single conversation by its ID in accordance with RLS policies."""
         conversation = await self.data_service.get_conversation(conversation_id)
-        return Conversation.model_validate(conversation)
+        return conversation

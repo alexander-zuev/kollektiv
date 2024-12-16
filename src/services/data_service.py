@@ -147,4 +147,4 @@ class DataService:
     async def get_conversation(self, conversation_id: UUID) -> Conversation:
         """Get a single conversation by its ID in accordance with RLS policies."""
         conversation = await self.repository.find_by_id(Conversation, conversation_id)
-        return Conversation.model_validate(conversation)
+        return conversation

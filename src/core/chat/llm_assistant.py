@@ -11,8 +11,12 @@ from weave import Model
 from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 from src.core.chat.prompt_manager import PromptManager
 from src.core.chat.tool_manager import ToolManager
+from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
-from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
+from src.infrastructure.common.decorators import (
+    anthropic_error_handler,
+    base_error_handler,
+)
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
 from src.models.chat_models import (
@@ -21,6 +25,7 @@ from src.models.chat_models import (
     StandardEvent,
     StandardEventType,
     ToolResultBlock,
+    ToolUseBlock,
 )
 from src.models.llm_models import SystemPrompt, Tool
 
@@ -51,19 +56,17 @@ class ClaudeAssistant(Model):
     system_prompt: SystemPrompt = Field(default_factory=lambda: SystemPrompt(text=""))
     tools: list[Tool] = Field(default_factory=list, description="List of tools available to the assistant")
 
-    # TODO: refactor and probably this should not be part of claude, but retriever? or chat service?
-    retrieved_contexts: list[str] = Field(default_factory=list)
-
     # Dependencies
     prompt_manager: PromptManager = Field(default_factory=PromptManager)
     tool_manager: ToolManager = Field(default_factory=ToolManager)
-    retriever: Any | None = Field(default=None)
+    retriever: Retriever | None = Field(default=None, description="Retriever instance")
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __init__(
         self,
         vector_db: VectorDB,
+        retriever: Retriever,
         api_key: str | None = None,
         model_name: str | None = None,
     ):
@@ -81,10 +84,10 @@ class ClaudeAssistant(Model):
             model_name=model_name or settings.main_model,
         )
 
-        # Initialize client and tools
         self.client = anthropic.AsyncAnthropic(api_key=self.api_key, max_retries=2)
         self.tools = self.tool_manager.get_all_tools()
         self.system_prompt = self.prompt_manager.get_system_prompt(document_summaries="No documents loaded yet.")
+        self.retriever = retriever
         logger.debug("Claude assistant successfully initialized.")
 
     # TODO: this method needs to be refactored completely
@@ -145,10 +148,15 @@ class ClaudeAssistant(Model):
                                 if event.content_block.type == "tool_use":
                                     yield StandardEvent(
                                         event_type=StandardEventType.TOOL_START,
-                                        content={
-                                            "type": "tool_use",
-                                            "tool": event.content_block.name,
-                                        },
+                                        content=MessageContent(
+                                            blocks=[
+                                                ToolUseBlock(
+                                                    id=event.content_block.id,
+                                                    name=event.content_block.name,
+                                                    input=event.content_block.input,
+                                                )
+                                            ]
+                                        ),
                                     )
                             case "content_block_stop":
                                 logger.debug("===== Stream content block ended =====")
@@ -161,9 +169,11 @@ class ClaudeAssistant(Model):
 
                     # Get final message
                     full_response = await stream.get_final_message()
+                    full_response_text = f"{full_response.content[0].text}"
                     logger.debug(f"Full response: {full_response}")
                     yield StandardEvent(
-                        event_type=StandardEventType.FULL_MESSAGE, content=MessageContent(blocks=full_response.content)
+                        event_type=StandardEventType.FULL_MESSAGE,
+                        content=MessageContent(blocks=full_response.content),  # already a list of content blocks
                     )
 
                     # Handle tool use and get results
@@ -172,21 +182,27 @@ class ClaudeAssistant(Model):
                         tool_result = await self.handle_tool_use(
                             tool_use_block.name, tool_use_block.input, tool_use_block.id
                         )
-                        yield StandardEvent(
-                            event_type=StandardEventType.TOOL_RESULT, content=MessageContent(blocks=tool_result)
+
+                        tool_result_event = StandardEvent(
+                            event_type=StandardEventType.TOOL_RESULT,
+                            content=MessageContent(blocks=[tool_result]),
                         )
-                        logger.debug(f"Tool result: {StandardEvent.content}")
+                        yield tool_result_event
+                        logger.debug(f"Tool result: {tool_result_event.content}")
                     if not tool_use_block:
                         break
         except (RetryableLLMError, NonRetryableLLMError) as e:
             logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred in stream response: {str(e)}", exc_info=True)
             raise
 
     async def handle_tool_use(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> ToolResultBlock:
         """Handle tool use for specified tools."""
         try:
             if tool_name == "rag_search":
-                search_results = await self.use_rag_search(tool_input=tool_inputL)
+                search_results = await self.use_rag_search(tool_input=tool_input)
                 tool_result = ToolResultBlock(
                     tool_use_id=tool_use_id,
                     content=f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
@@ -198,17 +214,17 @@ class ClaudeAssistant(Model):
             raise ValueError(f"Unknown tool: {tool_name}")
         except Exception as e:
             logger.error(f"Error executing tool {tool_name}: {str(e)}")
-            return {"role": "system", "content": [{"type": "error", "content": f"Error: {str(e)}"}]}
+            result = ToolResultBlock(tool_use_id=tool_use_id, content="", is_error=True)
+            logger.debug(f"Tool result: {result}")
+            return result
 
     @anthropic_error_handler
-    @weave.op()
     # TODO: this method belongs to retriever
-    def formulate_rag_query(self, recent_conversation_history: list[dict[str, Any]], important_context: str) -> str:
+    async def formulate_rag_query(self, important_context: str) -> str:
         """
         Formulate a RAG search query based on recent conversation history and important context.
 
         Args:
-            recent_conversation_history (list[dict[str, Any]]): A list of conversation history dictionaries.
             important_context (str): A string containing important contextual information.
 
         Returns:
@@ -219,17 +235,8 @@ class ClaudeAssistant(Model):
         """
         logger.debug(f"Important context: {important_context}")
 
-        if not recent_conversation_history:
-            raise ValueError("Recent conversation history is empty")
-
         if not important_context:
             logger.warning("Important context is empty, proceeding to rag search query formulation without it")
-
-        # extract most recent user query
-        most_recent_user_query = next(
-            (msg["content"] for msg in reversed(recent_conversation_history) if msg["role"] == "user"),
-            "No recent " "user query found.",
-        )
 
         query_generation_prompt = f"""
         Based on the following conversation context and the most recent user query, formulate the best possible search
@@ -243,12 +250,7 @@ class ClaudeAssistant(Model):
         Query requirements:
         - Provide only the formulated query in your response, without any additional text.
 
-        Recent conversation history:
-        {recent_conversation_history}
-
         Important context to consider: {important_context}
-
-        Most recent user query: {most_recent_user_query}
 
         Formulated search query:
         """
@@ -270,26 +272,8 @@ class ClaudeAssistant(Model):
         rag_query = response.content[0].text.strip()
         return rag_query
 
-    @base_error_handler
-    def get_recent_context(self, n_messages: int = 6) -> list[dict[str, str]]:
-        """
-        Retrieve the most recent messages from the conversation history.
-
-        Args:
-            n_messages (int): The number of recent messages to retrieve. Defaults to 6.
-
-        Returns:
-            list[dict[str, str]]: A list of dictionaries representing the recent messages.
-
-        Raises:
-            None
-        """
-        recent_messages = self.conversation_history.messages[-n_messages:]
-        return [msg.to_dict() for msg in recent_messages]
-
     # TODO: this method belongs to retriever
-    @base_error_handler
-    def use_rag_search(self, tool_input: dict[str, Any]) -> list[str]:
+    async def use_rag_search(self, tool_input: dict[str, Any]) -> list[str]:
         """
         Perform a retrieval-augmented generation (RAG) search using the provided tool input.
 
@@ -302,17 +286,14 @@ class ClaudeAssistant(Model):
         Raises:
             KeyError: If 'important_context' is not found in tool_input.
         """
-        # Get recent conversation context (last n messages for each role)
-        recent_conversation_history = self.get_recent_context()
-
         # important context
         important_context = tool_input["important_context"]
 
         # prepare queries for search
-        rag_query = self.formulate_rag_query(recent_conversation_history, important_context)
+        rag_query = await self.formulate_rag_query(important_context)
         logger.debug(f"Using this query for RAG search: {rag_query}")
-        multiple_queries = self.generate_multi_query(rag_query)
-        combined_queries = self.combine_queries(rag_query, multiple_queries)
+        multiple_queries = await self.generate_multi_query(rag_query)
+        combined_queries = await self.combine_queries(rag_query, multiple_queries)
 
         # get ranked search results
         results = self.retriever.retrieve(user_query=rag_query, combined_queries=combined_queries, top_n=3)
@@ -355,7 +336,7 @@ class ClaudeAssistant(Model):
 
     @anthropic_error_handler
     @weave.op()
-    def generate_multi_query(self, query: str, model: str | None = None, n_queries: int = 5) -> list[str]:
+    async def generate_multi_query(self, query: str, model: str | None = None, n_queries: int = 5) -> list[str]:
         """
         Generate multiple related queries based on a user query.
 
@@ -386,19 +367,19 @@ class ClaudeAssistant(Model):
         if model is None:
             model = self.model_name
 
-        message = self.client.messages.create(
+        message = await self.client.messages.create(
             model=model,
             max_tokens=1024,
             system=prompt,
             messages=[{"role": "user", "content": query}],
         )
 
+        logger.debug(f"Generated multi queries: {message}")
         content = message.content[0].text
         content = content.split("\n")
         return content
 
-    @base_error_handler
-    def combine_queries(self, user_query: str, generated_queries: list[str]) -> list[str]:
+    async def combine_queries(self, user_query: str, generated_queries: list[str]) -> list[str]:
         """
         Combine user query with generated queries.
 

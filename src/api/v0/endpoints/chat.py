@@ -1,6 +1,8 @@
+from collections.abc import AsyncIterator
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
+from fastapi.exceptions import RequestValidationError
 from sse_starlette.sse import EventSourceResponse
 
 from src.api.dependencies import ChatServiceDep
@@ -11,7 +13,7 @@ from src.api.v0.schemas.chat_schemas import (
     LLMResponse,
     UserMessage,
 )
-from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
+from src.core._exceptions import DatabaseError, EntityNotFoundError, NonRetryableLLMError, RetryableLLMError
 from src.models.chat_models import Conversation
 
 # Define routers with base prefix only
@@ -35,9 +37,12 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
     Returns Server-Sent Events with tokens.
     """
     try:
-        return EventSourceResponse(
-            chat_service.get_response(user_id=request.user_id, message=request.message), media_type="text/event-stream"
-        )
+
+        async def event_stream() -> AsyncIterator[str]:
+            async for event in chat_service.get_response(user_id=request.user_id, message=request.message):
+                yield event.model_dump_json()
+
+        return EventSourceResponse(event_stream(), media_type="text/event-stream")
     except NonRetryableLLMError as e:
         raise HTTPException(
             status_code=500, detail=f"A non-retryable error occurred in the system:: {str(e)}. We are on it."
@@ -49,14 +54,86 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
 
 
 # Get all conversations
-@conversations_router.get(Routes.V0.Conversations.LIST, response_model=ConversationListResponse)
+@conversations_router.get(
+    Routes.V0.Conversations.LIST,
+    response_model=ConversationListResponse,
+    responses={
+        200: {"model": ConversationListResponse},
+        400: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
 async def list_conversations(user_id: UUID, chat_service: ChatServiceDep) -> ConversationListResponse:
     """Get grouped list of conversations."""
-    return await chat_service.get_conversations(user_id)
+    try:
+        return await chat_service.get_conversations(user_id)
+    except DatabaseError as e:
+        logger.error(f"Database error while getting conversations for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ErrorResponse(
+                error="Database Error", code=500, detail="Failed to retrieve conversations."
+            ).model_dump(),
+        ) from e
+    except RequestValidationError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorResponse(error="Bad Request", code=400, detail="Invalid request data.").model_dump(),
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error while getting conversations for user {user_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ErrorResponse(
+                error="Internal Server Error", code=500, detail="An unexpected error occurred."
+            ).model_dump(),
+        ) from e
 
 
 # Get messages in a conversation
-@conversations_router.get(Routes.V0.Conversations.GET, response_model=Conversation)
-async def get_conversation(user_id: UUID, conversation_id: UUID, chat_service: ChatServiceDep) -> Conversation:
+@conversations_router.get(
+    Routes.V0.Conversations.GET,
+    response_model=Conversation,
+    responses={
+        200: {"model": Conversation},
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def get_conversation(conversation_id: UUID, chat_service: ChatServiceDep) -> Conversation:
     """Get all messages in a conversation."""
-    return await chat_service.get_conversation(user_id, conversation_id)
+    try:
+        return await chat_service.get_conversation(conversation_id)
+    # Handle case where conversation is not found
+    except EntityNotFoundError as e:
+        logger.warning(f"Conversation not found: {conversation_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ErrorResponse(error="Not Found", code=404, detail="Conversation not found.").model_dump(),
+        ) from e
+    # Handle all other database errors
+    except DatabaseError as e:
+        logger.error(f"Database error while getting conversation {conversation_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ErrorResponse(
+                error="Database Error", code=500, detail="Failed to retrieve conversation."
+            ).model_dump(),
+        ) from e
+    # Handle case when the client sends invalid request
+    except RequestValidationError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorResponse(error="Bad Request", code=400, detail="Invalid request data.").model_dump(),
+        ) from e
+    except Exception as e:
+        logger.error(f"Unexpected error while getting conversation {conversation_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ErrorResponse(
+                error="Internal Server Error", code=500, detail="An unexpected error occurred."
+            ).model_dump(),
+        ) from e

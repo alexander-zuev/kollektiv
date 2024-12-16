@@ -76,15 +76,18 @@ class ConversationManager:
             logger.error(f"Error adding message: {e}, {conversation_id}, {role}, {content}", exc_info=True)
             raise
 
-    async def add_pending_message(self, conversation_id: UUID, role: Role, content: MessageContent) -> None:
+    async def add_pending_message(
+        self, conversation_id: UUID, role: Role, content: MessageContent
+    ) -> ConversationMessage:
         """Add message to pending state during tool use."""
         if conversation_id not in self.pending_messages:
             self.pending_messages[conversation_id] = []
 
         message = ConversationMessage(role=role, content=content)
         self.pending_messages[conversation_id].append(message)
-        logger.info(f"Added pending {role} message to conversation {conversation_id}: {message}")
-        logger.debug(f"Pending messages: {self.pending_messages[conversation_id]}")
+        logger.info(f"Added pending {role} message to conversation {conversation_id}: {message.content}")
+        # logger.debug(f"Pending messages: {self.pending_messages[conversation_id]}")
+        return message
 
     async def commit_pending(self, conversation_id: UUID) -> None:
         """Commit pending messages to conversation history."""
