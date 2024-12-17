@@ -5,7 +5,7 @@ import tiktoken
 from pydantic import ValidationError
 
 from src.infrastructure.common.logger import get_logger
-from src.models.chat_models import ConversationHistory, ConversationMessage, MessageContent, Role
+from src.models.chat_models import ContentBlock, ConversationHistory, ConversationMessage, Role
 
 logger = get_logger()
 
@@ -53,7 +53,7 @@ class ConversationManager:
         self.conversations[conversation.conversation_id] = conversation
         return conversation
 
-    async def add_message(self, conversation_id: UUID, role: str, content: MessageContent) -> None:
+    async def add_message_to_conversation(self, conversation_id: UUID, role: Role, content: list[ContentBlock]) -> None:
         """Add a message directly to conversation history."""
         try:
             conversation = self.conversations.get(conversation_id)
@@ -61,7 +61,9 @@ class ConversationManager:
                 logger.error(f"No conversation found for {conversation_id}", exc_info=True)
                 raise ValueError(f"Conversation {conversation_id} not found")
 
-            message = ConversationMessage(conversation_id=conversation_id, role=role, content=content)
+            message = self._create_message_object(conversation_id, role, content)
+
+            logger.debug(f"Adding message: {message}")
             conversation.messages.append(message)
 
             # Update token count
@@ -76,17 +78,23 @@ class ConversationManager:
             logger.error(f"Error adding message: {e}, {conversation_id}, {role}, {content}", exc_info=True)
             raise
 
-    async def add_pending_message(
-        self, conversation_id: UUID, role: Role, content: MessageContent
+    async def add_message_to_pending_conversation(
+        self, conversation_id: UUID, role: Role, content: list[ContentBlock]
     ) -> ConversationMessage:
         """Add message to pending state during tool use."""
         if conversation_id not in self.pending_messages:
             self.pending_messages[conversation_id] = []
 
-        message = ConversationMessage(role=role, content=content)
+        message = self._create_message_object(conversation_id, role, content)
+        logger.debug(f"Adding pending message: {message}")
         self.pending_messages[conversation_id].append(message)
         logger.info(f"Added pending {role} message to conversation {conversation_id}: {message.content}")
         return message
+
+    def _create_message_object(
+        self, conversation_id: UUID, role: Role, content: list[ContentBlock]
+    ) -> ConversationMessage:
+        return ConversationMessage(conversation_id=conversation_id, role=role, content=content)
 
     async def commit_pending(self, conversation_id: UUID) -> None:
         """Commit pending messages to conversation history."""
@@ -115,7 +123,7 @@ class ConversationManager:
         """Discard pending messages."""
         self.pending_messages.pop(conversation_id, None)
 
-    async def _estimate_tokens(self, content: MessageContent) -> int:
+    async def _estimate_tokens(self, content: list[ContentBlock]) -> int:
         """Estimate token count for content."""
         if isinstance(content, str):
             return len(self.tokenizer.encode(content))

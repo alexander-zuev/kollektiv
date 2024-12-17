@@ -1,10 +1,9 @@
 from datetime import datetime
 from enum import Enum
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
-from src.models.chat_models import MessageContent
 
 # Chat models
 
@@ -41,14 +40,14 @@ class Error(BaseModel):
 class LLMResponse(BaseModel):
     """Client-facing event structure."""
 
-    message_type: MessageType = Field(..., description="Type of the llm message")
-    conversation_id: UUID | None = Field(None, description="UUID of the conversation")
-    text_token: str | None = Field(None, description="Text token from the LLM")
-    structured_content: MessageContent | None = Field(None, description="Structured content of the message")
-    error: Error | None = Field(None, description="Error information")
     message_id: UUID | None = Field(
         None, description="UUID of the message (useful for full assistant message, primarily for internal use)"
     )
+    conversation_id: UUID | None = Field(None, description="UUID of the conversation")
+    message_type: MessageType = Field(..., description="Type of the llm message")
+    text_token: str | None = Field(None, description="Text token from the LLM")
+    structured_content: list[dict[str, Any]] | None = Field(None, description="Structured content of the message")
+    error: Error | None = Field(None, description="Error information")
     text: str | None = Field(None, description="Full text of the message (for full assistant message)")
 
     model_config = {

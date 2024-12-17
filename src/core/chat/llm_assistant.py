@@ -29,10 +29,12 @@ from src.infrastructure.common.decorators import (
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
 from src.models.chat_models import (
+    ContentBlock,
+    ContentBlockType,
     ConversationHistory,
-    MessageContent,
     StandardEvent,
     StandardEventType,
+    TextBlock,
     ToolResultBlock,
     ToolUseBlock,
 )
@@ -159,7 +161,7 @@ class ClaudeAssistant(Model):
                             case "message_stop":
                                 yield self.handle_message_stop(event)
                             case "error":
-                                yield self.handle_error(event)
+                                self.handle_error(event)
 
                     # Get final message
                     full_response_event = await self.handle_full_message(event, stream)
@@ -170,7 +172,7 @@ class ClaudeAssistant(Model):
                     tool_use_block = next(
                         (
                             block
-                            for block in full_response_event.content.blocks
+                            for block in full_response_event.content
                             if hasattr(block, "type") and block.type == "tool_use"
                         ),
                         None,
@@ -197,43 +199,55 @@ class ClaudeAssistant(Model):
     def handle_message_start(self, event: MessageStartEvent) -> StandardEvent:
         """Handle message start event."""
         logger.debug("===== Stream message started =====")
-        return StandardEvent(event_type=StandardEventType.MESSAGE_START, content="")
+        return StandardEvent(
+            event_type=StandardEventType.MESSAGE_START,
+            content=ContentBlock.create_blocks([{"type": ContentBlockType.TEXT, "text": ""}]),
+        )
 
     def handle_text_token(self, event: ContentBlockDeltaEvent) -> StandardEvent:
         """Handle text token event."""
         logger.debug(f"===== Stream text token: {event.text} =====")
-        return StandardEvent(event_type=StandardEventType.TEXT_TOKEN, content=event.text)
+        return StandardEvent(
+            event_type=StandardEventType.TEXT_TOKEN,
+            content=ContentBlock.create_blocks([{"type": ContentBlockType.TEXT, "text": event.text}]),
+        )
 
-    def handle_content_block_start(self, event: ContentBlockStartEvent) -> None:
+    def handle_content_block_start(self, event: ContentBlockStartEvent) -> StandardEvent | None:
         """Handle content block start event."""
         logger.debug("===== Stream content block started =====")
         if event.content_block.type == "tool_use":
+            # Serialize the tool use block
+            tool_use_block = ToolUseBlock(
+                id=event.content_block.id,
+                name=event.content_block.name,
+                input=event.content_block.input,
+            )
             return StandardEvent(
                 event_type=StandardEventType.TOOL_START,
-                content=MessageContent(
-                    blocks=[
-                        ToolUseBlock(
-                            id=event.content_block.id,
-                            name=event.content_block.name,
-                            input=event.content_block.input,
-                        )
-                    ]
-                ),
+                content=[tool_use_block],
             )
+        return None
 
     def handle_content_block_stop(self, event: ContentBlockStopEvent) -> None:
         """Handle content block stop event."""
         logger.debug("===== Stream content block ended =====")
 
-    def handle_error(self, event: MessageStreamEvent) -> StandardEvent:
+    def handle_error(self, event: MessageStreamEvent) -> None:
         """Handle error event."""
         logger.error(f"===== Stream error: {event.error} =====")
-        return StandardEvent(event_type=StandardEventType.ERROR, content=event.error)
+        return StandardEvent(
+            event_type=StandardEventType.ERROR,
+            content=[TextBlock(text=event.error)],
+            is_error=True,
+        )
 
     def handle_message_stop(self, event: MessageStopEvent) -> StandardEvent:
         """Handle message stop event."""
         logger.debug("===== Stream message ended =====")
-        return StandardEvent(event_type=StandardEventType.MESSAGE_STOP, content="")
+        return StandardEvent(
+            event_type=StandardEventType.MESSAGE_STOP,
+            content=[TextBlock(text="")],
+        )
 
     async def handle_full_message(
         self, event: MessageStopEvent, stream: AsyncStream[MessageStreamEvent]
@@ -241,18 +255,26 @@ class ClaudeAssistant(Model):
         """Handle full message event."""
         full_response = await stream.get_final_message()
         logger.debug(f"Full response: {full_response}")
+        content_blocks = []
+        for block_data in full_response.content:
+            if block_data.type == "text":
+                content_blocks.append(TextBlock.model_validate(block_data.model_dump(by_alias=True)))
+            elif block_data.type == "tool_use":
+                content_blocks.append(ToolUseBlock.model_validate(block_data.model_dump(by_alias=True)))
+
         return StandardEvent(
             event_type=StandardEventType.FULL_MESSAGE,
-            content=MessageContent(blocks=full_response.content),  # already a list of content blocks
+            content=content_blocks,
         )
 
     async def handle_tool_use(self, event: ToolUseBlock) -> StandardEvent:
         """Handle tool use event."""
         tool_result = await self.get_tool_result(event.name, event.input, event.id)
 
+        # Serialize the tool result block
         tool_result_event = StandardEvent(
             event_type=StandardEventType.TOOL_RESULT,
-            content=MessageContent(blocks=[tool_result]),
+            content=[tool_result],
         )
         yield tool_result_event
         logger.debug(f"Tool result: {tool_result_event.content}")

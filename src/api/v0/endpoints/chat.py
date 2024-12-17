@@ -46,6 +46,7 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
                 yield event.model_dump_json()
 
         return EventSourceResponse(event_stream(), media_type="text/event-stream")
+
     except NonRetryableLLMError as e:
         raise HTTPException(
             status_code=500, detail=f"A non-retryable error occurred in the system:: {str(e)}. We are on it."

@@ -15,7 +15,6 @@ from src.infrastructure.common.logger import get_logger
 from src.models.chat_models import (
     Conversation,
     ConversationHistory,
-    MessageContent,
     Role,
     StandardEvent,
     StandardEventType,
@@ -56,44 +55,54 @@ class ChatService:
                 match event.event_type:
                     # tokens -> stream to user
                     case StandardEventType.TEXT_TOKEN:
-                        yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text_token=event.content)
+                        yield LLMResponse(message_type=MessageType.TEXT_TOKEN, text_token=event.content[0].text)
                     # tool use -> just note them for now
                     case StandardEventType.TOOL_START:
-                        yield LLMResponse(message_type=MessageType.TOOL_USE, structured_content=event.content)
+                        yield LLMResponse(
+                            message_type=MessageType.TOOL_USE,
+                            structured_content=[
+                                block.model_dump(by_alias=True, exclude_none=True) for block in event.content
+                            ],
+                        )
                     case StandardEventType.TOOL_RESULT:
                         # add tool result to conversation
-                        await self.conversation_manager.add_message(
+                        await self.conversation_manager.add_message_to_conversation(
                             conversation_id=conversation_id, role=Role.USER, content=event.content
                         )
                         logger.debug(f"Added tool result to conversation: {event.content}")
-                        yield LLMResponse(message_type=MessageType.TOOL_RESULT, structured_content=event.content)
+                        yield LLMResponse(
+                            message_type=MessageType.TOOL_RESULT,
+                            structured_content=[
+                                block.model_dump(by_alias=True, exclude_none=True) for block in event.content
+                            ],
+                        )
                     # message stop -> this is just a signal
                     case StandardEventType.MESSAGE_STOP:
                         logger.debug("Message stop")
                     # final message -> add to conversation
                     case StandardEventType.FULL_MESSAGE:
                         # Add pending assistant message to conversation
-                        assistant_message = await self.conversation_manager.add_pending_message(
-                            conversation_id=conversation_id, role=Role.ASSISTANT, content=event.content
+                        assistant_message = await self.conversation_manager.add_message_to_pending_conversation(
+                            conversation_id=conversation_id,
+                            role=Role.ASSISTANT,
+                            content=event.content,
                         )
-                        logger.debug(f"Added assistant message to conversation: {event.content}")
 
                         # Yield the full message text
                         yield LLMResponse(
                             message_id=assistant_message.message_id,
                             message_type=MessageType.FULL_MESSAGE,
-                            structured_content=event.content,
+                            structured_content=[
+                                block.model_dump(by_alias=True, exclude_none=True) for block in event.content
+                            ],
                         )
-                        # Safer logging
-                        text_blocks = [block.text for block in event.content.blocks if isinstance(block, TextBlock)]
-                        logger.debug(f"Text blocks in assistant message: {text_blocks}")
 
             # Once all is done and said, commit pending messages
             await self.conversation_manager.commit_pending(conversation_id)
 
             # Yield DONE event
             yield LLMResponse(message_type=MessageType.DONE, text="===Streaming complete===")
-            logger.debug("Yielded done message")
+            logger.debug("Message DONE event yielded")
 
         except RetryableLLMError as e:
             # On error, rollback pending messages
@@ -125,8 +134,8 @@ class ChatService:
 
         # 2. Add user message to pending state
         conversation_id = conversation.conversation_id
-        await self.conversation_manager.add_pending_message(
-            conversation_id=conversation_id, role=Role.USER, content=MessageContent.from_str(message)
+        await self.conversation_manager.add_message_to_pending_conversation(
+            conversation_id=conversation_id, role=Role.USER, content=[TextBlock(text=message)]
         )
 
         # 3. Combine stable + pending messages for Claude
