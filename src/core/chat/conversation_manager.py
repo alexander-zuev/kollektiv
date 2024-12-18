@@ -29,27 +29,25 @@ class ConversationManager:
             conversation_id: Optional UUID for the conversation. If None, creates a new conversation
                            with a generated UUID.
         """
+        # Create new conversation if no ID is provided
         if conversation_id is None:
-            # Create new conversation with auto-generated UUID
             conversation = await self.create_conversation()
             logger.info(f"Created new conversation: {conversation.conversation_id}")
             return conversation
 
-        if conversation_id not in self.conversations:
-            # Create new conversation with provided UUID
-            conversation = await self.create_conversation(conversation_id=conversation_id)
-            self.conversations[conversation_id] = conversation
-            logger.info(f"Created new conversation: {conversation.conversation_id}")
-            return conversation
-
-        return self.conversations[conversation_id]
+        # Get existing conversation
+        else:
+            conversation = self.conversations.get(conversation_id)
+            if not conversation:
+                raise ValueError(f"Conversation {conversation_id} not found")
+        return conversation
 
     async def create_conversation(self, conversation_id: UUID | None = None) -> ConversationHistory:
         """Create a new conversation history with auto-generated UUID."""
         conversation = (
             ConversationHistory(conversation_id=conversation_id) if conversation_id else ConversationHistory()
         )
-        # Save to memory using the auto-generated ID
+        # Add to in-memory storage
         self.conversations[conversation.conversation_id] = conversation
         return conversation
 

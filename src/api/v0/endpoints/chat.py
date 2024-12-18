@@ -42,7 +42,7 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
     try:
 
         async def event_stream() -> AsyncIterator[str]:
-            async for event in chat_service.get_response(user_id=request.user_id, message=request.message):
+            async for event in chat_service.get_response(user_message=request):
                 yield event.model_dump_json()
 
         return EventSourceResponse(event_stream(), media_type="text/event-stream")
