@@ -5,14 +5,14 @@ from src.api.v0.schemas.chat_schemas import ConversationSummary
 from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.storage.data_repository import DataRepository
-from src.models.base_models import BaseDbModel
-from src.models.chat_models import Conversation
+from src.models.base_models import SupabaseModel
+from src.models.chat_models import Conversation, ConversationHistory, ConversationMessage
 from src.models.content_models import DataSource, Document, SourceSummary
 from src.models.job_models import Job
 
 logger = get_logger()
 
-T = TypeVar("T", bound=BaseDbModel)
+T = TypeVar("T", bound=SupabaseModel)
 
 
 class DataService:
@@ -148,3 +148,21 @@ class DataService:
         """Get a single conversation by its ID in accordance with RLS policies."""
         conversation = await self.repository.find_by_id(Conversation, conversation_id)
         return conversation
+
+    async def get_conversation_history(self, conversation_id: UUID) -> ConversationHistory:
+        """Get a single conversation history by its ID in accordance with RLS policies."""
+        # There is no ConversationHistory model, so we need to find the Conversation + Find all messages
+        # And build the model
+
+        # Find conversation first
+        conversation = await self.get_conversation(conversation_id=conversation_id)
+        # Find messages next
+        messages = await self.repository.find(ConversationMessage, filters={"conversation_id": conversation_id})
+        # Create ConversationHistory model
+        conversation_history = ConversationHistory(
+            conversation_id=conversation_id,
+            messages=messages,
+            conversation=conversation,
+        )
+        # Return it
+        return conversation_history

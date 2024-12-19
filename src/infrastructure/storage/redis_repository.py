@@ -1,13 +1,11 @@
-import asyncio
-from typing import TypeVar
-from uuid import uuid4
+from typing import Any, TypeVar
+from uuid import UUID
 
 from pydantic import BaseModel
 from redis.asyncio import Redis
 
 from src.infrastructure.common.logger import get_logger
-from src.infrastructure.external.redis_client import RedisClient
-from src.models.chat_models import ConversationHistory, ConversationMessage, Role, TextBlock
+from src.models.chat_models import ConversationHistory, ConversationMessage
 
 logger = get_logger()
 
@@ -23,10 +21,31 @@ class RedisRepository:
 
     def __init__(self, client: Redis):
         self.client = client
-        self.conversation_prefix = "conversations:{conversation_id}:history"
-        self.message_prefix = "conversations:{conversation_id}:pending_messages"
-        self.conversation_ttl = 60 * 60 * 24  # 1 day
-        self.message_ttl = 60 * 60  # 1 hour
+        self.prefix_config = {
+            ConversationHistory: "conversations:{conversation_id}:history",
+            ConversationMessage: "conversations:{conversation_id}:pending_messages",
+        }
+        self.ttl_config = {
+            ConversationHistory: 60 * 60 * 24,  # 1 day
+            ConversationMessage: 60 * 60,  # 1 hour
+        }
+
+    def _get_prefix(self, model_class: type[T], **kwargs: Any) -> str:
+        """Get the prefix for the model."""
+        try:
+            prefix_template = self.prefix_config[model_class]
+            logger.debug(f"Prefix template: {prefix_template}")
+            return prefix_template.format(**kwargs)
+        except KeyError:
+            logger.error(f"No key prefix defined for model class: {model_class.__name__}", exc_info=True)
+            raise ValueError(f"No key prefix defined for model class: {model_class.__name__}")
+
+    def _get_ttl(self, model_class: type[T]) -> int:
+        """Get TTL for the model."""
+        try:
+            return self.ttl_config[model_class]
+        except KeyError:
+            raise ValueError(f"No TTL defined for model class: {model_class.__name__}")
 
     def _to_json(self, model: T) -> str:
         """Convert a model to a JSON string."""
@@ -37,49 +56,128 @@ class RedisRepository:
         """Convert a JSON string to a model."""
         return model_class.model_validate_json(json_str)
 
-    async def set_method(self, key: str, value: T) -> None:
+    async def set_method(self, key: UUID, value: T) -> None:
         """Set a value in the Redis database."""
-        json_str = self._to_json(value)
-        await self.client.set(key, json_str, ex=self.conversation_ttl)
-        logger.info(f"Set {key} to {json_str} with expire {self.conversation_ttl}")
+        prefix = self._get_prefix(type(value), conversation_id=key)
+        ttl = self._get_ttl(type(value))
 
-    async def get_method(self, key: str, model_class: type[T]) -> T | None:
+        json_str = self._to_json(value)
+        await self.client.set(prefix, json_str, ex=ttl)
+        logger.info(f"Set {prefix} to {json_str} with expire {ttl}")
+
+    async def get_method(self, key: UUID, model_class: type[T]) -> T | None:
         """Get a value from the Redis database."""
-        data = await self.client.get(key)
+        prefix = self._get_prefix(model_class, conversation_id=key)
+        data = await self.client.get(prefix)
         if data is None:
             return None
         return self._from_json(data, model_class)
 
-    async def rpush_method(self, key: str, value: T) -> None:
+    async def rpush_method(self, key: UUID, value: T) -> None:
         """Push a value to the end of a list."""
+        prefix = self._get_prefix(type(value), conversation_id=key)
+        ttl = self._get_ttl(type(value))
         json_str = self._to_json(value)
-        await self.client.rpush(key, json_str)
-        await self.client.expire(key, self.message_ttl)
-        logger.info(f"Rpush {key} with expire {self.message_ttl}")
+        await self.client.rpush(prefix, json_str)
+        await self.client.expire(prefix, ttl)
+        logger.info(f"Rpush {prefix} with expire {ttl}")
 
-    async def lrange_method(self, key: str, start: int, end: int, model_class: type[T]) -> list[T]:
+    async def lrange_method(self, key: UUID, start: int, end: int, model_class: type[T]) -> list[T]:
         """Retrieve a range of elements from a list."""
-        items = await self.client.lrange(key, start, end)
+        prefix = self._get_prefix(model_class, conversation_id=key)
+        items = await self.client.lrange(prefix, start, end)
         return [self._from_json(item, model_class) for item in items]
 
-    async def delete_method(self, key: str) -> None:
-        """Delete a key from the Redis database."""
-        await self.client.delete(key)
-        logger.info(f"Deleted {key}")
+    async def delete_method(self, key: UUID, model_class: type[T]) -> None:
+        """
+        Delete a key from the Redis database."""
+        prefix = self._get_prefix(model_class=model_class, conversation_id=key)
+        await self.client.delete(prefix)
+        logger.info(f"Deleted {prefix}")
 
-    async def lpop_method(self, key: str, model_class: type[T]) -> T | None:
+    async def lpop_method(self, key: UUID, model_class: type[T]) -> T | None:
         """Pop the first element from a list."""
-        data = await self.client.lpop(key)
+        prefix = self._get_prefix(model_class, conversation_id=key)
+        data = await self.client.lpop(prefix)
         if data is None:
             return None
-        return self._from_json(data.decode("utf-8"), model_class)
+        return self._from_json(data, model_class)
 
-    async def rpop_method(self, key: str, model_class: type[T]) -> T | None:
+    async def rpop_method(self, key: UUID, model_class: type[T]) -> T | None:
         """Pop the last element from a list."""
-        data = await self.client.rpop(key)
+        prefix = self._get_prefix(model_class, conversation_id=key)
+        data = await self.client.rpop(prefix)
         if data is None:
             return None
-        return self._from_json(data.decode("utf-8"), model_class)
+        return self._from_json(data, model_class)
+
+
+# async def test() -> None:
+#     client = RedisClient().client
+#     redis_repo = RedisRepository(client)
+
+#     conversation_prefix = redis_repo._get_prefix(ConversationHistory, conversation_id=uuid4())
+#     message_prefix = redis_repo._get_prefix(ConversationMessage, conversation_id=uuid4())
+
+#     print(conversation_prefix)
+#     print(message_prefix)
+
+#     some_key = uuid4()
+#     content_block = TextBlock(text="Hello, how are you?")
+#     conversation_example = ConversationHistory(
+#         conversation_id=some_key,
+#         messages=[
+#             ConversationMessage(
+#                 message_id=some_key,
+#                 role=Role.USER,
+#                 content=[content_block],
+#             )
+#         ],
+#     )
+
+#     await redis_repo.set_method(some_key, conversation_example)
+#     result = await redis_repo.get_method(some_key, ConversationHistory)
+#     print(result)
+
+#     message_example = ConversationMessage(
+#         message_id=some_key,
+#         role=Role.USER,
+#         content=[content_block],
+#     )
+#     message_example2 = ConversationMessage(
+#         message_id=some_key,
+#         role=Role.ASSISTANT,
+#         content=[content_block],
+#     )
+
+#     # await redis_repo.rpush_method(some_key, message_example)
+#     # await redis_repo.rpush_method(some_key, message_example2)
+
+#     # result = await redis_repo.lrange_method(some_key, 0, -1, ConversationMessage)
+#     # print(f"Before delete: {result}")
+
+#     await redis_repo.delete_method(some_key, ConversationMessage)
+
+#     # result = await redis_repo.get_method(some_key, ConversationMessage)
+#     # print(f"After delete: {result}")
+
+#     await redis_repo.rpush_method(some_key, message_example)
+#     await redis_repo.rpush_method(some_key, message_example2)
+
+#     popped_item = await redis_repo.lpop_method(some_key, ConversationMessage)
+#     print(f"After lpop: {popped_item}")
+
+#     result = await redis_repo.lrange_method(some_key, 0, -1, ConversationMessage)
+#     print(f"After lpop: {result}")
+
+#     popped_item = await redis_repo.rpop_method(some_key, ConversationMessage)
+#     print(f"After rpop: {popped_item}")
+
+#     result = await redis_repo.lrange_method(some_key, 0, -1, ConversationMessage)
+#     print(f"After rpop: {result}")
+
+
+# asyncio.run(test())
 
 
 # uuid = uuid4()
@@ -126,7 +224,7 @@ class RedisRepository:
 #     result = await repo.lrange_method("conversations:1:pending_messages", 0, -1, ConversationMessage)
 #     for message in result:
 #         print(f"Message: {message.model_dump_json()}")
-#     await repo.delete_method("conversations:1:pending_messages")
+#     await repo.delete_method("conversations:1:pending_messages", ConversationMessage)
 
 
 # asyncio.run(test())

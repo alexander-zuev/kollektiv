@@ -53,6 +53,12 @@ class InvalidWebhookEventError(WebhookError):
 
 
 # Chat-related errors
+class ConversationNotFoundError(KollektivError):
+    """Conversation not found."""
+
+    pass
+
+
 # Content-related errors
 class DataSourceError(KollektivError):
     """Exception raised for errors related to Data Source operations."""

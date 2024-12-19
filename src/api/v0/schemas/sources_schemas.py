@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from src.models.base_models import BaseDbModel
+from src.models.base_models import SupabaseModel
 from src.models.content_models import DataSource, DataSourceType, SourceStatus
 
 
@@ -58,7 +58,7 @@ class ContentSourceConfig(BaseModel):
         return v
 
 
-class AddContentSourceRequest(BaseDbModel):
+class AddContentSourceRequest(SupabaseModel):
     """
     Request model for adding a new content source.
 

@@ -5,10 +5,10 @@ from enum import Enum
 from typing import Any, ClassVar, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.infrastructure.common.logger import get_logger
-from src.models.base_models import BaseDbModel
+from src.models.base_models import SupabaseModel
 
 logger = get_logger()
 
@@ -115,7 +115,7 @@ class Role(str, Enum):
     USER = "user"
 
 
-class ConversationMessage(BaseDbModel):
+class ConversationMessage(SupabaseModel):
     """A message in a conversation between a user and an LLM."""
 
     message_id: UUID = Field(
@@ -124,7 +124,7 @@ class ConversationMessage(BaseDbModel):
     )
     conversation_id: UUID | None = Field(None, description="FK reference to a conversation.")
     role: Role = Field(..., description="Role of the message sender")
-    content: list[SerializeAsAny[ContentBlock]] = Field(..., description="list of content blocks")
+    content: list[TextBlock | ToolUseBlock | ToolResultBlock] = Field(..., description="list of content blocks")
 
     _db_config: ClassVar[dict] = {"schema": "chat", "table": "conversation_messages", "primary_key": "message_id"}
 
@@ -137,7 +137,7 @@ class ConversationMessage(BaseDbModel):
 
 
 # Conversation
-class Conversation(BaseDbModel):
+class Conversation(SupabaseModel):
     """Domain model for a conversation in chat.."""
 
     conversation_id: UUID = Field(default_factory=uuid4, description="UUID of the conversation")

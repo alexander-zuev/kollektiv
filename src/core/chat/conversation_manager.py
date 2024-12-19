@@ -3,10 +3,12 @@ from uuid import UUID
 
 import tiktoken
 from pydantic import ValidationError
-from redis import Redis
 
+from src.core._exceptions import ConversationNotFoundError
 from src.infrastructure.common.logger import get_logger
+from src.infrastructure.storage.redis_repository import RedisRepository
 from src.models.chat_models import ContentBlock, ConversationHistory, ConversationMessage, Role
+from src.services.data_service import DataService
 
 logger = get_logger()
 
@@ -18,16 +20,18 @@ class ConversationManager:
         self,
         max_tokens: int = 200000,
         tokenizer: str = "cl100k_base",
-        redis_client: Redis | None = None,
+        redis_repository: RedisRepository | None = None,
+        data_service: DataService | None = None,
     ):
         self.max_tokens = max_tokens
         self.tokenizer = tiktoken.get_encoding(tokenizer)
         # Redis
-        self.redis_client = redis_client
+        self.redis_repository = redis_repository
         # Main conversation storage
         self.conversations: dict[UUID, ConversationHistory] = {}
         # Temporary storage for messages during tool use
         self.pending_messages: dict[UUID, list[ConversationMessage]] = {}
+        self.data_service = data_service
 
     async def get_or_create_conversation(self, conversation_id: UUID | None = None) -> ConversationHistory:
         """
@@ -38,26 +42,35 @@ class ConversationManager:
                            with a generated UUID.
         """
         # Create new conversation if no ID is provided
-        if conversation_id is None:
-            conversation = await self.create_conversation()
-            logger.info(f"Created new conversation: {conversation.conversation_id}")
-            return conversation
+        try:
+            if conversation_id is None:
+                conversation = await self.create_conversation()
+                logger.info(f"Created new conversation: {conversation.conversation_id}")
+                return conversation
 
-        # Get existing conversation
-        else:
-            conversation = self.conversations.get(conversation_id)
-            if not conversation:
-                raise ValueError(f"Conversation {conversation_id} not found")
-        return conversation
+            # Try to get existing conversation
+            else:
+                # Try redis first
+                conversation = await self.redis_repository.get_method(conversation_id, ConversationHistory)
+                if not conversation:
+                    conversation = await self.data_service.get_conversation_history(conversation_id)
+                return conversation
+        except ConversationNotFoundError:
+            logger.error(f"Conversation with id {conversation_id} not found", exc_info=True)
+            raise
 
     async def create_conversation(self, conversation_id: UUID | None = None) -> ConversationHistory:
         """Create a new conversation history with auto-generated UUID."""
-        conversation = (
-            ConversationHistory(conversation_id=conversation_id) if conversation_id else ConversationHistory()
-        )
-        # Add to in-memory storage
-        self.conversations[conversation.conversation_id] = conversation
+        if conversation_id is None:
+            conversation = ConversationHistory()
+        else:
+            conversation = ConversationHistory(conversation_id=conversation_id)
+
+        # Add empty conversation to Redis
+        self.redis_repository.set_method(conversation.conversation_id, conversation)
+        logger.info(f"Created new conversation: {conversation.conversation_id}")
         return conversation
+        # Do I need to save it to Supabase at this time?
 
     async def add_message_to_conversation(self, conversation_id: UUID, role: Role, content: list[ContentBlock]) -> None:
         """Add a message directly to conversation history."""

@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, PrivateAttr
 
-from src.models.base_models import BaseDbModel
+from src.models.base_models import SupabaseModel
 
 
 class JobStatus(str, Enum):
@@ -55,7 +55,7 @@ class CrawlJobDetails(BaseModel):
     url: str = Field(..., description="URL that was crawled")
 
 
-class Job(BaseDbModel):
+class Job(SupabaseModel):
     """Track crawl job status and progress"""
 
     # General job info

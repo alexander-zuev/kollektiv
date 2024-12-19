@@ -61,7 +61,9 @@ class ServiceContainer:
 
             self.claude_assistant = ClaudeAssistant(vector_db=self.vector_db, retriever=self.retriever)
 
-            self.conversation_manager = ConversationManager(redis_client=self.redis_client)
+            self.conversation_manager = ConversationManager(
+                redis_repository=self.redis_repository, data_service=self.data_service
+            )
 
             self.chat_service = ChatService(
                 claude_assistant=self.claude_assistant,

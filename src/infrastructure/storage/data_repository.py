@@ -4,10 +4,10 @@ from uuid import UUID
 from src.infrastructure.common.decorators import supabase_operation
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.external.supabase_client import SupabaseClient
-from src.models.base_models import BaseDbModel
+from src.models.base_models import SupabaseModel
 
 logger = get_logger()
-T = TypeVar("T", bound=BaseDbModel)  # define a generic type for the repository
+T = TypeVar("T", bound=SupabaseModel)  # define a generic type for the repository
 
 
 class DataRepository:
