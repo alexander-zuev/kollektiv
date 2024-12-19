@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any, ClassVar, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 
 from src.infrastructure.common.logger import get_logger
 from src.models.base_models import BaseDbModel
@@ -124,7 +124,7 @@ class ConversationMessage(BaseDbModel):
     )
     conversation_id: UUID | None = Field(None, description="FK reference to a conversation.")
     role: Role = Field(..., description="Role of the message sender")
-    content: list[ContentBlock] = Field(..., description="list of content blocks")
+    content: list[SerializeAsAny[ContentBlock]] = Field(..., description="list of content blocks")
 
     _db_config: ClassVar[dict] = {"schema": "chat", "table": "conversation_messages", "primary_key": "message_id"}
 

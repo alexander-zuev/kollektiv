@@ -51,8 +51,6 @@ class Settings(BaseSettings):
         alias="PORT",  # Railway injects PORT environment variable
         description="API port - defaults to 8000, but can be overridden by Railway's PORT variable",
     )
-    chainlit_host: str = Field("127.0.0.1", description="Chainlit host")
-    chainlit_port: int = Field(8001, description="Chainlit port")
     log_level: str = Field("debug", description="Logging level")
 
     # Crawler configuration
@@ -99,8 +97,12 @@ class Settings(BaseSettings):
         description="Sentry DSN",
     )
 
-    # Redis
-    redis_url: str = Field(..., alias="REDIS_URL", description="Redis URL")
+    # Redis setup
+    redis_host: str | None = Field(None, alias="REDIS_HOST", description="Redis host")
+    redis_port: int | None = Field(None, alias="REDIS_PORT", description="Redis port")
+    redis_user: str | None = Field(None, alias="REDIS_USER", description="Redis user")
+    redis_password: str | None = Field(None, alias="REDIS_PASSWORD", description="Redis password")
+    redis_url: str | None = Field(None, alias="REDIS_URL", description="Redis url")
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),

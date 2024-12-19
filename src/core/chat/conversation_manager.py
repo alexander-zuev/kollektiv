@@ -3,6 +3,7 @@ from uuid import UUID
 
 import tiktoken
 from pydantic import ValidationError
+from redis import Redis
 
 from src.infrastructure.common.logger import get_logger
 from src.models.chat_models import ContentBlock, ConversationHistory, ConversationMessage, Role
@@ -13,9 +14,16 @@ logger = get_logger()
 class ConversationManager:
     """Manages conversation state, including in-memory storage and token management."""
 
-    def __init__(self, max_tokens: int = 200000, tokenizer: str = "cl100k_base"):
+    def __init__(
+        self,
+        max_tokens: int = 200000,
+        tokenizer: str = "cl100k_base",
+        redis_client: Redis | None = None,
+    ):
         self.max_tokens = max_tokens
         self.tokenizer = tiktoken.get_encoding(tokenizer)
+        # Redis
+        self.redis_client = redis_client
         # Main conversation storage
         self.conversations: dict[UUID, ConversationHistory] = {}
         # Temporary storage for messages during tool use
