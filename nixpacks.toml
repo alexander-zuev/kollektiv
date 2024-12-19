@@ -1,6 +1,6 @@
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.12.7"
-NIXPACKS_POETRY_VERSION = "1.8.5"  
+NIXPACKS_POETRY_VERSION = "1.8.5"
 
 [phases.setup]
 # Specifies the required Python version
