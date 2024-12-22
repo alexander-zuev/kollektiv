@@ -65,17 +65,6 @@ jobs:
     name: Unit and Integration Tests
     runs-on: ubuntu-latest
 
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - uses: actions/checkout@v4
 
@@ -92,6 +81,9 @@ jobs:
         run: |
           poetry lock --no-update
           poetry install --with dev --no-interaction --no-root
+
+      - name: Start Redis
+        run: docker-compose -f scripts/deps/docker-compose.yml up -d
 
       - name: Run all tests
         id: all-tests
@@ -112,3 +104,7 @@ jobs:
           file: coverage.xml
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Stop Redis
+        if: always()
+        run: docker-compose -f scripts/deps/docker-compose.yml down

@@ -33,7 +33,7 @@ class TestRedisRepository:
         assert messages[0].role == sample_message.role
 
         # Test delete
-        await redis_repository.delete_method(sample_uuid)
+        await redis_repository.delete_method(sample_uuid, ConversationMessage)
         messages = await redis_repository.lrange_method(sample_uuid, 0, -1, ConversationMessage)
         assert len(messages) == 0
 

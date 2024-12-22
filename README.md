@@ -16,6 +16,7 @@ This project aims to allow LLMs to tap into the most up-to-date knowledge in 2 c
 worry about incorrect replies, hallucinations or inaccuracies when working with the best LLMs.
 
 ## ❓Why?
+
 This project was born out of a **personal itch** - whenever a new feature of my favorite library comes up, I know I
 can't rely on the LLM to help me build with it - because it simply doesn't know about it!
 
@@ -33,12 +34,15 @@ Imagine your LLM could intelligently decide when it needs to check the documenta
 accurate reply?
 
 ## 🎯 Goal
+
 Meet Kollektiv -> an open-source RAG app that helps you easily:
+
 - parse the docs of your favorite libraries
 - efficiently stores and embeds them in a local vector storage
 - sets up an LLM chat which you can rely on
 
 **Note** this is v.0.1.6 and reliability of the system can be characterized as following:
+
 - in 50% of the times it works every time!
 
 So do let me know if you are experiencing issues and I'll try to fix them.
@@ -64,12 +68,12 @@ So do let me know if you are experiencing issues and I'll try to fix them.
   - OpenAI text-embedding-3-small (embeddings)
   - Anthropic Claude 3.5 Sonnet (chat)
   - Cohere (re-ranking)
-- **UI**: Chainlit
 - **Additional**: tiktoken, pydantic, pytest, ruff
 
 ## 🚀 Quick Start
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/alexander-zuev/kollektiv.git
    cd kollektiv
@@ -77,6 +81,7 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 
 2. **Set up environment variables:**
    Create a `.env` file in the project root with the following:
+
    ```bash
    FIRECRAWL_API_KEY="your_firecrawl_api_key"
    OPENAI_API_KEY="your_openai_api_key"
@@ -85,18 +90,21 @@ So do let me know if you are experiencing issues and I'll try to fix them.
    ```
 
 3. **Install dependencies:**
+
    ```bash
    poetry install
    ```
 
-4. **Run the application:**
+4. **Start the application and Redis:**
    ```bash
    poetry run kollektiv
    ```
+   This command will start the FastAPI application and a Redis server using Docker Compose. The `docker-compose.yml` file is located at `scripts/external_deps/docker-compose.yml`.
 
 ## 💡 Usage
 
 1. **Start the Application:**
+
    ```bash
    # Run both API and Chainlit UI
    poetry run kollektiv
@@ -106,15 +114,19 @@ So do let me know if you are experiencing issues and I'll try to fix them.
    ```
 
 2. **Add Documentation:**
+
    ```bash
    @docs add https://your-docs-url.com
    ```
+
    The system will guide you through:
+
    - Setting crawling depth
    - Adding exclude patterns (optional)
    - Processing and embedding content
 
 3. **Manage Documents:**
+
    ```bash
    @docs list                  # List all documents
    @docs remove [ID]          # Remove a document
@@ -135,10 +147,13 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 - Exclude patterns must start with `/`
 
 ## 🛣️ Roadmap
+
 For a brief roadmap please check out [project wiki page](https://github.com/alexander-zuev/kollektiv/wiki).
 
 ## 📈 Performance Metrics
+
 Evaluation is currently done using `ragas` library. There are 2 key parts assessed:
+
 1. End-to-end generation
    - Faithfulness
    - Answer relevancy
@@ -160,6 +175,7 @@ See the [LICENSE](LICENSE.md) file for the full license text and additional cond
 ## Project Renaming Notice
 
 The project has been renamed from **OmniClaude** to **Kollektiv** to:
+
 - avoid confusion / unintended copyright infringement of Anthropic
 - emphasize the goal to become a tool to enhance collaboration through simplifying access to knowledge
 - overall cool name (isn't it?)

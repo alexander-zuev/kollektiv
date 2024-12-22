@@ -14,10 +14,10 @@ from src.core.chat.llm_assistant import ClaudeAssistant
 from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.config.settings import settings
+from src.infrastructure.external.supabase_client import SupabaseClient
 from src.infrastructure.service_container import ServiceContainer
 from src.infrastructure.storage.data_repository import DataRepository
 from src.infrastructure.storage.redis_repository import RedisRepository
-from src.infrastructure.storage.supabase_client import SupabaseClient
 from src.models.chat_models import (
     ConversationHistory,
     ConversationMessage,
@@ -246,7 +246,7 @@ def redis_repository(mock_redis):
     return RedisRepository(mock_redis)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 async def redis_test_client():
     """Real Redis client for integration tests."""
     redis = Redis(host=settings.redis_host, port=settings.redis_port)
