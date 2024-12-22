@@ -101,7 +101,10 @@ def application_level_handler(func: Callable) -> Callable[..., T]:
 
 def anthropic_error_handler(func: Callable) -> Callable[..., T]:
     """
-    Apply error handling for various exceptions encountered in Anthropic API calls.
+    Applies error handling for various exceptions encountered during Anthropic API calls.
+
+    This decorator catches and handles specific exceptions from the Anthropic API,
+    raising custom exceptions for retryable and non-retryable errors.
 
     Args:
         func (Callable): The function to be wrapped with error handling.
@@ -110,16 +113,8 @@ def anthropic_error_handler(func: Callable) -> Callable[..., T]:
         Callable: A wrapper function that includes error handling.
 
     Raises:
-        AuthenticationError: If authentication fails.
-        BadRequestError: If the request is invalid.
-        PermissionDeniedError: If permission is denied.
-        NotFoundError: If the resource is not found.
-        RateLimitError: If the rate limit is exceeded.
-        APIConnectionError: For API connection issues, including timeout errors.
-        InternalServerError: If there's an internal server error.
-        APIError: For unexpected API errors.
-        AnthropicError: For unexpected Anthropic-specific errors.
-        Exception: For any other unexpected errors.
+        RetryableLLMError: For errors that can be retried, such as rate limits or timeouts.
+        NonRetryableLLMError: For errors that cannot be retried, such as authentication or bad requests.
     """
 
     @functools.wraps(func)
@@ -156,7 +151,8 @@ def anthropic_error_handler(func: Callable) -> Callable[..., T]:
 
 
 def supabase_operation(func: Callable[P, Coroutine[Any, Any, RT]]) -> Callable[P, Coroutine[Any, Any, RT]]:
-    """Decorator to handle common Supabase operations and errors.
+    """
+    Handles common Supabase operations and errors.
 
     This decorator catches common exceptions that can occur during Supabase
     operations, such as database errors, entity not found errors, and
@@ -167,6 +163,11 @@ def supabase_operation(func: Callable[P, Coroutine[Any, Any, RT]]) -> Callable[P
 
     Returns:
         The decorated function.
+
+    Raises:
+        DatabaseError: If a database error occurs.
+        EntityNotFoundError: If an entity is not found.
+        EntityValidationError: If an entity fails validation.
     """
 
     @wraps(func)

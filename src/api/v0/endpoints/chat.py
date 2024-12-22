@@ -9,8 +9,8 @@ from src.api.dependencies import ChatServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
 from src.api.v0.schemas.chat_schemas import (
+    ChatResponse,
     ConversationListResponse,
-    LLMResponse,
     UserMessage,
 )
 from src.core._exceptions import DatabaseError, EntityNotFoundError, NonRetryableLLMError, RetryableLLMError
@@ -26,9 +26,9 @@ logger = get_logger()
 
 @chat_router.post(
     Routes.V0.Chat.CHAT,
-    response_model=LLMResponse,
+    response_model=ChatResponse,
     responses={
-        200: {"model": LLMResponse},
+        200: {"model": ChatResponse},
         400: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
@@ -40,10 +40,11 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
     Returns Server-Sent Events with tokens.
     """
     try:
+        logger.debug(f"Request for debugging: {request.model_dump(serialize_as_any=True)}")
 
         async def event_stream() -> AsyncIterator[str]:
             async for event in chat_service.get_response(user_message=request):
-                yield event.model_dump_json()
+                yield event.model_dump_json(serialize_as_any=True)
 
         return EventSourceResponse(event_stream(), media_type="text/event-stream")
 

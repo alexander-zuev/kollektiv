@@ -1,6 +1,6 @@
 from unittest.mock import Mock, patch
 
-from src.core.chat.claude_assistant import ConversationHistory
+from src.models.chat_models import ConversationHistory
 
 
 def test_claude_assistant_initialization(claude_assistant_with_mock):

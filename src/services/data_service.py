@@ -1,8 +1,10 @@
+from datetime import UTC, datetime
 from typing import Any, TypeVar
 from uuid import UUID
 
 from src.api.v0.schemas.chat_schemas import ConversationSummary
 from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
+from src.core._exceptions import ConversationNotFoundError
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.storage.data_repository import DataRepository
 from src.models.base_models import SupabaseModel
@@ -151,18 +153,46 @@ class DataService:
 
     async def get_conversation_history(self, conversation_id: UUID) -> ConversationHistory:
         """Get a single conversation history by its ID in accordance with RLS policies."""
-        # There is no ConversationHistory model, so we need to find the Conversation + Find all messages
-        # And build the model
+        try:
+            # Find messages next
+            messages = await self.repository.find(ConversationMessage, filters={"conversation_id": conversation_id})
+            # Create ConversationHistory model
+            conversation_history = ConversationHistory(
+                messages=messages,
+            )
+            # Return it
+            return conversation_history
+        except ConversationNotFoundError:
+            logger.error(f"Conversation with id {conversation_id} not found", exc_info=True)
+            raise ConversationNotFoundError(f"Conversation with id {conversation_id} not found") from e
 
-        # Find conversation first
-        conversation = await self.get_conversation(conversation_id=conversation_id)
-        # Find messages next
-        messages = await self.repository.find(ConversationMessage, filters={"conversation_id": conversation_id})
-        # Create ConversationHistory model
-        conversation_history = ConversationHistory(
-            conversation_id=conversation_id,
-            messages=messages,
-            conversation=conversation,
-        )
-        # Return it
-        return conversation_history
+    async def update_conversation_supabase(
+        self, history: ConversationHistory, messages: list[ConversationMessage]
+    ) -> None:
+        """Update conversation in Supabase."""
+        await self.update_conversation(history, messages)
+        await self.save_messages(messages)
+
+    async def update_conversation(self, history: ConversationHistory, messages: list[ConversationMessage]) -> None:
+        """Update conversation in Supabase."""
+        # Extract message IDs from the new messages
+        new_message_ids = [message.message_id for message in messages]
+
+        # Get the current conversation
+        conversation = await self.get_conversation(history.conversation_id)
+
+        # Append new message IDs to existing message IDs
+        conversation.message_ids.extend(new_message_ids)
+        conversation.token_count = history.token_count
+        conversation.updated_at = datetime.now(UTC)
+
+        # Save updated conversation
+        await self.repository.save(conversation)
+
+    async def save_messages(self, messages: list[ConversationMessage]) -> None:
+        """Save messages to Supabase."""
+        await self.repository.save(messages)
+
+    async def save_conversation(self, conversation: Conversation) -> None:
+        """Save conversation to Supabase."""
+        await self.repository.save(conversation)

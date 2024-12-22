@@ -155,7 +155,7 @@ class DatabaseError(NonRetryableError):
         self,
         error_message: str,
         operation: str,
-        entity_type: str,
+        entity_type: str | None = None,
         details: dict | None = None,
         cause: Exception | None = None,
     ):

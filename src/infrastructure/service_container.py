@@ -1,4 +1,3 @@
-from redis import Redis
 from redis.asyncio import Redis
 
 from src.core.chat.conversation_manager import ConversationManager
@@ -11,6 +10,7 @@ from src.infrastructure.common.logger import get_logger
 from src.infrastructure.external.redis_client import RedisClient
 from src.infrastructure.external.supabase_client import SupabaseClient, supabase_client
 from src.infrastructure.storage.data_repository import DataRepository
+from src.infrastructure.storage.redis_repository import RedisRepository
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
@@ -37,6 +37,7 @@ class ServiceContainer:
         self.retriever: Retriever | None = None
         self.reranker: Reranker | None = None
         self.redis_client: Redis | None = None
+        self.redis_repository: RedisRepository | None = None
 
     def initialize_services(self) -> None:
         """Initialize all services."""
@@ -53,6 +54,7 @@ class ServiceContainer:
 
             # Redis
             self.redis_client = RedisClient().client
+            self.redis_repository = RedisRepository(client=self.redis_client)
 
             # Chat Services
             self.vector_db = VectorDB()

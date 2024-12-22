@@ -1,16 +1,26 @@
-# TODO: refactor token counting https://github.com/anthropics/anthropic-sdk-python?tab=readme-ov-file#token-counting
+import json
 from uuid import UUID
 
+import redis
 import tiktoken
-from pydantic import ValidationError
 
-from src.core._exceptions import ConversationNotFoundError
+from src.api.v0.schemas.chat_schemas import UserMessage
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.storage.redis_repository import RedisRepository
-from src.models.chat_models import ContentBlock, ConversationHistory, ConversationMessage, Role
+from src.models.chat_models import (
+    Conversation,
+    ConversationHistory,
+    ConversationMessage,
+    Role,
+    TextBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+)
 from src.services.data_service import DataService
 
 logger = get_logger()
+
+# TODO: refactor token counting https://github.com/anthropics/anthropic-sdk-python?tab=readme-ov-file#token-counting
 
 
 class ConversationManager:
@@ -18,167 +28,178 @@ class ConversationManager:
 
     def __init__(
         self,
+        data_service: DataService,
+        redis_repository: RedisRepository,
         max_tokens: int = 200000,
         tokenizer: str = "cl100k_base",
-        redis_repository: RedisRepository | None = None,
-        data_service: DataService | None = None,
     ):
         self.max_tokens = max_tokens
         self.tokenizer = tiktoken.get_encoding(tokenizer)
         # Redis
         self.redis_repository = redis_repository
-        # Main conversation storage
-        self.conversations: dict[UUID, ConversationHistory] = {}
-        # Temporary storage for messages during tool use
-        self.pending_messages: dict[UUID, list[ConversationMessage]] = {}
+        # Supabase
         self.data_service = data_service
 
-    async def get_or_create_conversation(self, conversation_id: UUID | None = None) -> ConversationHistory:
-        """
-        Get or create conversation history by ID.
+    async def create_conversation(self, message: UserMessage) -> ConversationHistory:
+        """Creates a new conversation history."""
+        # 1. Create an empty conversation
+        conversation = ConversationHistory()
+        logger.info(f"Creating new conversation with ID: {conversation.conversation_id}")
 
-        Args:
-            conversation_id: Optional UUID for the conversation. If None, creates a new conversation
-                           with a generated UUID.
-        """
-        # Create new conversation if no ID is provided
-        try:
-            if conversation_id is None:
-                conversation = await self.create_conversation()
-                logger.info(f"Created new conversation: {conversation.conversation_id}")
-                return conversation
+        # 2. Save empty converstaion to redis
+        await self.redis_repository.set_method(conversation.conversation_id, conversation)
+        logger.debug(f"Initialized empty conversation in Redis: {conversation.model_dump()}")
 
-            # Try to get existing conversation
-            else:
-                # Try redis first
-                conversation = await self.redis_repository.get_method(conversation_id, ConversationHistory)
-                if not conversation:
-                    conversation = await self.data_service.get_conversation_history(conversation_id)
-                return conversation
-        except ConversationNotFoundError:
-            logger.error(f"Conversation with id {conversation_id} not found", exc_info=True)
-            raise
+        # 3. Create a conversation in Supabase
+        # create a title
+        title = f"Conversation {conversation.conversation_id}"
+        supabase_conversation = Conversation(
+            conversation_id=conversation.conversation_id,
+            user_id=message.user_id,
+            title=title,
+            message_ids=[],
+            token_count=0,
+            data_sources=[],
+        )
+        await self.data_service.save_conversation(supabase_conversation)
 
-    async def create_conversation(self, conversation_id: UUID | None = None) -> ConversationHistory:
-        """Create a new conversation history with auto-generated UUID."""
-        if conversation_id is None:
-            conversation = ConversationHistory()
-        else:
-            conversation = ConversationHistory(conversation_id=conversation_id)
+        # 3. Add message to in-memory conversation
+        conversation_message = await self._convert_user_message(message)
+        conversation.messages.append(conversation_message)
+        logger.info(f"Added initial message to conversation {conversation.conversation_id}")
 
-        # Add empty conversation to Redis
-        self.redis_repository.set_method(conversation.conversation_id, conversation)
-        logger.info(f"Created new conversation: {conversation.conversation_id}")
         return conversation
-        # Do I need to save it to Supabase at this time?
 
-    async def add_message_to_conversation(self, conversation_id: UUID, role: Role, content: list[ContentBlock]) -> None:
-        """Add a message directly to conversation history."""
-        try:
-            conversation = self.conversations.get(conversation_id)
-            if not conversation:
-                logger.error(f"No conversation found for {conversation_id}", exc_info=True)
-                raise ValueError(f"Conversation {conversation_id} not found")
+    async def add_pending_message(self, message: ConversationMessage | UserMessage) -> ConversationMessage:
+        """Adds a message to the pending state during tool use."""
+        if isinstance(message, UserMessage):
+            message = await self._convert_user_message(message)
 
-            message = self._create_message_object(conversation_id, role, content)
-
-            logger.debug(f"Adding message: {message}")
-            conversation.messages.append(message)
-
-            # Update token count
-            token_count = await self._estimate_tokens(content)
-            conversation.token_count += token_count
-
-            # Prune if needed
-            await self._prune_history(conversation)
-
-            logger.debug(f"Conversation length after adding a message: {len(conversation.messages)}")
-        except ValidationError as e:
-            logger.error(f"Error adding message: {e}, {conversation_id}, {role}, {content}", exc_info=True)
-            raise
-
-    async def add_message_to_pending_conversation(
-        self, conversation_id: UUID, role: Role, content: list[ContentBlock]
-    ) -> ConversationMessage:
-        """Add message to pending state during tool use."""
-        if conversation_id not in self.pending_messages:
-            self.pending_messages[conversation_id] = []
-
-        message = self._create_message_object(conversation_id, role, content)
-        logger.debug(f"Adding pending message: {message}")
-        self.pending_messages[conversation_id].append(message)
-        logger.info(f"Added pending {role} message to conversation {conversation_id}: {message.content}")
+        if message.conversation_id is None:
+            raise ValueError("Conversation ID is required")
+        await self.redis_repository.rpush_method(message.conversation_id, message)
+        logger.info(f"Added pending message [role={message.role}] to conversation {message.conversation_id}")
+        logger.debug(f"Pending message details: {message.model_dump(exclude={'content'})}")
         return message
 
-    def _create_message_object(
-        self, conversation_id: UUID, role: Role, content: list[ContentBlock]
-    ) -> ConversationMessage:
-        return ConversationMessage(conversation_id=conversation_id, role=role, content=content)
+    async def _convert_user_message(self, message: UserMessage) -> ConversationMessage:
+        """Converts a UserMessage to a ConversationMessage by properly converting all content blocks."""
+        conversation_message = ConversationMessage(
+            message_id=message.message_id,
+            conversation_id=message.conversation_id,
+            role=Role.USER,
+            content=message.content,
+        )
+        logger.debug(f"conversation_message: {conversation_message.model_dump(serialize_as_any=True)}")
+        return conversation_message
 
     async def commit_pending(self, conversation_id: UUID) -> None:
-        """Commit pending messages to conversation history."""
-        # Log the number of pending messages *before* popping
-        num_pending_messages = len(self.pending_messages.get(conversation_id, []))
-        logger.debug(f"Number of pending messages: {num_pending_messages}")
+        """Commits pending messages to Redis and Supabase."""
+        logger.info(f"Starting commit of pending messages for conversation: {conversation_id}")
 
-        if pending := self.pending_messages.pop(conversation_id, None):
-            conversation = self.conversations.get(conversation_id)
-            if conversation:
-                conversation.messages.extend(pending)
-                # Update token count
-                for message in pending:
-                    conversation.token_count += await self._estimate_tokens(message.content)
-                await self._prune_history(conversation)
+        # 1. Atomically update conversation history with pending messages
+        conversation_history, pending_messages = await self.transfer_pending_to_history(conversation_id)
 
-        # Log the updated number of messages in the conversation
-        if conversation_id in self.conversations:
-            logger.debug(
-                f"Number of messages in current conversation: {len(self.conversations[conversation_id].messages)}"
-            )
-        else:
-            logger.debug(f"Conversation {conversation_id} not found after commit_pending.")
+        # 2. Save data to Supabase
+        if conversation_history:
+            # 3. Prune and save
+            conversation_history = await self._prune_history(conversation_history)
+            await self._update_conversation_supabase(history=conversation_history, messages=pending_messages)
+            logger.info(f"Committed {len(pending_messages)} messages for conversation: {conversation_id}")
 
-    async def rollback_pending(self, conversation_id: UUID) -> None:
-        """Discard pending messages."""
-        self.pending_messages.pop(conversation_id, None)
+    async def transfer_pending_to_history(
+        self, conversation_id: UUID
+    ) -> tuple[ConversationHistory, list[ConversationMessage]]:
+        """Transfers pending messages to the active conversation in Redis."""
+        logger.info(f"Transferring pending messages for conversation: {conversation_id}")
+        # Create a pipeline
+        async with self.redis_repository.client.pipeline(transaction=True) as pipe:
+            while True:
+                try:
+                    # 1. Watch keys
+                    messages_key = self.redis_repository._get_prefix(
+                        model_class=ConversationMessage, conversation_id=conversation_id
+                    )
+                    conversation_key = self.redis_repository._get_prefix(
+                        model_class=ConversationHistory, conversation_id=conversation_id
+                    )
+                    await pipe.watch(messages_key, conversation_key)
 
-    async def _estimate_tokens(self, content: list[ContentBlock]) -> int:
-        """Estimate token count for content."""
-        if isinstance(content, str):
-            return len(self.tokenizer.encode(content))
-        elif isinstance(content, list):
-            return sum(
-                len(self.tokenizer.encode(item["text"]))
-                for item in content
-                if isinstance(item, dict) and "text" in item
-            )
-        return 0
+                    # 2. Get the current state of the conversation and pending messages
+                    conversation = await self.redis_repository.get_method(conversation_id, ConversationHistory)
+                    if not conversation:
+                        raise ValueError(f"No conversation found for ID {conversation_id}")
 
-    async def _prune_history(self, conversation: ConversationHistory) -> None:
-        """Prune conversation history if it exceeds token limit."""
+                    pending_messages = await self.redis_repository.lrange_method(
+                        key=conversation_id, start=0, end=-1, model_class=ConversationMessage
+                    )
+
+                    # 3. Update conversation history
+                    conversation.messages.extend(pending_messages)
+                    conversation.token_count += await self._estimate_tokens(pending_messages)
+
+                    # 4. Make atomic save & delete
+                    pipe.multi()
+                    await self.redis_repository.set_method(conversation_id, conversation, pipe=pipe)
+                    await self.redis_repository.delete_method(conversation_id, ConversationMessage, pipe=pipe)
+
+                    # 5. Execute transaction
+                    await pipe.execute()
+
+                    return conversation, pending_messages
+                except redis.WatchError:
+                    logger.warning("WatchError during transfer_pending_to_history, retrying...")
+                    continue  # Retry the operation
+                except Exception as e:
+                    logger.error(f"Error transferring pending messages: {e}", exc_info=True)
+                    # rollback redis transaction
+                    raise
+
+    async def _update_conversation_supabase(
+        self, history: ConversationHistory, messages: list[ConversationMessage]
+    ) -> None:
+        """Updates the conversation in Supabase."""
+        await self.data_service.update_conversation_supabase(history, messages)
+
+    async def _estimate_tokens(self, messages: list[ConversationMessage]) -> int:
+        """Estimates the total token count for a list of messages."""
+        total_tokens = 0
+        for message in messages:
+            for block in message.content:
+                if isinstance(block, TextBlock):
+                    total_tokens += len(self.tokenizer.encode(block.text))
+                    logger.debug(f"Token count for text: {total_tokens}")
+                elif isinstance(block, ToolUseBlock):
+                    total_tokens += len(self.tokenizer.encode(block.tool_name))
+                    total_tokens += len(self.tokenizer.encode(json.dumps(block.tool_input, sort_keys=True)))
+                    logger.debug(f"Token count for tool use: {total_tokens}")
+                elif isinstance(block, ToolResultBlock):
+                    if block.content is not None:
+                        if isinstance(block.content, dict):
+                            total_tokens += len(self.tokenizer.encode(json.dumps(block.content, sort_keys=True)))
+                            logger.debug(f"Token count for tool result: {total_tokens}")
+        logger.debug(f"Total token count: {total_tokens}")
+        return total_tokens
+
+    async def _prune_history(self, conversation: ConversationHistory) -> ConversationHistory:
+        """Prunes the conversation history if it exceeds the token limit."""
         while conversation.token_count > self.max_tokens * 0.9 and len(conversation.messages) > 1:
             removed_message = conversation.messages.pop(0)
-            conversation.token_count -= await self._estimate_tokens(removed_message.content)
+            conversation.token_count -= await self._estimate_tokens([removed_message])
 
-    async def get_conversation_with_pending(self, conversation_id: UUID | None) -> ConversationHistory:
-        """
-        Get a conversation history that includes both stable and pending messages.
-        This creates a temporary copy for sending to the LLM.
-        """
-        conversation = self.conversations.get(conversation_id)
-        if not conversation:
-            raise ValueError(f"Conversation {conversation_id} not found")
+        return conversation
 
-        # Create a copy of stable conversation
-        combined = ConversationHistory(
-            conversation_id=conversation.conversation_id,
-            messages=conversation.messages.copy(),
-            token_count=conversation.token_count,
-        )
+    async def get_conversation(self, conversation_id: UUID, message: UserMessage) -> ConversationHistory:
+        """Fetches a conversation from Redis or Supabase, if not found in Redis."""
+        conversation = await self.redis_repository.get_method(conversation_id, ConversationHistory)
 
-        # Add pending messages
-        pending = self.pending_messages.get(conversation_id)
-        if pending:
-            combined.messages.extend(pending)
+        # If no conversation in Redis, fetch from Supabase
+        if conversation is None:
+            logger.info(f"Conversation {conversation_id} not found in Redis, fetching from Supabase")
+            conversation = await self.data_service.get_conversation_history(conversation_id)
 
-        return combined
+        # Add message to the conversation in-memory
+        conversation_message = await self._convert_user_message(message)
+        conversation.messages.append(conversation_message)
+
+        return conversation

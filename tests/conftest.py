@@ -1,16 +1,29 @@
 import os
+import uuid
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import numpy as np
 import pytest
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
+from fakeredis.aioredis import FakeRedis
 from fastapi.testclient import TestClient
+from redis.asyncio import Redis
 
 from app import create_app
-from src.core.chat.claude_assistant import ClaudeAssistant, ConversationMessage
+from src.core.chat.llm_assistant import ClaudeAssistant
 from src.core.content.crawler import FireCrawler
 from src.core.search.vector_db import VectorDB
+from src.infrastructure.config.settings import settings
 from src.infrastructure.service_container import ServiceContainer
+from src.infrastructure.storage.data_repository import DataRepository
+from src.infrastructure.storage.redis_repository import RedisRepository
+from src.infrastructure.storage.supabase_client import SupabaseClient
+from src.models.chat_models import (
+    ConversationHistory,
+    ConversationMessage,
+    Role,
+    TextBlock,
+)
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
@@ -93,7 +106,7 @@ def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
         )
         mock_anthropic.return_value = mock_client
 
-        assistant = ClaudeAssistant(vector_db=mock_vector_db)
+        assistant = ClaudeAssistant(vector_db=mock_vector_db, retriever=Mock())
         assistant.client = mock_client
 
         assistant.conversation_history.messages = [ConversationMessage(role="user", content="Initial message")]
@@ -198,3 +211,79 @@ def mock_webhook_content_service(mock_app):
     with patch("src.api.v0.endpoints.webhooks.ContentServiceDep", return_value=mock_service):
         mock_app.state.container.content_service = mock_service
         yield mock_service
+
+
+@pytest.fixture
+async def db_client():
+    """Create a test database client."""
+    client = SupabaseClient(url=settings.supabase_url, key=settings.supabase_service_key, schema="public")
+    yield client
+    await client.close()
+
+
+@pytest.fixture
+async def data_repository(db_client):
+    """Create a test data repository."""
+    return DataRepository(db_client=db_client)
+
+
+@pytest.fixture
+async def data_service(data_repository):
+    """Create a test data service."""
+    return DataService(repository=data_repository)
+
+
+# Redis-related fixtures
+@pytest.fixture
+def mock_redis():
+    """Fast fake Redis for unit tests."""
+    return FakeRedis()
+
+
+@pytest.fixture
+def redis_repository(mock_redis):
+    """Repository with fake Redis for unit tests."""
+    return RedisRepository(mock_redis)
+
+
+@pytest.fixture(scope="session")
+async def redis_test_client():
+    """Real Redis client for integration tests."""
+    redis = Redis(host=settings.redis_host, port=settings.redis_port)
+    try:
+        await redis.ping()
+        await redis.flushall()  # Clean the Redis instance before tests
+    except Exception as e:
+        raise RuntimeError(
+            "Redis server is required for integration tests.\n"
+            "Start it with: docker run -d -p 6379:6379 redis:7-alpine"
+        ) from e
+
+    yield redis
+    await redis.flushall()  # Clean after tests
+    await redis.close()
+
+
+@pytest.fixture
+async def redis_integration_repository(redis_test_client):
+    """Repository with real Redis for integration tests."""
+    return RedisRepository(redis_test_client)
+
+
+# Chat & Conversation Fixtures
+@pytest.fixture
+def sample_uuid():
+    """Sample UUID for testing."""
+    return uuid.UUID("12345678-1234-5678-1234-567812345678")
+
+
+@pytest.fixture
+def sample_message(sample_uuid):
+    """Sample message for testing."""
+    return ConversationMessage(message_id=sample_uuid, role=Role.USER, content=[TextBlock(text="Test message")])
+
+
+@pytest.fixture
+def sample_conversation(sample_uuid, sample_message):
+    """Sample conversation for testing."""
+    return ConversationHistory(conversation_id=sample_uuid, messages=[sample_message])

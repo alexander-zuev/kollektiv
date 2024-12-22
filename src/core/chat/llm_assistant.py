@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -9,8 +10,7 @@ from anthropic import AsyncStream
 from anthropic.types import (
     ContentBlockStartEvent,
     ContentBlockStopEvent,
-    MessageStartEvent,
-    MessageStopEvent,
+    InputJSONDelta,
     RawContentBlockDeltaEvent,
     TextDelta,
 )
@@ -30,12 +30,13 @@ from src.infrastructure.common.decorators import (
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
 from src.models.chat_models import (
+    AssistantMessageEvent,
     ConversationHistory,
     ErrorEvent,
-    FullMessageEvent,
     StreamingEvent,
     StreamingEventType,
     StreamingTextDelta,
+    TextBlock,
     ToolResultBlock,
     ToolUseBlock,
 )
@@ -130,14 +131,18 @@ class ClaudeAssistant(Model):
     async def stream_response(self, conv_history: ConversationHistory) -> AsyncGenerator[StreamingEvent, None]:
         """Stream responses from a conversation, handle tool use, and process assistant replies."""
         try:
-            logger.debug(f"Conversation history: {len(conv_history.messages)} messages.")
+            logger.debug(f"Number of messages in conversation history: {len(conv_history.messages)}")
 
             max_retries = 2
             retries = 0
+            current_tool_use_block: ToolUseBlock | None = (
+                None  # used to track if we have content block of type tool_use
+            )
+            tool_input_json = ""  # to accumulate tool use
 
             while retries < max_retries:
                 messages = conv_history.to_anthropic_messages()
-                logger.debug(f"Messages: {messages}")
+                logger.debug(f"Debugging messages list for Anthropic API: {messages}")
                 async with self.client.messages.stream(
                     messages=messages,
                     system=self.cached_system_prompt,
@@ -154,11 +159,11 @@ class ClaudeAssistant(Model):
                             case "message_start":
                                 yield self.handle_message_start(event)
                             case "content_block_start":
-                                yield self.handle_content_block_start(event)
+                                self.handle_content_block_start(event)
                             case "content_block_delta":
                                 yield self.handle_content_block_delta(event)
                             case "content_block_stop":
-                                yield self.handle_content_block_stop(event)
+                                yield await self.handle_content_block_stop(event)
                             case "message_stop":
                                 yield self.handle_message_stop(event)
                             case "error":
@@ -169,26 +174,26 @@ class ClaudeAssistant(Model):
                     yield assistant_response
                     logger.debug(f"Full response: {assistant_response}")
 
-                    # Handle tool use and get results
-                    tool_use_block = next(
-                        (
-                            block
-                            for block in assistant_response.content
-                            if hasattr(block, "type") and block.type == "tool_use"
-                        ),
-                        None,
-                    )
-                    if tool_use_block:
-                        tool_result = await self.handle_tool_call(tool_inputs=tool_use_block)
-                        # yield tool_result
+                    # # Handle tool use and get results
+                    # tool_use_block = next(
+                    #     (
+                    #         block
+                    #         for block in assistant_response.event_data.content
+                    #         if hasattr(block, "type") and block.type == "tool_use"
+                    #     ),
+                    #     None,
+                    # )
+                    # if tool_use_block:
+                    #     tool_result = await self.handle_tool_call(tool_inputs=tool_use_block)
+                    #     # yield tool_result
 
-                        if tool_result.content == "No relevant context found for the original request.":
-                            retries += 1
-                            logger.warning(f"RAG search failed. Retrying... (Attempt {retries}/{max_retries})")
-                            continue  # Retry the entire streaming process
+                    #     if tool_result.content == "No relevant context found for the original request.":
+                    #         retries += 1
+                    #         logger.warning(f"RAG search failed. Retrying... (Attempt {retries}/{max_retries})")
+                    #         continue  # Retry the entire streaming process
 
-                    if not tool_use_block:
-                        break
+                    # if not tool_use_block:
+                    #     break
 
         except (RetryableLLMError, NonRetryableLLMError) as e:
             logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
@@ -197,36 +202,68 @@ class ClaudeAssistant(Model):
             logger.error(f"An unexpected error occurred in stream response: {str(e)}", exc_info=True)
             raise
 
-    def handle_message_start(self, event: MessageStartEvent) -> StreamingEvent:
+    def handle_message_start(self, event: RawMessageStartEvent) -> StreamingEvent:
         """Handle message start event."""
         logger.debug("===== Stream message started =====")
         return StreamingEvent(
             event_type=StreamingEventType.MESSAGE_START,
         )
 
-    def handle_content_block_delta(self, event: RawContentBlockDeltaEvent) -> StreamingEvent | None:
+    def handle_content_block_delta(self, event: RawContentBlockDeltaEvent) -> StreamingEvent:
         """Handle text token event."""
-        logger.debug(f"===== Stream text token: {event.text} =====")
+        logger.debug("===== Stream text token =====")
         if isinstance(event.delta, TextDelta):
             return StreamingEvent(
                 event_type=StreamingEventType.TEXT_TOKEN,
                 event_data=StreamingTextDelta(text=event.delta.text),
             )
-        else:
-            logger.error(f"Unexpected event type: {type(event.delta)}")
-            pass
+        elif isinstance(event.delta, InputJSONDelta):
+            tool_input_json += event.delta.partial_json
+            logger.debug(f"Updated tool input JSON: {tool_input_json}")
+            return None
 
-    def handle_content_block_start(self, event: ContentBlockStartEvent) -> None:
+    def handle_content_block_start(self, event: ContentBlockStartEvent) -> ToolUseBlock | None:
         """Handle content block start event."""
         logger.debug("===== Stream content block started =====")
+        if event.content_block.type == "tool_use":
+            current_tool_use_block = ToolUseBlock(
+                block_type=event.content_block.type,
+                id=event.content_block.id,
+                name=event.content_block.name,
+                input={},
+            )
+            return current_tool_use_block
         return None
 
-    def handle_content_block_stop(self, event: ContentBlockStopEvent) -> None:
+    async def handle_content_block_stop(self, event: ContentBlockStopEvent) -> StreamingEvent:
         """Handle content block stop event."""
         logger.debug("===== Stream content block ended =====")
-        return None
+        if event.content_block.type == "tool_use" and current_tool_use_block:
+            try:
+                # Parse accumulated JSON string into dict
+                parsed_input = json.loads(tool_input_json)
 
-    def handle_error(self, event: MessageStreamEvent) -> None:
+                # Update the tool block with parsed input
+                current_tool_use_block.tool_input = parsed_input
+
+                # Get tool result
+                tool_result = await self.handle_tool_call(tool_inputs=current_tool_use_block)
+
+                return StreamingEvent(
+                    event_type=StreamingEventType.TOOL_RESULT,
+                    event_data=ToolResultBlock(
+                        tool_use_id=current_tool_use_block.tool_use_id,
+                        content=tool_result.content,
+                    ),
+                )
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse tool input JSON: {tool_input_json}")
+                logger.error(f"JSON parse error: {str(e)}")
+                raise NonRetryableLLMError(
+                    original_error=e, message="Failed to parse tool input JSON from LLM response"
+                )
+
+    def handle_error(self, event: MessageStreamEvent) -> StreamingEvent:
         """Handle error event."""
         logger.error(f"===== Stream error: {event.error} =====")
         return StreamingEvent(
@@ -234,12 +271,11 @@ class ClaudeAssistant(Model):
             event_data=ErrorEvent(data={"error": event.error}),
         )
 
-    def handle_message_stop(self, event: MessageStopEvent) -> StreamingEvent:
+    def handle_message_stop(self, event: RawMessageStopEvent) -> StreamingEvent:
         """Handle message stop event."""
         logger.debug("===== Stream message ended =====")
         return StreamingEvent(
             event_type=StreamingEventType.MESSAGE_STOP,
-            event_data=None,
         )
 
     async def handle_full_message(self, stream: AsyncStream[MessageStreamEvent]) -> StreamingEvent:
@@ -247,8 +283,15 @@ class ClaudeAssistant(Model):
         full_response = await stream.get_final_message()
         logger.debug(f"Full response: {full_response}")
         return StreamingEvent(
-            event_type=StreamingEventType.FULL_MESSAGE,
-            event_data=FullMessageEvent(data=full_response),
+            event_type=StreamingEventType.ASSISTANT_MESSAGE,
+            event_data=AssistantMessageEvent(
+                content=[
+                    TextBlock.model_validate(block.model_dump())
+                    if block.type == "text"
+                    else ToolUseBlock.model_validate(block.model_dump())
+                    for block in full_response.content
+                ]
+            ),
         )
 
     async def handle_tool_call(self, tool_inputs: ToolUseBlock) -> ToolResultBlock:
