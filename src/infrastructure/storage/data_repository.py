@@ -82,7 +82,7 @@ class DataRepository:
 
         # All entities must be same type
         entity_type = type(entities[0])
-        data = [e.model_dump(mode="json") for e in entities]
+        data = [e.model_dump(mode="json", by_alias=True, serialize_as_any=True) for e in entities]
 
         # Single transaction for all entities
         result = await (

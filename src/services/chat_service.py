@@ -113,6 +113,7 @@ class ChatService:
                     await self.conversation_manager.add_pending_message(message=assistant_message)
                     logger.debug(f"Added assistant message to pending for conversation {conversation.conversation_id}")
                     yield ChatResponse(event=AssistantResponseEvent(response=assistant_message))
+                    logger.debug(f"ASSISTANT RESPONSE FOR DEBUGGING AFTER ADDING TO PENDING: {assistant_message}")
 
                 case StreamingEventType.TOOL_RESULT:
                     if tool_use_count >= max_tool_retries_per_turn:
@@ -134,7 +135,7 @@ class ChatService:
                     )
 
                     await self.conversation_manager.add_pending_message(message=tool_result_message)
-                    logger.debug(f"Added tool result to pending for conversation {conversation.conversation_id}")
+                    logger.debug(f"Added tool result to pending for conversation {tool_result_message}")
 
                     await self.conversation_manager.commit_pending(conversation_id=conversation.conversation_id)
                     logger.debug(f"Committed pending messages for conversation {conversation.conversation_id}")

@@ -79,9 +79,10 @@ class ConversationManager:
             raise ValueError("Conversation ID is required")
         await self.redis_repository.rpush_method(message.conversation_id, message)
         logger.info(
-            f"Added pending message [role={message.role}] to conversation {message.conversation_id} with message_id {message.message_id}"
+            f"Added pending message [role={message.role}] to conversation {message.conversation_id} with message_id "
+            f"{message.message_id}"
         )
-        logger.debug(f"Pending message details: {message.model_dump(exclude={'content'})}")
+        logger.debug(f"Pending message details: {message.model_dump()}")
         return message
 
     async def _convert_user_message(self, message: UserMessage) -> ConversationMessage:

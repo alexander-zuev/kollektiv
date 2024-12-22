@@ -7,7 +7,7 @@ from typing import ClassVar, Literal
 from uuid import UUID, uuid4
 
 from anthropic.types import MessageParam
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from src.infrastructure.common.logger import get_logger
 from src.models.base_models import SupabaseModel
@@ -103,9 +103,9 @@ class ToolUseBlock(BaseModel):
     block_type: ContentBlockType = Field(
         ContentBlockType.TOOL_USE, description="Type of the content block", alias="type"
     )
+    tool_use_id: str = Field(..., description="ID of the tool use", alias="id")
     tool_name: str = Field(..., description="Name of the tool", alias="name")
     tool_input: dict = Field(..., description="Input to the tool", alias="input")
-    tool_use_id: str = Field(..., description="ID of the tool use", alias="id")
 
 
 class ToolResultBlock(BaseModel):
@@ -115,8 +115,8 @@ class ToolResultBlock(BaseModel):
         ContentBlockType.TOOL_RESULT, description="Type of the content block", alias="type"
     )
     tool_use_id: str = Field(..., description="ID of the tool use")
-    content: str | dict | None = Field(None, description="Result returned from the tool")
-    is_error: bool | None = Field(None, description="Error returned from the tool")
+    content: str = Field(..., description="Result returned from the tool")
+    is_error: bool = Field(False, description="Error returned from the tool")
 
 
 # Messages
@@ -136,15 +136,47 @@ class ConversationMessage(SupabaseModel):
     )
     conversation_id: UUID | None = Field(None, description="FK reference to a conversation.")
     role: Role = Field(..., description="Role of the message sender")
-    content: list[TextBlock | ToolUseBlock | ToolResultBlock] = Field(..., description="list of content blocks")
+    content: list[TextBlock | ToolUseBlock | ToolResultBlock] = Field(
+        ...,
+        description="Content of the message corresponding to Anthropic API",
+    )
 
     _db_config: ClassVar[dict] = {"schema": "chat", "table": "messages", "primary_key": "message_id"}
+
+    @model_validator(mode="before")
+    def validate_content(cls, values: dict) -> dict:
+        """Ensure the correct model is instantiated for each item in the `content` list."""
+        content_data = values.get("content", [])
+        resolved_content: list[TextBlock | ToolUseBlock | ToolResultBlock] = []
+
+        for item in content_data:
+            # Inspect the `block_type` field to determine which model to use
+            if isinstance(item, TextBlock):
+                resolved_content.append(item)
+            elif isinstance(item, ToolUseBlock):
+                resolved_content.append(item)
+            elif isinstance(item, ToolResultBlock):
+                resolved_content.append(item)
+            elif isinstance(item, dict):
+                if item.get("type") == ContentBlockType.TEXT:
+                    resolved_content.append(TextBlock(**item))
+                elif item.get("type") == ContentBlockType.TOOL_USE:
+                    resolved_content.append(ToolUseBlock(**item))
+                elif item.get("type") == ContentBlockType.TOOL_RESULT:
+                    resolved_content.append(ToolResultBlock(**item))
+                else:
+                    raise ValueError(f"Unknown content block type: {item.get('type')}, {item}")
+            else:
+                raise ValueError(f"Unknown content block type: {type(item)}, {item}")
+
+        values["content"] = resolved_content
+        return values
 
     def to_anthropic(self) -> MessageParam:
         """Convert to Anthropic API format"""
         return {
             "role": self.role.value,
-            "content": [block.model_dump(by_alias=True, exclude_none=True) for block in self.content],
+            "content": [block.model_dump(by_alias=True) for block in self.content],
         }
 
 
@@ -180,7 +212,9 @@ class ConversationHistory(BaseModel):
 
     def to_anthropic_messages(self) -> Iterable[MessageParam]:
         """Convert entire history to Anthropic format"""
-        return [msg.to_anthropic() for msg in self.messages]
+        result = [msg.to_anthropic() for msg in self.messages]
+        logger.debug(f"To Anthropic conversion result: {result}")
+        return result
 
 
 class ConversationSummary(BaseModel):

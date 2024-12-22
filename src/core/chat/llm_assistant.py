@@ -190,6 +190,7 @@ class ClaudeAssistant(Model):
                     # Get final message
                     assistant_response = await self.handle_full_message(stream)  # type: ignore
                     yield assistant_response
+                    logger.debug(f" EVENT RESPONSE FOR DEBUGGING: {assistant_response}")
 
                     # If tool result, yield tool result
                     if tool_result:
@@ -286,16 +287,19 @@ class ClaudeAssistant(Model):
         """Handle full message event."""
         full_response = await stream.get_final_message()
         logger.debug(f"FULL ASSISTANT RESPONSE FOR DEBUGGING: {full_response}")
+
+        content = []
+        for block in full_response.content:
+            if block.type == "text":
+                content.append(TextBlock.model_validate(block.model_dump()))
+            elif block.type == "tool_use":
+                content.append(ToolUseBlock.model_validate(block.model_dump()))
+            else:
+                logger.warning(f"Unexpected block type in assistant message: {block.type}")
+
         return StreamingEvent(
             event_type=StreamingEventType.ASSISTANT_MESSAGE,
-            event_data=AssistantMessageEvent(
-                content=[
-                    TextBlock.model_validate(block.model_dump())
-                    if block.type == "text"
-                    else ToolUseBlock.model_validate(block.model_dump())
-                    for block in full_response.content
-                ]
-            ),
+            event_data=AssistantMessageEvent(content=content),
         )
 
     async def handle_tool_call(self, tool_inputs: ToolUseBlock) -> ToolResultBlock:

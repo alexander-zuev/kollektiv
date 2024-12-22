@@ -48,12 +48,14 @@ class RedisRepository:
 
     def _to_json(self, model: T) -> str:
         """Convert a model to a JSON string."""
-        json_str = model.model_dump_json(serialize_as_any=True)
+        json_str = model.model_dump_json(by_alias=True, serialize_as_any=True)
         return json_str
 
     def _from_json(self, json_str: str, model_class: type[T]) -> T:
         """Convert a JSON string to a model."""
-        return model_class.model_validate_json(json_str)
+        logger.debug(f"From JSON: {json_str}")
+        result = model_class.model_validate_json(json_str)
+        return result
 
     async def set_method(self, key: UUID, value: T, pipe: Redis | None = None) -> None:
         """Set a value in the Redis database, optionally as part of pipeline."""
