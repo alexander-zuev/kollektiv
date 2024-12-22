@@ -2,7 +2,6 @@ import os
 import uuid
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-import anthropic
 import numpy as np
 import pytest
 from anthropic.types import (
@@ -110,25 +109,51 @@ def real_vector_db():
 @pytest.fixture
 async def mock_anthropic_client():
     """Create a mock Anthropic client with common responses."""
-    mock_client = AsyncMock(spec=anthropic.AsyncAnthropic)
+    # Create a Messages class mock first
+    mock_messages = AsyncMock()
 
-    # Mock message response
-    mock_message = Mock()
-    mock_message.content = [Mock(text="Test response", type="text")]
-    mock_message.usage.input_tokens = 100
-    mock_message.usage.output_tokens = 50
+    # Create a mock message with proper structure
+    mock_message = MagicMock()
+    mock_message.content = [
+        MagicMock(type="text", text="Test response", model_dump=lambda: {"type": "text", "text": "Test response"})
+    ]
+    mock_message.usage = MagicMock(input_tokens=100, output_tokens=50)
     mock_message.stop_reason = "end_turn"
+    mock_message.model_dump = MagicMock(
+        return_value={"content": [{"type": "text", "text": "Test response"}], "role": "assistant"}
+    )
 
-    # Setup stream response
+    # Setup stream response with proper event types
     mock_stream = AsyncMock()
     mock_stream.get_final_message.return_value = mock_message
 
     # Setup async context manager for streaming
     async def mock_stream_context():
-        yield mock_stream
+        mock_stream_instance = AsyncMock()
+        mock_stream_instance.get_final_message.return_value = mock_message
+        yield RawMessageStartEvent(
+            type="message_start",
+            message={
+                "id": "test-message-id",
+                "content": [],
+                "model": "test-model",
+                "role": "assistant",
+                "type": "message",
+                "usage": {"input_tokens": 0, "output_tokens": 0},
+            },
+        )
+        yield RawContentBlockDeltaEvent(
+            type="content_block_delta", delta=TextDelta(type="text_delta", text="Test response"), index=0
+        )
+        yield RawMessageStopEvent(type="message_stop", message=mock_message.model_dump())
 
-    mock_client.messages.create = AsyncMock(return_value=mock_message)
-    mock_client.messages.stream = AsyncMock(__aenter__=mock_stream_context)
+    # Attach the mocked methods to messages
+    mock_messages.create = AsyncMock(return_value=mock_message)
+    mock_messages.stream = AsyncMock(__aenter__=mock_stream_context)
+
+    # Now create the client with the messages attribute pre-configured
+    mock_client = AsyncMock()
+    mock_client.messages = mock_messages
 
     return mock_client
 
@@ -151,7 +176,7 @@ def mock_tool_manager():
             name="rag_search",
             description="Search using RAG",
             input_schema={"type": "object", "properties": {"important_context": {"type": "string"}}},
-        )
+        ).with_cache()
     ]
     return mock_manager
 
@@ -166,14 +191,14 @@ def mock_prompt_manager():
 
 @pytest.fixture
 async def claude_assistant_with_mocks(
-    mock_vector_db: VectorDB,
-    mock_anthropic_client: AsyncMock,
-    mock_retriever: AsyncMock,
-    mock_tool_manager: Mock,
-    mock_prompt_manager: Mock,
-) -> ClaudeAssistant:
-    """Set up a ClaudeAssistant instance with all dependencies mocked."""
-    with patch("anthropic.AsyncAnthropic", return_value=mock_anthropic_client):
+    mock_vector_db,
+    mock_anthropic_client,
+    mock_retriever,
+    mock_tool_manager,
+    mock_prompt_manager,
+):
+    """Create a ClaudeAssistant instance with all dependencies mocked."""
+    with patch("anthropic.AsyncAnthropic", return_value=mock_anthropic_client) as mock_anthropic:
         assistant = ClaudeAssistant(
             vector_db=mock_vector_db,
             retriever=mock_retriever,
@@ -189,7 +214,17 @@ async def claude_assistant_with_mocks(
 def streaming_events():
     """Create sample streaming events for testing."""
     return {
-        "message_start": RawMessageStartEvent(type="message_start", message={}),
+        "message_start": RawMessageStartEvent(
+            type="message_start",
+            message={
+                "id": "test-message-id",
+                "content": [],
+                "model": "test-model",
+                "role": "assistant",
+                "type": "message",
+                "usage": {"input_tokens": 0, "output_tokens": 0},
+            },
+        ),
         "content_block_start": ContentBlockStartEvent(
             type="content_block_start",
             content_block=Mock(type="text", id="test-id"),

@@ -4,6 +4,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from src.core._exceptions import NonRetryableLLMError
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
 from src.models.llm_models import Tool, ToolInputSchema, ToolName
@@ -44,7 +45,11 @@ class ToolManager:
 
     def get_tool(self, name: ToolName) -> Tool | None:
         """Get a specific tool by name."""
-        return self.tools.get(name)
+        try:
+            return self.tools.get(name)
+        except KeyError:
+            logger.error(f"Tool {name} not found")
+            raise NonRetryableLLMError(f"Tool {name} not found") from e
 
     def force_tool_choice(self, name: ToolName) -> dict[str, Any]:
         """Force tool choice."""
