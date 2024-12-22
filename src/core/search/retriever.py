@@ -23,12 +23,12 @@ class Retriever:
         self.db = vector_db
         self.reranker = reranker
 
-    async def retrieve(self, user_query: str, combined_queries: list[str], top_n: int | None) -> list[dict[str, Any]]:
+    async def retrieve(self, rag_query: str, combined_queries: list[str], top_n: int | None) -> list[dict[str, Any]]:
         """
         Retrieve and rank documents based on user query and combined queries.
 
         Args:
-            user_query (str): The primary user query for retrieving documents.
+            rag_query (str): The primary user query for retrieving documents.
             combined_queries (list[str]): A list of queries to combine for document retrieval.
             top_n (int, optional): The maximum number of top documents to return. Defaults to None.
 
@@ -51,7 +51,7 @@ class Retriever:
         logger.info(f"Search returned {len(unique_documents)} unique chunks")
 
         # rerank the results
-        ranked_documents = self.reranker.rerank(user_query, unique_documents)
+        ranked_documents = self.reranker.rerank(rag_query, unique_documents)
 
         # filter irrelevnat results
         filtered_results = self.filter_irrelevant_results(ranked_documents, relevance_threshold=0.1)

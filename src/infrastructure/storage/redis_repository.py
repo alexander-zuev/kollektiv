@@ -34,7 +34,6 @@ class RedisRepository:
         """Get the prefix for the model."""
         try:
             prefix_template = self.prefix_config[model_class]
-            logger.debug(f"Prefix template: {prefix_template}")
             return prefix_template.format(**kwargs)
         except KeyError:
             logger.error(f"No key prefix defined for model class: {model_class.__name__}", exc_info=True)
@@ -86,7 +85,6 @@ class RedisRepository:
         await self.client.rpush(prefix, json_str)
         await self.client.expire(prefix, ttl)
         logger.info(f"Pushed to Redis list: {prefix} (TTL: {ttl}s)")
-        logger.debug(f"List operation details - Key: {prefix}, Value type: {type(value).__name__}")
 
     async def lrange_method(self, key: UUID, start: int, end: int, model_class: type[T]) -> list[T]:
         """Retrieve a range of elements from a list."""

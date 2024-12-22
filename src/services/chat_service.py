@@ -18,6 +18,7 @@ from src.core.chat.llm_assistant import ClaudeAssistant
 from src.infrastructure.common.logger import get_logger
 from src.models.chat_models import (
     Conversation,
+    ConversationHistory,
     ConversationMessage,
     Role,
     StreamingEventType,
@@ -45,55 +46,32 @@ class ChatService:
                 # If it's an existing conversation
                 conversation_id = user_message.conversation_id
                 logger.info(f"Continuing conversation: {conversation_id}")
-                conversation = await self.conversation_manager.get_conversation(
+                conversation = await self.conversation_manager.get_conversation_history(
                     conversation_id=conversation_id, message=user_message
                 )
             else:
-                # 1. Create a conversation if it doesn't exist
+                logger.info(f"Creating new conversation for user {user_message.user_id}")
                 conversation = await self.conversation_manager.create_conversation(message=user_message)
                 user_message.conversation_id = conversation.conversation_id
-                logger.info(f"Created new conversation: {conversation.conversation_id}")
+                logger.debug(f"Created conversation with ID: {conversation.conversation_id}")
 
-            # 2. Send conversation_id to the client
+            # 2. Send conversation_id to client
             yield ChatResponse(event=MessageAcceptedEvent(conversation_id=conversation.conversation_id))
             logger.debug(f"Sent MessageAcceptedEvent for conversation: {conversation.conversation_id}")
 
-            # 3. Add user message to pending messages
+            # 3. Add user message to pending
             await self.conversation_manager.add_pending_message(message=user_message)
+            logger.debug(
+                f"Added user message to pending for conversation {conversation.conversation_id}: "
+                f"{user_message.content[:100]}..."
+            )
 
-            # 3. Send user message to LLM and start streaming response
-            async for event in self.claude_assistant.stream_response(conv_history=conversation):
-                match event.event_type:
-                    # tokens -> stream to user
-                    case StreamingEventType.TEXT_TOKEN:
-                        yield ChatResponse(event=MessageDeltaEvent(text_delta=event.event_data.text))
-                    case StreamingEventType.MESSAGE_STOP:
-                        logger.debug("Message stream completed")
-                    case StreamingEventType.ASSISTANT_MESSAGE:
-                        logger.info(f"Processing assistant message for conversation: {conversation.conversation_id}")
-                        assistant_message = ConversationMessage(
-                            conversation_id=conversation.conversation_id,
-                            role=Role.ASSISTANT,
-                            content=event.event_data.content,
-                        )
-                        # Add to pending messages
-                        await self.conversation_manager.add_pending_message(message=assistant_message)
+            # 4. Process stream
+            logger.info(f"Starting stream processing for conversation {conversation.conversation_id}")
+            async for event in self._process_stream(conversation):
+                yield event
 
-                        # Yield the full message text
-                        yield ChatResponse(event=AssistantResponseEvent(response=assistant_message))
-
-                        # If tool use in assisntant response
-                        # add tool_result to pending as a user message
-                        # get assistnat response to tool result
-                        # yield assistnat response again to the user
-
-            # 5. Commit pending messages
-            logger.info(f"Committing conversation updates for: {conversation.conversation_id}")
-            await self.conversation_manager.commit_pending(conversation_id=conversation.conversation_id)
-
-            # 6. Done
-            yield ChatResponse(event=MessageDoneEvent())
-            logger.info(f"Completed message processing for conversation: {conversation.conversation_id}")
+            logger.info(f"Completed message processing for conversation {conversation.conversation_id}")
 
         except RetryableLLMError as e:
             logger.error(f"Retryable error in conversation {user_message.conversation_id}: {str(e)}", exc_info=True)
@@ -107,6 +85,86 @@ class ChatService:
                 original_error=e,
                 message=f"Error in chat service processing message: {str(e)} for user {user_message.user_id}",
             ) from e
+
+    async def _process_stream(
+        self, conversation: ConversationHistory, tool_use_count: int = 0
+    ) -> AsyncGenerator[ChatResponse, None]:
+        """Process a stream of events and yield ChatResponse objects."""
+        max_tool_retries_per_turn = 2
+        tool_result_processed = False
+
+        logger.debug(
+            f"Starting stream processing for conversation {conversation.conversation_id} "
+            f"(tool use count: {tool_use_count})"
+        )
+
+        async for event in self.claude_assistant.stream_response(conv_history=conversation):
+            match event.event_type:
+                case StreamingEventType.TEXT_TOKEN:
+                    yield ChatResponse(event=MessageDeltaEvent(text_delta=event.event_data.text))
+
+                case StreamingEventType.ASSISTANT_MESSAGE:
+                    logger.info(f"Processing assistant message for conversation {conversation.conversation_id}")
+                    assistant_message = ConversationMessage(
+                        conversation_id=conversation.conversation_id,
+                        role=Role.ASSISTANT,
+                        content=event.event_data.content,
+                    )
+                    await self.conversation_manager.add_pending_message(message=assistant_message)
+                    logger.debug(f"Added assistant message to pending for conversation {conversation.conversation_id}")
+                    yield ChatResponse(event=AssistantResponseEvent(response=assistant_message))
+
+                case StreamingEventType.TOOL_RESULT:
+                    if tool_use_count >= max_tool_retries_per_turn:
+                        logger.warning(
+                            f"Max tool retries ({max_tool_retries_per_turn}) reached for conversation "
+                            f"{conversation.conversation_id}"
+                        )
+                        continue
+
+                    logger.info(
+                        f"Processing tool result for conversation {conversation.conversation_id} "
+                        f"(attempt {tool_use_count + 1}/{max_tool_retries_per_turn})"
+                    )
+                    tool_result = event.event_data.content
+                    tool_result_message = ConversationMessage(
+                        conversation_id=conversation.conversation_id,
+                        role=Role.USER,
+                        content=[tool_result],
+                    )
+
+                    await self.conversation_manager.add_pending_message(message=tool_result_message)
+                    logger.debug(f"Added tool result to pending for conversation {conversation.conversation_id}")
+
+                    await self.conversation_manager.commit_pending(conversation_id=conversation.conversation_id)
+                    logger.debug(f"Committed pending messages for conversation {conversation.conversation_id}")
+
+                    tool_result_processed = True
+                    conversation = await self.conversation_manager.get_conversation_history(
+                        conversation_id=conversation.conversation_id,
+                    )
+                    logger.debug(
+                        f"Retrieved updated conversation history for {conversation.conversation_id}. "
+                        f"Starting new stream..."
+                    )
+
+                    async for new_event in self._process_stream(conversation, tool_use_count + 1):
+                        yield new_event
+
+                case StreamingEventType.MESSAGE_STOP:
+                    if not tool_result_processed:
+                        logger.debug(
+                            f"No tool result processed, committing pending messages for conversation "
+                            f"{conversation.conversation_id}"
+                        )
+                        await self.conversation_manager.commit_pending(conversation_id=conversation.conversation_id)
+                    else:
+                        logger.debug(
+                            f"Tool result already processed for conversation {conversation.conversation_id}, "
+                            f"skipping commit"
+                        )
+                    yield ChatResponse(event=MessageDoneEvent())
+                    return
 
     async def get_conversations(self, user_id: UUID) -> ConversationListResponse:
         """Return a list of all conversations for a users, ordered into time groups."""

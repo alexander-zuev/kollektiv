@@ -1,11 +1,12 @@
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
 
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
-from src.models.llm_models import Tool, ToolInputSchema
+from src.models.llm_models import Tool, ToolInputSchema, ToolName
 
 logger = get_logger()
 
@@ -15,7 +16,7 @@ class ToolManager:
 
     def __init__(self, tools_dir: Path = settings.tools_dir, tools_file: str = settings.tools_file) -> None:
         self.tools_path = tools_dir / tools_file
-        self.tools: dict[str, Tool] = {}
+        self.tools: dict[ToolName, Tool] = {}
         self._load_tools()
 
     def _load_tools(self) -> None:
@@ -29,7 +30,9 @@ class ToolManager:
                 if "input_schema" in tool_data:
                     tool_data["input_schema"] = ToolInputSchema(**tool_data["input_schema"])
 
-                self.tools[name] = Tool(**tool_data)
+                # Convert string name to ToolName enum
+                tool_name = ToolName(name)  # This validates the name matches an enum value
+                self.tools[tool_name] = Tool(**tool_data)
 
         except (yaml.YAMLError, ValidationError) as e:
             logger.error(f"Failed to load tools: {e}", exc_info=True)
@@ -39,6 +42,10 @@ class ToolManager:
         """Get all tools with caching enabled."""
         return list(self.tools.values())
 
-    def get_tool(self, name: str) -> Tool | None:
+    def get_tool(self, name: ToolName) -> Tool | None:
         """Get a specific tool by name."""
         return self.tools.get(name)
+
+    def force_tool_choice(self, name: ToolName) -> dict[str, Any]:
+        """Force tool choice."""
+        return {"type": "tool", "name": name.value}

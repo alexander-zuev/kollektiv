@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterable
 from typing import Any
 
 import anthropic
@@ -11,8 +11,14 @@ from anthropic.types import (
     ContentBlockStartEvent,
     ContentBlockStopEvent,
     InputJSONDelta,
+    Message,
+    MessageParam,
     RawContentBlockDeltaEvent,
+    RawMessageStartEvent,
+    RawMessageStopEvent,
+    TextBlockParam,
     TextDelta,
+    ToolParam,
 )
 from anthropic.types.message_stream_event import MessageStreamEvent
 from pydantic import ConfigDict, Field
@@ -38,9 +44,10 @@ from src.models.chat_models import (
     StreamingTextDelta,
     TextBlock,
     ToolResultBlock,
+    ToolResultEvent,
     ToolUseBlock,
 )
-from src.models.llm_models import SystemPrompt, Tool
+from src.models.llm_models import SystemPrompt, Tool, ToolName
 
 logger = get_logger()
 
@@ -51,11 +58,13 @@ class ClaudeAssistant(Model):
 
     Args:
         vector_db (VectorDB): The vector database instance for retrieving contextual information.
+        retriever (Retriever): The retriever instance for RAG operations.
         api_key (str, optional): The API key for the Anthropic client. Defaults to ANTHROPIC_API_KEY.
         model_name (str, optional): The name of the model to use. Defaults to MAIN_MODEL.
 
     Raises:
         anthropic.exceptions.AnthropicError: If there's an error initializing the Anthropic client.
+        NonRetryableLLMError: If there's an error initializing dependencies.
     """
 
     # Required fields
@@ -98,7 +107,7 @@ class ClaudeAssistant(Model):
         )
 
         self.client = anthropic.AsyncAnthropic(api_key=self.api_key, max_retries=2)
-        self.tools = self.tool_manager.get_all_tools()
+        self.tools = [self.tool_manager.get_tool(ToolName.RAG_SEARCH)]
         self.system_prompt = self.prompt_manager.get_system_prompt(document_summaries="No documents loaded yet.")
         self.retriever = retriever
         logger.debug("Claude assistant successfully initialized.")
@@ -118,12 +127,12 @@ class ClaudeAssistant(Model):
         logger.debug(f"Updated system prompt: {self.system_prompt}")
 
     @property
-    def cached_system_prompt(self) -> list[dict[str, Any]]:
+    def cached_system_prompt(self) -> list[TextBlockParam]:
         """Get cached system prompt for Anthropic API."""
         return [self.system_prompt.with_cache()]
 
     @property
-    def cached_tools(self) -> list[Tool]:
+    def cached_tools(self) -> Iterable[ToolParam]:
         """Return a list of cached tools with specific attributes."""
         return [tool.with_cache() for tool in self.tools]
 
@@ -139,6 +148,8 @@ class ClaudeAssistant(Model):
                 None  # used to track if we have content block of type tool_use
             )
             tool_input_json = ""  # to accumulate tool use
+            tool_result = None
+            message_stop_event = None
 
             while retries < max_retries:
                 messages = conv_history.to_anthropic_messages()
@@ -152,48 +163,45 @@ class ClaudeAssistant(Model):
                     extra_headers=self.extra_headers,
                 ) as stream:
                     async for event in stream:
-                        logger.debug(f"Received event type: {event.type}")
-
                         # Match event type
                         match event.type:
                             case "message_start":
-                                yield self.handle_message_start(event)
+                                yield self.handle_message_start(event)  # type: ignore
                             case "content_block_start":
-                                self.handle_content_block_start(event)
+                                current_tool_use_block = self.handle_content_block_start(event)  # type: ignore
                             case "content_block_delta":
-                                yield self.handle_content_block_delta(event)
+                                result = self.handle_content_block_delta(event, tool_input_json)  # type: ignore
+                                event, tool_input_json = result
+                                if event:
+                                    yield event
                             case "content_block_stop":
-                                yield await self.handle_content_block_stop(event)
+                                if event.content_block.type == "tool_use" and current_tool_use_block:  # type: ignore
+                                    tool_result = await self.handle_content_block_stop(
+                                        event,
+                                        current_tool_use_block,
+                                        tool_input_json,  # type: ignore
+                                    )
+                                    continue
                             case "message_stop":
-                                yield self.handle_message_stop(event)
+                                message_stop_event = self.handle_message_stop(event)  # type: ignore
                             case "error":
-                                yield self.handle_error(event)
+                                yield self.handle_error(event)  # type: ignore
 
                     # Get final message
-                    assistant_response = await self.handle_full_message(stream)
+                    assistant_response = await self.handle_full_message(stream)  # type: ignore
                     yield assistant_response
-                    logger.debug(f"Full response: {assistant_response}")
 
-                    # # Handle tool use and get results
-                    # tool_use_block = next(
-                    #     (
-                    #         block
-                    #         for block in assistant_response.event_data.content
-                    #         if hasattr(block, "type") and block.type == "tool_use"
-                    #     ),
-                    #     None,
-                    # )
-                    # if tool_use_block:
-                    #     tool_result = await self.handle_tool_call(tool_inputs=tool_use_block)
-                    #     # yield tool_result
-
-                    #     if tool_result.content == "No relevant context found for the original request.":
-                    #         retries += 1
-                    #         logger.warning(f"RAG search failed. Retrying... (Attempt {retries}/{max_retries})")
-                    #         continue  # Retry the entire streaming process
-
-                    # if not tool_use_block:
-                    #     break
+                    # If tool result, yield tool result
+                    if tool_result:
+                        yield StreamingEvent(
+                            event_type=StreamingEventType.TOOL_RESULT,
+                            event_data=ToolResultEvent(
+                                content=tool_result,
+                            ),
+                        )
+                    # Finally
+                    if message_stop_event:
+                        yield message_stop_event
 
         except (RetryableLLMError, NonRetryableLLMError) as e:
             logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
@@ -209,22 +217,8 @@ class ClaudeAssistant(Model):
             event_type=StreamingEventType.MESSAGE_START,
         )
 
-    def handle_content_block_delta(self, event: RawContentBlockDeltaEvent) -> StreamingEvent:
-        """Handle text token event."""
-        logger.debug("===== Stream text token =====")
-        if isinstance(event.delta, TextDelta):
-            return StreamingEvent(
-                event_type=StreamingEventType.TEXT_TOKEN,
-                event_data=StreamingTextDelta(text=event.delta.text),
-            )
-        elif isinstance(event.delta, InputJSONDelta):
-            tool_input_json += event.delta.partial_json
-            logger.debug(f"Updated tool input JSON: {tool_input_json}")
-            return None
-
     def handle_content_block_start(self, event: ContentBlockStartEvent) -> ToolUseBlock | None:
         """Handle content block start event."""
-        logger.debug("===== Stream content block started =====")
         if event.content_block.type == "tool_use":
             current_tool_use_block = ToolUseBlock(
                 block_type=event.content_block.type,
@@ -235,7 +229,23 @@ class ClaudeAssistant(Model):
             return current_tool_use_block
         return None
 
-    async def handle_content_block_stop(self, event: ContentBlockStopEvent) -> StreamingEvent:
+    def handle_content_block_delta(
+        self, event: RawContentBlockDeltaEvent, tool_input_json: str
+    ) -> tuple[StreamingEvent | None, str]:
+        """Handle text token event."""
+        if isinstance(event.delta, TextDelta):
+            return StreamingEvent(
+                event_type=StreamingEventType.TEXT_TOKEN,
+                event_data=StreamingTextDelta(text=event.delta.text),
+            ), tool_input_json
+        elif isinstance(event.delta, InputJSONDelta):
+            tool_input_json += event.delta.partial_json
+            logger.debug(f"Updated tool input JSON: {tool_input_json}")
+            return None, tool_input_json
+
+    async def handle_content_block_stop(
+        self, event: ContentBlockStopEvent, current_tool_use_block: ToolUseBlock, tool_input_json: str
+    ) -> ToolResultBlock | None:
         """Handle content block stop event."""
         logger.debug("===== Stream content block ended =====")
         if event.content_block.type == "tool_use" and current_tool_use_block:
@@ -248,20 +258,14 @@ class ClaudeAssistant(Model):
 
                 # Get tool result
                 tool_result = await self.handle_tool_call(tool_inputs=current_tool_use_block)
+                return tool_result
 
-                return StreamingEvent(
-                    event_type=StreamingEventType.TOOL_RESULT,
-                    event_data=ToolResultBlock(
-                        tool_use_id=current_tool_use_block.tool_use_id,
-                        content=tool_result.content,
-                    ),
-                )
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse tool input JSON: {tool_input_json}")
                 logger.error(f"JSON parse error: {str(e)}")
                 raise NonRetryableLLMError(
                     original_error=e, message="Failed to parse tool input JSON from LLM response"
-                )
+                ) from e
 
     def handle_error(self, event: MessageStreamEvent) -> StreamingEvent:
         """Handle error event."""
@@ -281,7 +285,7 @@ class ClaudeAssistant(Model):
     async def handle_full_message(self, stream: AsyncStream[MessageStreamEvent]) -> StreamingEvent:
         """Handle full message event."""
         full_response = await stream.get_final_message()
-        logger.debug(f"Full response: {full_response}")
+        logger.debug(f"FULL ASSISTANT RESPONSE FOR DEBUGGING: {full_response}")
         return StreamingEvent(
             event_type=StreamingEventType.ASSISTANT_MESSAGE,
             event_data=AssistantMessageEvent(
@@ -296,118 +300,54 @@ class ClaudeAssistant(Model):
 
     async def handle_tool_call(self, tool_inputs: ToolUseBlock) -> ToolResultBlock:
         """Handle tool use event."""
-        tool_result = await self.get_tool_result(tool_inputs.name, tool_inputs.input, tool_inputs.id)
+        tool_result = await self.get_tool_result(tool_inputs)
         logger.debug(f"Tool result: {tool_result}")
         return tool_result
 
-    async def get_tool_result(self, tool_name: str, tool_input: dict[str, Any], tool_use_id: str) -> ToolResultBlock:
+    async def get_tool_result(self, tool_inputs: ToolUseBlock) -> ToolResultBlock:
         """Handle tool use for specified tools."""
         try:
-            if tool_name == "rag_search":
-                search_results = await self.use_rag_search(tool_input=tool_input)
+            if tool_inputs.tool_name == "rag_search":
+                search_results = await self.use_rag_search(tool_inputs)
                 if search_results is None:
                     # Special tool use block for no context
                     tool_result = ToolResultBlock(
-                        tool_use_id=tool_use_id,
+                        tool_use_id=tool_inputs.tool_use_id,
                         content="No relevant context found for the original request.",
                     )
                 else:
                     # Regular tool use block with context
                     tool_result = ToolResultBlock(
-                        tool_use_id=tool_use_id,
+                        tool_use_id=tool_inputs.tool_use_id,
                         content=f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
                         f"Please use this context to answer my original request, if it's relevant.",
                     )
 
                 return tool_result
 
-            raise ValueError(f"Unknown tool: {tool_name}")
+            raise ValueError(f"Unknown tool: {tool_inputs.tool_name}")
         except Exception as e:
-            logger.error(f"Error executing tool {tool_name}: {str(e)}", exc_info=True)
+            logger.error(f"Error executing tool {tool_inputs.tool_name}: {str(e)}", exc_info=True)
             raise NonRetryableLLMError(
                 original_error=e, message=f"An error occurred while handling tool: {str(e)}"
             ) from e
 
-    @anthropic_error_handler
     # TODO: this method belongs to retriever
-    async def formulate_rag_query(self, important_context: str) -> str:
-        """
-        Formulate a RAG search query based on recent conversation history and important context.
+    async def use_rag_search(self, tool_inputs: ToolUseBlock) -> list[str] | None:
+        """Perform RAG search using the provided tool input.
 
         Args:
-            important_context (str): A string containing important contextual information.
-
-        Returns:
-            str: A formulated search query for RAG.
-
-        Raises:
-            ValueError: If 'recent_conversation_history' is empty.
+            tool_inputs: ToolUseBlock containing the rag_query
         """
-        logger.debug(f"Important context: {important_context}")
-
-        if not important_context:
-            logger.warning("Important context is empty, proceeding to rag search query formulation without it")
-
-        query_generation_prompt = f"""
-        Based on the following conversation context and the most recent user query, formulate the best possible search
-        query for searching in the vector database.
-
-        When preparing the query please take into account the following:
-        - The query will be used to retrieve documents from a local vector database
-        - The type of search used is vector similarity search
-        - The most recent user query is especially important
-
-        Query requirements:
-        - Provide only the formulated query in your response, without any additional text.
-
-        Important context to consider: {important_context}
-
-        Formulated search query:
-        """
-
-        system_prompt = (
-            "You are an expert query formulator for a RAG system. Your task is to create optimal search "
-            "queries that capture the essence of the user's inquiry while considering the full conversation context."
-        )
-        messages = [{"role": "user", "content": query_generation_prompt}]
-        max_tokens = 150
-
-        response = await self.client.messages.create(
-            max_tokens=max_tokens,
-            system=system_prompt,
-            messages=messages,
-            model=self.model_name,
-        )
-
-        rag_query = response.content[0].text.strip()
-        return rag_query
-
-    # TODO: this method belongs to retriever
-    async def use_rag_search(self, tool_input: dict[str, Any]) -> list[str] | None:
-        """
-        Perform a retrieval-augmented generation (RAG) search using the provided tool input.
-
-        Args:
-            tool_input (dict[str, Any]): A dictionary containing 'important_context' key to formulate the RAG query.
-
-        Returns:
-            list[str] | None: A list of preprocessed ranked documents resulting from the RAG search,
-                              or None if no results are found for any query after retries.
-
-        Raises:
-            KeyError: If 'important_context' is not found in tool_input.
-        """
-        # important context
-        important_context = tool_input["important_context"]
-
-        # prepare queries for search
-        rag_query = await self.formulate_rag_query(important_context)
+        # Get the query from tool input
+        rag_query = tool_inputs.tool_input["rag_query"]  # This matches the new schema
         logger.debug(f"Using this query for RAG search: {rag_query}")
+        # Merge these two methods
         multiple_queries = await self.generate_multi_query(rag_query)
-        combined_queries = await self.combine_queries(rag_query, multiple_queries)
+        combined_queries = multiple_queries + [rag_query]
 
         # get ranked search results
-        results = await self.retriever.retrieve(user_query=rag_query, combined_queries=combined_queries, top_n=3)
+        results = await self.retriever.retrieve(rag_query=rag_query, combined_queries=combined_queries, top_n=3)
         logger.debug(f"Retriever results: {results}")
 
         if not results:
@@ -450,116 +390,59 @@ class ClaudeAssistant(Model):
 
     @anthropic_error_handler
     @weave.op()
-    async def generate_multi_query(self, query: str, model: str | None = None, n_queries: int = 5) -> list[str]:
-        """
-        Generate multiple related queries based on a user query.
+    async def generate_multi_query(self, query: str, model: str | None = None, n_queries: int = 3) -> list[str]:
+        """Generate multiple search queries from a single user query using Claude's tool use capability."""
+        messages = [
+            MessageParam(
+                role="user",
+                content=[
+                    TextBlockParam(
+                        type="text", text=f"Generate {n_queries} search queries for the following question: {query}"
+                    ),
+                ],
+            )
+        ]
 
-        Args:
-            query (str): The original user query.
-            model (str, optional): The model used for generating queries. Defaults to None.
-            n_queries (int, optional): The number of related queries to generate. Defaults to 5.
-
-        Returns:
-            list[str]: A list of generated queries related to the original query.
-
-        Raises:
-            Exception: If there is an error in the message generation process.
-        """
-        prompt = f"""
-            You are an AI assistant whose task is to generate multiple queries as part of a RAG system.
-            You are helping users retrieve relevant information from a vector database.
-            For the given user question, formulate up to {n_queries} related, relevant questions to assist in
-            finding the information.
-
-            Requirements to follow:
-            - Do NOT include any other text in your response except for 3 queries, each on a separate line.
-            - Provide concise, single-topic questions (without compounding sentences) that cover various aspects of
-            the topic.
-            - Ensure each question is complete and directly related to the original inquiry.
-            - List each question on a separate line without numbering.
-            """
-        if model is None:
-            model = self.model_name
-
-        message = await self.client.messages.create(
-            model=model,
+        response = await self.client.messages.create(
+            model=self.model_name,
             max_tokens=1024,
-            system=prompt,
-            messages=[{"role": "user", "content": query}],
+            messages=messages,
+            tools=[self.tool_manager.get_tool(ToolName.MULTI_QUERY)],
+            tool_choice=self.tool_manager.force_tool_choice(ToolName.MULTI_QUERY),
         )
+        logger.debug(f"Multi query tool response: {response}")
 
-        logger.debug(f"Generated multi queries: {message}")
-        content = message.content[0].text
-        content = content.split("\n")
-        return content
+        return self.parse_tool_response(response, n_queries)
 
-    async def combine_queries(self, user_query: str, generated_queries: list[str]) -> list[str]:
-        """
-        Combine user query with generated queries.
+    def parse_tool_response(self, response: Message, n_queries: int) -> list[str]:
+        """Parse the tool response from the Anthropic API."""
+        # Extract tool calls
+        tool_calls = [block for block in response.content if block.type == "tool_use"]
+        if not tool_calls:
+            logger.error("No tool use in response")
+            raise ValueError("Claude failed to use the multi_query_tool")
 
-        Args:
-            user_query (str): The initial user-provided query.
-            generated_queries (list[str]): A list of queries generated by the system.
+        tool_input = tool_calls[0].input
 
-        Returns:
-            list[str]: A list containing the user query and the filtered generated queries.
+        # Parse and validate the JSON response
+        try:
+            # Expect: {"queries": ["query1", "query2", ...]}
+            if "queries" not in tool_input:
+                raise KeyError("Response missing 'queries' key")
 
-        Raises:
-            None
-        """
-        combined_queries = [query for query in [user_query] + generated_queries if query.strip()]
-        return combined_queries
+            queries = tool_input["queries"]
+            if not isinstance(queries, list):
+                raise ValueError(f"Expected list of queries, got {type(queries)}")
 
-    @anthropic_error_handler
-    @weave.op()
-    async def predict(self, question: str) -> dict:
-        """
-        Predict the answer to the given question.
+            if not all(isinstance(q, str) for q in queries):
+                raise ValueError("All queries must be strings")
 
-        Args:
-            question (str): The question for which an answer is to be predicted.
+            if not queries:
+                raise ValueError("Empty queries list returned")
 
-        Returns:
-            dict: A dictionary containing the answer and the contexts retrieved.
+            # Return exactly n_queries
+            return queries[:n_queries]
 
-        Raises:
-            TypeError: If the `question` is not of type `str`.
-            Exception: If there is an error in getting the response.
-        """
-        logger.debug(f"Predict method called with row: {question}")
-        # user_input = row.get('question', '')
-
-        self.reset_conversation()  # reset history and context for each prediction
-
-        answer = self.get_response(question, stream=False)
-        contexts = self.retrieved_contexts
-
-        if contexts and len(contexts) > 0:
-            context_snippet = contexts[0][:250]
-            logger.info(f"Printing answer: {answer}\n\n " f"Based on the following contexts {context_snippet}")
-        else:
-            logger.warning("No contexts retrieved for the given model output")
-
-        return {
-            "answer": answer,
-            "contexts": contexts,
-        }
-
-    # TODO: refactor to conversation history
-    def reset_conversation(self) -> None:
-        """
-        Reset the conversation state to its initial state.
-
-        Resets the conversation history and clears any retrieved contexts.
-
-        Args:
-            self: The instance of the class calling this method.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        self.conversation_history = ConversationHistory()
-        self.retrieved_contexts = []
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.error(f"Failed to parse tool response: {tool_input}")
+            raise ValueError(f"Invalid tool response format: {e}")

@@ -57,3 +57,24 @@ base_prompt: |
   Remember to use your tools judiciously and always prioritize providing the most accurate,
   helpful, and contextually relevant information to the user. Adapt your communication style to
   the user's level of understanding and the complexity of the topic at hand.
+
+multi_query_prompt: |
+  Your task is to generate multiple search queries to help retrieve relevant information from a document database.
+  For the given user question, generate {n_queries} focused, single-topic queries that cover different aspects 
+  of the information need.
+
+  Guidelines:
+  - Generate exactly {n_queries} unique queries
+  - Each query should focus on a single aspect of the question
+  - Make queries specific and targeted
+  - Avoid compound questions
+  - Return ONLY a JSON object with a "queries" key containing an array of strings
+
+  Example output format:
+  {{"queries": [
+    "What is X?",
+    "How does X work?",
+    "What are the benefits of X?"
+  ]}}
+
+  Original question: {user_question}

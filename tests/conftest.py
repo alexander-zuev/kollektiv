@@ -2,8 +2,16 @@ import os
 import uuid
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
+import anthropic
 import numpy as np
 import pytest
+from anthropic.types import (
+    ContentBlockStartEvent,
+    RawContentBlockDeltaEvent,
+    RawMessageStartEvent,
+    RawMessageStopEvent,
+    TextDelta,
+)
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fakeredis.aioredis import FakeRedis
 from fastapi.testclient import TestClient
@@ -11,7 +19,10 @@ from redis.asyncio import Redis
 
 from app import create_app
 from src.core.chat.llm_assistant import ClaudeAssistant
+from src.core.chat.prompt_manager import PromptManager, SystemPrompt
+from src.core.chat.tool_manager import Tool, ToolManager
 from src.core.content.crawler import FireCrawler
+from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.config.settings import settings
 from src.infrastructure.external.supabase_client import SupabaseClient
@@ -97,27 +108,100 @@ def real_vector_db():
 
 
 @pytest.fixture
-def claude_assistant_with_mock(mock_vector_db: VectorDB) -> ClaudeAssistant:
-    """Set up a ClaudeAssistant instance with mocked dependencies."""
-    with patch("anthropic.Anthropic") as mock_anthropic:
-        mock_client = Mock()
-        mock_client.handle_tool_use = Mock(
-            return_value={"role": "user", "content": [{"type": "tool_result", "content": "Tool response"}]}
+async def mock_anthropic_client():
+    """Create a mock Anthropic client with common responses."""
+    mock_client = AsyncMock(spec=anthropic.AsyncAnthropic)
+
+    # Mock message response
+    mock_message = Mock()
+    mock_message.content = [Mock(text="Test response", type="text")]
+    mock_message.usage.input_tokens = 100
+    mock_message.usage.output_tokens = 50
+    mock_message.stop_reason = "end_turn"
+
+    # Setup stream response
+    mock_stream = AsyncMock()
+    mock_stream.get_final_message.return_value = mock_message
+
+    # Setup async context manager for streaming
+    async def mock_stream_context():
+        yield mock_stream
+
+    mock_client.messages.create = AsyncMock(return_value=mock_message)
+    mock_client.messages.stream = AsyncMock(__aenter__=mock_stream_context)
+
+    return mock_client
+
+
+@pytest.fixture
+async def mock_retriever():
+    """Create a mock Retriever with predefined responses."""
+    mock_retriever = AsyncMock(spec=Retriever)
+    mock_retriever.retrieve = AsyncMock(return_value=["Test document 1", "Test document 2"])
+    mock_retriever.use_rag_search = AsyncMock(return_value=["Test search result"])
+    return mock_retriever
+
+
+@pytest.fixture
+def mock_tool_manager():
+    """Create a mock ToolManager with predefined tools."""
+    mock_manager = Mock(spec=ToolManager)
+    mock_manager.get_all_tools.return_value = [
+        Tool(
+            name="rag_search",
+            description="Search using RAG",
+            input_schema={"type": "object", "properties": {"important_context": {"type": "string"}}},
         )
-        mock_anthropic.return_value = mock_client
+    ]
+    return mock_manager
 
-        assistant = ClaudeAssistant(vector_db=mock_vector_db, retriever=Mock())
-        assistant.client = mock_client
 
-        assistant.conversation_history.messages = [ConversationMessage(role="user", content="Initial message")]
+@pytest.fixture
+def mock_prompt_manager():
+    """Create a mock PromptManager with predefined prompts."""
+    mock_manager = Mock(spec=PromptManager)
+    mock_manager.get_system_prompt.return_value = SystemPrompt(text="Test system prompt")
+    return mock_manager
+
+
+@pytest.fixture
+async def claude_assistant_with_mocks(
+    mock_vector_db: VectorDB,
+    mock_anthropic_client: AsyncMock,
+    mock_retriever: AsyncMock,
+    mock_tool_manager: Mock,
+    mock_prompt_manager: Mock,
+) -> ClaudeAssistant:
+    """Set up a ClaudeAssistant instance with all dependencies mocked."""
+    with patch("anthropic.AsyncAnthropic", return_value=mock_anthropic_client):
+        assistant = ClaudeAssistant(
+            vector_db=mock_vector_db,
+            retriever=mock_retriever,
+            api_key="test-key",
+            model_name="test-model",
+        )
+        assistant.tool_manager = mock_tool_manager
+        assistant.prompt_manager = mock_prompt_manager
         return assistant
 
 
 @pytest.fixture
-def claude_assistant_with_real_db(real_vector_db):
-    """Set up a ClaudeAssistant instance with real VectorDB."""
-    assistant = ClaudeAssistant(vector_db=real_vector_db)
-    return assistant
+def streaming_events():
+    """Create sample streaming events for testing."""
+    return {
+        "message_start": RawMessageStartEvent(type="message_start", message={}),
+        "content_block_start": ContentBlockStartEvent(
+            type="content_block_start",
+            content_block=Mock(type="text", id="test-id"),
+            index=0,
+        ),
+        "content_block_delta": RawContentBlockDeltaEvent(
+            type="content_block_delta",
+            delta=TextDelta(type="text_delta", text="test"),
+            index=0,
+        ),
+        "message_stop": RawMessageStopEvent(type="message_stop", message={}),
+    }
 
 
 def pytest_addoption(parser):

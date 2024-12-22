@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 from uuid import UUID, uuid4
 
+from anthropic.types import MessageParam
 from pydantic import BaseModel, Field
 
 from src.infrastructure.common.logger import get_logger
@@ -27,6 +29,7 @@ class StreamingEventType(str, Enum):
 
     # Custom events
     TEXT_TOKEN = "text_token"
+    TOOL_RESULT = "tool_result"
     ASSISTANT_MESSAGE = "assistant_message"
 
 
@@ -45,8 +48,10 @@ class ErrorEvent(BaseModel):
 
 
 class ToolUseEvent(BaseModel):
+    """Tool use event."""
+
     type: Literal["tool_use"] = "tool_use"
-    tool_use_input: ToolUseBlock = Field(..., description="Tool use inputs")
+    content: ToolUseBlock = Field(..., description="Tool use inputs")
 
 
 class AssistantMessageEvent(BaseModel):
@@ -56,11 +61,18 @@ class AssistantMessageEvent(BaseModel):
     content: list[TextBlock | ToolUseBlock] = Field(..., description="Assistant response content blocks")
 
 
+class ToolResultEvent(BaseModel):
+    """Tool result event."""
+
+    type: Literal["tool_result"] = "tool_result"
+    content: ToolResultBlock = Field(..., description="Tool result content block")
+
+
 class StreamingEvent(BaseModel):
     """Anthropic event structure for internal use."""
 
     event_type: StreamingEventType = Field(..., description="Type of the event")
-    event_data: StreamingTextDelta | ErrorEvent | AssistantMessageEvent | None = Field(
+    event_data: StreamingTextDelta | ErrorEvent | AssistantMessageEvent | ToolUseEvent | ToolResultEvent | None = Field(
         None, description="Text delta or error event"
     )
 
@@ -128,7 +140,7 @@ class ConversationMessage(SupabaseModel):
 
     _db_config: ClassVar[dict] = {"schema": "chat", "table": "messages", "primary_key": "message_id"}
 
-    def to_anthropic(self) -> dict[str, Any]:
+    def to_anthropic(self) -> MessageParam:
         """Convert to Anthropic API format"""
         return {
             "role": self.role.value,
@@ -166,7 +178,7 @@ class ConversationHistory(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Creation timestamp")
     updated_at: datetime | None = Field(default=None, description="Last updated timestamp")
 
-    def to_anthropic_messages(self) -> list[dict]:
+    def to_anthropic_messages(self) -> Iterable[MessageParam]:
         """Convert entire history to Anthropic format"""
         return [msg.to_anthropic() for msg in self.messages]
 

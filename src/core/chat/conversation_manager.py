@@ -78,7 +78,9 @@ class ConversationManager:
         if message.conversation_id is None:
             raise ValueError("Conversation ID is required")
         await self.redis_repository.rpush_method(message.conversation_id, message)
-        logger.info(f"Added pending message [role={message.role}] to conversation {message.conversation_id}")
+        logger.info(
+            f"Added pending message [role={message.role}] to conversation {message.conversation_id} with message_id {message.message_id}"
+        )
         logger.debug(f"Pending message details: {message.model_dump(exclude={'content'})}")
         return message
 
@@ -133,6 +135,7 @@ class ConversationManager:
                     pending_messages = await self.redis_repository.lrange_method(
                         key=conversation_id, start=0, end=-1, model_class=ConversationMessage
                     )
+                    logger.debug(f"Pending messages: {pending_messages}")
 
                     # 3. Update conversation history
                     conversation.messages.extend(pending_messages)
@@ -178,7 +181,7 @@ class ConversationManager:
                         if isinstance(block.content, dict):
                             total_tokens += len(self.tokenizer.encode(json.dumps(block.content, sort_keys=True)))
                             logger.debug(f"Token count for tool result: {total_tokens}")
-        logger.debug(f"Total token count: {total_tokens}")
+        # logger.debug(f"Total token count: {total_tokens}")
         return total_tokens
 
     async def _prune_history(self, conversation: ConversationHistory) -> ConversationHistory:
@@ -189,7 +192,9 @@ class ConversationManager:
 
         return conversation
 
-    async def get_conversation(self, conversation_id: UUID, message: UserMessage) -> ConversationHistory:
+    async def get_conversation_history(
+        self, conversation_id: UUID, message: UserMessage | None = None
+    ) -> ConversationHistory:
         """Fetches a conversation from Redis or Supabase, if not found in Redis."""
         conversation = await self.redis_repository.get_method(conversation_id, ConversationHistory)
 
@@ -199,7 +204,8 @@ class ConversationManager:
             conversation = await self.data_service.get_conversation_history(conversation_id)
 
         # Add message to the conversation in-memory
-        conversation_message = await self._convert_user_message(message)
-        conversation.messages.append(conversation_message)
+        if message:
+            conversation_message = await self._convert_user_message(message)
+            conversation.messages.append(conversation_message)
 
         return conversation

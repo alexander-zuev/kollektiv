@@ -2,55 +2,91 @@ rag_search:
   name: rag_search
   description: |
     Retrieves relevant information from a local document database using RAG (Retrieval Augmented Generation)
-    technology. This tool performs a semantic search on a vector database containing pre-processed and embedded
+    technology. This tool performs semantic search on a vector database containing pre-processed and embedded
     documents, returning the most relevant content based on the input query.
 
     What this tool does:
-    1. Analyzes the conversation context and user query to formulate an optimal search query.
-    2. Performs a vector similarity search in the local document database.
-    3. Retrieves and ranks the most relevant document chunks.
-    4. Returns a list of relevant text passages along with their relevance scores.
+    1. Takes a direct search query and performs vector similarity search
+    2. Retrieves and ranks the most relevant document chunks
+    3. Returns formatted text passages with relevance scores
+
+    Example input:
+    {
+      "rag_query": "How do React hooks manage component state?"
+    }
+
+    Example output:
+    - A list of relevant text passages, each containing:
+      * Document text
+      * Relevance score
+      * Source information (if available)
+    - Returns null if no relevant content is found
 
     When to use this tool:
-    1. The user request requires up-to-date information about specific libraries, APIs, or topics that are indexed
-    in the local vector database.
-    2. You need to verify or expand on information related to the documents in the database.
-    3. The user's query is complex or requires detailed technical information that may not be part of your general
-    knowledge.
-    4. You need to provide accurate, source-based responses for technical or domain-specific questions.
+    1. When you need specific information from the indexed documentation
+    2. When verifying technical details or implementation specifics
+    3. When the user asks about topics covered in the loaded documents
+    4. When you need authoritative source material for your response
 
     When NOT to use this tool:
-    1. For general knowledge questions that don't require specific document retrieval.
-    2. When the user's query is clearly outside the scope of the indexed documents.
-    3. For tasks that require real-time data or information that wouldn't be present in static documentation.
+    1. For general knowledge questions not requiring document lookup
+    2. When the query is clearly outside the scope of indexed documents
+    3. For real-time or dynamic data requests
+    4. For questions about very recent changes not yet in your knowledge base
 
-    Parameters:
-    - important_context (string, required): The key information from the conversation history and current query
-    that should be considered when formulating the search query. This helps in generating a more targeted and
-    relevant search.
+    Important caveats:
+    1. The tool's effectiveness depends on the quality of the search query
+    2. Results are ranked by vector similarity to the query
+    3. Only searches within pre-loaded documentation
+    4. Cannot access external resources or the internet
 
-    How this tool's results are used:
-    1. The tool returns a list of relevant text passages and their relevance scores.
-    2. You should analyze these passages and incorporate the most relevant information into your response.
-    3. Always cite or reference the source of the information when using it in your answers.
-
-    Important caveats and limitations:
-    1. The tool's effectiveness depends on the quality and recency of the indexed documents.
-    2. It may not have information on very recent developments or changes not yet indexed in the database.
-    3. The tool does not understand or interpret the retrieved information; it's your responsibility to analyze and
-    use it appropriately.
-    4. The relevance scores are based on vector similarity and may not always perfectly match semantic relevance.
-    5. This tool does not have access to external resources or the internet; it only searches the local
-    document database.
-
-    Remember to use this tool judiciously and always prioritize providing accurate, helpful, and contextually
-    relevant information to the user.
   input_schema:
     type: object
     properties:
-      important_context:
+      rag_query:
         type: string
-        description:
-          The most important context that should be taken into account by the LLM assistant
-          that is going to be generating the actual search query.
-    required: ["important_context"]
+        description: The direct search query to find relevant information in the document database
+    required: ["rag_query"]
+
+multi_query_tool:
+  name: multi_query_tool
+  description: |
+    Generates multiple search queries based on the user's original question to improve RAG retrieval results. 
+    You must return a JSON object with a "queries" array containing the generated queries.
+
+    What this tool does:
+    1. Analyzes the user's question to identify key concepts and information needs
+    2. Generates multiple variations and aspects of the question
+    3. Returns a list of focused, single-topic queries in JSON format
+
+    Example input:
+    {
+      "question": "What are the key features of React hooks?"
+    }
+
+    Example output:
+    {
+      "queries": [
+        "What is the basic purpose of React hooks?",
+        "How do React hooks differ from class components?",
+        "What are the most commonly used React hooks?",
+        "What are the rules of using React hooks?",
+        "What are the performance benefits of React hooks?"
+      ]
+    }
+
+    Requirements:
+    1. Always return exactly n_queries number of queries (or 3 if not specified)
+    2. Each query must be a complete, focused question
+    3. Queries should cover different aspects of the original question
+    4. Output must be valid JSON with a "queries" key containing an array of strings
+
+  input_schema:
+    type: object
+    properties:
+      queries:
+        type: array
+        items:
+          type: string
+        description: The list of queries to generate
+    required: ["queries"]

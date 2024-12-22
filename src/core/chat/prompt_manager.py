@@ -23,3 +23,13 @@ class PromptManager:
         """Get system prompt model with provided kwargs."""
         text = self.prompts["base_prompt"].format(**kwargs)
         return SystemPrompt(text=text)
+
+    def get_multi_query_prompt(self, **kwargs: Any) -> str:
+        """Get multi-query prompt."""
+        try:
+            text = self.prompts["multi_query_prompt"].format(**kwargs)
+        except KeyError:
+            raise ValueError("Multi-query prompt not found")
+        if isinstance(text, str):
+            return text
+        raise ValueError("Multi-query prompt is not a string")
