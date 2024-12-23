@@ -26,10 +26,6 @@ class JobStatus(str, Enum):
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
-    # Updated
-    CRAWLING = "crawling"
-    PROCESSING = "processing"
-    LOADING = "loading"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -39,6 +35,7 @@ class JobType(str, Enum):
     """Represents the type of a job."""
 
     CRAWL = "crawl"
+    PROCESSING = "processing"
 
 
 class CrawlJobDetails(BaseModel):
@@ -55,6 +52,13 @@ class CrawlJobDetails(BaseModel):
     url: str = Field(..., description="URL that was crawled")
 
 
+class ProcessingJobDetails(BaseModel):
+    """Detailed information about a processing job - chunking and vector storage."""
+
+    source_id: UUID = Field(..., description="Maps each processing job to the Source object.")
+    document_ids: list[UUID] = Field(..., description="List of document ids to be processed.")
+
+
 class Job(SupabaseModel):
     """Track crawl job status and progress"""
 
@@ -64,7 +68,7 @@ class Job(SupabaseModel):
     job_type: JobType = Field(..., description="Type of the job.")
 
     # Job details
-    details: dict = Field(..., description="Detailed information about the job.")
+    details: CrawlJobDetails | ProcessingJobDetails = Field(..., description="Detailed information about the job.")
 
     # Timing
     completed_at: datetime | None = Field(None, description="Completion timestamp")
