@@ -11,6 +11,7 @@ from src.models.job_models import (
     Job,
     JobStatus,
     JobType,
+    ProcessingJobDetails,
 )
 from src.services.data_service import DataService
 
@@ -23,7 +24,7 @@ class JobManager:
     def __init__(self, data_service: DataService) -> None:
         self.data_service = data_service
 
-    def _create_job_details(self, job_type: JobType, **kwargs: Any) -> dict:
+    def _create_job_details(self, job_type: JobType, **kwargs: Any) -> list[CrawlJobDetails | ProcessingJobDetails]:
         """
         Create job details based on job type.
 
@@ -42,6 +43,8 @@ class JobManager:
         match job_type:
             case JobType.CRAWL:
                 return CrawlJobDetails(**kwargs).model_dump()
+            case JobType.PROCESS:
+                return ProcessingJobDetails(**kwargs).model_dump()
             case _:
                 raise ValidationError(f"Unsupported job type: {job_type}")
 

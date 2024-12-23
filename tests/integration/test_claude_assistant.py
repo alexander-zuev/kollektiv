@@ -6,8 +6,10 @@ from unittest.mock import Mock, patch
 import pytest
 from anthropic.types import ToolUseBlock
 
-from src.core.chat.claude_assistant import ClaudeAssistant
-from src.core.search.vector_db import Reranker, ResultRetriever, VectorDB
+from src.core.chat.llm_assistant import ClaudeAssistant
+from src.core.search.reranker import Reranker
+from src.core.search.retriever import Retriever
+from src.core.search.vector_db import VectorDB
 
 
 @pytest.fixture(scope="function")
@@ -15,7 +17,7 @@ def test_claude_assistant(real_vector_db: VectorDB) -> Generator[ClaudeAssistant
     """Create a Claude Assistant instance with real vector DB."""
     # Create and initialize the retriever
     reranker = Reranker()
-    retriever = ResultRetriever(vector_db=real_vector_db, reranker=reranker)
+    retriever = Retriever(vector_db=real_vector_db, reranker=reranker)
 
     # Initialize assistant with the properly set up retriever
     assistant = ClaudeAssistant(vector_db=real_vector_db)

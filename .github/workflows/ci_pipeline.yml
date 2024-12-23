@@ -64,6 +64,7 @@ jobs:
   test:
     name: Unit and Integration Tests
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -80,6 +81,9 @@ jobs:
         run: |
           poetry lock --no-update
           poetry install --with dev --no-interaction --no-root
+
+      - name: Start Redis
+        run: docker-compose -f scripts/deps/docker-compose.yml up -d
 
       - name: Run all tests
         id: all-tests
@@ -100,3 +104,7 @@ jobs:
           file: coverage.xml
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Stop Redis
+        if: always()
+        run: docker-compose -f scripts/deps/docker-compose.yml down

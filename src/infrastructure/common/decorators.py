@@ -1,7 +1,7 @@
 import asyncio
 import functools
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
@@ -16,11 +16,18 @@ from anthropic import (
     RateLimitError,
 )
 
-from src.core._exceptions import DatabaseError, NonRetryableLLMError, RetryableLLMError
+from src.core._exceptions import (
+    DatabaseError,
+    EntityNotFoundError,
+    EntityValidationError,
+    NonRetryableLLMError,
+    RetryableLLMError,
+)
 from src.infrastructure.common.logger import get_logger
 
 logger = get_logger()
 
+RT = TypeVar("RT")
 P = ParamSpec("P")
 T = TypeVar("T")
 
@@ -94,7 +101,10 @@ def application_level_handler(func: Callable) -> Callable[..., T]:
 
 def anthropic_error_handler(func: Callable) -> Callable[..., T]:
     """
-    Apply error handling for various exceptions encountered in Anthropic API calls.
+    Applies error handling for various exceptions encountered during Anthropic API calls.
+
+    This decorator catches and handles specific exceptions from the Anthropic API,
+    raising custom exceptions for retryable and non-retryable errors.
 
     Args:
         func (Callable): The function to be wrapped with error handling.
@@ -103,16 +113,8 @@ def anthropic_error_handler(func: Callable) -> Callable[..., T]:
         Callable: A wrapper function that includes error handling.
 
     Raises:
-        AuthenticationError: If authentication fails.
-        BadRequestError: If the request is invalid.
-        PermissionDeniedError: If permission is denied.
-        NotFoundError: If the resource is not found.
-        RateLimitError: If the rate limit is exceeded.
-        APIConnectionError: For API connection issues, including timeout errors.
-        InternalServerError: If there's an internal server error.
-        APIError: For unexpected API errors.
-        AnthropicError: For unexpected Anthropic-specific errors.
-        Exception: For any other unexpected errors.
+        RetryableLLMError: For errors that can be retried, such as rate limits or timeouts.
+        NonRetryableLLMError: For errors that cannot be retried, such as authentication or bad requests.
     """
 
     @functools.wraps(func)
@@ -148,29 +150,47 @@ def anthropic_error_handler(func: Callable) -> Callable[..., T]:
     return sync_wrapper
 
 
-def supabase_operation(func: Callable[P, T]) -> Callable[P, T]:
+def supabase_operation(func: Callable[P, Coroutine[Any, Any, RT]]) -> Callable[P, Coroutine[Any, Any, RT]]:
     """
-    Decorator to handle Supabase database operation errors.
+    Handles common Supabase operations and errors.
 
-    Catches exceptions during Supabase operations, logs the error,
-    and raises a custom DatabaseError.
+    This decorator catches common exceptions that can occur during Supabase
+    operations, such as database errors, entity not found errors, and
+    validation errors. It also handles logging of these errors.
 
     Args:
-        func: The function to be decorated.
+        func: The function to decorate.
 
     Returns:
         The decorated function.
 
     Raises:
-        DatabaseError: If any exception occurs during the Supabase operation.
+        DatabaseError: If a database error occurs.
+        EntityNotFoundError: If an entity is not found.
+        EntityValidationError: If an entity fails validation.
     """
 
-    @functools.wraps(func)
-    async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+    @wraps(func)
+    async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> RT:
         try:
             return await func(*args, **kwargs)
+        except DatabaseError as e:
+            logger.error(f"Database error in {func.__name__}: {e.error_message}")
+            raise e from None
+        except EntityNotFoundError as e:
+            logger.warning(f"Entity not found error in {func.__name__}: {e.error_message}")
+            raise e from None
+        except EntityValidationError as e:
+            logger.error(f"Entity validation error in {func.__name__}: {e.error_message}")
+            raise e from None
         except Exception as e:
-            logger.error(f"Database operation failed in {func.__name__}: {e}", exc_info=True)
-            raise DatabaseError(message=str(e), operation=func.__name__, entity_type="Supabase", cause=e) from e
+            logger.error(f"Unexpected error in {func.__name__}: {e}", exc_info=True)
+            raise DatabaseError(
+                error_message=f"Unexpected error in {func.__name__}",
+                operation=func.__name__,
+                entity_type=None,
+                details={"error": str(e)},
+                cause=e,
+            ) from e
 
     return async_wrapper

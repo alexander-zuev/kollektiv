@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.infrastructure.config.settings import settings
-from src.models.base_models import BaseDbModel
+from src.models.base_models import SupabaseModel
 
 
 class ScrapeOptions(BaseModel):
@@ -324,7 +324,7 @@ class CrawlData(BaseModel):
 
 
 # Crawl Result
-class CrawlResult(BaseDbModel):
+class CrawlResult(SupabaseModel):
     """Model representing the result of a web crawl operation."""
 
     _db_config: ClassVar[dict] = {"schema": "content", "table": "crawl_results", "primary_key": "result_id"}

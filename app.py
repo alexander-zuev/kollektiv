@@ -1,11 +1,12 @@
 import json
-from collections.abc import AsyncGenerator
+import subprocess
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 import logfire
 import sentry_sdk
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -31,9 +32,10 @@ logger = get_logger()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events."""
     try:
-        # Initialize ngrok for local development
+        # Initialize external dependencies for local development
         if settings.environment == Environment.LOCAL:
             settings.setup_ngrok()
+            subprocess.run(["docker-compose", "-f", "scripts/external_deps/docker-compose.yml", "up", "-d"])
 
         # Initialize services
         container = ServiceContainer()
@@ -52,6 +54,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from pyngrok import ngrok
 
             ngrok.kill()
+        if settings.environment == Environment.LOCAL:
+            subprocess.run(["docker-compose", "-f", "scripts/external_deps/docker-compose.yml", "down"])
 
 
 def get_allowed_origins() -> list[str]:
@@ -67,7 +71,7 @@ def get_allowed_origins() -> list[str]:
 
 # Add debug middleware
 class RequestDebugMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         """Debug middleware to log request details."""
         try:
             # Log detailed request info

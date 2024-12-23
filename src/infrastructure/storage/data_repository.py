@@ -4,10 +4,10 @@ from uuid import UUID
 from src.infrastructure.common.decorators import supabase_operation
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.external.supabase_client import SupabaseClient
-from src.models.base_models import BaseDbModel
+from src.models.base_models import SupabaseModel
 
 logger = get_logger()
-T = TypeVar("T", bound=BaseDbModel)  # define a generic type for the repository
+T = TypeVar("T", bound=SupabaseModel)  # define a generic type for the repository
 
 
 class DataRepository:
@@ -25,13 +25,13 @@ class DataRepository:
         saved = await repo.save(source)
 
         # Query jobs by status
-        jobs = await repo.query(
+        jobs = await repo.find(
             Job,
             filters={"status": JobStatus.PENDING}
         )
 
         # Complex JSONB queries
-        sources = await repo.query(
+        sources = await repo.find(
             DataSource,
             filters={
                 "metadata->url": "https://...",
@@ -40,7 +40,7 @@ class DataRepository:
         )
 
         # Pagination and ordering
-        requests = await repo.query(
+        requests = await repo.find(
             AddContentSourceRequest,
             order_by="created_at.desc",
             limit=10
@@ -82,7 +82,7 @@ class DataRepository:
 
         # All entities must be same type
         entity_type = type(entities[0])
-        data = [e.model_dump(mode="json") for e in entities]
+        data = [e.model_dump(mode="json", by_alias=True, serialize_as_any=True) for e in entities]
 
         # Single transaction for all entities
         result = await (
@@ -97,8 +97,8 @@ class DataRepository:
         return saved if isinstance(entity, list) else saved[0]
 
     @supabase_operation
-    async def get_by_id(self, model_class: type[T], id: UUID) -> T | None:
-        """Retrieve an entity by its primary key.
+    async def find_by_id(self, model_class: type[T], id: UUID) -> T | None:
+        """Retrieve a single entity by its primary key.
 
         Args:
             model_class: The model class to query
@@ -108,14 +108,16 @@ class DataRepository:
             Entity instance or None if not found
 
         Examples:
-            source = await repo.get_by_id(DataSource, source_id)
-            job = await repo.get_by_id(Job, job_id)
+            source = await repo.find_by_id(DataSource, source_id)
+            job = await repo.find_by_id(Job, job_id)
         """
-        result = await self.query(model_class=model_class, filters={model_class._db_config["primary_key"]: str(id)})
-        return result[0] if result else None
+        result = await self.find(model_class=model_class, filters={model_class._db_config["primary_key"]: str(id)})
+        if result:
+            return model_class.model_validate(result[0])
+        return None
 
     @supabase_operation
-    async def query(
+    async def find(
         self,
         model_class: type[T],
         filters: dict[str, Any] | None = None,
@@ -140,13 +142,13 @@ class DataRepository:
 
         Examples:
             # Get pending jobs
-            jobs = await repo.query(
+            jobs = await repo.find(
                 Job,
                 filters={"status": JobStatus.PENDING}
             )
 
             # Get sources with pagination
-            sources = await repo.query(
+            sources = await repo.find(
                 DataSource,
                 filters={"status": SourceStatus.COMPLETED},
                 order_by="created_at.desc",
@@ -155,7 +157,7 @@ class DataRepository:
             )
 
             # Query by JSONB field
-            requests = await repo.query(
+            requests = await repo.find(
                 AddContentSourceRequest,
                 filters={"request_config->url": "https://..."}
             )

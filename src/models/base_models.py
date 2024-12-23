@@ -4,8 +4,8 @@ from typing import Any, ClassVar, Self
 from pydantic import BaseModel, Field, PrivateAttr
 
 
-class BaseDbModel(BaseModel):
-    """Base class for all models stored in the database."""
+class SupabaseModel(BaseModel):
+    """Base class for all models stored in the Supabase database."""
 
     _db_config: ClassVar[dict] = PrivateAttr(
         default={

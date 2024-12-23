@@ -53,6 +53,12 @@ class InvalidWebhookEventError(WebhookError):
 
 
 # Chat-related errors
+class ConversationNotFoundError(KollektivError):
+    """Conversation not found."""
+
+    pass
+
+
 # Content-related errors
 class DataSourceError(KollektivError):
     """Exception raised for errors related to Data Source operations."""
@@ -149,7 +155,7 @@ class DatabaseError(NonRetryableError):
         self,
         error_message: str,
         operation: str,
-        entity_type: str,
+        entity_type: str | None = None,
         details: dict | None = None,
         cause: Exception | None = None,
     ):
@@ -157,7 +163,7 @@ class DatabaseError(NonRetryableError):
         self.entity_type = entity_type
         self.details = details or {}
         self.cause = cause
-        super().__init__(error_message, **kwargs)
+        super().__init__(error_message)
 
     def add_context(self, operation: str, entity_type: str) -> Self:
         """Adds context information to the exception."""

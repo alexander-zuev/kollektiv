@@ -5,7 +5,6 @@ from typing import Any
 
 import aiofiles
 import anthropic
-from anthropic import AsyncAnthropic
 import weave
 from anthropic.types import Message
 
