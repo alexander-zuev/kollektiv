@@ -13,7 +13,9 @@ services:
     restart: unless-stopped
 
   rq-worker-service:
-    image: python:3.12.7-slim
+    build:
+      context: ../../
+      dockerfile: scripts/docker/Dockerfile
     # container_name: rq-worker
     deploy:
       replicas: 2
@@ -21,16 +23,10 @@ services:
       - ../../config/environments/.env
     volumes:
       - ../../:/app
-    working_dir: /app
     environment:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - REDIS_QUEUE_NAME=${REDIS_QUEUE_NAME:-processing}
       - PYTHONPATH=/app # Ensure Python can find your modules
-    command: >
-      bash -c "pip install poetry 
-      && poetry config virtualenvs.create false 
-      && poetry install 
-      && poetry run rq worker ${REDIS_QUEUE_NAME:-processing}"
     depends_on:
       redis-service:
         condition: service_healthy

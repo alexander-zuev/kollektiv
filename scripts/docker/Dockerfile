@@ -1,22 +1,32 @@
-   # Use a base image
-   FROM python:3.12-slim
+# Use a base image
+FROM python:3.12-slim
 
-   # Set the working directory
-   WORKDIR /app
 
-   # Copy only the necessary files for installing dependencies
-   COPY pyproject.toml poetry.lock ./
+# Prevents Python from writing pyc files.
+ENV PYTHONDONTWRITEBYTECODE=1
 
-   # Install Poetry and dependencies
-   RUN pip install poetry \
-       && poetry config virtualenvs.create false \
-       && poetry install --no-dev
+# Keeps Python from buffering stdout and stderr to avoid situations where
+# the application crashes without emitting any logs due to buffering.
+ENV PYTHONUNBUFFERED=1
 
-   # Copy the rest of your application code
-   COPY . .
+# Set the working directory in Container
+WORKDIR /app
 
-   # Set environment variables
-   ENV PYTHONPATH=/app
+# Copy only the necessary files for installing dependencies
+COPY pyproject.toml poetry.lock ./
 
-   # Command to run the worker
-   CMD ["poetry", "run", "rq", "worker", "--url", "$REDIS_URL", "$REDIS_QUEUE_NAME"]
+# Install Poetry and dependencies
+RUN pip install poetry \
+    && poetry config virtualenvs.create false \
+    && poetry install --no-dev
+
+# Copy the rest of your application code
+COPY . .
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV REDIS_URL=redis://host.docker.internal:6379/0
+ENV REDIS_QUEUE_NAME=processing
+
+# Use exec form with shell to handle env vars and signals properly
+CMD ["/bin/sh", "-c", "exec poetry run rq worker --url ${REDIS_URL} ${REDIS_QUEUE_NAME}"]

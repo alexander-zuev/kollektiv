@@ -107,7 +107,6 @@ class Settings(BaseSettings):
     # Redis queue
     redis_queue_name: str = Field("processing", description="Redis queue name", alias="REDIS_QUEUE_NAME")
     processing_queue_timeout: str = Field("3h", description="Processing queue timeout", alias="REDIS_QUEUE_TIMEOUT")
-    worker_count: int = Field(1, description="Number of worker threads", alias="REDIS_WORKER_COUNT")
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),
