@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Initialize external dependencies for local development
         if settings.environment == Environment.LOCAL:
             settings.setup_ngrok()
-            subprocess.run(["docker-compose", "-f", "scripts/external_deps/docker-compose.yml", "up", "-d"])
+            subprocess.run(["docker-compose", "-f", "scripts/docker/docker-compose.yml", "up", "-d"])
 
         # Initialize services
         container = ServiceContainer()

@@ -1,0 +1,37 @@
+name: kollektiv-external-deps
+services:
+  redis-service:
+    image: redis:7.4.1-alpine
+    ports:
+      - "6379:6379"
+    container_name: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  rq-worker-service:
+    image: python:3.12.7-slim
+    # container_name: rq-worker
+    deploy:
+      replicas: 2
+    env_file:
+      - ../../config/environments/.env
+    volumes:
+      - ../../:/app
+    working_dir: /app
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_QUEUE_NAME=${REDIS_QUEUE_NAME:-processing}
+      - PYTHONPATH=/app # Ensure Python can find your modules
+    command: >
+      bash -c "pip install poetry 
+      && poetry config virtualenvs.create false 
+      && poetry install 
+      && poetry run rq worker ${REDIS_QUEUE_NAME:-processing}"
+    depends_on:
+      redis-service:
+        condition: service_healthy
+    restart: unless-stopped

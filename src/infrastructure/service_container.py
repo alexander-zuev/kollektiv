@@ -53,7 +53,7 @@ class ServiceContainer:
             self.content_service = ContentService(self.firecrawler, self.job_manager, self.data_service)
 
             # Redis
-            self.redis_client = RedisClient().client
+            self.redis_client = RedisClient().async_client
             self.redis_repository = RedisRepository(client=self.redis_client)
 
             # Chat Services
