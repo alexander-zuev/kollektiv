@@ -108,6 +108,10 @@ class Settings(BaseSettings):
     redis_queue_name: str = Field("processing", description="Redis queue name", alias="REDIS_QUEUE_NAME")
     processing_queue_timeout: str = Field("3h", description="Processing queue timeout", alias="REDIS_QUEUE_TIMEOUT")
 
+    # Chroma client
+    chroma_host: str = Field("localhost", description="Chroma host", alias="CHROMA_HOST")
+    chroma_port: int = Field(8000, description="Chroma port", alias="CHROMA_PORT")
+
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),
         env_file_encoding="utf-8",

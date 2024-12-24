@@ -1,13 +1,18 @@
-name: Docker Build and Deploy
+name: Docker Build and Push
 
 on:
   push:
     paths:
       - "scripts/docker/Dockerfile"
+      - "src/**"
+      - "pyproject.toml"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,15 +33,3 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/kollektiv-rq:latest
             ghcr.io/${{ github.repository_owner }}/kollektiv-rq:${{ github.sha }}
-
-      - name: Install Railway CLI
-        run: curl -fsSL https://railway.app/install.sh | sh
-
-      - name: Deploy to Railway
-        run: |
-          railway up \
-            --service ${{ secrets.RAILWAY_RQ_SERVICE_NAME }} \
-            --environment ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }} \
-            --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

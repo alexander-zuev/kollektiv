@@ -6,7 +6,7 @@ from rq.job import Job, JobStatus
 
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.external.redis_client import RedisClient
-from src.infrastructure.workers.tasks import chat_service_job, crawler_service_job
+from src.infrastructure.workers.tasks import chat_servibce_job, crawler_service_job
 
 logger = get_logger()
 
