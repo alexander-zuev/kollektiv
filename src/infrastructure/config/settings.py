@@ -114,6 +114,11 @@ class Settings(BaseSettings):
     chroma_url: str | None = Field(
         None, description="Chroma URL exposed by Railway service. Not set locally.", alias="CHROMA_PRIVATE_URL"
     )
+    chroma_client_auth_credentials: str | None = Field(
+        None,
+        description="Chroma client auth credentials, used only in staging/prod",
+        alias="CHROMA_CLIENT_AUTH_CREDENTIALS",
+    )
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),

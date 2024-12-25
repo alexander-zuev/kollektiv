@@ -34,13 +34,14 @@ class RQManager:
         return self.queue.enqueue(func, *args, **kwargs)
 
 
-configure_logging(debug=True)
+if __name__ == "__main__":
+    configure_logging(debug=True)
 
-rq_manager = RQManager(redis_client=RedisClient().sync_client)
+    rq_manager = RQManager(redis_client=RedisClient().sync_client)
 
-n_tasks = 10
+    n_tasks = 10
 
-for task in range(n_tasks):
-    job_id = str(uuid4())
-    sample_documents = "sample_documents"
-    rq_manager.enqueue(process_documents, job_id, sample_documents)
+    for task in range(n_tasks):
+        job_id = str(uuid4())
+        sample_documents = "sample_documents"
+        rq_manager.enqueue(process_documents, job_id, sample_documents)

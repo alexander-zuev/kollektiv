@@ -27,6 +27,8 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV REDIS_URL=redis://host.docker.internal:6379/0
 ENV REDIS_QUEUE_NAME=processing
+ENV CHROMA_PRIVATE_URL=${CHROMA_PRIVATE_URL}  
+
 
 # Use exec form with shell to handle env vars and signals properly
 # CMD ["/bin/sh", "-c", "exec poetry run rq worker --url ${REDIS_URL} ${REDIS_QUEUE_NAME}"]

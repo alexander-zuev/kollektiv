@@ -2,9 +2,10 @@ from urllib.parse import urlparse
 
 import chromadb
 from chromadb.api.async_api import AsyncClientAPI
+from chromadb.config import Settings
 
 from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infrastructure.config.settings import Environment, settings
 
 logger = get_logger()
 
@@ -32,6 +33,16 @@ class ChromaClient:
             port = settings.chroma_port
 
         instance = cls()
-        instance.client = await chromadb.AsyncHttpClient(host=host, port=port)
+        if settings.environment == Environment.LOCAL:
+            instance.client = await chromadb.AsyncHttpClient(host=host, port=port)
+        else:
+            instance.client = await chromadb.AsyncHttpClient(
+                host=host,
+                port=port,
+                settings=Settings(
+                    chroma_client_auth_provider="chromadb.auth.basic_authn.BasicAuthClientProvider",
+                    chroma_client_auth_credentials=settings.chroma_client_auth_credentials,
+                ),
+            )
         await instance.client.heartbeat()
         return instance

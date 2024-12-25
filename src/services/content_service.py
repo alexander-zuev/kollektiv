@@ -118,6 +118,7 @@ class ContentService:
     async def _create_and_save_datasource(self, request: AddContentSourceRequest) -> DataSource:
         """Initiates saving of the datasource record into the database."""
         data_source = DataSource(
+            user_id=request.user_id,
             source_type=request.source_type,
             status=SourceStatus.PENDING,
             metadata=request.request_config.model_dump(),
