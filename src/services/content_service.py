@@ -11,6 +11,7 @@ from src.core._exceptions import DataSourceError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
 from src.infrastructure.common.decorators import generic_error_handler
 from src.infrastructure.common.logger import get_logger
+from src.infrastructure.rq.rq_manager import RQManager
 from src.models.content_models import DataSource, Document, SourceStatus
 from src.models.firecrawl_models import CrawlRequest
 from src.models.job_models import Job, JobStatus, JobType
@@ -23,10 +24,17 @@ logger = get_logger()
 class ContentService:
     """Service for managing content sources."""
 
-    def __init__(self, crawler: FireCrawler, job_manager: JobManager, data_service: DataService):
+    def __init__(
+        self,
+        crawler: FireCrawler,
+        job_manager: JobManager,
+        data_service: DataService,
+        rq_manager: RQManager,
+    ):
         self.crawler = crawler
         self.job_manager = job_manager
         self.data_service = data_service
+        self.rq_manager = rq_manager
 
     @generic_error_handler
     async def add_source(self, request: AddContentSourceRequest) -> SourceAPIResponse:
@@ -110,6 +118,7 @@ class ContentService:
     async def _create_and_save_datasource(self, request: AddContentSourceRequest) -> DataSource:
         """Initiates saving of the datasource record into the database."""
         data_source = DataSource(
+            user_id=request.user_id,
             source_type=request.source_type,
             status=SourceStatus.PENDING,
             metadata=request.request_config.model_dump(),

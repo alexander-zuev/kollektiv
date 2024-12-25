@@ -1,0 +1,46 @@
+name: kollektiv-local-deps
+services:
+  redis:
+    image: redis:7.4.1-alpine
+    ports:
+      - "6379:6379"
+    container_name: redis
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  rq-worker:
+    build:
+      context: ../../
+      dockerfile: scripts/docker/Dockerfile
+    # container_name: rq-worker
+    deploy:
+      replicas: 2
+    env_file:
+      - ../../config/environments/.env
+    volumes:
+      - ../../:/app
+    environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_QUEUE_NAME=${REDIS_QUEUE_NAME:-process_documents_queue}
+      - CHROMA_HOST=chroma-server
+      - PYTHONPATH=/app # Ensure Python can find your modules
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # for local testing only
+  chroma-server:
+    image: chromadb/chroma:0.5.23
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat" ]
+      interval: 10s
+      timeout: 5s
+      retries: 1
+    restart: unless-stopped

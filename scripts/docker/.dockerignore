@@ -1,0 +1,71 @@
+# Include any files or directories that you don't want to be copied to your
+# container here (e.g., local build artifacts, temporary files, etc.).
+#
+# For more help, visit the .dockerignore file reference guide at
+# https://docs.docker.com/go/build-context-dockerignore/
+
+# Python
+__pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+.installed.cfg
+.pytest_cache/
+.coverage
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+
+# Environment & Config
+.env*
+.venv
+venv/
+ENV/
+.secrets/
+config/environments/*
+!config/environments/.env.example
+
+# Development & IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Project Specific
+src/data/raw/*
+src/data/chunks/*
+src/vector_storage/chroma/*
+logs/*
+docs/
+output_chunks/
+.sentry/
+.logfire/
+
+# Testing
+tests/
+*_test.py
+*_tests.py
+coverage.xml
+
+# Documentation
+*.md
+LICENSE*
+CHANGELOG*
+roadmap.md
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker
+
+# Dependencies
+poetry.lock  # Only if you want to use the one from build context
+
+# Version Control
+.git
+.gitignore
+.gitattributes
+.github
+
+

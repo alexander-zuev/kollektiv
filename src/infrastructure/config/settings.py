@@ -104,6 +104,22 @@ class Settings(BaseSettings):
     redis_password: str | None = Field(None, alias="REDIS_PASSWORD", description="Redis password")
     redis_url: str | None = Field(None, alias="REDIS_URL", description="Redis url")
 
+    # Redis queue
+    redis_queue_name: str = Field("process_documents_queue", description="Redis queue name", alias="REDIS_QUEUE_NAME")
+    processing_queue_timeout: str = Field("3h", description="Processing queue timeout", alias="REDIS_QUEUE_TIMEOUT")
+
+    # Chroma client
+    chroma_host: str = Field("localhost", description="Chroma host", alias="CHROMA_HOST")
+    chroma_port: int = Field(8000, description="Chroma port", alias="CHROMA_PORT")
+    chroma_url: str | None = Field(
+        None, description="Chroma URL exposed by Railway service. Not set locally.", alias="CHROMA_PRIVATE_URL"
+    )
+    chroma_client_auth_credentials: str | None = Field(
+        None,
+        description="Chroma client auth credentials, used only in staging/prod",
+        alias="CHROMA_CLIENT_AUTH_CREDENTIALS",
+    )
+
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),
         env_file_encoding="utf-8",
@@ -162,9 +178,6 @@ try:
     # Create directories
     for dir_path in [
         settings.log_dir,
-        settings.raw_data_dir,
-        settings.processed_data_dir,
-        settings.chroma_db_dir,
     ]:
         dir_path.mkdir(parents=True, exist_ok=True)
 

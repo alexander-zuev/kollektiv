@@ -28,39 +28,13 @@ class SourceStatus(str, Enum):
     FAILED = "failed"  # if addition failed
 
 
-class FireCrawlMetadata(BaseModel):
-    """General metadata about Firecrawl data sources."""
-
-    # Created initially
-    start_url: str = Field(..., alias="url", description="The original start URL of the crawl")
-    page_limit: int = Field(default=50, gt=0, description="Maximum number of pages to crawl.")
-    exclude_patterns: list[str] = Field(
-        default_factory=list,
-        description="The list of patterns to exclude, e.g., '/blog/*', '/author/*'.",
-    )
-    include_patterns: list[str] = Field(
-        default_factory=list,
-        description="The list of patterns to include, e.g., '/blog/*', '/api/*'.",
-    )
-
-    # Added after crawl is finished
-    total_pages: int = Field(default=0, ge=0, description="Total number of pages successfully crawled")
-    unique_links: list[str] = Field(default_factory=list, description="List of unique URLs discovered during crawling")
-    error_message: str | None = Field(None, description="Error message if the crawl failed")
-
-    class Config:
-        """Allows using both alias and non-alias names."""
-
-        populate_by_name = True  # Allows both 'url' and 'start_url' to be used
-
-
 class DataSource(SupabaseModel):
     """Base model for all raw data sources loaded into the system."""
 
     _db_config: ClassVar[dict] = {"schema": "content", "table": "data_sources", "primary_key": "source_id"}
 
     # User-related
-    # user_id: UUID = Field(..., description="User id, FK, provided by Supabase base after auth.")
+    user_id: UUID = Field(..., description="User id, FK, provided by Supabase base after auth.")
 
     source_id: UUID = Field(default_factory=uuid4)
     source_type: DataSourceType = Field(
