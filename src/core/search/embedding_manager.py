@@ -4,14 +4,17 @@ from src.infrastructure.config.settings import settings
 from src.models.vector_models import (
     CohereEmbeddingModelName,
     EmbeddingProvider,
-    OpenAIEmbeddingModelName,
 )
 
 
 class EmbeddingManager:
     """Manages the embedding functions for the vector database."""
 
-    def __init__(self, provider: EmbeddingProvider, model: CohereEmbeddingModelName | OpenAIEmbeddingModelName):
+    def __init__(
+        self,
+        provider: EmbeddingProvider | None = EmbeddingProvider.COHERE,
+        model: CohereEmbeddingModelName | None = CohereEmbeddingModelName.SMALL_MULTI,
+    ):
         self.provider = provider
         self.model = model
         self.embedding_function = self._get_embedding_function()

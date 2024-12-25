@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from chromadb import AsyncClientAPI
-
 from src.core.search.embedding_manager import EmbeddingManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.common.logger import get_logger
+from src.infrastructure.external.chroma_client import ChromaClient
+
+from src.models.content_models import Chunk, Document
 
 logger = get_logger()
 
@@ -23,7 +24,7 @@ class VectorDB:
 
     def __init__(
         self,
-        chroma_client: AsyncClientAPI,
+        chroma_client: ChromaClient,
         embedding_manager: EmbeddingManager,
     ):
         self.client = chroma_client
@@ -91,20 +92,8 @@ class VectorDB:
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
     # TODO: add to storage should be clean, this should not have any business logic, just adding & emebding - move to chunk processor
-    def add_documents(self, json_data: list[dict], file_name: str) -> None:
-        """
-        Add documents from a given JSON list to the database, handling duplicates and generating summaries.
-
-        Args:
-            json_data (list[dict]): A list of dictionaries containing the document data.
-            file_name (str): The name of the file from which the documents are being added.
-
-        Returns:
-            None
-
-        Raises:
-            Exception: If there is an error during the document preparation or addition process.
-        """
+    def add_documents(self, chunks: list[Chunk], user_id: UUID) -> None:
+        """Add documents to the vector database."""
         processed_docs = self.prepare_documents(json_data)
 
         ids = processed_docs["ids"]

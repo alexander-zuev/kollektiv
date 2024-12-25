@@ -52,8 +52,8 @@ class MarkdownChunker:
     def __init__(
         self,
         output_dir: str = str(settings.processed_data_dir),
-        max_tokens: int = 1000,
-        soft_token_limit: int = 800,
+        max_tokens: int = 512,
+        soft_token_limit: int = 400,
         min_chunk_size: int = 100,
         overlap_percentage: float = 0.05,
         save: bool = False,
@@ -1077,55 +1077,3 @@ class Validator:
 
         if not any(incorrect.values()):
             logger.info("No incorrect chunks found.")
-
-
-# class ChunkOrchestrator:
-#     """Orchestrates the chunking process end to end efficiently."""
-
-#     def __init__(self, validator: Validator, chunker: Chunker):
-#         self.validator = validator
-#         self.chunker = chunker
-
-
-#     async def process_documents(self, documents: list[Document]) -> list[Chunk]:
-#         """Efficient processes documents in batches"""
-#         pass
-
-#     async def _process_batch(self, batch: list[Document]) -> list[Chunk]:
-#         """Process a single batch of documents."""
-#         pass
-
-
-# Test usage
-def main() -> None:
-    """
-    Initialize logging settings, identify and process markdown files into chunks.
-
-    Args:
-        debug (bool, optional): Configure logging in debug mode. Defaults to True.
-
-    Returns:
-        None
-
-    Raises:
-        FileNotFoundError: If the specified chunks directory does not exist.
-        IOError: If there is an error processing the markdown files.
-    """
-    configure_logging(debug=True)
-
-    files_to_chunk = []
-    chunks_dir = settings.raw_data_dir
-    for filename in os.listdir(chunks_dir):
-        if os.path.isfile(os.path.join(chunks_dir, filename)):
-            files_to_chunk.append(filename)
-
-    for file in files_to_chunk:
-        markdown_chunker = MarkdownChunker()  # save incorrect chunks or not
-        data = markdown_chunker.load_data(input_filename=file)
-        chunks = markdown_chunker.process_pages(data)
-        markdown_chunker.save_chunks(chunks)
-        logger.info("Chunking job for " + file + " complete!")
-
-
-if __name__ == "__main__":
-    main()

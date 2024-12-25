@@ -53,7 +53,10 @@ class ServiceContainer:
 
             # Redis
             self.redis_client = RedisClient().async_client
-            self.redis_repository = RedisRepository(client=self.redis_client)
+            if self.redis_client is not None:
+                self.redis_repository = RedisRepository(client=self.redis_client)
+            else:
+                raise ValueError("Redis client is not initialized")
 
             # RQ
             self.rq_manager = RQManager(redis_client=RedisClient().sync_client)

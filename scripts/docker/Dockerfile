@@ -29,4 +29,5 @@ ENV REDIS_URL=redis://host.docker.internal:6379/0
 ENV REDIS_QUEUE_NAME=processing
 
 # Use exec form with shell to handle env vars and signals properly
-CMD ["/bin/sh", "-c", "exec poetry run rq worker --url ${REDIS_URL} ${REDIS_QUEUE_NAME}"]
+# CMD ["/bin/sh", "-c", "exec poetry run rq worker --url ${REDIS_URL} ${REDIS_QUEUE_NAME}"]
+CMD ["/bin/sh", "-c", "exec poetry run python -m src/infrastructure/rq/rq_worker.py"]

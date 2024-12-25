@@ -105,7 +105,7 @@ class Settings(BaseSettings):
     redis_url: str | None = Field(None, alias="REDIS_URL", description="Redis url")
 
     # Redis queue
-    redis_queue_name: str = Field("processing", description="Redis queue name", alias="REDIS_QUEUE_NAME")
+    redis_queue_name: str = Field("process_documents_queue", description="Redis queue name", alias="REDIS_QUEUE_NAME")
     processing_queue_timeout: str = Field("3h", description="Processing queue timeout", alias="REDIS_QUEUE_TIMEOUT")
 
     # Chroma client

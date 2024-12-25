@@ -25,7 +25,8 @@ services:
       - ../../:/app
     environment:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - REDIS_QUEUE_NAME=${REDIS_QUEUE_NAME:-processing}
+      - REDIS_QUEUE_NAME=${REDIS_QUEUE_NAME:-process_documents_queue}
+      - CHROMA_HOST=chroma-server
       - PYTHONPATH=/app # Ensure Python can find your modules
     depends_on:
       redis:
