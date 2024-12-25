@@ -1,72 +1,15 @@
-# TODO: Implement user-specific context (use user_id) for managing vector data to avoid conflicts between users.
-# TODO: Batch vector insertions to improve performance when handling multiple embeddings at once.
-# TODO: Support concurrent vector lookups using async or multi-threading to enhance retrieval performance.
-# TODO: Ensure embeddings are stored in the background and notify users when embedding is complete.
-# TODO: Add logging and error handling for vector database operations.
-# TODO: Consider introducing a queuing system to handle multiple embeddings requests efficiently.
-# TODO: 10x SPEED
-# TODO: 10x ACCURACY
-# TODO: consider transition to Supabase Vector
 from __future__ import annotations
 
-import json
-import os
 from typing import Any
+from uuid import UUID
 
-import chromadb
-import chromadb.utils.embedding_functions as embedding_functions
+from chromadb import AsyncClientAPI
 
-from src.core.chat.summary_manager import SummaryManager
+from src.core.search.embedding_manager import EmbeddingManager
 from src.infrastructure.common.decorators import base_error_handler
 from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
 
 logger = get_logger()
-
-
-class DocumentProcessor:
-    """
-    Process and manage document data.
-
-    Args:
-        filename (str): The name of the JSON file to load.
-
-    Returns:
-        list[dict]: A list of dictionaries containing the JSON data.
-
-    Raises:
-        FileNotFoundError: If the file cannot be found at the specified path.
-        json.JSONDecodeError: If the file contains invalid JSON.
-    """
-
-    def __init__(self) -> None:
-        self.processed_dir = settings.processed_data_dir
-
-    def load_json(self, filename: str) -> list[dict]:
-        """
-        Load and parse JSON data from a specified file.
-
-        Args:
-            filename (str): Name of the file containing JSON data.
-
-        Returns:
-            list[dict]: A list of dictionaries parsed from the JSON file.
-
-        Raises:
-            FileNotFoundError: If the specified file cannot be found.
-            JSONDecodeError: If the file contains invalid JSON.
-        """
-        try:
-            filepath = os.path.join(self.processed_dir, filename)
-            with open(filepath) as f:
-                data = json.load(f)
-            return data
-        except FileNotFoundError:
-            logger.error(f"File not found: {filename}")
-            raise
-        except json.JSONDecodeError:
-            logger.error(f"Invalid JSON in file: {filename}")
-            raise
 
 
 class VectorDB:
@@ -80,33 +23,31 @@ class VectorDB:
 
     def __init__(
         self,
-        embedding_function: str = "text-embedding-3-small",
-        openai_api_key: str = settings.openai_api_key,
+        chroma_client: AsyncClientAPI,
+        embedding_manager: EmbeddingManager,
     ):
-        self.embedding_function = None
-        self.client = None
-        self.collection = None
-        self.embedding_function_name = embedding_function
-        self.openai_api_key = openai_api_key
-        self.collection_name = "local-collection"
-        self.summary_manager = SummaryManager()
+        self.client = chroma_client
+        self.embedding_function = embedding_manager.get_embedding_function()
 
-        self._init()
+    def _generate_collection_name(self, user_id: UUID) -> str:
+        """Generate a collection name for a user."""
+        return f"user_{str(user_id)}_collection"
 
-    def _init(self) -> None:
-        """Initialize ChromaDB client and embedding function."""
-        self.client = chromadb.PersistentClient(path=str(settings.chroma_db_dir))
-        self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
-            api_key=self.openai_api_key, model_name=self.embedding_function_name
-        )
-        self.collection = self.client.get_or_create_collection(
-            self.collection_name, embedding_function=self.embedding_function
-        )
-        logger.info(
-            f"Successfully initialized ChromaDb with collection: {self.collection_name}\n"
-            f"with {self.collection.count()} documents (chunks)"
-        )
+    @base_error_handler
+    async def create_collection(self, user_id: UUID) -> None:
+        """Create a collection for a user."""
+        collection_name = self._generate_collection_name(user_id)
+        await self.client.create_collection(name=collection_name, embedding_function=self.embedding_function)
+        logger.info(f"Created collection: {collection_name}")
 
+    @base_error_handler
+    async def delete_collection(self, user_id: UUID) -> None:
+        """Delete a collection for a user."""
+        collection_name = self._generate_collection_name(user_id)
+        await self.client.delete_collection(name=collection_name)
+        logger.info(f"Deleted collection: {collection_name}")
+
+    # TODO: processing of the chunks for vector storage should NOT be done here - move to chunk processor
     def prepare_documents(self, chunks: list[dict]) -> dict[str, list[str]]:
         """
         Prepare documents by extracting and combining headers and content.
@@ -149,7 +90,7 @@ class VectorDB:
 
         return {"ids": ids, "documents": documents, "metadatas": metadatas}
 
-    @base_error_handler
+    # TODO: add to storage should be clean, this should not have any business logic, just adding & emebding - move to chunk processor
     def add_documents(self, json_data: list[dict], file_name: str) -> None:
         """
         Add documents from a given JSON list to the database, handling duplicates and generating summaries.
@@ -192,7 +133,6 @@ class VectorDB:
         # Generate summary for the entire file if not already present
         self.summary_manager.process_file(data=json_data, file_name=file_name)
 
-    @base_error_handler
     def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
         """
         Check if documents exist.
@@ -239,37 +179,12 @@ class VectorDB:
         Raises:
             SomeSpecificException: If an error occurs while querying the collection.
         """
+        collection_name = self._generate_collection_name(user_id)
         query_texts = [user_query] if isinstance(user_query, str) else user_query
         search_results = self.collection.query(
             query_texts=query_texts, n_results=n_results, include=["documents", "distances", "embeddings"]
         )
         return search_results
-
-    @base_error_handler
-    def reset_database(self) -> None:
-        """
-        Reset the database by deleting and recreating the collection, and clearing summaries.
-
-        Args:
-            self: The instance of the class containing this method.
-
-        Returns:
-            None
-
-        Raises:
-            Exception: If there is an error while deleting or creating the collection, or clearing summaries.
-        """
-        # Delete collection
-        self.client.delete_collection(self.collection_name)
-
-        self.collection = self.client.create_collection(
-            self.collection_name, embedding_function=self.embedding_function
-        )
-
-        # Delete the summaries file
-        self.summary_manager.clear_summaries()
-
-        logger.info("Database reset successfully. ")
 
     def deduplicate_documents(self, search_results: dict[str, Any]) -> dict[str, Any]:
         """

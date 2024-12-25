@@ -1,9 +1,6 @@
 import redis.asyncio as redis
 from redis import Redis
 
-# from redis.asyncio.client import Redis
-from rq import Queue
-
 from src.infrastructure.common.logger import get_logger
 from src.infrastructure.config.settings import settings
 
@@ -23,6 +20,7 @@ class RedisClient:
             decode_responses: Whether to decode byte responses to strings.
         """
         try:
+            # async client for Redis
             if settings.redis_url:
                 self.async_client = redis.from_url(settings.redis_url, decode_responses=decode_responses)
                 logger.info(f"Initialized Redis client using URL: {settings.redis_url}")
@@ -38,6 +36,8 @@ class RedisClient:
                     decode_responses=decode_responses,
                 )
                 logger.info(f"Initialized Redis client for host: {settings.redis_host}, port: {settings.redis_port}")
+
+            # sync client for RQ
             self.sync_client = Redis(
                 host=settings.redis_host,
                 port=settings.redis_port,
@@ -47,15 +47,6 @@ class RedisClient:
                 else None,
                 decode_responses=False,
             )
-            self.processing_queue = Queue(
-                settings.redis_queue_name,
-                connection=self.sync_client,
-                default_timeout=settings.processing_queue_timeout,
-            )
         except redis.ConnectionError as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
             raise
-
-    def get_queue(self) -> Queue:
-        """Get the RQ queue for processing jobs."""
-        return self.processing_queue

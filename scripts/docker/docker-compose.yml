@@ -1,18 +1,18 @@
-name: kollektiv-external-deps
+name: kollektiv-local-deps
 services:
-  redis-service:
+  redis:
     image: redis:7.4.1-alpine
     ports:
       - "6379:6379"
     container_name: redis
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 3
     restart: unless-stopped
 
-  rq-worker-service:
+  rq-worker:
     build:
       context: ../../
       dockerfile: scripts/docker/Dockerfile
@@ -28,6 +28,18 @@ services:
       - REDIS_QUEUE_NAME=${REDIS_QUEUE_NAME:-processing}
       - PYTHONPATH=/app # Ensure Python can find your modules
     depends_on:
-      redis-service:
+      redis:
         condition: service_healthy
+    restart: unless-stopped
+
+  # for local testing only
+  chroma-server:
+    image: chromadb/chroma:0.5.23
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat" ]
+      interval: 10s
+      timeout: 5s
+      retries: 1
     restart: unless-stopped

@@ -3,12 +3,15 @@ from redis.asyncio import Redis
 from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
 from src.core.content.crawler import FireCrawler
+from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.reranker import Reranker
 from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
 from src.infrastructure.common.logger import get_logger
+from src.infrastructure.external.chroma_client import ChromaClient
 from src.infrastructure.external.redis_client import RedisClient
 from src.infrastructure.external.supabase_client import SupabaseClient, supabase_client
+from src.infrastructure.rq.rq_manager import RQManager
 from src.infrastructure.storage.data_repository import DataRepository
 from src.infrastructure.storage.redis_repository import RedisRepository
 from src.services.chat_service import ChatService
@@ -38,8 +41,9 @@ class ServiceContainer:
         self.reranker: Reranker | None = None
         self.redis_client: Redis | None = None
         self.redis_repository: RedisRepository | None = None
+        self.embedding_manager: EmbeddingManager | None = None
 
-    def initialize_services(self) -> None:
+    async def initialize_services(self) -> None:
         """Initialize all services."""
         try:
             # Database & Repository
@@ -47,26 +51,35 @@ class ServiceContainer:
             self.repository = DataRepository(db_client=self.db_client)
             self.data_service = DataService(repository=self.repository)
 
-            # Job & Content Services
-            self.job_manager = JobManager(data_service=self.data_service)
-            self.firecrawler = FireCrawler()
-            self.content_service = ContentService(self.firecrawler, self.job_manager, self.data_service)
-
             # Redis
             self.redis_client = RedisClient().async_client
             self.redis_repository = RedisRepository(client=self.redis_client)
 
-            # Chat Services
-            self.vector_db = VectorDB()
+            # RQ
+            self.rq_manager = RQManager(redis_client=RedisClient().sync_client)
+
+            # Job & Content Services
+            self.job_manager = JobManager(data_service=self.data_service)
+            self.firecrawler = FireCrawler()
+            self.content_service = ContentService(
+                crawler=self.firecrawler,
+                job_manager=self.job_manager,
+                data_service=self.data_service,
+                rq_manager=self.rq_manager,
+            )
+
+            # Vector operations
+            self.client = await ChromaClient().create_client()
+            self.embedding_manager = EmbeddingManager()
+            self.vector_db = VectorDB(chroma_client=self.client, embedding_manager=self.embedding_manager)
             self.reranker = Reranker()
             self.retriever = Retriever(vector_db=self.vector_db, reranker=self.reranker)
 
+            # Chat Services
             self.claude_assistant = ClaudeAssistant(vector_db=self.vector_db, retriever=self.retriever)
-
             self.conversation_manager = ConversationManager(
                 redis_repository=self.redis_repository, data_service=self.data_service
             )
-
             self.chat_service = ChatService(
                 claude_assistant=self.claude_assistant,
                 data_service=self.data_service,

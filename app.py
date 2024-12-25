@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         # Initialize services
         container = ServiceContainer()
-        container.initialize_services()
+        await container.initialize_services()
 
         # Save in app state
         app.state.container = container
