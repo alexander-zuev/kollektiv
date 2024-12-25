@@ -44,7 +44,3 @@ for task in range(n_tasks):
     job_id = str(uuid4())
     sample_documents = "sample_documents"
     rq_manager.enqueue(process_documents, job_id, sample_documents)
-
-# job_id = str(uuid4())
-# sample_documents = "sample_documents"
-# rq_manager.enqueue(process_documents, job_id, sample_documents)

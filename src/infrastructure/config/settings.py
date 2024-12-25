@@ -111,6 +111,9 @@ class Settings(BaseSettings):
     # Chroma client
     chroma_host: str = Field("localhost", description="Chroma host", alias="CHROMA_HOST")
     chroma_port: int = Field(8000, description="Chroma port", alias="CHROMA_PORT")
+    chroma_url: str | None = Field(
+        None, description="Chroma URL exposed by Railway service. Not set locally.", alias="CHROMA_PRIVATE_URL"
+    )
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", "environments", ".env"),
