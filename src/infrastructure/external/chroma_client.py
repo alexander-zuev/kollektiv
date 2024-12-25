@@ -48,7 +48,6 @@ class ChromaClient:
                     chroma_client_auth_provider="chromadb.auth.basic_authn.BasicAuthClientProvider",
                     chroma_client_auth_credentials=settings.chroma_client_auth_credentials,
                 ),
-                headers={"Authorization": f"Bearer {settings.chroma_client_auth_credentials}"},
             )
         await instance.client.heartbeat()
         return instance
