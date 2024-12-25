@@ -32,4 +32,4 @@ ENV CHROMA_PRIVATE_URL=${CHROMA_PRIVATE_URL}
 
 # Use exec form with shell to handle env vars and signals properly
 # CMD ["/bin/sh", "-c", "exec poetry run rq worker --url ${REDIS_URL} ${REDIS_QUEUE_NAME}"]
-CMD ["/bin/sh", "-c", "exec poetry run python -m src/infrastructure/rq/rq_worker.py"]
+CMD ["/bin/sh", "-c", "exec poetry run python -m src/infrastructure/rq/rq_worker"]

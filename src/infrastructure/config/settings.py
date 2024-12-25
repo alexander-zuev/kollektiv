@@ -178,9 +178,6 @@ try:
     # Create directories
     for dir_path in [
         settings.log_dir,
-        settings.raw_data_dir,
-        settings.processed_data_dir,
-        settings.chroma_db_dir,
     ]:
         dir_path.mkdir(parents=True, exist_ok=True)
 

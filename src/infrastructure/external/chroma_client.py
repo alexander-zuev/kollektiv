@@ -33,9 +33,14 @@ class ChromaClient:
             port = settings.chroma_port
 
         instance = cls()
+
         if settings.environment == Environment.LOCAL:
             instance.client = await chromadb.AsyncHttpClient(host=host, port=port)
-        else:
+        elif settings.environment in [Environment.STAGING, Environment.PRODUCTION]:
+            logger.info(f"Initializing Chroma client using host: {host} and port: {port} with auth credentials")
+            if not settings.chroma_client_auth_credentials:
+                raise ValueError("CHROMA_CLIENT_AUTH_CREDENTIALS must be set in staging/production")
+
             instance.client = await chromadb.AsyncHttpClient(
                 host=host,
                 port=port,
@@ -43,6 +48,7 @@ class ChromaClient:
                     chroma_client_auth_provider="chromadb.auth.basic_authn.BasicAuthClientProvider",
                     chroma_client_auth_credentials=settings.chroma_client_auth_credentials,
                 ),
+                headers={"Authorization": f"Bearer {settings.chroma_client_auth_credentials}"},
             )
         await instance.client.heartbeat()
         return instance

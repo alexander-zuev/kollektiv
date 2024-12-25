@@ -1,7 +1,7 @@
 import asyncio
 
 from src.infrastructure.common.logger import configure_logging, get_logger
-from src.infrastructure.rq.rq_worker import services
+
 
 configure_logging(debug=True)
 logger = get_logger()
@@ -9,6 +9,8 @@ logger = get_logger()
 
 def process_documents(job_id: str, documents: str) -> None:
     """Load documents into the vector database."""
+    from src.infrastructure.rq.rq_worker import services
+
     logger.info(f"Processing documents for job: {job_id}")
     chroma_client = services.chroma_client
     asyncio.run(chroma_client.client.heartbeat())

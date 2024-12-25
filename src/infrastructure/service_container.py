@@ -89,6 +89,6 @@ class ServiceContainer:
                 conversation_manager=self.conversation_manager,
             )
 
-        except Exception:
-            logger.error("Error during service initialization")
+        except Exception as e:
+            logger.error(f"Error during service initialization: {e}", exc_info=True)
             raise

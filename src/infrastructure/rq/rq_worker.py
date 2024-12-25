@@ -6,7 +6,7 @@ from rq.worker import Worker
 from src.core.content.chunker import MarkdownChunker
 from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.vector_db import VectorDB
-from src.infrastructure.common.logger import get_logger
+from src.infrastructure.common.logger import configure_logging, get_logger
 from src.infrastructure.config.settings import settings
 from src.infrastructure.external.chroma_client import ChromaClient
 from src.infrastructure.external.redis_client import RedisClient
@@ -15,11 +15,14 @@ from src.infrastructure.storage.data_repository import DataRepository
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
 
+configure_logging(debug=True)
 logger = get_logger()
 
+logger.info("Starting RQ worker")
 
-class Services:
-    """Services singleton for RQ worker."""
+
+class WorkerServices:
+    """Services singleton necessary for RQ worker."""
 
     _instance = None
 
@@ -45,7 +48,7 @@ class Services:
         self.queue = Queue(name=settings.redis_queue_name, connection=self.redis_client)
 
     @classmethod
-    def get_instance(cls) -> "Services":
+    def get_instance(cls) -> "WorkerServices":
         """Get the singleton instance of Services."""
         if cls._instance is None:
             cls._instance = cls()
@@ -53,7 +56,7 @@ class Services:
 
 
 # Initialize services before worker starts
-services = Services.get_instance()
+services = WorkerServices.get_instance()
 
 
 # Start worker with retry logic
