@@ -88,17 +88,6 @@ def configure_logging(debug: bool = False) -> None:
     # Setup log level
     log_level = logging.DEBUG if debug else logging.INFO
 
-    # 1. Configure Logfire first (in non-local)
-    if settings.environment != Environment.LOCAL:
-        try:
-            logfire.configure(
-                token=settings.logfire_write_token,
-                environment=settings.environment,
-                service_name=settings.project_name,
-            )
-        except Exception as e:
-            print(f"Failed to configure Logfire: {e}")
-
     # 1. Configure kollektiv logger
     app_logger = logging.getLogger("kollektiv")
     app_logger.setLevel(log_level)

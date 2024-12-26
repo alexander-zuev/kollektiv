@@ -1,8 +1,7 @@
-import logfire
 from supabase import AsyncClient, create_async_client
 
 from src.infra.logger import get_logger
-from src.infra.settings import Environment, settings
+from src.infra.settings import settings
 
 logger = get_logger()
 
@@ -20,10 +19,6 @@ class SupabaseClient:
         """Connect to Supabase, handling potential errors."""
         if self._client is None:  # Only connect if not already connected
             try:
-                # Add Supabase instrumentation before client initialization
-                if settings.environment != Environment.LOCAL:
-                    logfire.instrument_supabase()
-
                 logger.debug(
                     f"Attempting to connect to Supabase at: {self.url} with key partially masked as: {self.key[:5]}..."
                 )

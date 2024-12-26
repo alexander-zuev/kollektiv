@@ -1,7 +1,6 @@
 from urllib.parse import urlparse
 
 import chromadb
-import logfire
 from chromadb.api.async_api import AsyncClientAPI
 from chromadb.config import Settings
 
@@ -21,8 +20,6 @@ class ChromaClient:
     @classmethod
     async def create_client(cls, host: str = settings.chroma_host, port: int = settings.chroma_port) -> "ChromaClient":
         """Create a new asyncChroma client."""
-        if settings.environment != Environment.LOCAL:
-            logfire.instrument_httpx()
 
         if settings.chroma_url:
             url_parts = urlparse(settings.chroma_url)

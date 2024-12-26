@@ -19,10 +19,6 @@ class RedisClient:
                            Note: RQ requires decode_responses=False
         """
         try:
-            # Add Redis instrumentation before client initialization
-            if settings.environment != Environment.LOCAL:
-                logfire.instrument_redis()
-
             # Initialize both clients using the same connection logic
             self.async_client = self._create_async_client(decode_responses)
             self.sync_client = self._create_sync_client(decode_responses=False)  # RQ needs this false

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from redis.asyncio import Redis
 
 from src.core.chat.conversation_manager import ConversationManager
@@ -13,7 +15,6 @@ from src.infra.external.chroma_client import ChromaClient
 from src.infra.external.redis_client import RedisClient
 from src.infra.external.supabase_client import SupabaseClient, supabase_client
 from src.infra.logger import get_logger
-from src.infra.misc.ngrok_service import NgrokService
 from src.infra.rq.rq_manager import RQManager
 from src.infra.settings import Environment, settings
 from src.services.chat_service import ChatService
@@ -44,7 +45,7 @@ class ServiceContainer:
         self.redis_client: Redis | None = None
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
-        self.ngrok_service: NgrokService | None = None
+        self.ngrok_service: None = None  # type hint, no init
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
@@ -93,6 +94,8 @@ class ServiceContainer:
             )
             # Local dependencies
             if settings.environment == Environment.LOCAL:
+                from src.infra.misc.ngrok_service import NgrokService  # Import here
+
                 self.ngrok_service = NgrokService()
                 await self.ngrok_service.start_tunnel()
 
@@ -104,7 +107,7 @@ class ServiceContainer:
             raise
 
     @classmethod
-    async def create(cls) -> "ServiceContainer":
+    async def create(cls) -> ServiceContainer:
         """Create a new ServiceContainer instance and initialize services."""
         container = cls()
         await container.initialize_services()

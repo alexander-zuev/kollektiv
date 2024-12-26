@@ -67,8 +67,15 @@ def create_app() -> FastAPI:
     )
 
     # instrument with logfire
-    if settings.environment != Environment.LOCAL:
-        logfire.instrument_fastapi(app)
+    logfire.configure(
+        token=settings.logfire_write_token,
+        environment=settings.environment,
+        service_name=settings.project_name,
+    )
+    logfire.instrument_fastapi(app)
+    logfire.instrument_httpx()
+    logfire.instrument_asyncpg()
+    logfire.instrument_redis()
 
     # Add middleware
     app.add_middleware(RequestDebugMiddleware)
