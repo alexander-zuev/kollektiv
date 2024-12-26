@@ -16,6 +16,10 @@ services:
     build:
       context: ../../
       dockerfile: scripts/docker/Dockerfile
+      args:
+        REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+        REDIS_QUEUE_NAME: ${REDIS_QUEUE_NAME:-process_documents_queue}
+        CHROMA_PRIVATE_URL: ${CHROMA_PRIVATE_URL:-}
     deploy:
       replicas: 2
     env_file:
@@ -28,7 +32,10 @@ services:
       - CHROMA_HOST=chroma-server
       - PYTHONPATH=/app
     depends_on:
-      - redis
+      chroma-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   # for local testing only
@@ -36,4 +43,10 @@ services:
     image: chromadb/chroma:0.5.23
     ports:
       - "8000:8000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped

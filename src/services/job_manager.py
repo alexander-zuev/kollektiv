@@ -4,8 +4,8 @@ from typing import Any
 from uuid import UUID
 
 from src.core._exceptions import JobNotFoundError, ValidationError
-from src.infrastructure.common.decorators import generic_error_handler
-from src.infrastructure.common.logger import get_logger
+from src.infra.decorators import generic_error_handler
+from src.infra.logger import get_logger
 from src.models.job_models import (
     CrawlJobDetails,
     Job,

@@ -1,8 +1,8 @@
 import logfire
 from supabase import AsyncClient, create_async_client
 
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import Environment, settings
+from src.infra.logger import get_logger
+from src.infra.settings import Environment, settings
 
 logger = get_logger()
 

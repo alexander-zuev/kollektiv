@@ -1,10 +1,11 @@
 from collections.abc import Callable
+from typing import Any
 
 from redis import Redis
 from rq import Queue, job
 
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.logger import get_logger
+from src.infra.settings import settings
 
 logger = get_logger()
 
@@ -27,6 +28,6 @@ class RQManager:
         """Get the RQ queue for processing jobs."""
         return self.queue
 
-    def enqueue(self, func: Callable, *args, **kwargs) -> job.Job:
+    def enqueue(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> job.Job:  # type: ignore
         """Enqueue a job to the specified queue."""
         return self.queue.enqueue(func, *args, **kwargs)

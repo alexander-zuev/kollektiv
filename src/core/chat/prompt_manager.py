@@ -3,7 +3,7 @@ from typing import Any
 
 import yaml
 
-from src.infrastructure.config.settings import settings
+from src.infra.settings import settings
 from src.models.llm_models import SystemPrompt
 
 

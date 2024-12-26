@@ -9,9 +9,9 @@ from src.api.v0.schemas.sources_schemas import (
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent
 from src.core._exceptions import DataSourceError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
-from src.infrastructure.common.decorators import generic_error_handler
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.rq.rq_manager import RQManager
+from src.infra.decorators import generic_error_handler
+from src.infra.logger import get_logger
+from src.infra.rq.rq_manager import RQManager
 from src.models.content_models import DataSource, Document, SourceStatus
 from src.models.firecrawl_models import CrawlRequest
 from src.models.job_models import Job, JobStatus, JobType

@@ -6,7 +6,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.api.routes import Routes
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 
 logger = get_logger()
 

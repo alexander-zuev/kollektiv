@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from src.api.dependencies import ContentServiceDep
 from src.api.routes import Routes
 from src.api.v0.schemas.webhook_schemas import WebhookResponse
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 from src.services.webhook_handler import FireCrawlWebhookHandler
 
 logger = get_logger()

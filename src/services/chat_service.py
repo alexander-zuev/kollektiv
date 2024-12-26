@@ -15,7 +15,7 @@ from src.api.v0.schemas.chat_schemas import (
 from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 from src.models.chat_models import (
     Conversation,
     ConversationHistory,

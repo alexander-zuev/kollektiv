@@ -462,3 +462,5 @@ output_chunks/
 # === Monitoring ===
 .sentry/
 .logfire/
+
+scripts/docker/ngrok.yml

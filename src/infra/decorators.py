@@ -23,7 +23,7 @@ from src.core._exceptions import (
     NonRetryableLLMError,
     RetryableLLMError,
 )
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 
 logger = get_logger()
 

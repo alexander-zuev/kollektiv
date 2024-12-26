@@ -3,8 +3,8 @@ from uuid import UUID
 
 from supabase import AsyncClient
 
-from src.infrastructure.common.decorators import supabase_operation
-from src.infrastructure.common.logger import get_logger
+from src.infra.decorators import supabase_operation
+from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
 
 logger = get_logger()

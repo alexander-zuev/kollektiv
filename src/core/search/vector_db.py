@@ -4,11 +4,10 @@ from typing import Any
 from uuid import UUID
 
 from src.core.search.embedding_manager import EmbeddingManager
-from src.infrastructure.common.decorators import base_error_handler
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.external.chroma_client import ChromaClient
-
-from src.models.content_models import Chunk, Document
+from src.infra.decorators import base_error_handler
+from src.infra.external.chroma_client import ChromaClient
+from src.infra.logger import get_logger
+from src.models.content_models import Chunk
 
 logger = get_logger()
 

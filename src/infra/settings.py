@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # Server configuration
     api_host: str = Field(
-        "127.0.0.1" if Environment.LOCAL else "0.0.0.0",  # Local uses localhost, others use 0.0.0.0
+        "127.0.0.1" if Environment.LOCAL else "0.0.0.0",  # noqa: S104, Local uses localhost, others use 0.0.0.0
         alias="API_HOST",
         description="API host - 127.0.0.1 for local, 0.0.0.0 for staging/prod",
     )
@@ -52,6 +52,11 @@ class Settings(BaseSettings):
         description="API port - defaults to 8000, but can be overridden by Railway's PORT variable",
     )
     log_level: str = Field("debug", description="Logging level")
+    railway_public_domain: str | None = Field(
+        None,
+        description="Railway's public domain for staging/prod",
+        alias="RAILWAY_PUBLIC_DOMAIN",
+    )
 
     # Crawler configuration
     max_retries: int = Field(3, description="Maximum retries for crawler requests")
@@ -72,22 +77,15 @@ class Settings(BaseSettings):
     supabase_key: str = Field(..., description="Supabase Service Key", alias="SUPABASE_SERVICE_KEY")
 
     # All paths are now relative to src_dir
-    log_dir: Path = Field(default_factory=lambda: Path("src/logs"))
     eval_dir: Path = Field(default_factory=lambda: Path("src/core/evaluation"))
-    raw_data_dir: Path = Field(default_factory=lambda: Path("src/data/raw"))
-    processed_data_dir: Path = Field(default_factory=lambda: Path("src/data/processed"))
-    job_file_dir: Path = Field(default_factory=lambda: Path("src/core/content/crawler"))
-    vector_storage_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/storage/vector"))
-    chroma_db_dir: Path = Field(default_factory=lambda: Path("src/infrastructure/storage/vector/chroma"))
     prompt_dir: Path = Field(default_factory=lambda: Path("src/core/chat/prompts"))
     prompts_file: str = Field("prompts.yaml", description="Prompt file")
     tools_dir: Path = Field(default_factory=lambda: Path("src/core/chat/tools"))
     tools_file: str = Field("tools.yaml", description="Tools file")
 
-    # Ngrok configuration (only for local development)
-    use_ngrok: bool = Field(True, description="Whether to use ngrok in local development")
-    ngrok_auth_token: str | None = Field(None, alias="NGROK_AUTH_TOKEN")
-    _ngrok_url: str | None = None
+    # Ngrok URL (set by docker-compose in local env)
+    ngrok_authtoken: str | None = Field(None, description="Used for local dev only", alias="NGROK_AUTHTOKEN")
+    ngrok_url: str | None = Field(None, description="Used for local dev only", alias="NGROK_URL")
 
     # Monitoring
     logfire_write_token: str = Field(..., alias="LOGFIRE_TOKEN", description="Logfire write token")
@@ -129,60 +127,36 @@ class Settings(BaseSettings):
     )
 
     @property
-    def base_url(self) -> str:
-        """Dynamically generate base URL based on environment."""
+    def public_url(self) -> str:
+        """Dynamically generate public URL based on environment."""
         if self.environment == Environment.LOCAL:
-            if self.use_ngrok and self._ngrok_url:
-                return self._ngrok_url
-            return f"http://{self.api_host}:{self.api_port}"
-
-        base_url = os.getenv("BASE_URL")
-        if not base_url:
-            raise ValueError(f"BASE_URL environment variable is required for {self.environment} environment")
-        return base_url
+            public_url = self.ngrok_url or f"http://{self.api_host}:{self.api_port}"
+            logger.debug(f"Using public URL: {public_url}")
+            return public_url
+        if not self.railway_public_domain:
+            raise ValueError("RAILWAY_PUBLIC_DOMAIN must be set in staging/production")
+        public_domain = self.railway_public_domain
+        logger.debug(f"Using public domain: {public_domain}")
+        return f"https://{public_domain}"
 
     @property
     def firecrawl_webhook_url(self) -> str:
         """Dynamically generates the Firecrawl webhook URL."""
-        return f"{self.base_url}{Routes.System.Webhooks.FIRECRAWL}"
-
-    def setup_ngrok(self) -> None:
-        """Initialize ngrok tunnel if in local environment."""
-        if self.environment != Environment.LOCAL or not self.use_ngrok:
-            return
-
-        try:
-            from pyngrok import conf, ngrok
-
-            if self.ngrok_auth_token:
-                conf.get_default().auth_token = self.ngrok_auth_token
-
-            # Use api_port directly instead of ngrok_port
-            tunnel = ngrok.connect(self.api_port, bind_tls=True)
-            self._ngrok_url = tunnel.public_url
-
-        except ImportError:
-            logger.warning("pyngrok not installed. Ngrok integration disabled.")
-            self.use_ngrok = False
-        except Exception as e:
-            logger.error(f"Failed to initialize ngrok: {str(e)}")
-            self.use_ngrok = False
+        return f"{self.public_url}{Routes.System.Webhooks.FIRECRAWL}"
 
 
-# Initialize settings instance
-try:
-    settings = Settings()
-    logger.info("Settings initialized successfully.")
+def initialize_settings() -> Settings:
+    """Initialize settings."""
+    try:
+        settings = Settings()
+        logger.info("✓ Initialized settings successfully.")
+        return settings
+    except ValueError as e:
+        logger.error("Environment variables not set.")
+        raise ValueError(f"An error occurred during settings loading: {str(e)}") from e
+    except Exception as e:
+        logger.error("Error occurred while loading settings")
+        raise Exception(f"An error occurred during settings loading: {str(e)}") from e
 
-    # Create directories
-    for dir_path in [
-        settings.log_dir,
-    ]:
-        dir_path.mkdir(parents=True, exist_ok=True)
 
-except ValueError as e:
-    logger.error("Environment variables not set.")
-    raise ValueError(f"An error occurred during settings loading: {str(e)}") from e
-except Exception as e:
-    logger.error("Error occurred while loading settings")
-    raise Exception(f"An error occurred during settings loading: {str(e)}") from e
+settings = initialize_settings()

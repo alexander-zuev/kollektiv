@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from redis.asyncio import Redis
 
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 from src.models.chat_models import ConversationHistory, ConversationMessage
 
 logger = get_logger()

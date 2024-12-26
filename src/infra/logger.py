@@ -1,3 +1,4 @@
+import json
 import logging
 import sys
 from enum import Enum
@@ -5,12 +6,10 @@ from enum import Enum
 import logfire
 from colorama import Fore, Style, init
 
-from src.infrastructure.config.settings import Environment, settings
+from src.infra.settings import Environment, settings
 
 # Initialize colorama
 init(autoreset=True)
-
-# Configure logfire with your settings
 
 
 class LogSymbols(str, Enum):
@@ -33,15 +32,14 @@ class ColoredFormatter(logging.Formatter):
         logging.WARNING: Fore.YELLOW,
         logging.ERROR: Fore.RED,
         logging.CRITICAL: Fore.MAGENTA + Style.BRIGHT,
-        # Color for interpolated values in messages
     }
 
     SYMBOLS = {
-        logging.INFO: LogSymbols.INFO.value,  # Info
-        logging.DEBUG: LogSymbols.DEBUG.value,  # Debug
-        logging.WARNING: LogSymbols.WARNING.value,  # Warning
-        logging.ERROR: LogSymbols.ERROR.value,  # Error
-        logging.CRITICAL: LogSymbols.CRITICAL.value,  # Critical
+        logging.INFO: LogSymbols.INFO.value,
+        logging.DEBUG: LogSymbols.DEBUG.value,
+        logging.WARNING: LogSymbols.WARNING.value,
+        logging.ERROR: LogSymbols.ERROR.value,
+        logging.CRITICAL: LogSymbols.CRITICAL.value,
     }
     VALUE_COLOR = Fore.LIGHTBLUE_EX
 
@@ -63,6 +61,28 @@ class ColoredFormatter(logging.Formatter):
         return f"{colored_symbol} {colored_level} [{timestamp}] {module}: {message}"
 
 
+class JsonFormatter(logging.Formatter):
+    """Format the log record as a JSON structure."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format the log record as a JSON structure."""
+        log_entry = {
+            "timestamp": self.formatTime(record, "%Y-%m-%d %H:%M:%S"),
+            "level": record.levelname,
+            "module": record.name,
+            "message": record.getMessage(),
+            "line": record.lineno,
+            "path": record.pathname,
+        }
+        # Add exception information if available
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        for key in dir(record):
+            if not key.startswith("_") and key not in log_entry:
+                log_entry[key] = getattr(record, key, None)
+        return json.dumps(log_entry)
+
+
 def configure_logging(debug: bool = False) -> None:
     """Configure the application's logging system with both local handlers and Logfire."""
     # Setup log level
@@ -70,11 +90,14 @@ def configure_logging(debug: bool = False) -> None:
 
     # 1. Configure Logfire first (in non-local)
     if settings.environment != Environment.LOCAL:
-        logfire.configure(
-            token=settings.logfire_write_token,
-            environment=settings.environment,
-            service_name=settings.project_name,
-        )
+        try:
+            logfire.configure(
+                token=settings.logfire_write_token,
+                environment=settings.environment,
+                service_name=settings.project_name,
+            )
+        except Exception as e:
+            print(f"Failed to configure Logfire: {e}")
 
     # 1. Configure kollektiv logger
     app_logger = logging.getLogger("kollektiv")
@@ -90,21 +113,25 @@ def configure_logging(debug: bool = False) -> None:
     # 3. Environment-specific handlers
     if settings.environment != Environment.LOCAL:
         logfire_handler = logfire.LogfireLoggingHandler()
+        logfire_handler.setFormatter(JsonFormatter())
         app_logger.addHandler(logfire_handler)
+
+    # 4. Add third-party logging handlers
+    logging.getLogger("fastapi").setLevel(level=log_level)
+    logging.getLogger("uvicorn.error").setLevel(level=log_level)
+    logging.getLogger("docker").setLevel(level=log_level)
+    logging.getLogger("wandb").setLevel(level=log_level)
 
     # 4. Propagate to other loggers
     app_logger.propagate = False
 
 
-def get_logger() -> logging.Logger:
+def get_logger() -> logging.LoggerAdapter:
     """
     Retrieve a logger named after the calling module.
 
     Returns:
-        logging.Logger: A logger specifically named for the module calling the function.
-
-    Raises:
-        None
+        logging.LoggerAdapter: A logger adapter that supports extra context fields.
     """
     import inspect
 
@@ -117,4 +144,5 @@ def get_logger() -> logging.Logger:
     finally:
         del frame  # Prevent reference cycles
 
-    return logging.getLogger(f"kollektiv.{module_name}")
+    logger = logging.getLogger(f"kollektiv.{module_name}")
+    return logging.LoggerAdapter(logger, extra={})

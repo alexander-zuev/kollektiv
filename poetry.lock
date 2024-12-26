@@ -3357,6 +3357,25 @@ files = [
 ]
 
 [[package]]
+name = "ngrok"
+version = "1.4.0"
+description = "The ngrok Agent SDK for Python"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "ngrok-1.4.0-cp37-abi3-macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2.whl", hash = "sha256:05a86cf684120c27d1f10c9a3a5320c7243a89a9f93e58c027dc3916bdeeade9"},
+    {file = "ngrok-1.4.0-cp37-abi3-macosx_10_12_x86_64.whl", hash = "sha256:166aa4ad1911564e8028436b4c0cc5401f846f79176c97bc84726d417f5483eb"},
+    {file = "ngrok-1.4.0-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:2a9bd2fbf3bf2ed8bdc668d20da9f961207ffe8795320598ca2747463c5f980d"},
+    {file = "ngrok-1.4.0-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:60a6fdaa08c7bcff6b208fb2d1d7d3065ab7bf99a1dfc6e9c4f4535dbbe2e0f6"},
+    {file = "ngrok-1.4.0-cp37-abi3-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:381a455b527a4c25e9aa5da231db2f836c243ae46b479f9a4af2b54fadfde906"},
+    {file = "ngrok-1.4.0-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8660b535a3b1593c80868c80dd2f7b480fcb075ec807ba727868348d037adea3"},
+    {file = "ngrok-1.4.0-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:0f31c5f7a3d93011a08d01ccd38c66b1febec3efe776b301ea677061d56561b1"},
+    {file = "ngrok-1.4.0-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:77aeac9d9e1a425c65fad10c7996279ba4099c68af6e18d66d0e9d96f2eef31b"},
+    {file = "ngrok-1.4.0-cp37-abi3-win32.whl", hash = "sha256:0b2a29f4a98ce62366262fc4906dfb0dfe28a9ec7114dc9e7cbe2d75f923fc00"},
+    {file = "ngrok-1.4.0-cp37-abi3-win_amd64.whl", hash = "sha256:1ff615ab7709976664730b80e4345d4bf7816b864f990bdf2b6529c7e7f9106d"},
+]
+
+[[package]]
 name = "nltk"
 version = "3.9.1"
 description = "Natural Language Toolkit"
@@ -4427,24 +4446,6 @@ files = [
 
 [package.extras]
 windows-terminal = ["colorama (>=0.4.6)"]
-
-[[package]]
-name = "pyngrok"
-version = "7.2.2"
-description = "A Python wrapper for ngrok."
-optional = false
-python-versions = ">=3.8"
-files = [
-    {file = "pyngrok-7.2.2-py3-none-any.whl", hash = "sha256:7c8e5a7026f9d519ad5b5943b1ec0b18cedcb1e4f2ae569290c2de6699ab9acd"},
-    {file = "pyngrok-7.2.2.tar.gz", hash = "sha256:f729ceba261823ab11f616255604531aeefc3beae8377ac1a27d533532d3bc1a"},
-]
-
-[package.dependencies]
-PyYAML = ">=5.1"
-
-[package.extras]
-dev = ["coverage[toml]", "flake8", "flake8-pyproject", "pep8-naming", "psutil", "pytest"]
-docs = ["Sphinx", "mypy", "sphinx-notfound-page", "sphinx-substitution-extensions", "sphinx_autodoc_typehints (==1.25.2)", "types-PyYAML"]
 
 [[package]]
 name = "pypdf"
@@ -6022,6 +6023,17 @@ files = [
 ]
 
 [[package]]
+name = "types-pyyaml"
+version = "6.0.12.20241221"
+description = "Typing stubs for PyYAML"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "types_PyYAML-6.0.12.20241221-py3-none-any.whl", hash = "sha256:0657a4ff8411a030a2116a196e8e008ea679696b5b1a8e1a6aa8ebb737b34688"},
+    {file = "types_pyyaml-6.0.12.20241221.tar.gz", hash = "sha256:4f149aa893ff6a46889a30af4c794b23833014c469cc57cbc3ad77498a58996f"},
+]
+
+[[package]]
 name = "types-requests"
 version = "2.32.0.20241016"
 description = "Typing stubs for requests"
@@ -7014,4 +7026,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<3.13"
-content-hash = "7abb1960b6384553684d4d55327835dfbe7e7404fb79abde554fba8e01a85510"
+content-hash = "1dd80d8eaf946a994720d1f1f64a1b5816632f7a787dbd84ba7a4d600fe12cc6"

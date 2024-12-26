@@ -1,6 +1,11 @@
 # Use a base image
 FROM python:3.12-slim
 
+# Define build arguments
+ARG REDIS_URL
+ARG REDIS_QUEUE_NAME
+ARG CHROMA_PRIVATE_URL 
+
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

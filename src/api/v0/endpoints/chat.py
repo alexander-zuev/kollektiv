@@ -14,7 +14,7 @@ from src.api.v0.schemas.chat_schemas import (
     UserMessage,
 )
 from src.core._exceptions import DatabaseError, EntityNotFoundError, NonRetryableLLMError, RetryableLLMError
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 from src.models.chat_models import Conversation
 
 # Define routers with base prefix only
