@@ -1,122 +1,99 @@
 import logging
-import os
 import sys
+from enum import Enum
 
 import logfire
 from colorama import Fore, Style, init
 
-from src.infrastructure.config.settings import settings
+from src.infrastructure.config.settings import Environment, settings
 
 # Initialize colorama
 init(autoreset=True)
 
 # Configure logfire with your settings
-logfire.configure(
-    token=settings.logfire_write_token, environment=settings.environment, service_name=settings.project_name
-)
+
+
+class LogSymbols(str, Enum):
+    """Unified symbols for all application logging."""
+
+    SUCCESS = "✓"
+    ERROR = "✗"
+    INFO = "→"
+    WARNING = "⚠"
+    DEBUG = "•"
+    CRITICAL = "‼"
 
 
 class ColoredFormatter(logging.Formatter):
-    """
-    Enhance log messages with colors and emojis based on their severity levels.
-
-    Args:
-        logging (module): A logging module instance for handling logs.
-
-    Returns:
-        None
-
-    Raises:
-        KeyError: If a log level is not found in COLORS or EMOJIS dictionaries.
-    """
+    """Enhance log messages with colors and emojis based on their severity levels."""
 
     COLORS = {
-        logging.DEBUG: Fore.BLUE,
-        logging.INFO: Fore.LIGHTCYAN_EX,
-        logging.WARNING: Fore.LIGHTYELLOW_EX,
+        logging.INFO: Fore.GREEN,
+        logging.DEBUG: Fore.LIGHTCYAN_EX,
+        logging.WARNING: Fore.YELLOW,
         logging.ERROR: Fore.RED,
         logging.CRITICAL: Fore.MAGENTA + Style.BRIGHT,
+        # Color for interpolated values in messages
     }
 
-    EMOJIS = {
-        logging.DEBUG: "🐞",  # Debug
-        logging.INFO: "ℹ️",  # Info
-        logging.WARNING: "⚠️",  # Warning
-        logging.ERROR: "❌",  # Error
-        logging.CRITICAL: "🔥",  # Critical
+    SYMBOLS = {
+        logging.INFO: LogSymbols.INFO.value,  # Info
+        logging.DEBUG: LogSymbols.DEBUG.value,  # Debug
+        logging.WARNING: LogSymbols.WARNING.value,  # Warning
+        logging.ERROR: LogSymbols.ERROR.value,  # Error
+        logging.CRITICAL: LogSymbols.CRITICAL.value,  # Critical
     }
+    VALUE_COLOR = Fore.LIGHTBLUE_EX
 
     def format(self, record: logging.LogRecord) -> str:
-        """
-        Format the log record with emoji and color based on log level.
+        """Format the log record with colored level and symbol."""
+        # Get timestamp and format module name more concisely
+        timestamp = self.formatTime(record, "%Y-%m-%d %H:%M:%S")
+        module = record.name.replace("kollektiv.src.", "")
 
-        Args:
-            record (logging.LogRecord): The log record to format.
-
-        Returns:
-            str: The formatted log message including color and emoji.
-
-        Raises:
-            KeyError: If a log level key does not exist in COLORS or EMOJIS.
-
-        """
-        # Get the original log message
-        log_message = super().format(record)
-
-        # Get the color and emoji based on the log level
+        # Color both symbol and level
         color = self.COLORS.get(record.levelno, "")
-        emoji = self.EMOJIS.get(record.levelno, "")
+        colored_symbol = f"{color}{self.SYMBOLS.get(record.levelno, '')}{Style.RESET_ALL}"
+        colored_level = f"{color}{record.levelname}{Style.RESET_ALL}:"
 
-        # Construct the final log message with emoji before the log level
-        log_message = f"{emoji} {record.levelname} - {log_message}"
+        # Get formatted message directly
+        message = record.getMessage()  # This handles all formatting
 
-        return f"{color}{log_message}{Style.RESET_ALL}"
+        # Final format
+        return f"{colored_symbol} {colored_level} [{timestamp}] {module}: {message}"
 
 
-def configure_logging(debug: bool = False, log_file: str = "app.log") -> None:
-    """
-    Configure the application's logging system with both local handlers and Logfire.
-
-    Args:
-        debug (bool): Whether to set the logging level to debug. Defaults to False.
-        log_file (str): The name of the file to log to. Defaults to "app.log".
-
-    Returns:
-        None
-
-    Raises:
-        Exception: Any exception that logging handlers or the file system might raise.
-    """
+def configure_logging(debug: bool = False) -> None:
+    """Configure the application's logging system with both local handlers and Logfire."""
+    # Setup log level
     log_level = logging.DEBUG if debug else logging.INFO
+
+    # 1. Configure kollektiv logger
     app_logger = logging.getLogger("kollektiv")
     app_logger.setLevel(log_level)
+    app_logger.handlers.clear()
 
-    # Remove existing handlers to prevent duplication
-    if app_logger.handlers:
-        app_logger.handlers.clear()
-
-    # Add Logfire handler
-    logfire_handler = logfire.LogfireLoggingHandler()
-    logfire_handler.setLevel(log_level)
-    app_logger.addHandler(logfire_handler)
-
-    # Console handler with colored output
+    # 2. Set up handlers
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
-    console_formatter = ColoredFormatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")
-    console_handler.setFormatter(console_formatter)
-
-    # File handler
-    log_file_path = os.path.join(settings.log_dir, log_file)
-    file_handler = logging.FileHandler(log_file_path)
-    file_handler.setLevel(logging.DEBUG)  # Log all levels to the file
-    file_formatter = logging.Formatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s")
-    file_handler.setFormatter(file_formatter)
-
-    # Add handlers to the app logger
+    console_handler.setFormatter(ColoredFormatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s"))
     app_logger.addHandler(console_handler)
-    app_logger.addHandler(file_handler)
 
+    # 3. Environment-specific handlers
+    if settings.environment != Environment.LOCAL:
+        logfire.configure(
+            token=settings.logfire_write_token,
+            environment=settings.environment,
+            service_name=settings.project_name,
+        )
+        logfire_handler = logfire.LogfireLoggingHandler()
+        app_logger.addHandler(logfire_handler)
+
+    # 4. Control FastAPI logging
+    for logger_name in ["uvicorn", "uvicorn.access"]:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+    # 5. Propagate to other loggers
     app_logger.propagate = False
 
 

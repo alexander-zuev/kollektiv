@@ -49,7 +49,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.error(f"Failed to initialize core services: {str(e)}", exc_info=True)
         raise  # Re-raise the exception to prevent startup
     finally:
-        logger.info("Shutting down Kollektiv API...")
         if settings.environment == Environment.LOCAL and settings.use_ngrok:
             from pyngrok import ngrok
 
@@ -122,7 +121,8 @@ def create_app() -> FastAPI:
     )
 
     # instrument with logfire
-    logfire.instrument_fastapi(app)
+    if settings.environment != Environment.LOCAL:
+        logfire.instrument_fastapi(app)
     # Add debug middleware first
     app.add_middleware(RequestDebugMiddleware)
 

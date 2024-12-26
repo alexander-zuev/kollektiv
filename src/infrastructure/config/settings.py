@@ -160,7 +160,6 @@ class Settings(BaseSettings):
             # Use api_port directly instead of ngrok_port
             tunnel = ngrok.connect(self.api_port, bind_tls=True)
             self._ngrok_url = tunnel.public_url
-            logger.info(f"Ngrok tunnel established at {self._ngrok_url}")
 
         except ImportError:
             logger.warning("pyngrok not installed. Ngrok integration disabled.")

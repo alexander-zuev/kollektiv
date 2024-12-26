@@ -1,11 +1,11 @@
 from typing import Any, TypeVar
 from uuid import UUID
 
+from supabase import AsyncClient
+
 from src.infrastructure.common.decorators import supabase_operation
 from src.infrastructure.common.logger import get_logger
-from src.infrastructure.external.supabase_client import SupabaseClient
 from src.models.base_models import SupabaseModel
-from supabase import AsyncClient
 
 logger = get_logger()
 T = TypeVar("T", bound=SupabaseModel)  # define a generic type for the repository
@@ -50,7 +50,7 @@ class DataRepository:
 
     def __init__(self, db_client: AsyncClient) -> None:
         self.db_client = db_client
-        logger.info("✓ Initialized data repository")
+        logger.info("✓ Initialized data repository successfully")
 
     @supabase_operation
     async def save(self, entity: T | list[T]) -> T | list[T]:
