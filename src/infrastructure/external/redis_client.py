@@ -1,8 +1,9 @@
+import logfire
 import redis.asyncio as redis
 from redis import Redis
 
 from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infrastructure.config.settings import Environment, settings
 
 logger = get_logger()
 
@@ -18,6 +19,10 @@ class RedisClient:
                            Note: RQ requires decode_responses=False
         """
         try:
+            # Add Redis instrumentation before client initialization
+            if settings.environment != Environment.LOCAL:
+                logfire.instrument_redis()
+
             # Initialize both clients using the same connection logic
             self.async_client = self._create_async_client(decode_responses)
             self.sync_client = self._create_sync_client(decode_responses=False)  # RQ needs this false

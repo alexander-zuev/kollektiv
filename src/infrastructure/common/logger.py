@@ -68,6 +68,14 @@ def configure_logging(debug: bool = False) -> None:
     # Setup log level
     log_level = logging.DEBUG if debug else logging.INFO
 
+    # 1. Configure Logfire first (in non-local)
+    if settings.environment != Environment.LOCAL:
+        logfire.configure(
+            token=settings.logfire_write_token,
+            environment=settings.environment,
+            service_name=settings.project_name,
+        )
+
     # 1. Configure kollektiv logger
     app_logger = logging.getLogger("kollektiv")
     app_logger.setLevel(log_level)
@@ -81,19 +89,10 @@ def configure_logging(debug: bool = False) -> None:
 
     # 3. Environment-specific handlers
     if settings.environment != Environment.LOCAL:
-        logfire.configure(
-            token=settings.logfire_write_token,
-            environment=settings.environment,
-            service_name=settings.project_name,
-        )
         logfire_handler = logfire.LogfireLoggingHandler()
         app_logger.addHandler(logfire_handler)
 
-    # 4. Control FastAPI logging
-    for logger_name in ["uvicorn", "uvicorn.access"]:
-        logging.getLogger(logger_name).setLevel(logging.WARNING)
-
-    # 5. Propagate to other loggers
+    # 4. Propagate to other loggers
     app_logger.propagate = False
 
 

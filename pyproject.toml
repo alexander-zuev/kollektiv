@@ -33,7 +33,7 @@ unstructured-ingest = {extras = ["remote"], version = "^0.3.0"}
 unstructured = "^0.16.5"
 libmagic = "^1.0"
 rq = "^2.0.0"
-logfire = {extras = ["fastapi"], version = "^2.5.0"}
+logfire = {extras = ["httpx"], version = "^2.11.0"}
 sentry-sdk = {extras = ["fastapi"], version = "^2.19.0"}
 sentry-cli = "^2.39.1"
 sse-starlette = "^2.1.3"
