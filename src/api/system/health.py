@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Response, status
 
 from src.api.routes import Routes
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 
 router = APIRouter()
 logger = get_logger()

@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from anthropic.types import MessageParam
 from pydantic import BaseModel, Field, model_validator
 
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
 
 logger = get_logger()

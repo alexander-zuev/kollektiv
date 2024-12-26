@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import asyncio
 
-from src.infrastructure.common.logger import configure_logging, get_logger
-from src.infrastructure.rq.worker_services import WorkerServices
+from src.infra.logger import get_logger
+from src.infra.rq.worker_services import WorkerServices
 
-configure_logging(debug=True)
 logger = get_logger()
 
 

@@ -4,10 +4,10 @@ from typing import Union
 from src.core.content.chunker import MarkdownChunker
 from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.vector_db import VectorDB
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.external.chroma_client import ChromaClient
-from src.infrastructure.external.supabase_client import SupabaseClient
-from src.infrastructure.storage.data_repository import DataRepository
+from src.infra.data.data_repository import DataRepository
+from src.infra.external.chroma_client import ChromaClient
+from src.infra.external.supabase_client import SupabaseClient
+from src.infra.logger import get_logger
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
 
@@ -27,7 +27,7 @@ class WorkerServices:
         self.embedding_manager = EmbeddingManager()
 
         # Initialize async services
-        self.chroma_client = asyncio.run(ChromaClient().create_client())
+        self.chroma_client = ChromaClient().create_client()
         self.supabase_client = asyncio.run(SupabaseClient().get_client())
 
         # Initialize dependent services

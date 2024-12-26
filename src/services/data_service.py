@@ -5,8 +5,8 @@ from uuid import UUID
 from src.api.v0.schemas.chat_schemas import ConversationSummary
 from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
 from src.core._exceptions import ConversationNotFoundError
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.storage.data_repository import DataRepository
+from src.infra.data.data_repository import DataRepository
+from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
 from src.models.chat_models import Conversation, ConversationHistory, ConversationMessage
 from src.models.content_models import DataSource, Document, SourceSummary

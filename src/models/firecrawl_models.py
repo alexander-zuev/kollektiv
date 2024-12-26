@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
-from src.infrastructure.config.settings import settings
+from src.infra.settings import settings
 from src.models.base_models import SupabaseModel
 
 

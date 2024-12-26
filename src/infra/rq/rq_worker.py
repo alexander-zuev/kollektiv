@@ -1,9 +1,9 @@
 from rq.worker import Worker
 
-from src.infrastructure.common.logger import configure_logging, get_logger
-from src.infrastructure.config.settings import settings
-from src.infrastructure.external.redis_client import RedisClient
-from src.infrastructure.rq.worker_services import WorkerServices
+from src.infra.external.redis_client import RedisClient
+from src.infra.logger import configure_logging, get_logger
+from src.infra.rq.worker_services import WorkerServices
+from src.infra.settings import settings
 
 configure_logging(debug=True)
 logger = get_logger()

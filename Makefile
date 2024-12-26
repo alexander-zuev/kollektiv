@@ -2,7 +2,7 @@
 
 # Docker commands
 up:
-	docker compose -f scripts/docker/docker-compose.yml up -d
+	docker compose -f scripts/docker/docker-compose.yml up -d --remove-orphans
 
 down:
 	docker compose -f scripts/docker/docker-compose.yml down

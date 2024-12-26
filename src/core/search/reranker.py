@@ -3,8 +3,8 @@ from typing import Any
 import cohere
 from cohere.v2.types import V2RerankResponse
 
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.logger import get_logger
+from src.infra.settings import settings
 
 logger = get_logger()
 

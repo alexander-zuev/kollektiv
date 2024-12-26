@@ -5,7 +5,7 @@ from cohere.v2.types import V2RerankResponse
 
 from src.core.search.reranker import Reranker
 from src.core.search.vector_db import VectorDB
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
 
 logger = get_logger()
 

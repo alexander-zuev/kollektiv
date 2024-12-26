@@ -1,7 +1,7 @@
 from supabase import AsyncClient, create_async_client
 
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.logger import get_logger
+from src.infra.settings import settings
 
 logger = get_logger()
 

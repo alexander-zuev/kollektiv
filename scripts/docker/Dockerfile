@@ -1,6 +1,11 @@
 # Use a base image
 FROM python:3.12-slim
 
+# Define build arguments
+ARG REDIS_URL
+ARG REDIS_QUEUE_NAME
+ARG CHROMA_PRIVATE_URL 
+
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -24,4 +29,4 @@ RUN pip install poetry \
 COPY . .
 
 # Start worker
-CMD ["/bin/sh", "-c", "exec poetry run python -m src.infrastructure.rq.rq_worker"]
+CMD ["/bin/sh", "-c", "exec poetry run python -m src.infra.rq.rq_worker"]

@@ -1,4 +1,5 @@
 import os
+import subprocess
 import uuid
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -16,24 +17,29 @@ from fakeredis.aioredis import FakeRedis
 from fastapi.testclient import TestClient
 from redis.asyncio import Redis
 
-from app import create_app
+from src.app import create_app
+from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
 from src.core.chat.prompt_manager import PromptManager, SystemPrompt
 from src.core.chat.tool_manager import Tool, ToolManager
 from src.core.content.crawler import FireCrawler
+from src.core.search.embedding_manager import EmbeddingManager
+from src.core.search.reranker import Reranker
 from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
-from src.infrastructure.config.settings import settings
-from src.infrastructure.external.supabase_client import SupabaseClient
-from src.infrastructure.service_container import ServiceContainer
-from src.infrastructure.storage.data_repository import DataRepository
-from src.infrastructure.storage.redis_repository import RedisRepository
+from src.infra.data.data_repository import DataRepository
+from src.infra.data.redis_repository import RedisRepository
+from src.infra.external.supabase_client import SupabaseClient
+from src.infra.rq.rq_manager import RQManager
+from src.infra.service_container import ServiceContainer
+from src.infra.settings import settings
 from src.models.chat_models import (
     ConversationHistory,
     ConversationMessage,
     Role,
     TextBlock,
 )
+from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
@@ -245,53 +251,83 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    """Configure custom markers."""
+    """Configure custom markers and start containers for integration tests."""
+    # Add test markers
     config.addinivalue_line("markers", "integration: mark test as integration test")
     config.addinivalue_line("markers", "e2e: mark test as end-to-end test")
 
+    # Start containers for integration tests
+    if config.getoption("--run-integration"):
+        # Clean up ngrok properly
+        try:
+            import ngrok
 
-@pytest.fixture(scope="session")
-def mock_app():
-    """Session-scoped fixture for the mocked app."""
+            ngrok.disconnect()  # Disconnect all tunnels in current session
+        except Exception:
+            pass
+
+        # Start containers
+        subprocess.run(["docker-compose", "-f", "scripts/docker/docker-compose.yml", "up", "-d"], check=True)
+
+
+def pytest_unconfigure(config):
+    """Cleanup containers after tests."""
+    if config.getoption("--run-integration"):
+        subprocess.run(["docker-compose", "-f", "scripts/docker/docker-compose.yml", "down"], check=True)
+
+
+@pytest.fixture(scope="function")
+async def mock_app():
+    """Function-scoped fixture for fully mocked app."""
     test_app = create_app()
 
-    mock_job_manager = MagicMock(spec=JobManager)
-    mock_firecrawler = MagicMock(spec=FireCrawler)
-
-    mock_content_service = AsyncMock(spec=ContentService)
-    mock_content_service.handle_event = AsyncMock(return_value=None)
-    mock_content_service.crawler = mock_firecrawler
-    mock_content_service.job_manager = mock_job_manager
-
+    # Create container with all required mocks
     container = MagicMock(spec=ServiceContainer)
-    container.job_manager = mock_job_manager
-    container.firecrawler = mock_firecrawler
-    container.content_service = mock_content_service
+
+    # 1. Database & Repository Layer
+    container.db_client = MagicMock(spec=SupabaseClient)
+    container.repository = MagicMock(spec=DataRepository)
+    container.data_service = MagicMock(spec=DataService)
+
+    # 2. Redis Layer
+    container.redis_client = MagicMock(spec=Redis)
+    container.redis_repository = MagicMock(spec=RedisRepository)
+    container.rq_manager = MagicMock(spec=RQManager)
+
+    # 3. Job & Content Layer
+    container.job_manager = MagicMock(spec=JobManager)
+    container.firecrawler = MagicMock(spec=FireCrawler)
+    container.content_service = AsyncMock(spec=ContentService)
+
+    # 4. Vector & Search Layer
+    container.vector_db = MagicMock(spec=VectorDB)
+    container.embedding_manager = MagicMock(spec=EmbeddingManager)
+    container.retriever = MagicMock(spec=Retriever)
+    container.reranker = MagicMock(spec=Reranker)
+
+    # 5. Chat Layer
+    container.claude_assistant = MagicMock(spec=ClaudeAssistant)
+    container.conversation_manager = MagicMock(spec=ConversationManager)
+    container.chat_service = MagicMock(spec=ChatService)
 
     test_app.state.container = container
     return test_app
 
 
 @pytest.fixture
-def integration_app():
-    """Integration test app with mocked external services."""
+async def integration_app():
+    """Integration test app with minimal required mocking."""
+    # Run integration tests in STAGING to avoid ngrok
     test_app = create_app()
-    container = ServiceContainer()
+    container = await ServiceContainer.create()
 
-    # Create mock FireCrawler with necessary attributes
-    mock_firecrawler = MagicMock(spec=FireCrawler)
-    mock_firecrawler.api_key = "test-key"  # Set the api_key attribute
-    mock_firecrawler.firecrawl_app = mock_firecrawler.initialize_firecrawl()
+    # Mock only external services that can't be run in tests
+    container.firecrawler = MagicMock(spec=FireCrawler)
+    container.firecrawler.api_key = "test-key"
+    container.firecrawler.firecrawl_app = MagicMock()
 
-    # Mock DataService
-    mock_data_service = MagicMock(spec=DataService)
-
-    # Mock specific services while keeping container structure
-    container.job_manager = JobManager(data_service=mock_data_service)
-    container.firecrawler = mock_firecrawler
-    container.content_service = ContentService(
-        job_manager=container.job_manager, crawler=container.firecrawler, data_service=mock_data_service
-    )
+    # Mock expensive services
+    container.claude_assistant = MagicMock(spec=ClaudeAssistant)
 
     test_app.state.container = container
     return test_app

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from redis.asyncio import Redis
 
 from src.core.chat.conversation_manager import ConversationManager
@@ -7,13 +9,14 @@ from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.reranker import Reranker
 from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.external.chroma_client import ChromaClient
-from src.infrastructure.external.redis_client import RedisClient
-from src.infrastructure.external.supabase_client import SupabaseClient, supabase_client
-from src.infrastructure.rq.rq_manager import RQManager
-from src.infrastructure.storage.data_repository import DataRepository
-from src.infrastructure.storage.redis_repository import RedisRepository
+from src.infra.data.data_repository import DataRepository
+from src.infra.data.redis_repository import RedisRepository
+from src.infra.external.chroma_client import ChromaClient
+from src.infra.external.redis_client import RedisClient
+from src.infra.external.supabase_client import SupabaseClient, supabase_client
+from src.infra.logger import get_logger
+from src.infra.rq.rq_manager import RQManager
+from src.infra.settings import Environment, settings
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
@@ -42,6 +45,7 @@ class ServiceContainer:
         self.redis_client: Redis | None = None
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
+        self.ngrok_service: None = None
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
@@ -72,7 +76,7 @@ class ServiceContainer:
             )
 
             # Vector operations
-            self.client = await ChromaClient().create_client()
+            self.client = ChromaClient().create_client()
             self.embedding_manager = EmbeddingManager()
             self.vector_db = VectorDB(chroma_client=self.client, embedding_manager=self.embedding_manager)
             self.reranker = Reranker()
@@ -88,7 +92,28 @@ class ServiceContainer:
                 data_service=self.data_service,
                 conversation_manager=self.conversation_manager,
             )
+            # Local dependencies
+            if settings.environment == Environment.LOCAL:
+                from src.infra.misc.ngrok_service import NgrokService  # Import here
+
+                self.ngrok_service = NgrokService()
+                await self.ngrok_service.start_tunnel()
+
+            # Result logging
+            logger.info("✓ Initialized services successfully.")
 
         except Exception as e:
             logger.error(f"Error during service initialization: {e}", exc_info=True)
             raise
+
+    @classmethod
+    async def create(cls) -> ServiceContainer:
+        """Create a new ServiceContainer instance and initialize services."""
+        container = cls()
+        await container.initialize_services()
+        return container
+
+    async def shutdown_services(self) -> None:
+        """Shutdown all services."""
+        if self.ngrok_service is not None:
+            await self.ngrok_service.stop_tunnel()

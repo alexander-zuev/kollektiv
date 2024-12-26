@@ -5,8 +5,8 @@ import redis
 import tiktoken
 
 from src.api.v0.schemas.chat_schemas import UserMessage
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.storage.redis_repository import RedisRepository
+from src.infra.data.redis_repository import RedisRepository
+from src.infra.logger import get_logger
 from src.models.chat_models import (
     Conversation,
     ConversationHistory,

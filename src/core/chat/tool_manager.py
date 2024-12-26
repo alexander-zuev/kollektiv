@@ -5,8 +5,8 @@ import yaml
 from pydantic import ValidationError
 
 from src.core._exceptions import NonRetryableLLMError
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.logger import get_logger
+from src.infra.settings import settings
 from src.models.llm_models import Tool, ToolInputSchema, ToolName
 
 logger = get_logger()
