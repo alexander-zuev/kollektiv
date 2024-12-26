@@ -110,7 +110,7 @@ class ClaudeAssistant(Model):
         self.tools = [self.tool_manager.get_tool(ToolName.RAG_SEARCH)]
         self.system_prompt = self.prompt_manager.get_system_prompt(document_summaries="No documents loaded yet.")
         self.retriever = retriever
-        logger.debug("Claude assistant successfully initialized.")
+        logger.info("✓ Initialized Claude assistant successfully")
 
     # TODO: this method needs to be refactored completely
     @base_error_handler

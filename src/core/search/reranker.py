@@ -28,9 +28,9 @@ class Reranker:
     def _init(self) -> None:
         try:
             self.client = cohere.ClientV2(api_key=self.cohere_api_key)
-            logger.debug("Successfully initialized Cohere client")
+            logger.info("✓ Initialized Cohere client successfully")
         except Exception as e:
-            logger.error(f"Error initializing Cohere client: {e}")
+            logger.error(f"Failed to initialize Cohere client: {e}", exc_info=True)
             raise
 
     def extract_documents_list(self, unique_documents: dict[str, Any]) -> list[str]:

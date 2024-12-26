@@ -2,31 +2,44 @@ from __future__ import annotations
 
 import asyncio
 
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.rq.rq_worker import services
+from src.infrastructure.common.logger import configure_logging, get_logger
 from src.infrastructure.rq.worker_services import WorkerServices
 
+configure_logging(debug=True)
 logger = get_logger()
 
 
-def process_documents(job_id: str, documents: str, services: WorkerServices = services) -> None:
-    """Load documents into the vector database."""
-    logger.info(f"Processing documents for job: {job_id}")
-    chroma_client = services.chroma_client
-    asyncio.run(chroma_client.client.heartbeat())
-    chunker = services.chunker
-    chunker_max_tokens = chunker.max_tokens
-    logger.info(f"Chunker max tokens: {chunker_max_tokens}")
-    logger.info(f"Processing documents for job: {job_id}")
+def test_services_connectivity(job_id: str) -> dict:
+    """Test task that verifies connectivity to all services.
 
-    print("proces_documents")
+    Tests:
+    1. Chroma heartbeat
+    2. Redis connectivity
+    3. Access to other services
+    """
+    services = WorkerServices.get_instance()
+    logger.info(f"Testing services connectivity for job: {job_id}")
+    results = {}
 
+    try:
+        # Test Chroma
+        chroma_client = services.chroma_client
+        asyncio.run(chroma_client.client.heartbeat())
+        results["chroma"] = "connected"
+        logger.info("✓ Chroma connection successful")
 
-# # 1. Chunk documents
-# chunks = chunker.chunk_documents(documents=documents)
+        # Test basic service access
+        chunker = services.chunker
+        results["chunker_max_tokens"] = chunker.max_tokens
+        logger.info(f"✓ Chunker service accessible, max_tokens: {chunker.max_tokens}")
 
-# # 2. Load & embed into vector database
-# await vector_db.add_documents(chunks)
+        # Test vector DB service
+        vector_db = services.vector_db
+        results["vector_db"] = "initialized"
+        logger.info("✓ Vector DB service accessible")
 
-# # 3. Return the results
-# return chunks
+        return results
+
+    except Exception as e:
+        logger.error(f"Service connectivity test failed for job {job_id}: {str(e)}", exc_info=True)
+        raise

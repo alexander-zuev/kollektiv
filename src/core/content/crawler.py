@@ -64,7 +64,7 @@ class FireCrawler:
     def initialize_firecrawl(self) -> FirecrawlApp:
         """Initialize and return the Firecrawl app."""
         app = FirecrawlApp(api_key=self.api_key)
-        logger.debug("Initialized firecrawler")
+        logger.info("✓ Initialized Firecrawler successfully")
         return app
 
     def _build_params(self, request: CrawlRequest) -> CrawlParams:

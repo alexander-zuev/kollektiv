@@ -20,7 +20,8 @@ class RQManager:
             connection=self.redis_client,
             default_timeout=settings.processing_queue_timeout,
         )
-        logger.info(f"Initialized RQManager with queue: {self.queue}")
+        logger.info("✓ Initialized RQManager successfully")
+        logger.debug(f"Queue: {self.queue}")
 
     def get_queue(self) -> Queue:
         """Get the RQ queue for processing jobs."""

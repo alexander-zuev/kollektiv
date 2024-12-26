@@ -43,10 +43,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         # Save in app state
         app.state.container = container
-        logger.info("Core services initialized successfully")
+        logger.info("✓ Initialized core services successfully")
         yield  # Hand over to the application
     except Exception as e:
-        logger.error(f"Failed to initialize core services: {str(e)}")
+        logger.error(f"Failed to initialize core services: {str(e)}", exc_info=True)
         raise  # Re-raise the exception to prevent startup
     finally:
         logger.info("Shutting down Kollektiv API...")

@@ -19,16 +19,16 @@ class SupabaseClient:
         """Connect to Supabase, handling potential errors."""
         if self._client is None:  # Only connect if not already connected
             try:
-                logger.info(
+                logger.debug(
                     f"Attempting to connect to Supabase at: {self.url} with key partially masked as: {self.key[:5]}..."
                 )
                 self._client = await create_async_client(
                     supabase_url=self.url,
                     supabase_key=self.key,
                 )
-                logger.info("Connected to Supabase successfully.")
+                logger.info("✓ Initialized Supabase client successfully")
             except Exception as e:
-                logger.error(f"Unexpected error connecting to Supabase: {e}", exc_info=True)
+                logger.error(f"Failed to initialize Supabase client: {e}", exc_info=True)
                 raise
 
     async def get_client(self) -> AsyncClient:

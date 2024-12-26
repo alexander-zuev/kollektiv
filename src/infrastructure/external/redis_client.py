@@ -22,9 +22,9 @@ class RedisClient:
             self.async_client = self._create_async_client(decode_responses)
             self.sync_client = self._create_sync_client(decode_responses=False)  # RQ needs this false
 
-            logger.info(f"Initialized Redis clients using URL: {settings.redis_url}")
+            logger.info("✓ Initialized Redis client successfully")
         except redis.ConnectionError as e:
-            logger.error(f"Failed to connect to Redis: {str(e)}")
+            logger.error(f"Failed to initialize Redis client: {e}", exc_info=True)
             raise
 
     def _create_async_client(self, decode_responses: bool) -> redis.Redis:

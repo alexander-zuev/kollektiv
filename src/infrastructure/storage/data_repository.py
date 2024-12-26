@@ -50,7 +50,7 @@ class DataRepository:
 
     def __init__(self, db_client: AsyncClient) -> None:
         self.db_client = db_client
-        logger.debug("Initialized data repository")
+        logger.info("✓ Initialized data repository")
 
     @supabase_operation
     async def save(self, entity: T | list[T]) -> T | list[T]:

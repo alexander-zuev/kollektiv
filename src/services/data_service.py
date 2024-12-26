@@ -34,7 +34,6 @@ class DataService:
 
     def __init__(self, repository: DataRepository):
         self.repository = repository
-        logger.debug("Initialized data service")
 
     # Core methods used by all services
 
