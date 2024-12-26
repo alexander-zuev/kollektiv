@@ -96,25 +96,27 @@ class Settings(BaseSettings):
     )
 
     # Redis setup
-    redis_host: str | None = Field(None, alias="REDIS_HOST", description="Redis host")
-    redis_port: int | None = Field(None, alias="REDIS_PORT", description="Redis port")
+    # redis_host: str | None = Field(None, alias="REDIS_HOST", description="Redis host")
+    # redis_port: int | None = Field(None, alias="REDIS_PORT", description="Redis port")
+    redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL", description="Redis url")
     redis_user: str | None = Field(None, alias="REDIS_USER", description="Redis user")
     redis_password: str | None = Field(None, alias="REDIS_PASSWORD", description="Redis password")
-    redis_url: str | None = Field(None, alias="REDIS_URL", description="Redis url")
 
     # Redis queue
     redis_queue_name: str = Field("process_documents_queue", description="Redis queue name", alias="REDIS_QUEUE_NAME")
     processing_queue_timeout: str = Field("3h", description="Processing queue timeout", alias="REDIS_QUEUE_TIMEOUT")
 
     # Chroma client
-    chroma_host: str = Field("localhost", description="Chroma host", alias="CHROMA_HOST")
-    chroma_port: int = Field(8000, description="Chroma port", alias="CHROMA_PORT")
-    chroma_url: str | None = Field(
-        None, description="Chroma URL exposed by Railway service. Not set locally.", alias="CHROMA_PRIVATE_URL"
+    # chroma_host: str = Field(description="Chroma host", alias="CHROMA_HOST")
+    # chroma_port: int = Field(8000, description="Chroma port", alias="CHROMA_PORT")
+    chroma_private_url: str = Field(
+        default="http://localhost:8000",
+        description="Chroma URL exposed by Railway service. Not set locally.",
+        alias="CHROMA_PRIVATE_URL",
     )
     chroma_client_auth_credentials: str | None = Field(
         None,
-        description="Chroma client auth credentials, used only in staging/prod",
+        description="Auth credential for Chroma - username:password",
         alias="CHROMA_CLIENT_AUTH_CREDENTIALS",
     )
 

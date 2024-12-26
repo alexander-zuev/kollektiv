@@ -45,7 +45,7 @@ class ServiceContainer:
         self.redis_client: Redis | None = None
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
-        self.ngrok_service: None = None  # type hint, no init
+        self.ngrok_service: None = None
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
@@ -76,7 +76,7 @@ class ServiceContainer:
             )
 
             # Vector operations
-            self.client = await ChromaClient().create_client()
+            self.client = ChromaClient().create_client()
             self.embedding_manager = EmbeddingManager()
             self.vector_db = VectorDB(chroma_client=self.client, embedding_manager=self.embedding_manager)
             self.reranker = Reranker()

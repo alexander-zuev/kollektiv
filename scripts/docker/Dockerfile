@@ -29,4 +29,4 @@ RUN pip install poetry \
 COPY . .
 
 # Start worker
-CMD ["/bin/sh", "-c", "exec poetry run python -m src.infrastructure.rq.rq_worker"]
+CMD ["/bin/sh", "-c", "exec poetry run python -m src.infra.rq.rq_worker"]

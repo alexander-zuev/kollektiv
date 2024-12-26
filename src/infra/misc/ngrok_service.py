@@ -25,4 +25,5 @@ class NgrokService:
 
     async def stop_tunnel(self) -> None:
         """Stop the ngrok tunnel."""
+        logger.info("Disconnecting ngrok tunnel")
         ngrok.disconnect()

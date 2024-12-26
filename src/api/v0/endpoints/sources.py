@@ -39,7 +39,7 @@ async def add_source(
     """
     try:
         source = await content_service.add_source(request)
-        return SourceResponse(success=True, data=source, message="Source added successfully")
+        return SourceResponse(success=True, data=source, message="Started processing source")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

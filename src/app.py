@@ -31,6 +31,7 @@ logger = get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events."""
+    container = None  # Initialize container to None
     try:
         # 1. Start external dependencies for local development
         if settings.environment == Environment.LOCAL:
@@ -46,9 +47,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.error(f"Failed to start application: {str(e)}", exc_info=True)
         raise
     finally:
-        if settings.environment == Environment.LOCAL:
+        if settings.environment == Environment.LOCAL and container:  # Check if container is not None
             subprocess.run(["docker-compose", "-f", "scripts/docker/docker-compose.yml", "down"])
-            await app.state.container.shutdown_services()
+            await container.shutdown_services()
 
 
 def create_app() -> FastAPI:
