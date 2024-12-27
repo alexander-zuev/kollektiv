@@ -42,6 +42,7 @@ services:
     volumes:
       - ../../:/app
     environment:
+      - SERVICE_CONTEXT=worker
       - CHROMA_PRIVATE_URL=http://chromadb:8000
       - REDIS_URL=redis://redis:6379 # override the localhost {host: redis, port: 6379}
     depends_on:

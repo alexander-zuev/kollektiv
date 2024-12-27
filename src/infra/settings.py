@@ -3,7 +3,7 @@ import os
 from enum import Enum
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.api.routes import Routes
@@ -13,6 +13,7 @@ logger = logging.getLogger("kollektiv.settings")
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
 logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 class Environment(str, Enum):
@@ -141,6 +142,17 @@ class Settings(BaseSettings):
     def firecrawl_webhook_url(self) -> str:
         """Dynamically generates the Firecrawl webhook URL."""
         return f"{self.public_url}{Routes.System.Webhooks.FIRECRAWL}"
+
+    @model_validator(mode="after")
+    def validate_worker_services(self) -> "Settings":
+        """Validates required environment variables for RQ worker."""
+        if os.getenv("SERVICE_CONTEXT") == "worker":
+            required_vars = ["chroma_private_url", "redis_url"]
+            logger.info(f"Validating worker services for {os.getenv('SERVICE_CONTEXT')}")
+            for var in required_vars:
+                if not getattr(self, var):
+                    raise ValueError(f"Missing required setting: {var}")
+        return self
 
 
 def initialize_settings() -> Settings:

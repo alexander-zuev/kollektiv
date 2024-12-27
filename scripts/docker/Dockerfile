@@ -1,14 +1,12 @@
 # Use a base image
 FROM python:3.12-slim
 
-# Define build arguments
-# ARG CHROMA_PRIVATE_URL 
-
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    CHROMA_PRIVATE_URL=${CHROMA_PRIVATE_URL}
+    CHROMA_PRIVATE_URL=${CHROMA_PRIVATE_URL} \
+    SERVICE_CONTEXT=${SERVICE_CONTEXT}
 
 # Set the working directory
 WORKDIR /app
