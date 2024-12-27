@@ -1,3 +1,4 @@
+import logfire
 from rq.worker import Worker
 
 from src.infra.external.redis_client import RedisClient
@@ -5,6 +6,14 @@ from src.infra.logger import configure_logging, get_logger
 from src.infra.rq.worker_services import WorkerServices
 from src.infra.settings import settings
 
+# Configure logfire
+logfire.configure(
+    token=settings.logfire_write_token,
+    environment=settings.environment,
+    service_name=settings.project_name,
+)
+
+# Configure logging
 configure_logging(debug=True)
 logger = get_logger()
 
