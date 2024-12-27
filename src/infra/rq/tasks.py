@@ -22,10 +22,9 @@ def test_services_connectivity(job_id: str) -> dict:
 
     try:
         # Test Chroma
-        chroma_client = services.chroma_client
-        asyncio.run(chroma_client.client.heartbeat())
+        asyncio.run(services.chroma_client.heartbeat())
         results["chroma"] = "connected"
-        logger.info("✓ Chroma connection successful")
+        logger.info("✓ Chroma heartbeat successful")
 
         # Test basic service access
         chunker = services.chunker

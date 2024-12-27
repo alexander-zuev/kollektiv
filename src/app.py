@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         # 1. Start external dependencies for local development
         if settings.environment == Environment.LOCAL:
-            subprocess.run(["docker-compose", "-f", "scripts/docker/docker-compose.yml", "up", "-d"])
+            subprocess.run(["make", "up"])
 
         # 2. Initialize services
         container = await ServiceContainer.create()
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         raise
     finally:
         if settings.environment == Environment.LOCAL and container:  # Check if container is not None
-            subprocess.run(["docker-compose", "-f", "scripts/docker/docker-compose.yml", "down"])
+            subprocess.run(["make", "down"])
             await container.shutdown_services()
 
 

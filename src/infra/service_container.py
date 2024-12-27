@@ -11,7 +11,7 @@ from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
-from src.infra.external.chroma_client import ChromaClient
+from src.infra.external.chroma_client import AsyncClientAPI, ChromaClient
 from src.infra.external.redis_client import RedisClient
 from src.infra.external.supabase_client import SupabaseClient, supabase_client
 from src.infra.logger import get_logger
@@ -46,6 +46,7 @@ class ServiceContainer:
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
         self.ngrok_service: None = None
+        self.chroma_client: AsyncClientAPI | None = None
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
@@ -76,9 +77,9 @@ class ServiceContainer:
             )
 
             # Vector operations
-            self.client = ChromaClient().create_client()
+            self.chroma_client = await ChromaClient().create_client()
             self.embedding_manager = EmbeddingManager()
-            self.vector_db = VectorDB(chroma_client=self.client, embedding_manager=self.embedding_manager)
+            self.vector_db = VectorDB(chroma_client=self.chroma_client, embedding_manager=self.embedding_manager)
             self.reranker = Reranker()
             self.retriever = Retriever(vector_db=self.vector_db, reranker=self.reranker)
 

@@ -1,0 +1,52 @@
+name: kollektiv
+services:
+  redis:
+    image: redis:7.4.1-alpine
+    ports:
+      - "6379:6379"
+    container_name: redis
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../../config/.env
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "${CHROMA_PRIVATE_URL}/api/v1/heartbeat" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  rq-worker:
+    build:
+      context: ../../
+      dockerfile: scripts/docker/Dockerfile
+    container_name: rq-worker
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import redis; redis.from_url('${REDIS_URL}').ping()" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    env_file:
+      - ../../config/.env
+    volumes:
+      - ../../:/app
+    environment:
+      - CHROMA_PRIVATE_URL=http://chromadb:8000
+      - REDIS_URL=redis://redis:6379 # override the localhost {host: redis, port: 6379}
+    depends_on:
+      chromadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped

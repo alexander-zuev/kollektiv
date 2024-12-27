@@ -1,5 +1,5 @@
-import redis.asyncio as redis
-from redis import Redis
+from redis import Redis as SyncRedis
+from redis.asyncio import Redis as AsyncRedis
 
 from src.infra.logger import get_logger
 from src.infra.settings import settings
@@ -27,10 +27,10 @@ class RedisClient:
             logger.error(f"Failed to initialize Redis client: {e}", exc_info=True)
             raise
 
-    def _create_async_client(self, decode_responses: bool) -> redis.Redis:
+    def _create_async_client(self, decode_responses: bool) -> AsyncRedis:
         """Create async Redis client."""
         try:
-            return redis.from_url(
+            return AsyncRedis.from_url(
                 settings.redis_url,
                 username=settings.redis_user if settings.redis_user != "default" else None,
                 password=settings.redis_password if settings.redis_password != "none" else None,
@@ -40,18 +40,10 @@ class RedisClient:
             logger.error(f"Failed to initialize Redis client: {e}", exc_info=True)
             raise
 
-        # return redis.Redis(
-        #     host=settings.redis_host or "localhost",
-        #     port=settings.redis_port or 6379,
-        #     username=settings.redis_user if settings.redis_user != "default" else None,
-        #     password=settings.redis_password if settings.redis_password != "none" else None,
-        #     decode_responses=decode_responses,
-        # )
-
-    def _create_sync_client(self, decode_responses: bool) -> Redis:
+    def _create_sync_client(self, decode_responses: bool) -> SyncRedis:
         """Create sync Redis client."""
         try:
-            return Redis.from_url(
+            return SyncRedis.from_url(
                 settings.redis_url,
                 username=settings.redis_user if settings.redis_user != "default" else None,
                 password=settings.redis_password if settings.redis_password != "none" else None,
@@ -60,11 +52,3 @@ class RedisClient:
         except Exception as e:
             logger.error(f"Failed to initialize Redis client: {e}", exc_info=True)
             raise
-
-        # return Redis(
-        #     host=settings.redis_host or "localhost",
-        #     port=settings.redis_port or 6379,
-        #     username=settings.redis_user if settings.redis_user != "default" else None,
-        #     password=settings.redis_password if settings.redis_password != "none" else None,
-        #     decode_responses=decode_responses,
-        # )

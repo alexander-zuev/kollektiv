@@ -13,7 +13,7 @@ logger = get_logger()
 class RQManager:
     """Manages RQ queues."""
 
-    def __init__(self, redis_client: Redis):
+    def __init__(self, redis_client: Redis) -> None:
         """Initialize RQManager with a Redis connection."""
         self.redis_client = redis_client
         self.queue = Queue(

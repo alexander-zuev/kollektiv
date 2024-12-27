@@ -2,16 +2,12 @@
 FROM python:3.12-slim
 
 # Define build arguments
-ARG REDIS_URL
-ARG REDIS_QUEUE_NAME
-ARG CHROMA_PRIVATE_URL 
+# ARG CHROMA_PRIVATE_URL 
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0} \
-    REDIS_QUEUE_NAME=${REDIS_QUEUE_NAME:-process_documents_queue} \
     CHROMA_PRIVATE_URL=${CHROMA_PRIVATE_URL}
 
 # Set the working directory

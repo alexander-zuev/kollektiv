@@ -5,7 +5,7 @@ from uuid import UUID
 
 from src.core.search.embedding_manager import EmbeddingManager
 from src.infra.decorators import base_error_handler
-from src.infra.external.chroma_client import ChromaClient
+from src.infra.external.chroma_client import AsyncClientAPI
 from src.infra.logger import get_logger
 from src.models.content_models import Chunk
 
@@ -23,7 +23,7 @@ class VectorDB:
 
     def __init__(
         self,
-        chroma_client: ChromaClient,
+        chroma_client: AsyncClientAPI,
         embedding_manager: EmbeddingManager,
     ):
         self.client = chroma_client

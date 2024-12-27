@@ -27,7 +27,7 @@ class WorkerServices:
         self.embedding_manager = EmbeddingManager()
 
         # Initialize async services
-        self.chroma_client = ChromaClient().create_client()
+        self.chroma_client = asyncio.run(ChromaClient().create_client())
         self.supabase_client = asyncio.run(SupabaseClient().get_client())
 
         # Initialize dependent services

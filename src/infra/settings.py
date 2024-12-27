@@ -96,9 +96,7 @@ class Settings(BaseSettings):
     )
 
     # Redis setup
-    # redis_host: str | None = Field(None, alias="REDIS_HOST", description="Redis host")
-    # redis_port: int | None = Field(None, alias="REDIS_PORT", description="Redis port")
-    redis_url: str = Field(default="redis://localhost:6379", alias="REDIS_URL", description="Redis url")
+    redis_url: str = Field(..., alias="REDIS_URL", description="Redis url")
     redis_user: str | None = Field(None, alias="REDIS_USER", description="Redis user")
     redis_password: str | None = Field(None, alias="REDIS_PASSWORD", description="Redis password")
 
@@ -107,10 +105,8 @@ class Settings(BaseSettings):
     processing_queue_timeout: str = Field("3h", description="Processing queue timeout", alias="REDIS_QUEUE_TIMEOUT")
 
     # Chroma client
-    # chroma_host: str = Field(description="Chroma host", alias="CHROMA_HOST")
-    # chroma_port: int = Field(8000, description="Chroma port", alias="CHROMA_PORT")
     chroma_private_url: str = Field(
-        default="http://localhost:8000",
+        ...,
         description="Chroma URL exposed by Railway service. Not set locally.",
         alias="CHROMA_PRIVATE_URL",
     )
@@ -121,7 +117,7 @@ class Settings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        env_file=os.path.join("config", "environments", ".env"),
+        env_file=os.path.join("config", ".env"),
         env_file_encoding="utf-8",
         env_nested_delimiter="__",
         case_sensitive=False,

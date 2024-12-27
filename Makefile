@@ -2,16 +2,16 @@
 
 # Docker commands
 up:
-	docker compose -f scripts/docker/docker-compose.yml up -d --remove-orphans
+	docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d --remove-orphans
 
 down:
-	docker compose -f scripts/docker/docker-compose.yml down
+	docker compose --env-file config/.env -f scripts/docker/compose.yaml down
 
 ps:
-	docker compose -f scripts/docker/docker-compose.yml ps
+	docker compose --env-file config/.env -f scripts/docker/compose.yaml ps
 
 logs:
-	docker compose -f scripts/docker/docker-compose.yml logs -f
+	docker compose --env-file config/.env -f scripts/docker/compose.yaml logs -f
 
 rebuild:
-	docker compose -f scripts/docker/docker-compose.yml build --no-cache
+	docker compose --env-file config/.env -f scripts/docker/compose.yaml build --no-cache
