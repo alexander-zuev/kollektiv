@@ -23,8 +23,10 @@ class SourceStatus(str, Enum):
 
     PENDING = "pending"  # right after creation
     CRAWLING = "crawling"  # after crawling started
+    CRAWLED = "crawled"  # after loading is complete
     PROCESSING = "processing"  # during chunking and embedding
-    COMPLETED = "completed"  # after loading is complete
+    ADDING_SUMMARY = "adding_summary"  # during adding summaries
+    COMPLETED = "completed"  # after processing is complete
     FAILED = "failed"  # if addition failed
 
 
@@ -117,7 +119,6 @@ class Chunk(BaseModel):
     # References
     chunk_id: UUID = Field(default_factory=uuid4, description="Unique identifier for the chunk")
     document_id: UUID = Field(..., description="UUID of the document this chunk belongs to")
-    source_id: UUID = Field(..., description="UUID of the source this chunk belongs to")
 
     # Main content
     headers: dict[str, Any] = Field(..., description="Chunk headers")

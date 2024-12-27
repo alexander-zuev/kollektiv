@@ -27,15 +27,6 @@ class RequestDebugMiddleware(BaseHTTPMiddleware):
                 f"Environment: {settings.environment}"
             )
 
-            # Get request body for POST/PUT requests
-            if request.method in ["POST", "PUT"]:
-                try:
-                    body = await request.body()
-                    if body:
-                        logger.debug(f"Request Body: {body.decode()}")
-                except Exception as e:
-                    logger.debug(f"Could not read body: {str(e)}")
-
             # Process request
             response = await call_next(request)
 

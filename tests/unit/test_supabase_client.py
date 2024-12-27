@@ -2,8 +2,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.infrastructure.config.settings import settings
-from src.infrastructure.external.supabase_client import SupabaseClient
+from src.infra.external.supabase_client import SupabaseClient
+from src.infra.settings import settings
 
 
 @pytest.fixture

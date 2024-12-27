@@ -9,7 +9,6 @@ from src.infra.logger import get_logger
 from src.models.job_models import (
     CrawlJobDetails,
     Job,
-    JobStatus,
     JobType,
     ProcessingJobDetails,
 )
@@ -88,37 +87,15 @@ class JobManager:
             JobNotFoundError: If job with given ID doesn't exist
         """
         # Get current job state
-        job = await self.get_job(job_id)
+        job = await self.data_service.get_job(job_id)
         if not job:
             raise JobNotFoundError(f"Job {job_id} not found")
-
-        # Add updated_at
-        updates["updated_at"] = datetime.now(UTC)
 
         # Apply updates
         updated_job = job.update(**updates)
 
         # Persist and return
         return await self.data_service.save_job(updated_job)
-
-    @generic_error_handler
-    async def get_job(self, job_id: UUID) -> Job:
-        """
-        Retrieve a job by ID.
-
-        Args:
-            job_id: UUID of the job to retrieve
-
-        Returns:
-            Job: The requested job instance
-
-        Raises:
-            JobNotFoundError: If job with given ID doesn't exist
-        """
-        job = await self.data_service.get_job(job_id)
-        if not job:
-            raise JobNotFoundError(f"Job {job_id} not found")
-        return job
 
     @generic_error_handler
     async def get_by_firecrawl_id(self, firecrawl_id: str) -> Job:
@@ -140,31 +117,19 @@ class JobManager:
         return job
 
     async def mark_job_completed(self, job_id: UUID, result_id: UUID | None = None) -> Job:
-        """
-        Mark a job as completed with optional result ID.
-
-        Args:
-            job_id: UUID of the job to complete
-            result_id: Optional UUID of the result in storage
-
-        Returns:
-            Job: Updated job instance
-        """
-        return await self.update_job(
-            job_id, {"status": JobStatus.COMPLETED, "completed_at": datetime.now(UTC), "result_id": result_id}
-        )
+        """Mark a job as completed."""
+        # job = await self.get_job(job_id)
+        job = await self.data_service.get_job(job_id)
+        if not job:
+            raise JobNotFoundError(f"Job {job_id} not found")
+        job.complete()
+        return await self.data_service.save_job(job)
 
     async def mark_job_failed(self, job_id: UUID, error: str) -> Job:
-        """
-        Mark a job as failed with error information.
-
-        Args:
-            job_id: UUID of the job to mark as failed
-            error: Error message describing the failure
-
-        Returns:
-            Job: Updated job instance
-        """
-        return await self.update_job(
-            job_id, {"status": JobStatus.FAILED, "completed_at": datetime.now(UTC), "error": error}
-        )
+        """Mark a job as failed with error information."""
+        # job = await self.get_job(job_id)
+        job = await self.data_service.get_job(job_id)
+        if not job:
+            raise JobNotFoundError(f"Job {job_id} not found")
+        job.fail(error)
+        return await self.data_service.save_job(job)

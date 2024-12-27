@@ -23,8 +23,7 @@ from src.infra.service_container import ServiceContainer
 from src.infra.settings import Environment, settings
 
 # Configure logging
-DEBUG = settings.log_level == "debug"
-configure_logging(debug=DEBUG)
+configure_logging(debug=settings.debug)
 logger = get_logger()
 
 
@@ -65,6 +64,7 @@ def create_app() -> FastAPI:
         title="Kollektiv API",
         description="RAG-powered LLM chat application",
         lifespan=lifespan,
+        redoc_url="/redoc",
     )
 
     # instrument with logfire
@@ -87,7 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router, tags=["system"])
     app.include_router(sentry_debug_router, tags=["system"])
     app.include_router(webhook_router, tags=["webhooks"])
-    app.include_router(content_router, tags=["content"])
+    app.include_router(content_router, tags=["sources"])
     app.include_router(chat_router, tags=["chat"])
     app.include_router(conversations_router, tags=["chat"])
 
@@ -109,7 +109,7 @@ def run() -> None:
             app,
             host=settings.api_host,
             port=settings.api_port,
-            log_level=settings.log_level,
+            log_level="debug" if settings.debug else "info",
         )
     except KeyboardInterrupt:
         logger.info("Shutting down server...")

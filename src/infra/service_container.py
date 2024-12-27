@@ -20,6 +20,7 @@ from src.infra.settings import Environment, settings
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
+from src.services.event_service import EventService
 from src.services.job_manager import JobManager
 
 logger = get_logger()
@@ -47,6 +48,7 @@ class ServiceContainer:
         self.embedding_manager: EmbeddingManager | None = None
         self.ngrok_service: None = None
         self.chroma_client: AsyncClientAPI | None = None
+        self.event_service: EventService | None = None
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
@@ -100,6 +102,10 @@ class ServiceContainer:
                 self.ngrok_service = NgrokService()
                 await self.ngrok_service.start_tunnel()
 
+            # Event service
+            self.event_service = EventService(content_service=self.content_service, redis_client=self.redis_client)
+            await self.event_service.start()
+
             # Result logging
             logger.info("✓ Initialized services successfully.")
 
@@ -118,3 +124,5 @@ class ServiceContainer:
         """Shutdown all services."""
         if self.ngrok_service is not None:
             await self.ngrok_service.stop_tunnel()
+        if self.event_service is not None:
+            await self.event_service.stop()

@@ -1,11 +1,10 @@
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from src.api.routes import Routes
-from src.infrastructure.config.settings import Environment, Settings
+from src.infra.settings import Environment, Settings
 
 
 def test_environment_independent_settings():
@@ -16,9 +15,7 @@ def test_environment_independent_settings():
     assert settings.firecrawl_api_url == "https://api.firecrawl.dev/v1"
     assert settings.api_host == "127.0.0.1"
     assert settings.api_port == 8000
-    assert settings.chainlit_host == "127.0.0.1"
-    assert settings.chainlit_port == 8001
-    assert settings.log_level == "debug"
+    assert settings.debug == False
     assert settings.max_retries == 3
     assert settings.backoff_factor == 2.0
     assert settings.default_page_limit == 25
@@ -29,14 +26,15 @@ def test_path_settings():
     """Test path configurations that are environment-independent."""
     settings = Settings()
 
-    # Path structure should be consistent
-    assert settings.log_dir == Path("src/logs")
-    assert settings.raw_data_dir == Path("src/data/raw")
-    assert settings.processed_data_dir == Path("src/data/processed")
-    assert settings.chroma_db_dir == Path("src/infrastructure/storage/vector/chroma")
-
     # Verify directories exist
-    for dir_path in [settings.log_dir, settings.raw_data_dir, settings.processed_data_dir, settings.chroma_db_dir]:
+    for dir_path in [
+        settings.src_dir,
+        settings.eval_dir,
+        settings.prompt_dir,
+        settings.tools_dir,
+        settings.prompts_file,
+        settings.tools_file,
+    ]:
         assert dir_path.exists()
         assert dir_path.is_dir()
 

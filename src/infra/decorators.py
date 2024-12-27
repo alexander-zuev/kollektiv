@@ -1,6 +1,5 @@
 import asyncio
 import functools
-import sys
 from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
@@ -48,55 +47,46 @@ def base_error_handler(func: Callable[P, T]) -> Callable[P, T]:
 
 
 def generic_error_handler(func: Callable[..., T]) -> Callable[..., T]:
-    """Decorator to catch and log any unhandled exceptions in a function."""
+    """Simple error handler that preserves the original error context."""
 
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs) -> T:
         try:
             return await func(*args, **kwargs)
-        except Exception as e:
-            logger.critical(
-                f"Unhandled exception in {func.__name__}: {str(e)}",
-                exc_info=True,  # Include traceback in the log
-            )
+        except Exception:
             raise
 
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs) -> T:
         try:
             return func(*args, **kwargs)
-        except Exception as e:
-            logger.critical(f"Unhandled exception in {func.__name__}: {str(e)}", exc_info=True)
+        except Exception:
             raise
 
-    # Determine if the function is async or not
-    if asyncio.iscoroutinefunction(func):
-        return async_wrapper
-    else:
-        return sync_wrapper
+    return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
 
 
-def application_level_handler(func: Callable) -> Callable[..., T]:
-    """Retrieve the application logger."""
+# def application_level_handler(func: Callable) -> Callable[..., T]:
+#     """Retrieve the application logger."""
 
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        # Access the logger
-        logger = get_logger()
+#     @functools.wraps(func)
+#     def wrapper(*args, **kwargs) -> Any:
+#         # Access the logger
+#         logger = get_logger()
 
-        try:
-            return func(*args, **kwargs)
-        except KeyboardInterrupt:
-            logger.info("User terminated program execution")
-            sys.exit(0)
-        except SystemExit:
-            logger.info("\nSystem exit called")
-            sys.exit(0)
-        except Exception as e:
-            logger.error(f"Error in {func.__name__}: {str(e)}")
-            raise
+#         try:
+#             return func(*args, **kwargs)
+#         except KeyboardInterrupt:
+#             logger.info("User terminated program execution")
+#             sys.exit(0)
+#         except SystemExit:
+#             logger.info("\nSystem exit called")
+#             sys.exit(0)
+#         except Exception as e:
+#             logger.error(f"Error in {func.__name__}: {str(e)}")
+#             raise
 
-    return wrapper
+#     return wrapper
 
 
 def anthropic_error_handler(func: Callable) -> Callable[..., T]:

@@ -2,8 +2,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.infrastructure.config.settings import settings
-from src.infrastructure.external.chroma_client import ChromaClient
+from src.infra.external.chroma_client import ChromaClient
+from src.infra.settings import settings
 
 
 @pytest.mark.unit

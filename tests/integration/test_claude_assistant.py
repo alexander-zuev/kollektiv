@@ -20,8 +20,7 @@ def test_claude_assistant(real_vector_db: VectorDB) -> Generator[ClaudeAssistant
     retriever = Retriever(vector_db=real_vector_db, reranker=reranker)
 
     # Initialize assistant with the properly set up retriever
-    assistant = ClaudeAssistant(vector_db=real_vector_db)
-    assistant.retriever = retriever
+    assistant = ClaudeAssistant(vector_db=real_vector_db, retriever=retriever)
 
     # Mock the summary manager
     with patch("src.core.search.vector_db.SummaryManager") as mock_summary_manager:
@@ -44,7 +43,6 @@ def test_claude_assistant(real_vector_db: VectorDB) -> Generator[ClaudeAssistant
         finally:
             # Clean up
             real_vector_db.reset_database()
-            assistant.reset_conversation()
 
 
 @pytest.mark.integration

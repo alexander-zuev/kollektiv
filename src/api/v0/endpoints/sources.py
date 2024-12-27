@@ -7,11 +7,11 @@ from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
 from src.infra.logger import get_logger
 
 logger = get_logger()
-router = APIRouter(prefix=f"{V0_PREFIX}{Routes.V0.CONTENT}")
+router = APIRouter(prefix=f"{V0_PREFIX}")
 
 
 @router.post(
-    Routes.V0.Content.SOURCES,
+    Routes.V0.Sources.SOURCES,
     response_model=SourceResponse,
     responses={
         201: {"model": SourceResponse},

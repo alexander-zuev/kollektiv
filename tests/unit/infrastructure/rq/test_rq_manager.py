@@ -2,8 +2,8 @@ from unittest.mock import MagicMock
 
 from rq import Queue
 
-from src.infrastructure.config.settings import settings
-from src.infrastructure.rq.rq_manager import RQManager
+from src.infra.settings import settings
+from src.infra.rq.rq_manager import RQManager
 
 
 class TestRQManagerUnit:

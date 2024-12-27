@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # Environment configuration
     environment: Environment = Field(Environment.LOCAL, alias="ENVIRONMENT", description="Application environment")
 
+    # Debug mode
+    debug: bool = Field(False, description="True if debug mode is enabled", alias="DEBUG")
+
     # API keys
     firecrawl_api_url: str = Field("https://api.firecrawl.dev/v1", description="Firecrawl API URL")
     firecrawl_api_key: str = Field(..., alias="FIRECRAWL_API_KEY")
@@ -48,11 +51,10 @@ class Settings(BaseSettings):
         description="API host - 127.0.0.1 for local, 0.0.0.0 for staging/prod",
     )
     api_port: int = Field(
-        default=8000,
+        default=8080,
         alias="PORT",  # Railway injects PORT environment variable
         description="API port - defaults to 8000, but can be overridden by Railway's PORT variable",
     )
-    log_level: str = Field("debug", description="Logging level")
     railway_public_domain: str | None = Field(
         None,
         description="Railway's public domain for staging/prod",
@@ -100,6 +102,9 @@ class Settings(BaseSettings):
     redis_url: str = Field(..., alias="REDIS_URL", description="Redis url")
     redis_user: str | None = Field(None, alias="REDIS_USER", description="Redis user")
     redis_password: str | None = Field(None, alias="REDIS_PASSWORD", description="Redis password")
+
+    # Pub/Sub
+    process_documents_channel: str = Field("process_documents", description="Process documents channel")
 
     # Redis queue
     redis_queue_name: str = Field("process_documents_queue", description="Redis queue name", alias="REDIS_QUEUE_NAME")

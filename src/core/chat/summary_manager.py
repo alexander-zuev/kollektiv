@@ -28,7 +28,6 @@ class SummaryManager:
         self.client = anthropic.AsyncAnthropic(api_key=settings.main_model, max_retries=MAX_RETRIES)
         self.model_name = model_name
         self.data_service = data_service
-        self.summaries = self.load_summaries()
 
     @anthropic_error_handler
     @weave.op()

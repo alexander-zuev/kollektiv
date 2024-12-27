@@ -404,7 +404,7 @@ def redis_repository(mock_redis):
 @pytest.fixture(scope="function")
 async def redis_test_client():
     """Real Redis client for integration tests."""
-    redis = Redis(host=settings.redis_host, port=settings.redis_port)
+    redis = Redis.from_url(settings.redis_url)
     try:
         await redis.ping()
         await redis.flushall()  # Clean the Redis instance before tests
