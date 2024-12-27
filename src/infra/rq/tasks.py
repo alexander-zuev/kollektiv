@@ -7,8 +7,6 @@ from src.infra.rq.worker_services import WorkerServices
 
 logger = get_logger()
 
-logger.info("Testing BUILD COMMAND")
-
 
 def test_services_connectivity(job_id: str):
     """Test task that verifies connectivity to all services.

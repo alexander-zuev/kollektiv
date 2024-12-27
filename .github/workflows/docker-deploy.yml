@@ -44,21 +44,22 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/kollektiv-rq:latest
             ghcr.io/${{ github.repository_owner }}/kollektiv-rq:${{ steps.get_tag.outputs.LATEST_TAG }}
 
-      # - name: Trigger Railway redeploy
-      #   run: |
-      #     response=$(curl -X POST \
-      #       -H "Authorization: Bearer ${RAILWAY_TOKEN}" \
-      #       -H "Content-Type: application/json" \
-      #       -v \
-      #       "https://backboard.railway.app/graphql/v2" \
-      #       -d '{
-      #         "query": "mutation DeploymentRedeploy($id: String!, $usePreviousImageTag: Boolean!) { deploymentRedeploy(id: $id, usePreviousImageTag: $usePreviousImageTag) { id status } }",
-      #         "variables": {
-      #           "id": "'"${RAILWAY_WORKER_DEPLOYMENT_ID}"'",
-      #           "usePreviousImageTag": false
-      #         }
-      #       }')
-      #     echo "Response: $response"
-      #   env:
-      #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      #     RAILWAY_WORKER_DEPLOYMENT_ID: ${{ secrets.RAILWAY_WORKER_DEPLOYMENT_ID }}
+      - name: Trigger Railway redeploy
+        run: |
+          response=$(curl -X POST \
+            -H "Authorization: Bearer ${RAILWAY_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -v \
+            "https://backboard.railway.app/graphql/v2" \
+            -d '{
+              "query": "mutation serviceInstanceRedeploy($environmentId: String!, $serviceId: String!) { serviceInstanceRedeploy(environmentId: $environmentId, serviceId: $serviceId) }",
+              "variables": {
+                "environmentId": "'"${RAILWAY_STAGING_ENVIRONMENT_ID}"'",
+                "serviceId": "'"${RAILWAY_WORKER_SERVICE_ID}"'"
+              }
+            }')
+          echo "Response: $response"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_STAGING_ENVIRONMENT_ID: ${{ secrets.RAILWAY_STAGING_ENVIRONMENT_ID }}
+          RAILWAY_WORKER_SERVICE_ID: ${{ secrets.RAILWAY_WORKER_SERVICE_ID }}

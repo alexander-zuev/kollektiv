@@ -1,4 +1,4 @@
-.PHONY: up down ps logs worker
+.PHONY: up down ps logs worker rebuild push-ghcr rebuild-and-push
 
 # Docker commands
 up:
@@ -15,3 +15,9 @@ logs:
 
 rebuild:
 	docker compose --env-file config/.env -f scripts/docker/compose.yaml build --no-cache
+
+push-ghcr:
+	docker build -f scripts/docker/Dockerfile -t ghcr.io/alexander-zuev/kollektiv-rq:latest .
+	docker push ghcr.io/alexander-zuev/kollektiv-rq:latest
+
+rebuild-and-push: rebuild push-ghcr

@@ -4,9 +4,7 @@ FROM python:3.12-slim
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    CHROMA_PRIVATE_URL=${CHROMA_PRIVATE_URL} \
-    SERVICE_CONTEXT=${SERVICE_CONTEXT}
+    PYTHONPATH=/app
 
 # Set the working directory
 WORKDIR /app
