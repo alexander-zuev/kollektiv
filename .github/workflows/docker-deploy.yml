@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/docker-deploy.yml"
       - "scripts/docker/Dockerfile"
+      - "scripts/docker/compose.yaml"
       - "src/**"
       - "pyproject.toml"
 
@@ -42,3 +43,18 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/kollektiv-rq:latest
             ghcr.io/${{ github.repository_owner }}/kollektiv-rq:${{ steps.get_tag.outputs.LATEST_TAG }}
+
+      - name: Trigger Railway redeploy
+        run: |
+          echo "Triggering deployment for project: ${RAILWAY_PROJECT_ID}"
+          echo "Service ID: ${RAILWAY_SERVICE_ID}"
+          response=$(curl -X POST \
+            -H "Authorization: Bearer ${RAILWAY_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -v \
+            "https://backboard.railway.app/api/projects/${RAILWAY_PROJECT_ID}/services/${RAILWAY_SERVICE_ID}/deployments")
+          echo "Response: $response"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
