@@ -195,3 +195,8 @@ class DataService:
     async def save_conversation(self, conversation: Conversation) -> None:
         """Save conversation to Supabase."""
         await self.repository.save(conversation)
+
+    async def get_documents(self, document_ids: list[UUID]) -> list[Document]:
+        """Get documents by their IDs."""
+        documents = await self.repository.find(Document, filters={"document_id": document_ids})
+        return [Document.model_validate(document) for document in documents]

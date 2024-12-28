@@ -54,6 +54,10 @@ class EventService:
             logger.exception(f"Failed to listen for events: {e}")
             raise
 
+    async def publish_event(self, event: dict, queue: str = settings.process_documents_channel) -> None:
+        """Publish an event to the event bus."""
+        await self.redis_client.publish(queue, json.dumps(event))
+
     async def handle_event(self, message: bytes) -> None:
         """Handle an event from the event bus."""
         try:

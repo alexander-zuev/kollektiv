@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logfire
 from redis.asyncio import Redis
+from supabase import AsyncClient
 
 from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
@@ -14,7 +15,7 @@ from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.external.chroma_client import AsyncClientAPI, ChromaClient
 from src.infra.external.redis_client import RedisClient
-from src.infra.external.supabase_client import SupabaseClient, supabase_client
+from src.infra.external.supabase_client import SupabaseClient
 from src.infra.logger import get_logger
 from src.infra.rq.rq_manager import RQManager
 from src.infra.settings import Environment, settings
@@ -37,7 +38,7 @@ class ServiceContainer:
         self.data_service: DataService | None = None
         self.content_service: ContentService | None = None
         self.repository: DataRepository | None = None
-        self.db_client: SupabaseClient | None = None
+        self.db_client: AsyncClient | None = None
         self.llm_assistant: ClaudeAssistant | None = None
         self.vector_db: VectorDB | None = None
         self.chat_service: ChatService | None = None
@@ -55,7 +56,7 @@ class ServiceContainer:
         """Initialize all services."""
         try:
             # Database & Repository
-            self.db_client = supabase_client
+            self.db_client = await SupabaseClient().get_client()
             self.repository = DataRepository(db_client=self.db_client)
             self.data_service = DataService(repository=self.repository)
 

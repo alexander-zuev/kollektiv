@@ -74,8 +74,6 @@ class DataRepository:
             job.status = JobStatus.COMPLETED
             updated = await repo.save(job)
         """
-        client = await self.db_client.get_client()
-
         # Handle both single and batch cases
         entities = [entity] if not isinstance(entity, list) else entity
         if not entities:
@@ -87,7 +85,7 @@ class DataRepository:
 
         # Single transaction for all entities
         result = await (
-            client.schema(entity_type._db_config["schema"])
+            self.db_client.schema(entity_type._db_config["schema"])
             .table(entity_type._db_config["table"])
             .upsert(data, on_conflict=entity_type._db_config["primary_key"])
             .execute()
@@ -163,8 +161,9 @@ class DataRepository:
                 filters={"request_config->url": "https://..."}
             )
         """
-        client = await self.db_client.get_client()
-        query = client.schema(model_class._db_config["schema"]).table(model_class._db_config["table"]).select("*")
+        query = (
+            self.db_client.schema(model_class._db_config["schema"]).table(model_class._db_config["table"]).select("*")
+        )
 
         if filters:
             for field, value in filters.items():

@@ -274,7 +274,7 @@ class ContentService:
         logger.debug(f"Updated source {details.source_id} status to PROCESSING")
 
         # 7. Enqueu processing job
-        await self.rq_manager.enqueue_job(process_documents_job, processing_job.job_id, document_ids)
+        self.rq_manager.enqueue_job(process_documents_job, processing_job.job_id, document_ids)
         logger.debug(f"Enqueued processing job {processing_job.job_id}")
 
     async def handle_pubsub_event(self, message: dict) -> None:

@@ -32,7 +32,7 @@ async def _process_documents_job_async(internal_job_id: UUID, document_ids: list
     """Process list of documents into chunks and adds them to vector DB."""
     logger.info(f"Processing documents job {internal_job_id}")
 
-    worker_services = WorkerServices.get_services()
+    worker_services = WorkerServices.get_instance()
 
     try:
         # 1. Set job status to IN_PROGRESS
@@ -73,27 +73,21 @@ async def _process_documents_job_async(internal_job_id: UUID, document_ids: list
         )
 
         # 7. publish completed event
-        await worker_services.redis_client.publish(
-            settings.process_documents_channel,
-            json.dumps(
-                {
-                    "job_id": str(internal_job_id),
-                    "status": "completed",
-                }
-            ),
+        await worker_services.event_service.publish_event(
+            {
+                "job_id": str(internal_job_id),
+                "status": "completed",
+            }
         )
 
     except Exception as e:
         logger.error(f"Error processing documents job {internal_job_id}: {e}", exc_info=True)
         await worker_services.job_manager.mark_job_failed(internal_job_id, str(e))
-        await worker_services.redis_client.publish(
-            settings.process_documents_channel,
-            json.dumps(
-                {
-                    "job_id": str(internal_job_id),
-                    "status": "failed",
-                    "error": str(e),
-                }
-            ),
+        await worker_services.event_service.publish_event(
+            {
+                "job_id": str(internal_job_id),
+                "status": "failed",
+                "error": str(e),
+            }
         )
         raise

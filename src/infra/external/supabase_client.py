@@ -36,6 +36,3 @@ class SupabaseClient:
         if self._client is None:
             await self.connect()
         return self._client
-
-
-supabase_client = SupabaseClient()

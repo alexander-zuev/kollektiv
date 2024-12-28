@@ -6,9 +6,11 @@ from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.vector_db import VectorDB
 from src.infra.data.data_repository import DataRepository
 from src.infra.external.chroma_client import ChromaClient
+from src.infra.external.redis_client import RedisClient
 from src.infra.external.supabase_client import SupabaseClient
 from src.infra.logger import get_logger
 from src.services.data_service import DataService
+from src.services.event_service import EventService
 from src.services.job_manager import JobManager
 
 logger = get_logger()
@@ -35,6 +37,13 @@ class WorkerServices:
         self.repository = DataRepository(db_client=self.supabase_client)
         self.data_service = DataService(repository=self.repository)
         self.job_manager = JobManager(data_service=self.data_service)
+
+        # Add Redis client
+        redis_client = RedisClient()
+        self.redis_client = redis_client.async_client  # For async operations like publish
+
+        # Add event service for publishing
+        self.event_service = EventService(content_service=self.data_service, redis_client=RedisClient().async_client)
 
     @classmethod
     def get_instance(cls) -> "WorkerServices":
