@@ -15,10 +15,11 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
-async def non_retryable_exception_handler(request: Request, exc: NonRetryableError) -> JSONResponse:
+async def non_retryable_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Catch and log a non-retryable error."""
-    logger.error(f"Non-retryable error at {request.url.path}: {exc}")
-    return JSONResponse(
-        status_code=500,
-        content={"detail": f"An internal error occured while processing your request: {str(exc)}."},
-    )
+    if isinstance(exc, NonRetryableError):
+        logger.error(f"Non-retryable error at {request.url.path}: {exc.error_message}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"An internal error occurred while processing your request: {exc.error_message}."},
+        )

@@ -10,21 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.config.cors_config import get_cors_config
 from src.api.handlers.error_handlers import global_exception_handler, non_retryable_exception_handler
-from src.api.middleware.debug_middleware import RequestDebugMiddleware
 from src.api.middleware.rate_limit import HealthCheckRateLimit
 from src.api.system.health import router as health_router
 from src.api.system.sentry_debug import router as sentry_debug_router
 from src.api.v0.endpoints.chat import chat_router, conversations_router
 from src.api.v0.endpoints.sources import router as content_router
 from src.api.v0.endpoints.webhooks import router as webhook_router
-from src.core._exceptions import NonRetryableError
 from src.infra.logger import configure_logging, get_logger
 from src.infra.service_container import ServiceContainer
 from src.infra.settings import Environment, settings
-
-# Configure logging
-configure_logging(debug=settings.debug)
-logger = get_logger()
 
 
 @asynccontextmanager
@@ -42,8 +36,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # 3. Save app state
         app.state.container = container
         yield
-    except Exception as e:
-        logger.error(f"Failed to start application: {str(e)}", exc_info=True)
+    except Exception:
+        logfire.exception("Failed to start Kollektiv!")
         raise
     finally:
         if settings.environment == Environment.LOCAL and container:  # Check if container is not None
@@ -53,6 +47,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    # Configure standard logging first
+    configure_logging(debug=settings.debug)
+    logger = get_logger()
+
+    # Initialize Sentry
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         traces_sample_rate=1,  # capture 100% of transactions
@@ -67,19 +66,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # instrument with logfire
-    logfire.configure(
-        token=settings.logfire_write_token,
-        environment=settings.environment,
-        service_name=settings.project_name,
-    )
-    logfire.instrument_fastapi(app)
-    logfire.instrument_httpx()
-    logfire.instrument_asyncpg()
-    logfire.instrument_redis()
-
     # Add middleware
-    app.add_middleware(RequestDebugMiddleware)
     app.add_middleware(CORSMiddleware, **get_cors_config(settings.environment))
     app.add_middleware(HealthCheckRateLimit, requests_per_minute=60)
 
@@ -93,7 +80,7 @@ def create_app() -> FastAPI:
 
     # Add exception handlers
     app.add_exception_handler(Exception, global_exception_handler)
-    app.add_exception_handler(NonRetryableError, non_retryable_exception_handler)
+    app.add_exception_handler(Exception, non_retryable_exception_handler)
 
     return app
 
@@ -101,18 +88,14 @@ def create_app() -> FastAPI:
 def run() -> None:
     """Run the FastAPI application."""
     try:
-        logger.info(
-            f"Starting Kollektiv API on {settings.api_host}:{settings.api_port} environment: {settings.environment.value}"
-        )
-        app = create_app()
         uvicorn.run(
-            app,
+            app=create_app(),
             host=settings.api_host,
             port=settings.api_port,
             log_level="debug" if settings.debug else "info",
         )
     except KeyboardInterrupt:
-        logger.info("Shutting down server...")
+        raise
 
 
 if __name__ == "__main__":

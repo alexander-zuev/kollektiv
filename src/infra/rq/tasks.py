@@ -72,7 +72,7 @@ async def _process_documents_job_async(internal_job_id: UUID, document_ids: list
             internal_job_id,
         )
 
-        # 6. publish completed event
+        # 7. publish completed event
         await worker_services.redis_client.publish(
             settings.process_documents_channel,
             json.dumps(

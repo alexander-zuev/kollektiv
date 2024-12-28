@@ -1,6 +1,6 @@
 from enum import Enum
 
-from src.infra.settings import Environment
+from src.models.base_models import Environment
 
 
 class AllowedOrigins(str, Enum):

@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 import sys
@@ -5,8 +6,6 @@ from enum import Enum
 
 import logfire
 from colorama import Fore, Style, init
-
-from src.infra.settings import Environment, settings
 
 # Initialize colorama
 init(autoreset=True)
@@ -45,48 +44,60 @@ class ColoredFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record with colored level and symbol."""
-        # Get timestamp and format module name more concisely
-        timestamp = self.formatTime(record, "%Y-%m-%d %H:%M:%S")
-        module = record.name.replace("kollektiv.src.", "")
+        # Step 1: Compute message and time exactly like the source
+        record.message = record.getMessage()
+        if self.usesTime():
+            record.asctime = self.formatTime(record, self.datefmt)
 
-        # Color both symbol and level
+        # Step 2: Format our custom message
+        timestamp = record.asctime if hasattr(record, "asctime") else self.formatTime(record, "%Y-%m-%d %H:%M:%S")
+        name = record.name
+        lineno = record.lineno
+
+        # Apply colors
         color = self.COLORS.get(record.levelno, "")
         colored_symbol = f"{color}{self.SYMBOLS.get(record.levelno, '')}{Style.RESET_ALL}"
         colored_level = f"{color}{record.levelname}{Style.RESET_ALL}:"
 
-        # Get formatted message directly
-        message = record.getMessage()  # This handles all formatting
+        # Format extra fields consistently
+        extra_arg_str = ""
+        if record.args:
+            extra_arg_str = f"Args: {json.dumps(record.args, default=str)}"
 
-        # Final format
-        return f"{colored_symbol} {colored_level} [{timestamp}] {module}: {message}"
+        # Build our custom formatted message
+        s = f"{colored_symbol} {colored_level} [{timestamp}] {name}:{lineno} - {record.message}{extra_arg_str}"
 
-
-class JsonFormatter(logging.Formatter):
-    """Format the log record as a JSON structure."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        """Format the log record as a JSON structure."""
-        log_entry = {
-            "timestamp": self.formatTime(record, "%Y-%m-%d %H:%M:%S"),
-            "level": record.levelname,
-            "module": record.name,
-            "message": record.getMessage(),
-            "line": record.lineno,
-            "path": record.pathname,
-        }
-        # Add exception information if available
+        # Step 3: Handle exc_info and stack_info EXACTLY like the source
         if record.exc_info:
-            log_entry["exception"] = self.formatException(record.exc_info)
-        for key in dir(record):
-            if not key.startswith("_") and key not in log_entry:
-                log_entry[key] = getattr(record, key, None)
-        return json.dumps(log_entry)
+            # Cache the traceback text to avoid converting it multiple times
+            # (it's constant anyway)
+            if not record.exc_text:
+                record.exc_text = self.formatException(record.exc_info)
+        if record.exc_text:
+            if s[-1:] != "\n":
+                s = s + "\n"
+            s = s + record.exc_text
+        if record.stack_info:
+            if s[-1:] != "\n":
+                s = s + "\n"
+            s = s + self.formatStack(record.stack_info)
+
+        return s
 
 
 def configure_logging(debug: bool = False) -> None:
     """Configure the application's logging system with both local handlers and Logfire."""
+    from src.infra.settings import settings
+
     # Setup log level
     log_level = logging.DEBUG if debug else logging.INFO
+
+    logfire.configure(
+        token=settings.logfire_write_token,
+        environment=settings.environment,
+        service_name=settings.project_name,
+        console=False,
+    )
 
     # 1. Configure kollektiv logger
     app_logger = logging.getLogger("kollektiv")
@@ -96,14 +107,12 @@ def configure_logging(debug: bool = False) -> None:
     # 2. Set up handlers
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
-    console_handler.setFormatter(ColoredFormatter("%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(message)s"))
+    console_handler.setFormatter(ColoredFormatter())
     app_logger.addHandler(console_handler)
 
     # 3. Environment-specific handlers
-    if settings.environment != Environment.LOCAL:
-        logfire_handler = logfire.LogfireLoggingHandler()
-        logfire_handler.setFormatter(JsonFormatter())
-        app_logger.addHandler(logfire_handler)
+    logfire_handler = logfire.LogfireLoggingHandler()
+    app_logger.addHandler(logfire_handler)
 
     # 4. Add third-party logging handlers
     logging.getLogger("fastapi").setLevel(level=log_level)
@@ -116,17 +125,13 @@ def configure_logging(debug: bool = False) -> None:
 
 
 def get_logger() -> logging.LoggerAdapter:
-    """
-    Retrieve a logger named after the calling module.
+    """Retrieve a logger named after the calling module.
 
     Returns:
         logging.LoggerAdapter: A logger adapter that supports extra context fields.
     """
-    import inspect
-
     frame = inspect.currentframe()
     try:
-        # Get the frame of the caller
         caller_frame = frame.f_back
         module = inspect.getmodule(caller_frame)
         module_name = module.__name__ if module else "kollektiv"

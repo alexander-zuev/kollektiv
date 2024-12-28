@@ -44,6 +44,7 @@ logfire = { extras = [
     "fastapi",
     "httpx",
     "redis",
+    "system-metrics",
 ], version = "^2.11.0" }
 asyncpg = "^0.30.0"
 

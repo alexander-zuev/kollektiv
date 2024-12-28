@@ -38,11 +38,11 @@ async def handle_firecrawl_webhook(
 
         # Get raw payload
         raw_payload = await request.json()
-        logger.debug("Received FireCrawl webhook payload")
 
         try:
             # Parse the webhook payload
             parsed_payload = handler._parse_firecrawl_payload(data=raw_payload)
+            logger.debug(f"Parsed event type: {parsed_payload.event_type}")
         except ValueError as ve:
             logger.error(f"Invalid webhook payload: {str(ve)}")
             raise HTTPException(
@@ -54,8 +54,7 @@ async def handle_firecrawl_webhook(
 
         # Process the event
         try:
-            await content_service.handle_event(event=webhook_event)
-            logger.debug("Successfully processed webhook event")
+            await content_service.handle_webhook_event(event=webhook_event)
         except Exception as e:
             logger.error(f"Error processing webhook event: {str(e)}")
             raise HTTPException(

@@ -15,7 +15,7 @@ from src.infra.rq.rq_manager import RQManager
 from src.infra.rq.tasks import process_documents_job
 from src.models.content_models import DataSource, Document, SourceStatus
 from src.models.firecrawl_models import CrawlRequest
-from src.models.job_models import Job, JobStatus, JobType
+from src.models.job_models import CrawlJobDetails, Job, JobStatus, JobType, ProcessingJobDetails
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
 
@@ -39,7 +39,7 @@ class ContentService:
 
     @generic_error_handler
     async def add_source(self, request: AddContentSourceRequest) -> SourceAPIResponse:
-        """Add a new content source and initiate crawling.
+        """POST /sources entrypoint.
 
         Args:
             request: Validated request containing source configuration
@@ -50,9 +50,7 @@ class ContentService:
         Raises:
             CrawlerError: If crawler fails to start
         """
-        # TODO: ensure this uses a transaction with context manager
-        # TODO: refactor into smaller items so that I can remove one large try-except from here
-        data_source = None  # Initialize to None
+        data_source = None
         try:
             logger.info(f"Starting to add source for request {request.request_id}")
 
@@ -71,8 +69,10 @@ class ContentService:
             # 4. Create Job
             job = await self.job_manager.create_job(
                 job_type=JobType.CRAWL,
-                source_id=data_source.source_id,
-                url=request.request_config.url,
+                details=CrawlJobDetails(
+                    source_id=data_source.source_id,
+                    url=request.request_config.url,
+                ),
             )
             logger.debug("STEP 4 Job saved")
 
@@ -141,21 +141,20 @@ class ContentService:
         return crawl_request
 
     async def list_sources(self) -> list[SourceAPIResponse]:
-        """List all content sources."""
+        """GET /sources entrypoint"""
         sources = await self.data_service.list_datasources()
         return [SourceAPIResponse.from_source(source) for source in sources]
 
     async def get_source(self, source_id: UUID) -> SourceAPIResponse:
-        """Get a source by UUID."""
+        """GET /sources/{source_id} entrypoint"""
         source = await self.data_service.retrieve_datasource(source_id=source_id)
         return SourceAPIResponse.from_source(source)
 
-    @generic_error_handler
-    async def handle_event(self, event: FireCrawlWebhookEvent) -> None:
+    async def handle_webhook_event(self, event: FireCrawlWebhookEvent) -> None:
         """Handles webhook events related to content ingestion."""
         logger.info(
             "Processing webhook event",
-            extra={
+            {
                 "event_type": event.data.event_type,
                 "firecrawl_id": event.data.firecrawl_id,
                 "provider": event.provider,
@@ -180,16 +179,15 @@ class ContentService:
                         await self._handle_failure(job, event.data.error or "Unknown error")
 
         except JobNotFoundError:
-            logger.error("Job not found", extra={"firecrawl_id": event.data.firecrawl_id})
+            logger.exception("Job not found", {"firecrawl_id": event.data.firecrawl_id})
             raise
         except Exception as e:
-            logger.error(
-                "Event handling failed",
-                extra={"event_type": event.data.event_type, "job_id": job.job_id if job else None, "error": str(e)},
+            logger.exception(
+                "Firecrawl webhook event handling failed",
+                {"event_type": event.data.event_type, "job_id": job.job_id if job else None, "error": str(e)},
             )
             raise
 
-    @generic_error_handler
     async def _handle_started(self, job: Job) -> None:
         """Handle crawl.started event"""
         try:
@@ -213,24 +211,20 @@ class ContentService:
     async def _handle_page_crawled(self, job: Job, event: FireCrawlWebhookEvent) -> None:
         """Handle crawl.page event - increment page count"""
         try:
-            # Simply increment pages_crawled
             await self.job_manager.update_job(
                 job_id=job.job_id, updates={"details": {"pages_crawled": job.details.pages_crawled + 1}}
             )
             logger.debug(f"Updated job {job.job_id} pages_crawled to {job.details.pages_crawled + 1}")
         except Exception as e:
-            logger.error("Failed to update page count", extra={"job_id": job.job_id, "error": str(e)})
+            logger.error("Failed to update page count", {"job_id": job.job_id, "error": str(e)})
             raise
 
-    # TODO: de-couple and move to job management via Redis. It should just enqueu the processing job instead of
-    # handling it itself.
-    @generic_error_handler
     async def _handle_crawl_completed(self, job: Job) -> None:
         """Handle crawl.completed event"""
         if job.job_type != JobType.CRAWL:
             raise ValueError(f"Expected CRAWL job type, got {job.job_type}")
 
-        details = job.details  # This is a CrawlJobDetails instance
+        details = job.details
 
         # 1. Get documents
         documents = await self.crawler.get_results(
@@ -265,23 +259,25 @@ class ContentService:
 
         # 5. Create a new processing job
         processing_job = await self.job_manager.create_job(
-            job_type=JobType.PROCESS,
-            source_id=details.source_id,  # Fix: access as property
-            details={"document_ids": document_ids},
+            job_type=JobType.PROCESSING,
+            details=ProcessingJobDetails(
+                document_ids=document_ids,
+                source_id=details.source_id,
+            ),
         )
 
         # 6. Update source status
         await self.data_service.update_datasource(
-            source_id=details.source_id,  # Fix: access as property
+            source_id=details.source_id,  #
             updates={"status": SourceStatus.PROCESSING, "job_id": processing_job.job_id},
         )
         logger.debug(f"Updated source {details.source_id} status to PROCESSING")
 
         # 7. Enqueu processing job
-        await self.rq_manager.enqueue_job(job=process_documents_job, args=(processing_job.job_id, document_ids))
+        await self.rq_manager.enqueue_job(process_documents_job, processing_job.job_id, document_ids)
         logger.debug(f"Enqueued processing job {processing_job.job_id}")
 
-    async def handle_processing_job(self, message: dict) -> None:
+    async def handle_pubsub_event(self, message: dict) -> None:
         """Handles a process documents jobs."""
         # 1. Retrieve job by job_id
         job = await self.job_manager.get_by_id(message["job_id"])
@@ -329,8 +325,7 @@ class ContentService:
             job_id=job.job_id,
             updates={"status": JobStatus.FAILED, "completed_at": datetime.now(UTC), "error": error},
         )
-
-        # retry potentially? or just inform the user
+        # TODO: retry potentially? or just inform the user
 
     async def _create_source_metadata(self, documents: list[Document]) -> dict[str, Any]:
         """Create updated source metadata after crawl completion.
@@ -353,26 +348,19 @@ class ContentService:
             "unique_links": list(unique_links),
         }
 
-    @generic_error_handler
     async def _handle_failure(self, job: Job, error: str) -> None:
         """Handle crawl.failed event"""
-        try:
-            # Update job with error
-            await self.job_manager.update_job(
-                job_id=job.job_id,
-                updates={"status": JobStatus.FAILED, "completed_at": datetime.now(UTC), "error": error},
-            )
-            logger.debug(f"Updated job {job.job_id} status to FAILED")
+        # Update job with error
+        await self.job_manager.update_job(
+            job_id=job.job_id,
+            updates={"status": JobStatus.FAILED, "completed_at": datetime.now(UTC), "error": error},
+        )
+        logger.debug(f"Updated job {job.job_id} status to FAILED")
 
-            # Update source status
-            source_id = (
-                job.details.source_id  # This works because both CrawlJobDetails and ProcessingJobDetails have source_id
-            )
-            await self.data_service.update_datasource(
-                source_id=source_id,
-                updates={"status": SourceStatus.FAILED, "error": error, "updated_at": datetime.now(UTC)},
-            )
-            logger.debug(f"Updated source {source_id} status to FAILED")
-        except Exception as e:
-            logger.error(f"Failed to handle failure for job {job.job_id}: {e}", exc_info=True)
-            raise
+        # Update source status
+        source_id = job.details.source_id
+        await self.data_service.update_datasource(
+            source_id=source_id,
+            updates={"status": SourceStatus.FAILED, "error": error, "updated_at": datetime.now(UTC)},
+        )
+        logger.debug(f"Updated source {source_id} status to FAILED")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logfire
 from redis.asyncio import Redis
 
 from src.core.chat.conversation_manager import ConversationManager
@@ -108,7 +109,7 @@ class ServiceContainer:
 
             # Result logging
             logger.info("✓ Initialized services successfully.")
-
+            logfire.info("✓ Initialized services successfully.")
         except Exception as e:
             logger.error(f"Error during service initialization: {e}", exc_info=True)
             raise

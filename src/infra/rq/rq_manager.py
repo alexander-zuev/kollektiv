@@ -28,6 +28,6 @@ class RQManager:
         """Get the RQ queue for processing jobs."""
         return self.queue
 
-    def enqueue(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> job.Job:  # type: ignore
+    def enqueue_job(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> job.Job:  # type: ignore
         """Enqueue a job to the specified queue."""
         return self.queue.enqueue(func, *args, **kwargs)

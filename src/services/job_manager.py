@@ -1,10 +1,8 @@
 # job_manager.py
-from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from src.core._exceptions import JobNotFoundError, ValidationError
-from src.infra.decorators import generic_error_handler
+from src.core._exceptions import JobNotFoundError
 from src.infra.logger import get_logger
 from src.models.job_models import (
     CrawlJobDetails,
@@ -23,55 +21,20 @@ class JobManager:
     def __init__(self, data_service: DataService) -> None:
         self.data_service = data_service
 
-    def _create_job_details(self, job_type: JobType, **kwargs: Any) -> list[CrawlJobDetails | ProcessingJobDetails]:
-        """
-        Create job details based on job type.
-
-        Args:
-            job_type: Type of job to create
-            **kwargs: Parameters specific to job type:
-                     - For CRAWL jobs:
-                       - source_id (UUID): ID of the source to crawl.
-
-        Returns:
-            dict: Validated job details
-
-        Raises:
-            ValidationError: If unsupported job type
-        """
-        match job_type:
-            case JobType.CRAWL:
-                return CrawlJobDetails(**kwargs).model_dump()
-            case JobType.PROCESS:
-                return ProcessingJobDetails(**kwargs).model_dump()
-            case _:
-                raise ValidationError(f"Unsupported job type: {job_type}")
-
-    @generic_error_handler
-    async def create_job(self, job_type: JobType, **kwargs: Any) -> Job:
+    async def create_job(self, job_type: JobType, details: CrawlJobDetails | ProcessingJobDetails) -> Job:
         """
         Create and persist a new job.
 
         Args:
             job_type: Type of job to create
-            **kwargs: Optional parameters specific to job type:
-                     - For CRAWL jobs:
-                       - source_id (UUID): ID of the source to crawl.
+            details: Details to create
 
         Returns:
             Job: The created job instance
-
-        Example:
-            job = await job_manager.create_job(
-                job_type=JobType.CRAWL,
-                source_id=existing_uuid
-            )
         """
-        details = self._create_job_details(job_type, **kwargs)
         job = Job(job_type=job_type, details=details)
         return await self.data_service.save_job(job)
 
-    @generic_error_handler
     async def update_job(self, job_id: UUID, updates: dict[str, Any]) -> Job:
         """
         Update a job with new data.
@@ -97,7 +60,6 @@ class JobManager:
         # Persist and return
         return await self.data_service.save_job(updated_job)
 
-    @generic_error_handler
     async def get_by_firecrawl_id(self, firecrawl_id: str) -> Job:
         """
         Retrieve a job by its FireCrawl ID.

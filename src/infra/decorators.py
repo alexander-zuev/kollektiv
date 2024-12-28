@@ -38,9 +38,7 @@ def base_error_handler(func: Callable[P, T]) -> Callable[P, T]:
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         try:
             return await func(*args, **kwargs)
-        except Exception as e:
-            # Create new error message instead of modifying LogRecord
-            logger.error("Error in %s: %s", func.__name__, str(e))
+        except Exception:
             raise
 
     return wrapper
@@ -64,29 +62,6 @@ def generic_error_handler(func: Callable[..., T]) -> Callable[..., T]:
             raise
 
     return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
-
-
-# def application_level_handler(func: Callable) -> Callable[..., T]:
-#     """Retrieve the application logger."""
-
-#     @functools.wraps(func)
-#     def wrapper(*args, **kwargs) -> Any:
-#         # Access the logger
-#         logger = get_logger()
-
-#         try:
-#             return func(*args, **kwargs)
-#         except KeyboardInterrupt:
-#             logger.info("User terminated program execution")
-#             sys.exit(0)
-#         except SystemExit:
-#             logger.info("\nSystem exit called")
-#             sys.exit(0)
-#         except Exception as e:
-#             logger.error(f"Error in {func.__name__}: {str(e)}")
-#             raise
-
-#     return wrapper
 
 
 def anthropic_error_handler(func: Callable) -> Callable[..., T]:
@@ -165,16 +140,16 @@ def supabase_operation(func: Callable[P, Coroutine[Any, Any, RT]]) -> Callable[P
         try:
             return await func(*args, **kwargs)
         except DatabaseError as e:
-            logger.error(f"Database error in {func.__name__}: {e.error_message}")
+            logger.exception(f"Database error in {func.__name__}: {e.error_message}")
             raise e from None
         except EntityNotFoundError as e:
             logger.warning(f"Entity not found error in {func.__name__}: {e.error_message}")
             raise e from None
         except EntityValidationError as e:
-            logger.error(f"Entity validation error in {func.__name__}: {e.error_message}")
+            logger.exception(f"Entity validation error in {func.__name__}: {e.error_message}")
             raise e from None
         except Exception as e:
-            logger.error(f"Unexpected error in {func.__name__}: {e}", exc_info=True)
+            logger.exception(f"Unexpected error in {func.__name__}: {e}")
             raise DatabaseError(
                 error_message=f"Unexpected error in {func.__name__}",
                 operation=func.__name__,

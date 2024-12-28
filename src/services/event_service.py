@@ -2,6 +2,7 @@ import asyncio
 import json
 from uuid import UUID
 
+import redis
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -49,8 +50,8 @@ class EventService:
             async for message in self.pubsub.listen():
                 if message["type"] == "message":
                     await self.handle_event(message["data"])
-        except Exception as e:
-            logger.error(f"Failed to listen for events: {e}")
+        except redis.exceptions.ConnectionError as e:
+            logger.exception(f"Failed to listen for events: {e}")
             raise
 
     async def handle_event(self, message: bytes) -> None:

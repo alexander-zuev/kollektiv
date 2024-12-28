@@ -1,27 +1,14 @@
-import logging
 import os
-from enum import Enum
 from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.api.routes import Routes
+from src.infra.logger import get_logger
+from src.models.base_models import Environment
 
-# Simple logger just for settings initialization
-logger = logging.getLogger("kollektiv.settings")
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter("%(levelname)s - %(message)s"))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-
-
-class Environment(str, Enum):
-    """Supported application environments."""
-
-    LOCAL = "local"
-    STAGING = "staging"
-    PRODUCTION = "production"
+logger = get_logger()
 
 
 class Settings(BaseSettings):
@@ -156,10 +143,10 @@ def initialize_settings() -> Settings:
         logger.info("✓ Initialized settings successfully.")
         return settings
     except ValueError as e:
-        logger.error("Environment variables not set.")
+        logger.exception("Environment variables not set.")
         raise ValueError(f"An error occurred during settings loading: {str(e)}") from e
     except Exception as e:
-        logger.error("Error occurred while loading settings")
+        logger.exception("Error occurred while loading settings")
         raise Exception(f"An error occurred during settings loading: {str(e)}") from e
 
 
