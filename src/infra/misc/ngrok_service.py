@@ -36,5 +36,9 @@ class NgrokService:
 
     async def stop_tunnel(self) -> None:
         """Stop the ngrok tunnel."""
-        logger.info("Disconnecting ngrok tunnel")
-        ngrok.disconnect()
+        try:
+            ngrok.disconnect()
+            logger.info("Disconnecting ngrok tunnel")
+        except Exception as e:
+            logger.error(f"Failed to disconnect ngrok tunnel: {e}")
+            raise e

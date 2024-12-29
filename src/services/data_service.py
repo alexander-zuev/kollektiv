@@ -9,7 +9,7 @@ from src.infra.data.data_repository import DataRepository
 from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
 from src.models.chat_models import Conversation, ConversationHistory, ConversationMessage
-from src.models.content_models import DataSource, Document, SourceSummary
+from src.models.content_models import Chunk, DataSource, Document, SourceSummary
 from src.models.job_models import Job
 
 logger = get_logger()
@@ -60,7 +60,6 @@ class DataService:
     async def get_job(self, job_id: UUID) -> Job:
         """Get job by ID with proper type casting."""
         result = await self.repository.find_by_id(Job, job_id)
-        # Explicit type cast to satisfy mypy
         return result
 
     async def get_by_firecrawl_id(self, firecrawl_id: str) -> Job | None:
@@ -200,3 +199,7 @@ class DataService:
         """Get documents by their IDs."""
         documents = await self.repository.find(Document, filters={"document_id": document_ids})
         return [Document.model_validate(document) for document in documents]
+
+    async def save_chunks(self, chunks: list[Chunk]) -> None:
+        """Save chunks to Supabase."""
+        logger.debug(f"Saving {len(chunks)} chunks")

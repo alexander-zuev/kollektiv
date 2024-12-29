@@ -65,7 +65,7 @@ class ColoredFormatter(logging.Formatter):
             extra_arg_str = f"Args: {json.dumps(record.args, default=str)}"
 
         # Build our custom formatted message
-        s = f"{colored_symbol} {colored_level} [{timestamp}] {name}:{lineno} - {record.message}{extra_arg_str}"
+        s = f"{colored_symbol} {colored_level} [{timestamp}] {name}:{lineno} - {record.message}. {extra_arg_str}"
 
         # Step 3: Handle exc_info and stack_info EXACTLY like the source
         if record.exc_info:

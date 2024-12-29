@@ -1,6 +1,5 @@
 import asyncio
 import json
-from uuid import UUID
 
 from redis.asyncio.client import PubSub
 from redis.exceptions import ConnectionError, TimeoutError
@@ -9,7 +8,6 @@ from src.infra.decorators import tenacity_retry_wrapper
 from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
 from src.infra.settings import settings
-from src.models.job_models import JobStatus
 from src.services.content_service import ContentService
 
 logger = get_logger()
@@ -63,11 +61,9 @@ class EventConsumer:
     async def handle_event(self, message: bytes) -> None:
         """Handle an event from the event bus."""
         try:
-            event_data = json.loads(message.decode("utf-8"))
-            job_id = UUID(event_data["job_id"])
-            status = JobStatus(event_data["status"])
+            message = json.loads(message)
 
-            await self.content_service.handle_job_event(job_id=job_id, status=status, error=event_data.get("error"))
+            await self.content_service.handle_pubsub_event(message)
         except Exception as e:
             logger.exception(f"Failed to handle event: {e}")
             raise

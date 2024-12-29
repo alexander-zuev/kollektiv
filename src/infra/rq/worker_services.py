@@ -44,7 +44,7 @@ class WorkerServices:
             self.data_service = DataService(repository=self.repository)
 
             # Redis
-            self.redis_manager = RedisManager.create()
+            self.sync_redis_manager = RedisManager.create(decode_responses=False)
             self.async_redis_manager = await RedisManager.create_async()
             self.redis_repository = RedisRepository(manager=self.async_redis_manager)
 
@@ -57,7 +57,7 @@ class WorkerServices:
             self.vector_db = VectorDB(chroma_manager=self.chroma_manager, embedding_manager=self.embedding_manager)
 
             # Events
-            self.event_publisher = EventPublisher(redis_manager=self.async_redis_manager)
+            self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
 
             # Result logging
             logger.info("✓ Initialized worker services successfully.")

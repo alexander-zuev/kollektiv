@@ -275,12 +275,11 @@ class ContentService:
 
         # 7. Enqueu processing job
         self.rq_manager.enqueue_job(process_documents_job, processing_job.job_id, document_ids)
-        logger.debug(f"Enqueued processing job {processing_job.job_id}")
 
     async def handle_pubsub_event(self, message: dict) -> None:
         """Handles a process documents jobs."""
         # 1. Retrieve job by job_id
-        job = await self.job_manager.get_by_id(message["job_id"])
+        job = await self.data_service.get_job(UUID(message["job_id"]))
 
         # 2. Handle event
         match job.status:
@@ -288,8 +287,9 @@ class ContentService:
                 logger.info(f"Processing job {job.job_id} completed")
                 await self.handle_completed_processing_job(job)
             case JobStatus.FAILED:
+                error = message.get("error")
                 logger.error(f"Processing job {job.job_id} failed")
-                await self.handle_failed_processing_job(job, job.error)
+                await self.handle_failed_processing_job(job, error)
 
     async def handle_completed_processing_job(self, job: Job) -> None:
         """Completes the ingestion process by updating the source and returning the source metadata."""

@@ -61,12 +61,12 @@ class ServiceContainer:
             self.data_service = DataService(repository=self.repository)
 
             # Redis
-            self.redis_manager = RedisManager.create()
             self.async_redis_manager = await RedisManager.create_async()
             self.redis_repository = RedisRepository(manager=self.async_redis_manager)
 
             # RQ
-            self.rq_manager = RQManager(redis_manager=self.redis_manager)
+            self.sync_redis_manager = RedisManager.create(decode_responses=False)
+            self.rq_manager = RQManager.create(redis_manager=self.sync_redis_manager)
 
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)
@@ -98,9 +98,9 @@ class ServiceContainer:
             self.ngrok_service = await NgrokService.create()
 
             # Events
-            self.event_publisher = await EventPublisher.create_async(redis_manager=self.redis_manager)
+            self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
             self.event_consumer = await EventConsumer.create_async(
-                redis_manager=self.redis_manager, content_service=self.content_service
+                redis_manager=self.async_redis_manager, content_service=self.content_service
             )
             await self.event_consumer.start()
 
@@ -122,12 +122,9 @@ class ServiceContainer:
         try:
             if self.ngrok_service is not None:
                 await self.ngrok_service.stop_tunnel()
-                logger.info("✓ Ngrok tunnel stopped successfully")
 
             if self.event_consumer is not None:
                 await self.event_consumer.stop()
 
-            if hasattr(self, "event_service") and self.event_service is not None:
-                await self.event_service.stop()
         except Exception as e:
             logger.error(f"Error during service shutdown: {e}", exc_info=True)

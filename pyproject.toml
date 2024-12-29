@@ -47,6 +47,8 @@ logfire = { extras = [
     "system-metrics",
 ], version = "^2.11.0" }
 asyncpg = "^0.30.0"
+ngrok = "^1.4.0"
+
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
@@ -61,7 +63,6 @@ types-aiofiles = "^24.1.0.20240626"
 types-colorama = "^0.4.15.20240311"
 types-markdown = "^3.7.0.20240822"
 fakeredis = "^2.26.2"
-ngrok = "^1.4.0"
 
 [build-system]
 requires = ["poetry-core"]

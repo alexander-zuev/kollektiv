@@ -18,7 +18,7 @@ def start_worker() -> None:
     # Setup worker services
     worker_services = asyncio.run(WorkerServices.create())  # this sets up _instance
 
-    redis_client = worker_services.redis_manager.get_sync_client()
+    redis_client = worker_services.sync_redis_manager.get_sync_client()
     worker = Worker([settings.redis_queue_name], connection=redis_client)
     logger.info(f"Started worker on queue: {settings.redis_queue_name}")
     worker.work()

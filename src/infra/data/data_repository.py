@@ -170,8 +170,21 @@ class DataRepository:
         query = client.schema(model_class._db_config["schema"]).table(model_class._db_config["table"]).select("*")
 
         if filters:
+            processed_filters = {}
             for field, value in filters.items():
-                query = query.eq(field, value)
+                if isinstance(value, UUID):
+                    processed_filters[field] = str(value)
+                elif isinstance(value, list) and all(isinstance(x, UUID) for x in value):
+                    processed_filters[field] = [str(x) for x in value]
+                else:
+                    processed_filters[field] = value
+
+            # Use processed values in query with correct operators
+            for field, value in processed_filters.items():
+                if isinstance(value, list):
+                    query = query.in_(field, value)  # Use in_ for lists
+                else:
+                    query = query.eq(field, value)  # Use eq for single values
 
         if order_by:
             query = query.order(order_by)

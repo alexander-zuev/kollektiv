@@ -70,16 +70,16 @@ class RedisManager:
                 raise
 
     @classmethod
-    def create(cls) -> "RedisManager":
+    def create(cls, decode_responses: bool = True) -> "RedisManager":
         """Creates a new sync redis client"""
-        instance = cls()
+        instance = cls(decode_responses=decode_responses)
         instance._connect_sync()
         return instance
 
     @classmethod
-    async def create_async(cls) -> "RedisManager":
+    async def create_async(cls, decode_responses: bool = True) -> "RedisManager":
         """Creates a new async redis client"""
-        instance = cls()
+        instance = cls(decode_responses=decode_responses)
         await instance._connect_async()
         return instance
 
