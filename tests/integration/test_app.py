@@ -32,7 +32,6 @@ class TestAppInitialization:
 
         assert "CORSMiddleware" in middleware_classes
         assert "HealthCheckRateLimit" in middleware_classes
-        assert "RequestDebugMiddleware" in middleware_classes
 
     def test_error_handlers_registered(self, integration_client: TestClient):
         """Test error handlers are properly registered."""

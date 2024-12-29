@@ -19,6 +19,7 @@ class TestRedisRepositoryIntegration:
         assert retrieved is not None
         assert retrieved.conversation_id == sample_conversation.conversation_id
         assert len(retrieved.messages) == len(sample_conversation.messages)
+        assert retrieved.messages[0].content[0].text == sample_conversation.messages[0].content[0].text
 
         # Delete
         await redis_integration_repository.delete_method(sample_uuid, ConversationHistory)
@@ -66,9 +67,12 @@ class TestRedisRepositoryIntegration:
         assert len(remaining) == 1
         assert remaining[0].content[0].text == "Message 1"
 
+        # Clean up
+        await redis_integration_repository.delete_method(sample_uuid, ConversationMessage)
+
     async def test_pipeline_operations(self, redis_integration_repository, sample_uuid):
         """Test pipeline operations for atomic updates."""
-        # 1. Setup
+        # 1. Setup initial conversation and pending messages
         initial_message = ConversationMessage(
             message_id=uuid.uuid4(), role=Role.USER, content=[TextBlock(text="Initial message")]
         )
@@ -85,7 +89,7 @@ class TestRedisRepositoryIntegration:
             await redis_integration_repository.rpush_method(sample_uuid, msg)
 
         # 2. Pipeline Operation
-        async with redis_integration_repository.client.pipeline(transaction=True) as pipe:
+        async with (await redis_integration_repository.manager.get_async_client()).pipeline(transaction=True) as pipe:
             # Retrieve conversation and pending messages
             retrieved_conversation = await redis_integration_repository.get_method(sample_uuid, ConversationHistory)
             retrieved_pending_messages = await redis_integration_repository.lrange_method(
@@ -112,3 +116,30 @@ class TestRedisRepositoryIntegration:
 
         remaining_messages = await redis_integration_repository.lrange_method(sample_uuid, 0, -1, ConversationMessage)
         assert len(remaining_messages) == 0
+
+        # Clean up
+        await redis_integration_repository.delete_method(sample_uuid, ConversationHistory)
+
+    async def test_ttl_persistence(
+        self, redis_integration_repository, sample_conversation, sample_message, sample_uuid
+    ):
+        """Test TTL settings are correctly applied and persisted."""
+        # Test conversation TTL
+        await redis_integration_repository.set_method(sample_uuid, sample_conversation)
+        conv_ttl = await (await redis_integration_repository.manager.get_async_client()).ttl(
+            f"conversations:{sample_uuid}:history"
+        )
+        assert conv_ttl > 0
+        assert conv_ttl <= 60 * 60 * 24  # 1 day
+
+        # Test message TTL
+        await redis_integration_repository.rpush_method(sample_uuid, sample_message)
+        msg_ttl = await (await redis_integration_repository.manager.get_async_client()).ttl(
+            f"conversations:{sample_uuid}:pending_messages"
+        )
+        assert msg_ttl > 0
+        assert msg_ttl <= 60 * 60  # 1 hour
+
+        # Clean up
+        await redis_integration_repository.delete_method(sample_uuid, ConversationHistory)
+        await redis_integration_repository.delete_method(sample_uuid, ConversationMessage)

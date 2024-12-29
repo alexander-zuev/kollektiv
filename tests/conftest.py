@@ -14,7 +14,6 @@ from anthropic.types import (
 )
 from chromadb import AsyncClientAPI
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
-from fakeredis.aioredis import FakeRedis
 from fastapi.testclient import TestClient
 from redis import Redis as SyncRedis
 from redis.asyncio import Redis as AsyncRedis
@@ -32,10 +31,10 @@ from src.core.search.vector_db import VectorDB
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.external.chroma_manager import ChromaManager
+from src.infra.external.redis_manager import RedisManager
 from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.rq.rq_manager import RQManager
 from src.infra.service_container import ServiceContainer
-from src.infra.settings import settings
 from src.models.chat_models import (
     ConversationHistory,
     ConversationMessage,
@@ -370,7 +369,8 @@ def mock_webhook_content_service(mock_app):
 @pytest.fixture
 async def db_client():
     """Create a test database client."""
-    client = SupabaseClient(url=settings.supabase_url, key=settings.supabase_service_key, schema="public")
+    manager = SupabaseManager.create_async()
+    client = await manager.get_async_client()
     yield client
     await client.close()
 
@@ -400,44 +400,50 @@ def mock_sync_redis():
 def mock_async_redis():
     """Mock for asynchronous Redis client."""
     mock_client = AsyncMock(spec=AsyncRedis)
+    # Basic Redis operations
     mock_client.ping = AsyncMock(return_value=True)
+
+    # Setup pipeline
+    mock_pipeline = AsyncMock()
+    mock_pipeline.execute = AsyncMock(return_value=[True, True])
+    mock_pipeline.__aenter__ = AsyncMock(return_value=mock_pipeline)
+    mock_pipeline.__aexit__ = AsyncMock()
+    mock_client.pipeline = AsyncMock(return_value=mock_pipeline)
+
+    # Repository operations
+    mock_client.set = AsyncMock()
+    mock_client.get = AsyncMock()
+    mock_client.rpush = AsyncMock()
+    mock_client.lrange = AsyncMock(return_value=[])
+    mock_client.delete = AsyncMock()
+    mock_client.lpop = AsyncMock()
+    mock_client.rpop = AsyncMock()
     return mock_client
 
 
 @pytest.fixture
-def mock_redis():
-    """Fast fake Redis for unit tests."""
-    return FakeRedis()
-
-
-@pytest.fixture
-def redis_repository(mock_redis):
-    """Repository with fake Redis for unit tests."""
-    return RedisRepository(mock_redis)
+def redis_repository(mock_async_redis):
+    """Repository with mocked Redis for unit tests."""
+    manager = RedisManager()
+    manager._async_client = mock_async_redis
+    return RedisRepository(manager=manager)
 
 
 @pytest.fixture(scope="function")
-async def redis_test_client():
-    """Real Redis client for integration tests."""
-    redis = AsyncRedis.from_url(settings.redis_url)
-    try:
-        await redis.ping()
-        await redis.flushall()  # Clean the Redis instance before tests
-    except Exception as e:
-        raise RuntimeError(
-            "Redis server is required for integration tests.\n"
-            "Start it with: docker run -d -p 6379:6379 redis:7-alpine"
-        ) from e
-
-    yield redis
-    await redis.flushall()  # Clean after tests
-    await redis.close()
+async def redis_integration_manager():
+    """Real RedisManager for integration tests."""
+    manager = await RedisManager.create_async()
+    if manager._async_client:
+        await manager._async_client.flushall()  # Clean before test
+    yield manager
+    if manager._async_client:
+        await manager._async_client.flushall()  # Clean after test
 
 
 @pytest.fixture
-async def redis_integration_repository(redis_test_client):
+async def redis_integration_repository(redis_integration_manager):
     """Repository with real Redis for integration tests."""
-    return RedisRepository(redis_test_client)
+    return RedisRepository(manager=redis_integration_manager)
 
 
 # Chat & Conversation Fixtures
@@ -473,3 +479,18 @@ def mock_chroma_manager():
     mock_manager = AsyncMock(spec=ChromaManager)
     mock_manager._client = None
     return mock_manager
+
+
+@pytest.fixture
+def mock_redis_pipeline():
+    """Mock for Redis pipeline."""
+    mock_pipeline = AsyncMock()
+    mock_pipeline.execute = AsyncMock(return_value=[True, True])  # Simulate successful execution
+    return mock_pipeline
+
+
+@pytest.fixture
+def mock_redis_with_pipeline(mock_redis, mock_redis_pipeline):
+    """Mock Redis with pipeline support."""
+    mock_redis.pipeline = AsyncMock(return_value=mock_redis_pipeline)
+    return mock_redis

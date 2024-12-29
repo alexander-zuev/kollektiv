@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.infra.external.supabase_client import SupabaseClient
+from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.settings import settings
 
 
@@ -17,13 +17,14 @@ def mock_create_client():
 class TestSupabaseClient:
     """Test suite for SupabaseClient."""
 
-    def test_successful_initialization(self, mock_create_client):
+    async def test_successful_initialization(self, mock_create_client):
         """Test that client initializes successfully with default settings."""
         # Act
-        client = SupabaseClient()
+        manager = await SupabaseManager.create_async()
+        client = await manager.get_async_client()
 
         # Assert
-        mock_create_client.assert_called_once_with(
+        mock_create_client.assert_awaited_once_with(
             supabase_url=settings.supabase_url, supabase_key=settings.supabase_key
         )
         assert client._client is not None
@@ -40,11 +41,11 @@ class TestSupabaseClient:
     async def test_get_client(self, mock_create_async_client):
         """Test that get_client connects if not already connected."""
         # Arrange
-        client = SupabaseClient()
+        manager = await SupabaseManager.create_async()
 
         # Act
-        result = await client.get_client()
+        client = await manager.get_async_client()
 
         # Assert
         mock_create_async_client.assert_called_once()
-        assert result == client._client
+        assert client is mock_create_async_client.return_value

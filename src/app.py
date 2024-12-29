@@ -49,7 +49,7 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     # Configure standard logging first
     configure_logging(debug=settings.debug)
-    logger = get_logger()
+    get_logger()
 
     # Initialize Sentry
     sentry_sdk.init(

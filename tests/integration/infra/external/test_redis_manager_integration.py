@@ -8,12 +8,11 @@ class TestRedisManagerIntegration:
     """Integration tests for RedisManager with real Redis."""
 
     @pytest.mark.asyncio
-    async def test_async_client_initialization(self, redis_test_client):
-        """Test async client creation and connection with real Redis."""
-        manager = RedisManager()
-        client = await manager.get_async_client()
+    async def test_connection_and_operations(self, redis_integration_manager):
+        """Test that RedisManager can connect and perform operations."""
+        client = await redis_integration_manager.get_async_client()
 
-        # Verify client works
+        # Verify basic operations work
         await client.set("test_key", "test_value")
         result = await client.get("test_key")
         assert result == "test_value"
@@ -44,18 +43,27 @@ class TestRedisManagerIntegration:
         assert async1 is async2
 
     @pytest.mark.asyncio
-    async def test_decode_responses_setting(self):
+    async def test_decode_responses_setting(self, redis_integration_manager):
         """Test decode_responses setting is respected."""
-        # Test with decode_responses=False
-        binary_manager = RedisManager(decode_responses=False)
-        binary_client = await binary_manager.get_async_client()
-        await binary_client.set("binary_test", "value")
-        result = await binary_client.get("binary_test")
-        assert isinstance(result, bytes)
+        # First clean up any existing data
+        client = await redis_integration_manager.get_async_client()
+        await client.flushall()
 
         # Test with decode_responses=True (default)
-        text_manager = RedisManager()
-        text_client = await text_manager.get_async_client()
-        await text_client.set("text_test", "value")
-        result = await text_client.get("text_test")
+        await client.set("text_test", "value")
+        result = await client.get("text_test")
         assert isinstance(result, str)
+        assert result == "value"
+
+        # Create a new manager with decode_responses=False
+        binary_manager = RedisManager(decode_responses=False)
+        try:
+            binary_client = await binary_manager.get_async_client()
+            await binary_client.set("binary_test", "value")
+            result = await binary_client.get("binary_test")
+            assert isinstance(result, bytes)
+            assert result.decode() == "value"
+        finally:
+            if binary_manager._async_client:
+                await binary_manager._async_client.close()
+                binary_manager._async_client = None
