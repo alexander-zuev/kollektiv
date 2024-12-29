@@ -12,6 +12,7 @@ from anthropic.types import (
     RawMessageStopEvent,
     TextDelta,
 )
+from chromadb import AsyncClientAPI
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fakeredis.aioredis import FakeRedis
 from fastapi.testclient import TestClient
@@ -30,6 +31,7 @@ from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
+from src.infra.external.chroma_manager import ChromaManager
 from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.rq.rq_manager import RQManager
 from src.infra.service_container import ServiceContainer
@@ -455,3 +457,19 @@ def sample_message(sample_uuid):
 def sample_conversation(sample_uuid, sample_message):
     """Sample conversation for testing."""
     return ConversationHistory(conversation_id=sample_uuid, messages=[sample_message])
+
+
+@pytest.fixture
+def mock_chroma_client():
+    """Mock for ChromaDB async client."""
+    mock_client = AsyncMock(spec=AsyncClientAPI)
+    mock_client.heartbeat = AsyncMock()
+    return mock_client
+
+
+@pytest.fixture
+def mock_chroma_manager():
+    """Mock for ChromaManager."""
+    mock_manager = AsyncMock(spec=ChromaManager)
+    mock_manager._client = None
+    return mock_manager

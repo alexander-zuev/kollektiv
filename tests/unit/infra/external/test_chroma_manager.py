@@ -1,60 +1,65 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from src.infra.external.chroma_client import ChromaClient
-from src.infra.settings import settings
+from src.infra.external.chroma_manager import ChromaManager
 
 
 @pytest.mark.unit
-class TestChromaClient:
-    """Unit tests for ChromaClient."""
+class TestChromaManager:
+    """Unit tests for ChromaManager."""
 
     def test_initialization(self):
-        """Test that ChromaClient initializes with None client."""
-        client = ChromaClient()
-        assert client.client is None
+        """Test that ChromaManager initializes with None client."""
+        manager = ChromaManager()
+        assert manager._client is None
+
+    def test_parse_url(self):
+        """Test URL parsing."""
+        test_url = "http://localhost:8000"
+        host, port = ChromaManager._parse_url(test_url)
+        assert host == "localhost"
+        assert port == 8000
 
     @pytest.mark.asyncio
-    async def test_create_client(self):
-        """Test create_client class method."""
-        # Mock the AsyncHttpClient and heartbeat
-        mock_client = AsyncMock()
-        mock_client.heartbeat = AsyncMock()
+    async def test_connect_async(self, mock_chroma_client):
+        """Test async connection."""
+        manager = ChromaManager()
 
-        with patch("chromadb.AsyncHttpClient", return_value=mock_client) as mock_http_client:
-            chroma_client = await ChromaClient.create_client()
+        with patch("chromadb.AsyncHttpClient", return_value=mock_chroma_client):
+            await manager._connect_async()
 
-            # Verify ChromaClient was created with correct configuration
-            mock_http_client.assert_called_once_with(
-                host=settings.chroma_host,
-                port=settings.chroma_port,
-            )
-
-            # Verify heartbeat was called
-            mock_client.heartbeat.assert_called_once()
-
-            # Verify client is properly set
-            assert chroma_client.client == mock_client
+            assert manager._client is mock_chroma_client
+            mock_chroma_client.heartbeat.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_create_client_custom_host_port(self):
-        """Test create_client with custom host and port."""
-        custom_host = "custom_host"
-        custom_port = 9000
+    async def test_create_async(self, mock_chroma_client):
+        """Test create_async class method."""
+        with patch("chromadb.AsyncHttpClient", return_value=mock_chroma_client):
+            manager = await ChromaManager.create_async()
 
-        # Mock the AsyncHttpClient and heartbeat
-        mock_client = AsyncMock()
-        mock_client.heartbeat = AsyncMock()
+            assert isinstance(manager, ChromaManager)
+            assert manager._client is mock_chroma_client
+            mock_chroma_client.heartbeat.assert_awaited_once()
 
-        with patch("chromadb.AsyncHttpClient", return_value=mock_client) as mock_http_client:
-            chroma_client = await ChromaClient.create_client(host=custom_host, port=custom_port)
+    @pytest.mark.asyncio
+    async def test_get_async_client(self, mock_chroma_client):
+        """Test get_async_client method."""
+        with patch("chromadb.AsyncHttpClient", return_value=mock_chroma_client):
+            manager = ChromaManager()
+            client = await manager.get_async_client()
 
-            # Verify ChromaClient was created with custom configuration
-            mock_http_client.assert_called_once_with(
-                host=custom_host,
-                port=custom_port,
-            )
+            assert client is mock_chroma_client
+            mock_chroma_client.heartbeat.assert_awaited_once()
 
-            # Verify client is properly set
-            assert chroma_client.client == mock_client
+    @pytest.mark.asyncio
+    async def test_get_async_client_reuse(self, mock_chroma_client):
+        """Test that get_async_client reuses existing client."""
+        with patch("chromadb.AsyncHttpClient", return_value=mock_chroma_client):
+            manager = ChromaManager()
+
+            client1 = await manager.get_async_client()
+            client2 = await manager.get_async_client()
+
+            assert client1 is client2
+            assert mock_chroma_client.heartbeat.await_count == 1  # Only called once
