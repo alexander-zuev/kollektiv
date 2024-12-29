@@ -26,7 +26,7 @@ class SupabaseManager:
             f"Supabase connection attempt {retry_state.attempt_number} failed. Retrying..."
         ),
     )
-    async def connect(self) -> None:
+    async def _connect_async(self) -> None:
         """Connect to Supabase, retry if connection fails."""
         if self._client is None:
             try:
@@ -47,13 +47,10 @@ class SupabaseManager:
     async def create(cls) -> "SupabaseManager":
         """Factory method to elegantly create a Supabase client instance and connect immediately."""
         instance = cls()
-        await instance.connect()
+        await instance._connect_async()
         return instance
 
     async def get_client(self) -> AsyncClient:
         """Wrapper method to get the connected client instance or reconnect if necessary."""
-        if self._client is None:
-            logger.info("Supabase client not initialized, attempting to connect...")
-            await self.connect()
-            return self._client
+        await self._connect_async()
         return self._client

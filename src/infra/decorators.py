@@ -4,6 +4,7 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 
+import tenacity
 from anthropic import (
     AnthropicError,
     APIConnectionError,
@@ -159,3 +160,34 @@ def supabase_operation(func: Callable[P, Coroutine[Any, Any, RT]]) -> Callable[P
             ) from e
 
     return async_wrapper
+
+
+def tenacity_retry_wrapper(
+    exceptions: tuple[type[Exception], ...] | None = None,
+    multiplier: int = 2,
+    min_wait: int = 2,
+    max_wait: int = 30,
+    max_attempts: int = 3,
+) -> Callable:
+    """Create a retry decorator with configurable exceptions.
+
+    Args:
+        exceptions: Tuple of exceptions to catch. Defaults to (Exception,) if None
+        multiplier: Multiplier for the exponential backoff
+        min_wait: Minimum wait time between attempts
+        max_wait: Maximum wait time between attempts
+        max_attempts: Maximum number of attempts
+
+    Retries:
+        - Wait 2-30 seconds between attempts
+        - Up to a total of 60 seconds
+    """
+    # Get logger from the calling module
+    logger = get_logger()
+
+    return tenacity.retry(
+        retry=tenacity.retry_if_exception_type(exceptions or (Exception,)),
+        wait=tenacity.wait_exponential(multiplier=multiplier, min=min_wait, max=max_wait),
+        stop=tenacity.stop_after_attempt(max_attempts),
+        before_sleep=lambda retry_state: logger.warning(f"Attempt {retry_state.attempt_number} failed. Retrying..."),
+    )
