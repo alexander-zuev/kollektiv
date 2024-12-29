@@ -2,7 +2,7 @@ import asyncio
 
 from rq.worker import Worker
 
-from src.infra.external.redis_client import RedisClient
+from src.infra.external.redis_client import RedisManager
 from src.infra.logger import configure_logging, get_logger
 from src.infra.rq.worker_services import WorkerServices
 from src.infra.settings import settings
@@ -19,7 +19,7 @@ def start_worker() -> None:
     # Setup worker services
     asyncio.run(WorkerServices.create())  # this sets up _instance
 
-    redis_client = RedisClient().sync_client
+    redis_client = RedisManager().sync_client
     worker = Worker([settings.redis_queue_name], connection=redis_client)
     logger.info(f"Started worker on queue: {settings.redis_queue_name}")
     worker.work()

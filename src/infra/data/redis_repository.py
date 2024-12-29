@@ -2,8 +2,9 @@ from typing import Any, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel
-from redis.asyncio import Redis
+from redis.asyncio import Redis as AsyncRedis
 
+from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
 from src.models.chat_models import ConversationHistory, ConversationMessage
 
@@ -19,8 +20,8 @@ T = TypeVar("T", bound=BaseModel)  # T can be any type that is a sub class of Ba
 class RedisRepository:
     """Asynchronous Redis repository for storing and retrieving data."""
 
-    def __init__(self, client: Redis):
-        self.client = client
+    def __init__(self, manager: RedisManager):
+        self.manager = manager
         self.prefix_config = {
             ConversationHistory: "conversations:{conversation_id}:history",
             ConversationMessage: "conversations:{conversation_id}:pending_messages",
@@ -57,7 +58,12 @@ class RedisRepository:
         result = model_class.model_validate_json(json_str)
         return result
 
-    async def set_method(self, key: UUID, value: T, pipe: Redis | None = None) -> None:
+    async def create_pipeline(self, transaction: bool = True) -> AsyncRedis:
+        """Create a new pipeline"""
+        client = await self.manager.get_async_client()
+        return client.pipeline(transaction=transaction)
+
+    async def set_method(self, key: UUID, value: T, pipe: AsyncRedis | None = None) -> None:
         """Set a value in the Redis database, optionally as part of pipeline."""
         prefix = self._get_prefix(type(value), conversation_id=key)
         ttl = self._get_ttl(type(value))
@@ -67,13 +73,15 @@ class RedisRepository:
             pipe.set(prefix, json_str, ex=ttl)
             logger.debug(f"Added SET operation to pipeline for key: {prefix}")
         else:
-            await self.client.set(prefix, json_str, ex=ttl)
+            client = await self.manager.get_async_client()
+            await client.set(prefix, json_str, ex=ttl)
             logger.info(f"Set Redis key: {prefix} (TTL: {ttl}s)")
 
     async def get_method(self, key: UUID, model_class: type[T]) -> T | None:
         """Get a value from the Redis database."""
         prefix = self._get_prefix(model_class, conversation_id=key)
-        data = await self.client.get(prefix)
+        client = await self.manager.get_async_client()
+        data = await client.get(prefix)
         if data is None:
             logger.debug(f"Key not found in Redis: {prefix}")
             return None
@@ -84,30 +92,34 @@ class RedisRepository:
         prefix = self._get_prefix(type(value), conversation_id=key)
         ttl = self._get_ttl(type(value))
         json_str = self._to_json(value)
-        await self.client.rpush(prefix, json_str)
-        await self.client.expire(prefix, ttl)
+        client = await self.manager.get_async_client()
+        await client.rpush(prefix, json_str)
+        await client.expire(prefix, ttl)
         logger.info(f"Pushed to Redis list: {prefix} (TTL: {ttl}s)")
 
     async def lrange_method(self, key: UUID, start: int, end: int, model_class: type[T]) -> list[T]:
         """Retrieve a range of elements from a list."""
         prefix = self._get_prefix(model_class, conversation_id=key)
-        items = await self.client.lrange(prefix, start, end)
+        client = await self.manager.get_async_client()
+        items = await client.lrange(prefix, start, end)
         return [self._from_json(item, model_class) for item in items]
 
-    async def delete_method(self, key: UUID, model_class: type[T], pipe: Redis | None = None) -> None:
+    async def delete_method(self, key: UUID, model_class: type[T], pipe: AsyncRedis | None = None) -> None:
         """Delete a key from the Redis database."""
         prefix = self._get_prefix(model_class=model_class, conversation_id=key)
         if pipe:
             pipe.delete(prefix)
             logger.debug(f"Added delete to pipeline: {prefix}")
         else:
-            await self.client.delete(prefix)
+            client = await self.manager.get_async_client()
+            await client.delete(prefix)
             logger.info(f"Deleted from Redis: {prefix}")
 
     async def lpop_method(self, key: UUID, model_class: type[T]) -> T | None:
         """Pop the first element from a list."""
         prefix = self._get_prefix(model_class, conversation_id=key)
-        data = await self.client.lpop(prefix)
+        client = await self.manager.get_async_client()
+        data = await client.lpop(prefix)
         if data is None:
             return None
         return self._from_json(data, model_class)
@@ -115,7 +127,8 @@ class RedisRepository:
     async def rpop_method(self, key: UUID, model_class: type[T]) -> T | None:
         """Pop the last element from a list."""
         prefix = self._get_prefix(model_class, conversation_id=key)
-        data = await self.client.rpop(prefix)
+        client = await self.manager.get_async_client()
+        data = await client.rpop(prefix)
         if data is None:
             return None
         return self._from_json(data, model_class)

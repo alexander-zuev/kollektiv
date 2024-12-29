@@ -13,12 +13,12 @@ from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.events.event_consumer import EventConsumer
 from src.infra.events.event_publisher import EventPublisher
-from src.infra.external.chroma_client import AsyncClientAPI, ChromaClient
-from src.infra.external.redis_client import RedisClient
+from src.infra.external.chroma_manager import ChromaManager
+from src.infra.external.redis_manager import RedisManager
 from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
+from src.infra.misc.ngrok_service import NgrokService
 from src.infra.rq.rq_manager import RQManager
-from src.infra.settings import Environment, settings
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
@@ -47,8 +47,8 @@ class ServiceContainer:
         self.async_redis_client: Redis | None = None
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
-        self.ngrok_service: None = None
-        self.chroma_client: AsyncClientAPI | None = None
+        self.ngrok_service: NgrokService | None = None
+        self.chroma_manager: ChromaManager | None = None
         self.event_publisher: EventPublisher | None = None
         self.event_consumer: EventConsumer | None = None
 
@@ -56,16 +56,17 @@ class ServiceContainer:
         """Initialize all services."""
         try:
             # Database & Repository
-            self.supabase_manager = await SupabaseManager.create()
+            self.supabase_manager = await SupabaseManager.create_async()
             self.repository = DataRepository(supabase_manager=self.supabase_manager)
             self.data_service = DataService(repository=self.repository)
 
             # Redis
-            self.async_redis_client = RedisClient().async_client
-            self.redis_repository = RedisRepository(client=self.async_redis_client)
+            self.redis_manager = RedisManager.create()
+            self.async_redis_manager = await RedisManager.create_async()
+            self.redis_repository = RedisRepository(manager=self.async_redis_manager)
 
             # RQ
-            self.rq_manager = RQManager(redis_client=RedisClient().sync_client)
+            self.rq_manager = RQManager(redis_manager=self.redis_manager)
 
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)
@@ -78,9 +79,9 @@ class ServiceContainer:
             )
 
             # Vector operations
-            self.chroma_client = await ChromaClient().create_client()
+            self.chroma_manager = await ChromaManager.create_async()
             self.embedding_manager = EmbeddingManager()
-            self.vector_db = VectorDB(chroma_client=self.chroma_client, embedding_manager=self.embedding_manager)
+            self.vector_db = VectorDB(chroma_manager=self.chroma_manager, embedding_manager=self.embedding_manager)
             self.reranker = Reranker()
             self.retriever = Retriever(vector_db=self.vector_db, reranker=self.reranker)
 
@@ -94,20 +95,15 @@ class ServiceContainer:
                 data_service=self.data_service,
                 conversation_manager=self.conversation_manager,
             )
-            # Local dependencies
-            if settings.environment == Environment.LOCAL:
-                from src.infra.misc.ngrok_service import NgrokService  # Import here
-
-                self.ngrok_service = NgrokService()
-                await self.ngrok_service.start_tunnel()
+            self.ngrok_service = await NgrokService.create()
 
             # Events
-            self.event_publisher = EventPublisher(redis_client=self.async_redis_client)
-            self.event_consumer = await EventConsumer.start(
-                redis_client=self.async_redis_client, content_service=self.content_service
+            self.event_publisher = await EventPublisher.create_async(redis_manager=self.redis_manager)
+            self.event_consumer = await EventConsumer.create_async(
+                redis_manager=self.redis_manager, content_service=self.content_service
             )
 
-            # Result logging
+            # Log the successful initialization
             logger.info("✓ Initialized services successfully.")
         except Exception as e:
             logger.error(f"Error during service initialization: {e}", exc_info=True)

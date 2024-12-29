@@ -1,6 +1,6 @@
-import tenacity
-from supabase import AsyncClient, create_async_client
+from supabase import AsyncClient, AuthRetryableError, NotConnectedError, create_async_client
 
+from src.infra.decorators import tenacity_retry_wrapper
 from src.infra.logger import get_logger
 from src.infra.settings import settings
 
@@ -18,14 +18,7 @@ class SupabaseManager:
         self.service_role_key = service_role_key
         self._client: AsyncClient | None = None  # instance of Supabase async client
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_attempt(3),
-        wait=tenacity.wait_exponential(multiplier=1, min=4, max=15),
-        retry=tenacity.retry_if_exception_type((ConnectionError, TimeoutError)),
-        before_sleep=lambda retry_state: logger.warning(
-            f"Supabase connection attempt {retry_state.attempt_number} failed. Retrying..."
-        ),
-    )
+    @tenacity_retry_wrapper(exceptions=(AuthRetryableError, NotConnectedError))
     async def _connect_async(self) -> None:
         """Connect to Supabase, retry if connection fails."""
         if self._client is None:
@@ -39,18 +32,18 @@ class SupabaseManager:
                     supabase_key=self.service_role_key,
                 )
                 logger.info("✓ Initialized Supabase client successfully")
-            except Exception as e:
+            except (AuthRetryableError, NotConnectedError) as e:
                 logger.exception(f"Failed to initialize Supabase client: {e}")
                 raise
 
     @classmethod
-    async def create(cls) -> "SupabaseManager":
+    async def create_async(cls) -> "SupabaseManager":
         """Factory method to elegantly create a Supabase client instance and connect immediately."""
         instance = cls()
         await instance._connect_async()
         return instance
 
-    async def get_client(self) -> AsyncClient:
+    async def get_async_client(self) -> AsyncClient:
         """Wrapper method to get the connected client instance or reconnect if necessary."""
         await self._connect_async()
         return self._client

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from src.core.search.embedding_manager import EmbeddingManager
 from src.infra.decorators import base_error_handler
-from src.infra.external.chroma_client import AsyncClientAPI
+from src.infra.external.chroma_manager import ChromaManager
 from src.infra.logger import get_logger
 from src.models.content_models import Chunk
 
@@ -23,10 +23,9 @@ class VectorDB:
 
     def __init__(
         self,
-        chroma_client: AsyncClientAPI,
+        chroma_manager: ChromaManager,
         embedding_manager: EmbeddingManager,
     ):
-        self.client = chroma_client
         self.embedding_function = embedding_manager.get_embedding_function()
 
     def _generate_collection_name(self, user_id: UUID) -> str:
@@ -37,14 +36,16 @@ class VectorDB:
     async def create_collection(self, user_id: UUID) -> None:
         """Create a collection for a user."""
         collection_name = self._generate_collection_name(user_id)
-        await self.client.create_collection(name=collection_name, embedding_function=self.embedding_function)
+        client = await self.chroma_manager.get_async_client()
+        await client.create_collection(name=collection_name, embedding_function=self.embedding_function)
         logger.info(f"Created collection: {collection_name}")
 
     @base_error_handler
     async def delete_collection(self, user_id: UUID) -> None:
         """Delete a collection for a user."""
         collection_name = self._generate_collection_name(user_id)
-        await self.client.delete_collection(name=collection_name)
+        client = await self.chroma_manager.get_async_client()
+        await client.delete_collection(name=collection_name)
         logger.info(f"Deleted collection: {collection_name}")
 
     # TODO: processing of the chunks for vector storage should NOT be done here - move to chunk processor

@@ -3,9 +3,10 @@ from typing import Union
 from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.vector_db import VectorDB
 from src.infra.data.data_repository import DataRepository
+from src.infra.data.redis_repository import RedisRepository
 from src.infra.events.event_publisher import EventPublisher
 from src.infra.external.chroma_client import ChromaClient
-from src.infra.external.redis_client import RedisClient
+from src.infra.external.redis_manager import RedisManager
 from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
 from src.services.data_service import DataService
@@ -19,36 +20,6 @@ class WorkerServices:
 
     _instance: Union["WorkerServices", None] = None
 
-    # def __init__(self) -> None:
-    #     logger.info("Initializing services...")
-
-    #     # Initialize sync services
-    #     self.chunker = MarkdownChunker()
-    #     self.embedding_manager = EmbeddingManager()
-
-    #     # Initialize async services
-    #     self.chroma_client = asyncio.run(ChromaClient().create_client())
-    #     self.supabase_client = asyncio.run(SupabaseManager.create())
-
-    #     # Initialize dependent services
-    #     self.vector_db = VectorDB(chroma_client=self.chroma_client, embedding_manager=self.embedding_manager)
-    #     self.repository = DataRepository(db_client=self.supabase_client)
-    #     self.data_service = DataService(repository=self.repository)
-    #     self.job_manager = JobManager(data_service=self.data_service)
-
-    #     # Add Redis client
-    #     self.redis_client = RedisClient().async_client  # For async operations like publish
-
-    #     # Events
-    #     self.event_publisher = EventPublisher(redis_client=self.redis_client)
-
-    # @classmethod
-    # def get_instance(cls) -> "WorkerServices":
-    #     """Get the singleton instance of Services."""
-    #     if cls._instance is None:
-    #         cls._instance = cls()
-    #     return cls._instance
-
     def __init__(self) -> None:
         logger.info("Initializing worker services...")
 
@@ -57,7 +28,8 @@ class WorkerServices:
         self.repository: DataRepository | None = None
         self.supabase_manager: SupabaseManager | None = None
         self.vector_db: VectorDB | None = None
-        self.async_redis_client: Redis | None = None
+        self.redis_manager: RedisManager | None = None
+        self.async_redis_manager: RedisManager | None = None
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
         self.chroma_client: AsyncClientAPI | None = None
@@ -67,12 +39,14 @@ class WorkerServices:
         """Initialize all necesssary worker services."""
         try:
             # Database & Repository
-            self.supabase_manager = await SupabaseManager.create()
+            self.supabase_manager = await SupabaseManager.create_async()
             self.repository = DataRepository(supabase_manager=self.supabase_manager)
             self.data_service = DataService(repository=self.repository)
 
             # Redis
-            self.async_redis_client = RedisClient().async_client
+            self.redis_manager = RedisManager.create()
+            self.async_redis_manager = await RedisManager.create_async()
+            self.redis_repository = RedisRepository(manager=self.async_redis_manager)
 
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)

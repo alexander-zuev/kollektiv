@@ -74,7 +74,7 @@ class DataRepository:
             updated = await repo.save(job)
         """
         # Get client
-        client = await self.supabase_manager.get_client()
+        client = await self.supabase_manager.get_async_client()
 
         # Handle both single and batch cases
         entities = [entity] if not isinstance(entity, list) else entity
@@ -164,7 +164,7 @@ class DataRepository:
             )
         """
         # Get client first
-        client = await self.supabase_manager.get_client()
+        client = await self.supabase_manager.get_async_client()
 
         # Build query
         query = client.schema(model_class._db_config["schema"]).table(model_class._db_config["table"]).select("*")
