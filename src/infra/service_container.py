@@ -102,6 +102,7 @@ class ServiceContainer:
             self.event_consumer = await EventConsumer.create_async(
                 redis_manager=self.redis_manager, content_service=self.content_service
             )
+            await self.event_consumer.start()
 
             # Log the successful initialization
             logger.info("✓ Initialized services successfully.")
@@ -118,7 +119,15 @@ class ServiceContainer:
 
     async def shutdown_services(self) -> None:
         """Shutdown all services."""
-        if self.ngrok_service is not None:
-            await self.ngrok_service.stop_tunnel()
-        if self.event_service is not None:
-            await self.event_service.stop()
+        try:
+            if self.ngrok_service is not None:
+                await self.ngrok_service.stop_tunnel()
+                logger.info("✓ Ngrok tunnel stopped successfully")
+
+            if self.event_consumer is not None:
+                await self.event_consumer.stop()
+
+            if hasattr(self, "event_service") and self.event_service is not None:
+                await self.event_service.stop()
+        except Exception as e:
+            logger.error(f"Error during service shutdown: {e}", exc_info=True)

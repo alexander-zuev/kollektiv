@@ -1,44 +1,65 @@
 from unittest.mock import MagicMock
 
+import pytest
+from redis.exceptions import ConnectionError, TimeoutError
 from rq import Queue
 
-from src.infra.settings import settings
 from src.infra.rq.rq_manager import RQManager
+from src.infra.settings import settings
 
 
 class TestRQManagerUnit:
     """Unit tests for RQManager."""
 
-    def test_initialization(self):
-        """Test that RQManager initializes correctly."""
-        mock_redis_client = MagicMock()
-        rq_manager = RQManager(redis_client=mock_redis_client)
+    def test_initialization(self, mock_sync_redis):
+        """Test RQManager initialization."""
+        manager = RQManager(redis_manager=mock_sync_redis)
+        assert isinstance(manager, RQManager)
+        assert manager._queue is None
 
-        # Verify that the queue is created with the correct name and connection
-        assert isinstance(rq_manager.queue, Queue)
-        assert rq_manager.queue.name == settings.redis_queue_name
-        assert rq_manager.queue.connection == mock_redis_client
+    def test_queue_property(self, mock_sync_redis):
+        """Test queue property creates and reuses queue."""
+        manager = RQManager(redis_manager=mock_sync_redis)
 
-    def test_get_queue(self):
-        """Test that get_queue returns the correct queue."""
-        mock_redis_client = MagicMock()
-        rq_manager = RQManager(redis_client=mock_redis_client)
-        queue = rq_manager.get_queue()
+        # First access creates queue
+        queue = manager.queue
         assert isinstance(queue, Queue)
         assert queue.name == settings.redis_queue_name
+        assert queue.connection == mock_sync_redis.get_sync_client()
 
-    def test_enqueue(self):
-        """Test that enqueue method enqueues a job correctly."""
-        mock_redis_client = MagicMock()
-        rq_manager = RQManager(redis_client=mock_redis_client)
+        # Second access reuses queue
+        queue2 = manager.queue
+        assert queue2 is queue
+
+    def test_enqueue_job_success(self, mock_sync_redis):
+        """Test successful job enqueue."""
+        manager = RQManager(redis_manager=mock_sync_redis)
         mock_queue = MagicMock()
-        rq_manager.queue = mock_queue
+        manager._queue = mock_queue
 
-        # Mock task function
-        mock_task = MagicMock()
+        test_func = MagicMock()
+        test_args = ("arg1", "arg2")
+        test_kwargs = {"kwarg1": "value1"}
 
-        # Enqueue a job
-        rq_manager.enqueue(mock_task, "arg1", key="value")
+        manager.enqueue_job(test_func, *test_args, **test_kwargs)
+        mock_queue.enqueue.assert_called_once_with(test_func, *test_args, **test_kwargs)
 
-        # Verify that the enqueue method of the queue is called with the correct arguments
-        mock_queue.enqueue.assert_called_once_with(mock_task, "arg1", key="value")
+    def test_enqueue_job_connection_error(self, mock_sync_redis):
+        """Test job enqueue with connection error."""
+        manager = RQManager(redis_manager=mock_sync_redis)
+        mock_queue = MagicMock()
+        mock_queue.enqueue.side_effect = ConnectionError("Test error")
+        manager._queue = mock_queue
+
+        with pytest.raises(ConnectionError, match="Failed to enqueue job: Test error"):
+            manager.enqueue_job(MagicMock())
+
+    def test_enqueue_job_timeout_error(self, mock_sync_redis):
+        """Test job enqueue with timeout error."""
+        manager = RQManager(redis_manager=mock_sync_redis)
+        mock_queue = MagicMock()
+        mock_queue.enqueue.side_effect = TimeoutError("Test timeout")
+        manager._queue = mock_queue
+
+        with pytest.raises(TimeoutError, match="Failed to enqueue job: Test timeout"):
+            manager.enqueue_job(MagicMock())

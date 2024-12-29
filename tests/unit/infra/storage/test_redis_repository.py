@@ -97,3 +97,44 @@ class TestRedisRepository:
         # Test TTL configuration
         assert redis_repository._get_ttl(ConversationHistory) == 60 * 60 * 24  # 1 day
         assert redis_repository._get_ttl(ConversationMessage) == 60 * 60  # 1 hour
+
+    async def test_pipeline_operations(
+        self, redis_repository, sample_conversation, sample_uuid, mock_async_redis, mock_redis_pipeline
+    ):
+        """Test pipeline operations."""
+        # Setup pipeline mock
+        mock_async_redis.pipeline = AsyncMock(return_value=mock_redis_pipeline)
+        mock_redis_pipeline.set = AsyncMock()
+        mock_redis_pipeline.delete = AsyncMock()
+
+        # Add operations to pipeline
+        await redis_repository.set_method(sample_uuid, sample_conversation, pipe=mock_redis_pipeline)
+        await redis_repository.delete_method(sample_uuid, ConversationMessage, pipe=mock_redis_pipeline)
+
+        # Verify pipeline operations
+        mock_redis_pipeline.set.assert_called_once()
+        mock_redis_pipeline.delete.assert_called_once()
+        mock_async_redis.pipeline.assert_called_once_with(transaction=True)
+
+    async def test_error_handling(self, redis_repository, sample_uuid, mock_async_redis, sample_message):
+        """Test error handling scenarios."""
+
+        # Test invalid model
+        class InvalidModel(BaseModel):
+            pass
+
+        with pytest.raises(ValueError, match="No key prefix defined"):
+            redis_repository._get_prefix(InvalidModel, conversation_id=sample_uuid)
+
+        with pytest.raises(ValueError, match="No TTL defined"):
+            redis_repository._get_ttl(InvalidModel)
+
+        # Test Redis get error - should return None on error
+        mock_async_redis.get = AsyncMock(return_value=None)
+        result = await redis_repository.get_method(sample_uuid, ConversationHistory)
+        assert result is None
+
+        # Test Redis rpush error (should not raise)
+        mock_async_redis.rpush = AsyncMock(side_effect=Exception("Redis error"))
+        mock_async_redis.expire = AsyncMock()
+        await redis_repository.rpush_method(sample_uuid, sample_message)  # Should not raise

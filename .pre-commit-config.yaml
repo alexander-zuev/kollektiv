@@ -86,7 +86,7 @@ repos:
   - repo: local
     hooks:
       - id: pytest-unit
-        name: Run unit tests
+        name: Unit tests
         entry: pytest
         language: system
         pass_filenames: false
@@ -102,7 +102,7 @@ repos:
         verbose: true
 
       - id: pytest-integration
-        name: Run integration tests
+        name: Integration tests
         entry: pytest
         language: system
         pass_filenames: false
@@ -118,7 +118,7 @@ repos:
         verbose: true
 
       - id: update-project-structure
-        name: Update project documentation
+        name: Update project structure
         entry: python scripts/maintenance/generate_structure.py
         language: system
         pass_filenames: false

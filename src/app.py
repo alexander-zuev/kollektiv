@@ -40,9 +40,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logfire.exception("Failed to start Kollektiv!")
         raise
     finally:
-        if settings.environment == Environment.LOCAL and container:  # Check if container is not None
-            subprocess.run(["make", "down"])
+        if container:  # Always try to shutdown if container exists, not just in LOCAL
             await container.shutdown_services()
+            if settings.environment == Environment.LOCAL:
+                subprocess.run(["make", "down"])
 
 
 def create_app() -> FastAPI:

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from uuid import UUID
 
@@ -28,16 +29,16 @@ class EventConsumer:
         instance = cls(redis_manager=redis_manager, content_service=content_service)
         redis_client = await instance.redis_manager.get_async_client()
         instance.pubsub = redis_client.pubsub()
-        await instance.start()
+        await instance.pubsub.subscribe(settings.process_documents_channel)
+        logger.info("✓ Event consumer subscribed successfully")
         return instance
 
     @tenacity_retry_wrapper(exceptions=(ConnectionError, TimeoutError))
     async def start(self) -> None:
         """Start listening for events from the event bus."""
         try:
-            await self.pubsub.subscribe(settings.process_documents_channel)
-            await self.listen_for_events()
-            logger.info("✓ Event consumer started successfully")
+            asyncio.create_task(self.listen_for_events())
+
         except (ConnectionError, TimeoutError) as e:
             logger.exception(f"Failed to subscribe to channel {settings.process_documents_channel}: {e}")
             raise
@@ -52,6 +53,13 @@ class EventConsumer:
             logger.exception(f"Failed to listen for events: {e}")
             raise
 
+    async def stop(self) -> None:
+        """Stop listening for events from the event bus."""
+        if self.pubsub:
+            await self.pubsub.unsubscribe()
+            await self.pubsub.aclose()
+            logger.info("✓ Event consumer stopped successfully")
+
     async def handle_event(self, message: bytes) -> None:
         """Handle an event from the event bus."""
         try:
@@ -61,10 +69,5 @@ class EventConsumer:
 
             await self.content_service.handle_job_event(job_id=job_id, status=status, error=event_data.get("error"))
         except Exception as e:
-            logger.error(f"Failed to handle event: {e}")
+            logger.exception(f"Failed to handle event: {e}")
             raise
-
-    def stop_listening(self) -> None:
-        """Stop listening for events from the event bus."""
-        self.pubsub.unsubscribe()
-        self.pubsub.aclose()
