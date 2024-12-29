@@ -15,7 +15,8 @@ from anthropic.types import (
 from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fakeredis.aioredis import FakeRedis
 from fastapi.testclient import TestClient
-from redis.asyncio import Redis
+from redis import Redis as SyncRedis
+from redis.asyncio import Redis as AsyncRedis
 
 from src.app import create_app
 from src.core.chat.conversation_manager import ConversationManager
@@ -29,7 +30,7 @@ from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
-from src.infra.external.supabase_client import SupabaseClient
+from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.rq.rq_manager import RQManager
 from src.infra.service_container import ServiceContainer
 from src.infra.settings import settings
@@ -258,22 +259,18 @@ def pytest_configure(config):
 
     # Start containers for integration tests
     if config.getoption("--run-integration"):
-        # Clean up ngrok properly
-        try:
-            import ngrok
-
-            ngrok.disconnect()  # Disconnect all tunnels in current session
-        except Exception:
-            pass
-
-        # Start containers
-        subprocess.run(["docker-compose", "-f", "scripts/docker/docker-compose.yml", "up", "-d"], check=True)
+        subprocess.run(
+            ["docker", "compose", "--env-file", "config/.env", "-f", "scripts/docker/compose.yaml", "up", "-d"],
+            check=True,
+        )
 
 
 def pytest_unconfigure(config):
     """Cleanup containers after tests."""
     if config.getoption("--run-integration"):
-        subprocess.run(["docker-compose", "-f", "scripts/docker/docker-compose.yml", "down"], check=True)
+        subprocess.run(
+            ["docker", "compose", "--env-file", "config/.env", "-f", "scripts/docker/compose.yaml", "down"], check=True
+        )
 
 
 @pytest.fixture(scope="function")
@@ -285,7 +282,7 @@ async def mock_app():
     container = MagicMock(spec=ServiceContainer)
 
     # 1. Database & Repository Layer
-    container.db_client = MagicMock(spec=SupabaseClient)
+    container.db_client = MagicMock(spec=SupabaseManager)
     container.repository = MagicMock(spec=DataRepository)
     container.data_service = MagicMock(spec=DataService)
 
@@ -390,6 +387,22 @@ async def data_service(data_repository):
 
 # Redis-related fixtures
 @pytest.fixture
+def mock_sync_redis():
+    """Mock for synchronous Redis client."""
+    mock_client = MagicMock(spec=SyncRedis)
+    mock_client.ping.return_value = True
+    return mock_client
+
+
+@pytest.fixture
+def mock_async_redis():
+    """Mock for asynchronous Redis client."""
+    mock_client = AsyncMock(spec=AsyncRedis)
+    mock_client.ping = AsyncMock(return_value=True)
+    return mock_client
+
+
+@pytest.fixture
 def mock_redis():
     """Fast fake Redis for unit tests."""
     return FakeRedis()
@@ -404,7 +417,7 @@ def redis_repository(mock_redis):
 @pytest.fixture(scope="function")
 async def redis_test_client():
     """Real Redis client for integration tests."""
-    redis = Redis.from_url(settings.redis_url)
+    redis = AsyncRedis.from_url(settings.redis_url)
     try:
         await redis.ping()
         await redis.flushall()  # Clean the Redis instance before tests

@@ -25,29 +25,32 @@ class RedisManager:
 
     def _create_sync_client(self, decode_responses: bool) -> SyncRedis:
         """Create sync Redis client."""
-        return SyncRedis.from_url(
+        client = SyncRedis.from_url(
             settings.redis_url,
             username=settings.redis_user if settings.redis_user != "default" else None,
             password=settings.redis_password if settings.redis_password != "none" else None,
             decode_responses=decode_responses,
         )
+        return client
 
-    async def _create_async_client(self, decode_responses: bool) -> AsyncRedis:
+    def _create_async_client(self, decode_responses: bool) -> AsyncRedis:
         """Create async Redis client."""
-        return AsyncRedis.from_url(
+        client = AsyncRedis.from_url(
             settings.redis_url,
             username=settings.redis_user if settings.redis_user != "default" else None,
             password=settings.redis_password if settings.redis_password != "none" else None,
             decode_responses=decode_responses,
         )
+        return client
 
     @tenacity_retry_wrapper(exceptions=(ConnectionError, TimeoutError))
     def _connect_sync(self) -> None:
         """Connect to the sync redis client and handle connection errors."""
         if self._sync_client is None:
             try:
-                self._sync_client = self._create_sync_client(decode_responses=self._decode_responses)
-                self._sync_client.ping()
+                client = self._create_sync_client(decode_responses=self._decode_responses)
+                client.ping()
+                self._sync_client = client
                 logger.info("✓ Initialized sync Redis client successfully")
             except (ConnectionError, TimeoutError) as e:
                 logger.exception(f"Failed to initialize sync Redis client: {e}")
@@ -58,8 +61,9 @@ class RedisManager:
         """Connect to the async redis client and handle connection errors."""
         if self._async_client is None:
             try:
-                self._async_client = await self._create_async_client(decode_responses=self._decode_responses)
-                await self._async_client.ping()
+                client = self._create_async_client(decode_responses=self._decode_responses)
+                await client.ping()
+                self._async_client = client
                 logger.info("✓ Initialized async Redis client successfully")
             except (ConnectionError, TimeoutError) as e:
                 logger.exception(f"Failed to initialize async Redis client: {e}")

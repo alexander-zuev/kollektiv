@@ -5,7 +5,7 @@ from src.core.search.vector_db import VectorDB
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.events.event_publisher import EventPublisher
-from src.infra.external.chroma_client import ChromaClient
+from src.infra.external.chroma_manager import ChromaManager
 from src.infra.external.redis_manager import RedisManager
 from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
@@ -32,7 +32,7 @@ class WorkerServices:
         self.async_redis_manager: RedisManager | None = None
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
-        self.chroma_client: AsyncClientAPI | None = None
+        self.chroma_manager: ChromaManager | None = None
         self.event_publisher: EventPublisher | None = None
 
     async def initialize_services(self) -> None:
@@ -52,12 +52,12 @@ class WorkerServices:
             self.job_manager = JobManager(data_service=self.data_service)
 
             # Vector operations
-            self.chroma_client = await ChromaClient().create_client()
+            self.chroma_manager = await ChromaManager.create_async()
             self.embedding_manager = EmbeddingManager()
-            self.vector_db = VectorDB(chroma_client=self.chroma_client, embedding_manager=self.embedding_manager)
+            self.vector_db = VectorDB(chroma_manager=self.chroma_manager, embedding_manager=self.embedding_manager)
 
             # Events
-            self.event_publisher = EventPublisher(redis_client=self.async_redis_client)
+            self.event_publisher = EventPublisher(redis_manager=self.async_redis_manager)
 
             # Result logging
             logger.info("✓ Initialized worker services successfully.")
@@ -76,6 +76,5 @@ class WorkerServices:
     @classmethod
     async def get_instance(cls) -> "WorkerServices":
         """Get the singleton instance of WorkerServices."""
-        if cls._instance is None:
-            await cls.create()
+        await cls.create()
         return cls._instance

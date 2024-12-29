@@ -52,7 +52,6 @@ async def _process_documents_job_async(internal_job_id: UUID, document_ids: list
                 headers={"header1": "value1", "header2": "value2"},
             )
         ]
-        chunks_ids = [chunk.chunk_id for chunk in chunks]
         logger.info("Placeholder for processing documents into chunks")
 
         # 4. Store chunks in Supabase
