@@ -1,9 +1,8 @@
 from typing import Any, TypeVar
 from uuid import UUID
 
-from supabase import AsyncClient
-
 from src.infra.decorators import supabase_operation
+from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
 
@@ -48,8 +47,8 @@ class DataRepository:
         )
     """
 
-    def __init__(self, db_client: AsyncClient) -> None:
-        self.db_client = db_client
+    def __init__(self, supabase_manager: SupabaseManager) -> None:
+        self.supabase_manager = supabase_manager
         logger.info("✓ Initialized data repository successfully")
 
     @supabase_operation
@@ -74,6 +73,9 @@ class DataRepository:
             job.status = JobStatus.COMPLETED
             updated = await repo.save(job)
         """
+        # Get client
+        client = await self.supabase_manager.get_client()
+
         # Handle both single and batch cases
         entities = [entity] if not isinstance(entity, list) else entity
         if not entities:
@@ -85,7 +87,7 @@ class DataRepository:
 
         # Single transaction for all entities
         result = await (
-            self.db_client.schema(entity_type._db_config["schema"])
+            client.schema(entity_type._db_config["schema"])
             .table(entity_type._db_config["table"])
             .upsert(data, on_conflict=entity_type._db_config["primary_key"])
             .execute()
@@ -161,9 +163,11 @@ class DataRepository:
                 filters={"request_config->url": "https://..."}
             )
         """
-        query = (
-            self.db_client.schema(model_class._db_config["schema"]).table(model_class._db_config["table"]).select("*")
-        )
+        # Get client first
+        client = await self.supabase_manager.get_client()
+
+        # Build query
+        query = client.schema(model_class._db_config["schema"]).table(model_class._db_config["table"]).select("*")
 
         if filters:
             for field, value in filters.items():

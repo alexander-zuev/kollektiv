@@ -64,7 +64,11 @@ class Settings(BaseSettings):
 
     # Supabase
     supabase_url: str = Field(..., description="Supabase URL", alias="SUPABASE_URL")
-    supabase_key: str = Field(..., description="Supabase Service Key", alias="SUPABASE_SERVICE_KEY")
+    supabase_service_role_key: str = Field(
+        ...,
+        description="Kollektiv API uses Supabase service role key for managing the database",
+        alias="SUPABASE_SERVICE_KEY",
+    )
 
     # All paths are now relative to src_dir
     eval_dir: Path = Field(default_factory=lambda: Path("src/core/evaluation"))

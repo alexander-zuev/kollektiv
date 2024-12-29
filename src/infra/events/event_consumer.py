@@ -1,4 +1,3 @@
-import asyncio
 import json
 from uuid import UUID
 
@@ -19,8 +18,8 @@ from src.services.content_service import ContentService
 logger = get_logger()
 
 
-class EventService:
-    """Handles events from the event bus."""
+class EventConsumer:
+    """Consumes events from the event bus and dispatches them to the appropriate services."""
 
     def __init__(self, redis_client: AsyncRedis, content_service: ContentService) -> None:
         self.redis_client = redis_client
@@ -32,16 +31,19 @@ class EventService:
         wait=wait_exponential(multiplier=1, min=4, max=60),
         stop=stop_after_attempt(5),
         before_sleep=lambda retry_state: logger.warning(
-            f"Redis connection attempt {retry_state.attempt_number} failed, retrying..."
+            f"Event consumer attempt {retry_state.attempt_number} failed, retrying..."
         ),
     )
-    async def start(self) -> None:
+    @classmethod
+    async def start(cls, redis_client: AsyncRedis, content_service: ContentService) -> None:
         """Start listening for events from the event bus."""
+        instance = cls(redis_client=redis_client, content_service=content_service)
         try:
-            await self.pubsub.subscribe(settings.process_documents_channel)
-            asyncio.create_task(self.listen_for_events())
+            await instance.pubsub.subscribe(settings.process_documents_channel)
+            await instance.listen_for_events()
+            logger.info("✓ Event consumer started successfully")
         except Exception as e:
-            logger.error(f"Failed to subscribe to channel {settings.process_documents_channel}: {e}")
+            logger.exception(f"Failed to subscribe to channel {settings.process_documents_channel}: {e}")
             raise
 
     async def listen_for_events(self) -> None:
@@ -53,10 +55,6 @@ class EventService:
         except redis.exceptions.ConnectionError as e:
             logger.exception(f"Failed to listen for events: {e}")
             raise
-
-    async def publish_event(self, event: dict, queue: str = settings.process_documents_channel) -> None:
-        """Publish an event to the event bus."""
-        await self.redis_client.publish(queue, json.dumps(event))
 
     async def handle_event(self, message: bytes) -> None:
         """Handle an event from the event bus."""
@@ -70,7 +68,7 @@ class EventService:
             logger.error(f"Failed to handle event: {e}")
             raise
 
-    async def stop(self) -> None:
+    def stop_listening(self) -> None:
         """Stop listening for events from the event bus."""
-        await self.pubsub.unsubscribe()
-        await self.pubsub.aclose()
+        self.pubsub.unsubscribe()
+        self.pubsub.aclose()

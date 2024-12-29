@@ -34,8 +34,6 @@ class ChromaClient:
 
         instance = cls()
         host, port = instance._parse_url(settings.chroma_private_url)
-        logger.debug(f"Initializing Chroma client using URL: {settings.chroma_private_url}")
-
         try:
             instance.client = await chromadb.AsyncHttpClient(
                 host=host,
@@ -46,8 +44,8 @@ class ChromaClient:
                 # ),
             )
             await instance.client.heartbeat()
-            logger.info("✓ Initialized Chroma client successfully")
+            logger.info(f"✓ Initialized Chroma client successfully on {settings.chroma_private_url}")
             return instance.client
         except Exception as e:
-            logger.error(f"Failed to initialize Chroma client: {str(e)}", exc_info=True)
+            logger.exception(f"Failed to initialize Chroma client: {str(e)}")
             raise

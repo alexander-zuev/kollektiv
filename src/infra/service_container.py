@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import logfire
 from redis.asyncio import Redis
-from supabase import AsyncClient
 
 from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
@@ -13,16 +11,17 @@ from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDB
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
+from src.infra.events.event_consumer import EventConsumer
+from src.infra.events.event_publisher import EventPublisher
 from src.infra.external.chroma_client import AsyncClientAPI, ChromaClient
 from src.infra.external.redis_client import RedisClient
-from src.infra.external.supabase_client import SupabaseClient
+from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
 from src.infra.rq.rq_manager import RQManager
 from src.infra.settings import Environment, settings
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
-from src.services.event_service import EventService
 from src.services.job_manager import JobManager
 
 logger = get_logger()
@@ -32,40 +31,38 @@ class ServiceContainer:
     """Container object for all services that are initialized in the application."""
 
     def __init__(self) -> None:
-        """Initialize container attributes."""
+        """Initialize Kollektiv container attributes."""
         self.job_manager: JobManager | None = None
         self.firecrawler: FireCrawler | None = None
         self.data_service: DataService | None = None
         self.content_service: ContentService | None = None
         self.repository: DataRepository | None = None
-        self.db_client: AsyncClient | None = None
+        self.supabase_manager: SupabaseManager | None = None
         self.llm_assistant: ClaudeAssistant | None = None
         self.vector_db: VectorDB | None = None
         self.chat_service: ChatService | None = None
         self.conversation_manager: ConversationManager | None = None
         self.retriever: Retriever | None = None
         self.reranker: Reranker | None = None
-        self.redis_client: Redis | None = None
+        self.async_redis_client: Redis | None = None
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
         self.ngrok_service: None = None
         self.chroma_client: AsyncClientAPI | None = None
-        self.event_service: EventService | None = None
+        self.event_publisher: EventPublisher | None = None
+        self.event_consumer: EventConsumer | None = None
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
         try:
             # Database & Repository
-            self.db_client = await SupabaseClient().get_client()
-            self.repository = DataRepository(db_client=self.db_client)
+            self.supabase_manager = await SupabaseManager.create()
+            self.repository = DataRepository(supabase_manager=self.supabase_manager)
             self.data_service = DataService(repository=self.repository)
 
             # Redis
-            self.redis_client = RedisClient().async_client
-            if self.redis_client is not None:
-                self.redis_repository = RedisRepository(client=self.redis_client)
-            else:
-                raise ValueError("Redis client is not initialized")
+            self.async_redis_client = RedisClient().async_client
+            self.redis_repository = RedisRepository(client=self.async_redis_client)
 
             # RQ
             self.rq_manager = RQManager(redis_client=RedisClient().sync_client)
@@ -104,13 +101,14 @@ class ServiceContainer:
                 self.ngrok_service = NgrokService()
                 await self.ngrok_service.start_tunnel()
 
-            # Event service
-            self.event_service = EventService(content_service=self.content_service, redis_client=self.redis_client)
-            await self.event_service.start()
+            # Events
+            self.event_publisher = EventPublisher(redis_client=self.async_redis_client)
+            self.event_consumer = await EventConsumer.start(
+                redis_client=self.async_redis_client, content_service=self.content_service
+            )
 
             # Result logging
             logger.info("✓ Initialized services successfully.")
-            logfire.info("✓ Initialized services successfully.")
         except Exception as e:
             logger.error(f"Error during service initialization: {e}", exc_info=True)
             raise

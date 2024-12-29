@@ -1,3 +1,5 @@
+import asyncio
+
 from rq.worker import Worker
 
 from src.infra.external.redis_client import RedisClient
@@ -5,21 +7,21 @@ from src.infra.logger import configure_logging, get_logger
 from src.infra.rq.worker_services import WorkerServices
 from src.infra.settings import settings
 
-# Configure logging
-configure_logging(debug=True)
-logger = get_logger()
 
-logger.info("Starting RQ worker")
-
-services = WorkerServices.get_instance()
-
-
-# Start worker
+# Customer worker entrypoint
 def start_worker() -> None:
     """Start worker with retry logic."""
+    # Configure logging
+    configure_logging(debug=True)
+    logger = get_logger()
+    logger.debug("Starting RQ worker")
+
+    # Setup worker services
+    asyncio.run(WorkerServices.create())  # this sets up _instance
+
     redis_client = RedisClient().sync_client
     worker = Worker([settings.redis_queue_name], connection=redis_client)
-    logger.info(f"Starting worker on queue: {settings.redis_queue_name}")
+    logger.info(f"Started worker on queue: {settings.redis_queue_name}")
     worker.work()
 
 

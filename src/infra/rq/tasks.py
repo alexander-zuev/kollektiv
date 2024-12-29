@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from uuid import UUID
 
-from src.infra import settings
 from src.infra.logger import get_logger
 from src.infra.rq.worker_services import WorkerServices
 from src.models.content_models import Chunk
@@ -22,7 +20,7 @@ def process_documents_job(internal_job_id: UUID, document_ids: list[UUID]) -> No
         loop.run_until_complete(_process_documents_job_async(internal_job_id, document_ids))
         logger.info(f"Successfully processed documents job {internal_job_id}")
     except Exception as e:
-        logger.error(f"Error processing documents job {internal_job_id}: {e}", exc_info=True)
+        logger.exception(f"Error processing documents job {internal_job_id}: {e}")
         raise
     finally:
         loop.close()
@@ -32,7 +30,7 @@ async def _process_documents_job_async(internal_job_id: UUID, document_ids: list
     """Process list of documents into chunks and adds them to vector DB."""
     logger.info(f"Processing documents job {internal_job_id}")
 
-    worker_services = WorkerServices.get_instance()
+    worker_services = await WorkerServices.get_instance()
 
     try:
         # 1. Set job status to IN_PROGRESS
@@ -73,7 +71,7 @@ async def _process_documents_job_async(internal_job_id: UUID, document_ids: list
         )
 
         # 7. publish completed event
-        await worker_services.event_service.publish_event(
+        await worker_services.event_publisher.publish_event(
             {
                 "job_id": str(internal_job_id),
                 "status": "completed",
@@ -81,9 +79,9 @@ async def _process_documents_job_async(internal_job_id: UUID, document_ids: list
         )
 
     except Exception as e:
-        logger.error(f"Error processing documents job {internal_job_id}: {e}", exc_info=True)
+        logger.exception(f"Error processing documents job {internal_job_id}: {e}")
         await worker_services.job_manager.mark_job_failed(internal_job_id, str(e))
-        await worker_services.event_service.publish_event(
+        await worker_services.event_publisher.publish_event(
             {
                 "job_id": str(internal_job_id),
                 "status": "failed",
