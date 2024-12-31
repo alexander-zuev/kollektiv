@@ -40,6 +40,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379
       - REDIS_URL=redis://redis:6379 # need to connect to the redis service in the container, not localhost
       - CHROMA_PRIVATE_URL=http://chromadb:8000 # need to connect to the chromadb service in the container, not localhost
+      - SERVICE=celery
     depends_on:
       redis:
         condition: service_healthy

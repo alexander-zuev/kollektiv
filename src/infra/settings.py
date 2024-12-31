@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+from enum import Enum
 from pathlib import Path
 
 from pydantic import Field
@@ -11,8 +14,15 @@ from src.models.base_models import Environment
 logger = get_logger()
 
 
+class ServiceType(str, Enum):
+    """Type of service being run."""
+
+    API = "api"
+    CELERY = "celery"
+
+
 class Settings(BaseSettings):
-    """Application-wide settings."""
+    """Settings shared between API and Celery worker."""
 
     # General
     project_name: str = Field("kollektiv", description="Project name")
@@ -97,10 +107,6 @@ class Settings(BaseSettings):
     # Pub/Sub
     process_documents_channel: str = Field("process_documents", description="Process documents channel")
 
-    # Celery
-    celery_broker_url: str = Field(..., alias="CELERY_BROKER_URL", description="Celery broker URL")
-    celery_result_backend: str = Field(..., alias="CELERY_RESULT_BACKEND", description="Celery result backend")
-
     # Chroma client
     chroma_private_url: str = Field(
         ...,
@@ -111,6 +117,13 @@ class Settings(BaseSettings):
         None,
         description="Auth credential for Chroma - username:password",
         alias="CHROMA_CLIENT_AUTH_CREDENTIALS",
+    )
+
+    # Add this with other settings
+    service: ServiceType = Field(
+        ...,  # Make it required
+        alias="SERVICE",
+        description="Type of service to run (api or celery)",
     )
 
     model_config = SettingsConfigDict(
@@ -138,6 +151,24 @@ class Settings(BaseSettings):
     def firecrawl_webhook_url(self) -> str:
         """Dynamically generates the Firecrawl webhook URL."""
         return f"{self.public_url}{Routes.System.Webhooks.FIRECRAWL}"
+
+    # TODO: will refactor later
+    # TODO: settings need to eagerly validate
+    # TODO: settings need to be passed into container for access, not into individual module
+    @property
+    def celery(self) -> CelerySettings:
+        """Celery-worker specicic settings. Do not apply to FastAPI service."""
+        if self.service != ServiceType.CELERY:
+            raise ValueError("Celery settings are only available for the celery service")
+        return CelerySettings()
+
+
+class CelerySettings(BaseSettings):
+    """Celery-worker specicic settings. Do not apply to FastAPI service."""
+
+    # Celery
+    broker_url: str = Field(..., alias="CELERY_BROKER_URL", description="Celery broker URL")
+    result_backend: str = Field(..., alias="CELERY_RESULT_BACKEND", description="Celery result backend")
 
 
 def initialize_settings() -> Settings:
