@@ -15,6 +15,7 @@ logs:
 
 rebuild:
 	docker compose --env-file config/.env -f scripts/docker/compose.yaml build --no-cache
+	docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d --remove-orphans
 
 push-ghcr:
 	docker build -f scripts/docker/Dockerfile -t ghcr.io/alexander-zuev/kollektiv-rq:latest .

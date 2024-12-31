@@ -11,6 +11,7 @@ from src.models.base_models import SupabaseModel
 from src.models.chat_models import Conversation, ConversationHistory, ConversationMessage
 from src.models.content_models import Chunk, DataSource, Document, SourceSummary
 from src.models.job_models import Job
+from src.models.vector_models import VectorCollection
 
 logger = get_logger()
 
@@ -52,9 +53,8 @@ class DataService:
 
     async def save_job(self, job: Job) -> Job:
         """Save or update a job."""
-        logger.debug(f"Saving job {job.job_id}")
         result = await self.repository.save(job)
-        # Explicit type cast to satisfy mypy
+        logger.debug(f"Job {job.job_id} saved")
         return Job.model_validate(result.model_dump())
 
     async def get_job(self, job_id: UUID) -> Job:
@@ -203,3 +203,8 @@ class DataService:
     async def save_chunks(self, chunks: list[Chunk]) -> None:
         """Save chunks to Supabase."""
         logger.debug(f"Saving {len(chunks)} chunks")
+
+    async def save_collection(self, collection: VectorCollection) -> None:
+        """Save collection to Supabase."""
+        logger.debug(f"Saving collection {collection.name}")
+        await self.repository.save(collection)

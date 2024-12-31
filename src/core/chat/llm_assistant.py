@@ -28,7 +28,7 @@ from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 from src.core.chat.prompt_manager import PromptManager
 from src.core.chat.tool_manager import ToolManager
 from src.core.search.retriever import Retriever
-from src.core.search.vector_db import VectorDB
+from src.core.search.vector_db import VectorDatabase
 from src.infra.decorators import (
     anthropic_error_handler,
     base_error_handler,
@@ -68,7 +68,7 @@ class ClaudeAssistant(Model):
     """
 
     # Required fields
-    vector_db: VectorDB
+    vector_db: VectorDatabase
 
     # Client config
     client: anthropic.AsyncAnthropic | None = Field(default=None)
@@ -87,7 +87,7 @@ class ClaudeAssistant(Model):
 
     def __init__(
         self,
-        vector_db: VectorDB,
+        vector_db: VectorDatabase,
         retriever: Retriever,
         api_key: str | None = None,
         model_name: str | None = None,

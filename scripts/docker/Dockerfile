@@ -9,6 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set the working directory
 WORKDIR /app
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy dependency files
 COPY pyproject.toml poetry.lock ./
 
@@ -19,6 +24,3 @@ RUN pip install poetry \
 
 # Copy application code
 COPY . .
-
-# Start worker
-CMD ["/bin/sh", "-c", "exec poetry run python -m src.infra.rq.rq_worker"]

@@ -8,7 +8,7 @@ from src.core.content.crawler import FireCrawler
 from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.reranker import Reranker
 from src.core.search.retriever import Retriever
-from src.core.search.vector_db import VectorDB
+from src.core.search.vector_db import VectorDatabase
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.events.event_consumer import EventConsumer
@@ -18,7 +18,6 @@ from src.infra.external.redis_manager import RedisManager
 from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
 from src.infra.misc.ngrok_service import NgrokService
-from src.infra.rq.rq_manager import RQManager
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
@@ -39,7 +38,7 @@ class ServiceContainer:
         self.repository: DataRepository | None = None
         self.supabase_manager: SupabaseManager | None = None
         self.llm_assistant: ClaudeAssistant | None = None
-        self.vector_db: VectorDB | None = None
+        self.vector_db: VectorDatabase | None = None
         self.chat_service: ChatService | None = None
         self.conversation_manager: ConversationManager | None = None
         self.retriever: Retriever | None = None
@@ -64,10 +63,6 @@ class ServiceContainer:
             self.async_redis_manager = await RedisManager.create_async()
             self.redis_repository = RedisRepository(manager=self.async_redis_manager)
 
-            # RQ
-            self.sync_redis_manager = RedisManager.create(decode_responses=False)
-            self.rq_manager = RQManager.create(redis_manager=self.sync_redis_manager)
-
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)
             self.firecrawler = FireCrawler()
@@ -75,13 +70,16 @@ class ServiceContainer:
                 crawler=self.firecrawler,
                 job_manager=self.job_manager,
                 data_service=self.data_service,
-                rq_manager=self.rq_manager,
             )
 
             # Vector operations
             self.chroma_manager = await ChromaManager.create_async()
             self.embedding_manager = EmbeddingManager()
-            self.vector_db = VectorDB(chroma_manager=self.chroma_manager, embedding_manager=self.embedding_manager)
+            self.vector_db = VectorDatabase(
+                chroma_manager=self.chroma_manager,
+                embedding_manager=self.embedding_manager,
+                data_service=self.data_service,
+            )
             self.reranker = Reranker()
             self.retriever = Retriever(vector_db=self.vector_db, reranker=self.reranker)
 

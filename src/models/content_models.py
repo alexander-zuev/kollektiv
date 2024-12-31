@@ -117,6 +117,7 @@ class Chunk(SupabaseModel):
     """Individual chunk of content with metadata"""
 
     # IDs
+    source_id: UUID = Field(..., description="UUID of the source this chunk belongs to")
     chunk_id: UUID = Field(default_factory=uuid4, description="Unique identifier for the chunk")
     document_id: UUID = Field(..., description="UUID of the document this chunk belongs to")
 

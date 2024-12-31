@@ -3,11 +3,13 @@ import os
 import re
 import uuid
 from typing import Any
+from uuid import uuid4
 
 import tiktoken
 
 from src.infra.decorators import generic_error_handler
 from src.infra.logger import get_logger
+from src.models.content_models import Chunk
 
 logger = get_logger()
 
@@ -106,6 +108,23 @@ class MarkdownChunker:
         )
 
         return content
+
+    async def create_fake_chunks(self, n_chunks: int = 1000) -> list[Chunk]:
+        """Create fake chunks for testing."""
+        chunks = []
+        for i in range(n_chunks):
+            chunk = Chunk(
+                chunk_id=uuid4(),
+                document_id=uuid4(),
+                source_id=uuid4(),
+                text=f"Fake chunk content {i}",
+                token_count=100,
+                source_url="https://example.com",
+                page_title="Example Page",
+                headers={"header1": "value1", "header2": "value2"},
+            )
+            chunks.append(chunk)
+        return chunks
 
     @generic_error_handler
     def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:

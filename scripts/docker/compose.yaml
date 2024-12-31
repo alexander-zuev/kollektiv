@@ -25,31 +25,32 @@ services:
       retries: 5
       start_period: 5s
     restart: unless-stopped
-
-  rq-worker:
+  celery-worker:
+    container_name: celery-worker
     build:
       context: ../../
       dockerfile: scripts/docker/Dockerfile
-    container_name: rq-worker
-    healthcheck:
-      test: [ "CMD", "python", "-c", "import redis; redis.from_url('${REDIS_URL}').ping()" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
+    command: celery -A src.infra.celery.worker:celery_app worker --loglevel=info
     env_file:
       - ../../config/.env
     volumes:
-      - ../../:/app
+      - ../../:/app # this allows locally to not relaunch as code changes
     environment:
-      - CHROMA_PRIVATE_URL=http://chromadb:8000
-      - REDIS_URL=redis://redis:6379 # override the localhost {host: redis, port: 6379}
-      - SUPABASE_URL=http://host.docker.internal:54321
+      - CELERY_BROKER_URL=redis://redis:6379
+      - CELERY_RESULT_BACKEND=redis://redis:6379
+      - REDIS_URL=redis://redis:6379 # need to connect to the redis service in the container, not localhost
+      - CHROMA_PRIVATE_URL=http://chromadb:8000 # need to connect to the chromadb service in the container, not localhost
     depends_on:
-      chromadb:
-        condition: service_healthy
       redis:
         condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "celery", "-A", "src.infra.celery.worker:celery_app", "inspect", "ping", "-d", "celery@$HOSTNAME" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

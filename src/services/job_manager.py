@@ -80,7 +80,6 @@ class JobManager:
 
     async def mark_job_completed(self, job_id: UUID, result_id: UUID | None = None) -> Job:
         """Mark a job as completed."""
-        # job = await self.get_job(job_id)
         job = await self.data_service.get_job(job_id)
         if not job:
             raise JobNotFoundError(f"Job {job_id} not found")

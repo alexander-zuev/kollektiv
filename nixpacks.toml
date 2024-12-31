@@ -22,4 +22,5 @@ commands = [
 
 [phases.start]
 # Command to start the application
+# TODO: update to proper gunicorn setup
 cmd = "poetry run kollektiv"

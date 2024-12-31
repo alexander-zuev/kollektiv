@@ -97,9 +97,9 @@ class Settings(BaseSettings):
     # Pub/Sub
     process_documents_channel: str = Field("process_documents", description="Process documents channel")
 
-    # Redis queue
-    redis_queue_name: str = Field("process_documents_queue", description="Redis queue name", alias="REDIS_QUEUE_NAME")
-    processing_queue_timeout: str = Field("3h", description="Processing queue timeout", alias="REDIS_QUEUE_TIMEOUT")
+    # Celery
+    celery_broker_url: str = Field(..., alias="CELERY_BROKER_URL", description="Celery broker URL")
+    celery_result_backend: str = Field(..., alias="CELERY_RESULT_BACKEND", description="Celery result backend")
 
     # Chroma client
     chroma_private_url: str = Field(

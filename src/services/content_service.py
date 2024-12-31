@@ -11,8 +11,6 @@ from src.core._exceptions import DataSourceError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
 from src.infra.decorators import generic_error_handler
 from src.infra.logger import get_logger
-from src.infra.rq.rq_manager import RQManager
-from src.infra.rq.tasks import process_documents_job
 from src.models.content_models import DataSource, Document, SourceStatus
 from src.models.firecrawl_models import CrawlRequest
 from src.models.job_models import CrawlJobDetails, Job, JobStatus, JobType, ProcessingJobDetails
@@ -30,12 +28,10 @@ class ContentService:
         crawler: FireCrawler,
         job_manager: JobManager,
         data_service: DataService,
-        rq_manager: RQManager,
     ):
         self.crawler = crawler
         self.job_manager = job_manager
         self.data_service = data_service
-        self.rq_manager = rq_manager
 
     @generic_error_handler
     async def add_source(self, request: AddContentSourceRequest) -> SourceAPIResponse:
@@ -274,7 +270,7 @@ class ContentService:
         logger.debug(f"Updated source {details.source_id} status to PROCESSING")
 
         # 7. Enqueu processing job
-        self.rq_manager.enqueue_job(process_documents_job, processing_job.job_id, document_ids)
+        # self.rq_manager.enqueue_job(process_documents, processing_job.job_id, document_ids)
 
     async def handle_pubsub_event(self, message: dict) -> None:
         """Handles a process documents jobs."""
@@ -317,7 +313,7 @@ class ContentService:
         )
 
         # 5. Inform the client
-        # TODO: implement
+        logger.info(f"Source {source_id} completed!!!")
 
     async def handle_failed_processing_job(self, job: Job, error: str) -> None:
         """Handles a failed processing job."""

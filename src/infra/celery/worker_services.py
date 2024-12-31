@@ -1,7 +1,8 @@
 from typing import Union
 
+from src.core.content.chunker import MarkdownChunker
 from src.core.search.embedding_manager import EmbeddingManager
-from src.core.search.vector_db import VectorDB
+from src.core.search.vector_db import VectorDatabase
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.events.event_publisher import EventPublisher
@@ -16,7 +17,7 @@ logger = get_logger()
 
 
 class WorkerServices:
-    """Services singleton necessary for RQ worker."""
+    """Services singleton necessary for Celery worker."""
 
     _instance: Union["WorkerServices", None] = None
 
@@ -27,13 +28,14 @@ class WorkerServices:
         self.data_service: DataService | None = None
         self.repository: DataRepository | None = None
         self.supabase_manager: SupabaseManager | None = None
-        self.vector_db: VectorDB | None = None
+        self.vector_db: VectorDatabase | None = None
         self.redis_manager: RedisManager | None = None
         self.async_redis_manager: RedisManager | None = None
         self.redis_repository: RedisRepository | None = None
         self.embedding_manager: EmbeddingManager | None = None
         self.chroma_manager: ChromaManager | None = None
         self.event_publisher: EventPublisher | None = None
+        self.chunker: MarkdownChunker | None = None
 
     async def initialize_services(self) -> None:
         """Initialize all necesssary worker services."""
@@ -44,17 +46,21 @@ class WorkerServices:
             self.data_service = DataService(repository=self.repository)
 
             # Redis
-            self.sync_redis_manager = RedisManager.create(decode_responses=False)
             self.async_redis_manager = await RedisManager.create_async()
             self.redis_repository = RedisRepository(manager=self.async_redis_manager)
 
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)
+            self.chunker = MarkdownChunker()
 
             # Vector operations
             self.chroma_manager = await ChromaManager.create_async()
             self.embedding_manager = EmbeddingManager()
-            self.vector_db = VectorDB(chroma_manager=self.chroma_manager, embedding_manager=self.embedding_manager)
+            self.vector_db = VectorDatabase(
+                chroma_manager=self.chroma_manager,
+                embedding_manager=self.embedding_manager,
+                data_service=self.data_service,
+            )
 
             # Events
             self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
