@@ -5,8 +5,8 @@ import redis
 import tiktoken
 
 from src.api.v0.schemas.chat_schemas import UserMessage
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.storage.redis_repository import RedisRepository
+from src.infra.data.redis_repository import RedisRepository
+from src.infra.logger import get_logger
 from src.models.chat_models import (
     Conversation,
     ConversationHistory,
@@ -116,7 +116,7 @@ class ConversationManager:
         """Transfers pending messages to the active conversation in Redis."""
         logger.info(f"Transferring pending messages for conversation: {conversation_id}")
         # Create a pipeline
-        async with self.redis_repository.client.pipeline(transaction=True) as pipe:
+        async with self.redis_repository.create_pipeline(transaction=True) as pipe:
             while True:
                 try:
                     # 1. Watch keys

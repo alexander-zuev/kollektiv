@@ -28,13 +28,13 @@ from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 from src.core.chat.prompt_manager import PromptManager
 from src.core.chat.tool_manager import ToolManager
 from src.core.search.retriever import Retriever
-from src.core.search.vector_db import VectorDB
-from src.infrastructure.common.decorators import (
+from src.core.search.vector_db import VectorDatabase
+from src.infra.decorators import (
     anthropic_error_handler,
     base_error_handler,
 )
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.logger import get_logger
+from src.infra.settings import settings
 from src.models.chat_models import (
     AssistantMessageEvent,
     ConversationHistory,
@@ -68,7 +68,7 @@ class ClaudeAssistant(Model):
     """
 
     # Required fields
-    vector_db: VectorDB
+    vector_db: VectorDatabase
 
     # Client config
     client: anthropic.AsyncAnthropic | None = Field(default=None)
@@ -87,7 +87,7 @@ class ClaudeAssistant(Model):
 
     def __init__(
         self,
-        vector_db: VectorDB,
+        vector_db: VectorDatabase,
         retriever: Retriever,
         api_key: str | None = None,
         model_name: str | None = None,
@@ -110,7 +110,7 @@ class ClaudeAssistant(Model):
         self.tools = [self.tool_manager.get_tool(ToolName.RAG_SEARCH)]
         self.system_prompt = self.prompt_manager.get_system_prompt(document_summaries="No documents loaded yet.")
         self.retriever = retriever
-        logger.debug("Claude assistant successfully initialized.")
+        logger.info("✓ Initialized Claude assistant successfully")
 
     # TODO: this method needs to be refactored completely
     @base_error_handler

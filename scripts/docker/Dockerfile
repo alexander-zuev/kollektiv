@@ -4,13 +4,15 @@ FROM python:3.12-slim
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    REDIS_URL=${REDIS_URL:-redis://host.docker.internal:6379/0} \
-    REDIS_QUEUE_NAME=${REDIS_QUEUE_NAME:-process_documents_queue} \
-    CHROMA_PRIVATE_URL=${CHROMA_PRIVATE_URL}
+    PYTHONPATH=/app
 
 # Set the working directory
 WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files
 COPY pyproject.toml poetry.lock ./
@@ -22,6 +24,3 @@ RUN pip install poetry \
 
 # Copy application code
 COPY . .
-
-# Start worker
-CMD ["/bin/sh", "-c", "exec poetry run python -m src.infrastructure.rq.rq_worker"]

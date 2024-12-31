@@ -4,8 +4,8 @@ from typing import Any
 from cohere.v2.types import V2RerankResponse
 
 from src.core.search.reranker import Reranker
-from src.core.search.vector_db import VectorDB
-from src.infrastructure.common.logger import get_logger
+from src.core.search.vector_db import VectorDatabase
+from src.infra.logger import get_logger
 
 logger = get_logger()
 
@@ -19,7 +19,7 @@ class Retriever:
         reranker (Reranker): The reranker used for reranking documents.
     """
 
-    def __init__(self, vector_db: VectorDB, reranker: Reranker):
+    def __init__(self, vector_db: VectorDatabase, reranker: Reranker):
         self.db = vector_db
         self.reranker = reranker
 

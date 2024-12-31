@@ -18,9 +18,9 @@ from src.core._exceptions import (
     FireCrawlTimeoutError,
     is_retryable_error,
 )
-from src.infrastructure.common.decorators import generic_error_handler
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.decorators import generic_error_handler
+from src.infra.logger import get_logger
+from src.infra.settings import settings
 from src.models.content_models import Document, DocumentMetadata
 from src.models.firecrawl_models import (
     CrawlParams,
@@ -64,7 +64,7 @@ class FireCrawler:
     def initialize_firecrawl(self) -> FirecrawlApp:
         """Initialize and return the Firecrawl app."""
         app = FirecrawlApp(api_key=self.api_key)
-        logger.debug("Initialized firecrawler")
+        logger.info("✓ Initialized Firecrawler successfully")
         return app
 
     def _build_params(self, request: CrawlRequest) -> CrawlParams:

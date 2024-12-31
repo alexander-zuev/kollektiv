@@ -19,7 +19,3 @@ commands = [
   "poetry config virtualenvs.create false",
   "poetry install --only main --no-interaction --no-ansi",
 ]
-
-[phases.start]
-# Command to start the application
-cmd = "poetry run kollektiv"

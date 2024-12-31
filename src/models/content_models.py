@@ -23,8 +23,10 @@ class SourceStatus(str, Enum):
 
     PENDING = "pending"  # right after creation
     CRAWLING = "crawling"  # after crawling started
+    CRAWLED = "crawled"  # after loading is complete
     PROCESSING = "processing"  # during chunking and embedding
-    COMPLETED = "completed"  # after loading is complete
+    ADDING_SUMMARY = "adding_summary"  # during adding summaries
+    COMPLETED = "completed"  # after processing is complete
     FAILED = "failed"  # if addition failed
 
 
@@ -111,13 +113,13 @@ class DocumentMetadata(BaseModel):
         super().__init__(**kwargs)
 
 
-class Chunk(BaseModel):
+class Chunk(SupabaseModel):
     """Individual chunk of content with metadata"""
 
-    # References
+    # IDs
+    source_id: UUID = Field(..., description="UUID of the source this chunk belongs to")
     chunk_id: UUID = Field(default_factory=uuid4, description="Unique identifier for the chunk")
     document_id: UUID = Field(..., description="UUID of the document this chunk belongs to")
-    source_id: UUID = Field(..., description="UUID of the source this chunk belongs to")
 
     # Main content
     headers: dict[str, Any] = Field(..., description="Chunk headers")
@@ -127,26 +129,3 @@ class Chunk(BaseModel):
     token_count: int = Field(..., description="Total number of tokens in the document")
     source_url: str = Field(..., description="Source URL of the document")
     page_title: str = Field(..., description="Page title of the document")
-
-
-class DocumentChunk(SupabaseModel):
-    """Represents a chunk of content from a document."""
-
-    _db_config: ClassVar[dict] = {"schema": "content", "table": "document_chunks", "primary_key": "document_id"}
-
-    document_id: UUID = Field(..., description="FK UUID of the document this chunk belongs to")
-    source_id: UUID = Field(..., description="FK UUID of the source this chunk belongs to")
-    chunks: list[Chunk] = Field(..., description="JSONB array of chunks")
-    metadata: dict[str, Any] = Field(
-        ...,
-        description="Metadata about the document chunking process",
-    )
-
-
-class DocumentChunkMetadata(BaseModel):
-    """Metadata about the document chunking process"""
-
-    chunk_ids: list[UUID] = Field(..., description="List of chunk IDs related to the document")
-    chunk_count: int = Field(..., description="Number of chunks")
-    total_tokens: int = Field(..., description="Total number of tokens in the document")
-    avg_chunk_size: int = Field(..., description="Average size of the chunks")

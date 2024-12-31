@@ -8,9 +8,9 @@ import anthropic
 import weave
 from anthropic.types import Message
 
-from src.infrastructure.common.decorators import anthropic_error_handler, base_error_handler
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.decorators import anthropic_error_handler, base_error_handler
+from src.infra.logger import get_logger
+from src.infra.settings import settings
 from src.services.data_service import DataService
 
 logger = get_logger()
@@ -28,7 +28,6 @@ class SummaryManager:
         self.client = anthropic.AsyncAnthropic(api_key=settings.main_model, max_retries=MAX_RETRIES)
         self.model_name = model_name
         self.data_service = data_service
-        self.summaries = self.load_summaries()
 
     @anthropic_error_handler
     @weave.op()

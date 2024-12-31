@@ -1,30 +1,38 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
-from app import create_app
-from src.infrastructure.service_container import ServiceContainer
-
-
-# 1. Service Container Initialization
-def test_service_container_initialization():
-    container = ServiceContainer()
-    with patch.object(container, "initialize_services", return_value=None) as mock_init:
-        container.initialize_services()
-        mock_init.assert_called_once()
-
-    # Simulate an error during service initialization
-    with patch.object(container, "initialize_services", side_effect=Exception("Initialization error")):
-        with pytest.raises(Exception, match="Initialization error"):
-            container.initialize_services()
+from src.app import lifespan
+from src.infra.service_container import ServiceContainer
 
 
-# 2. Error Handling in Lifespan
-def test_lifespan_error_handling():
-    app = create_app()
+@pytest.mark.unit
+def test_app_basic_configuration(mock_app):
+    """Test basic FastAPI app configuration."""
+    assert mock_app.title == "Kollektiv API"
+    assert mock_app.description == "RAG-powered LLM chat application"
 
-    with patch("app.ServiceContainer.initialize_services", side_effect=Exception("Startup error")):
-        with pytest.raises(Exception, match="Startup error"):
-            with TestClient(app) as client:
-                client.get("/health")
+
+@pytest.mark.unit
+async def test_startup_error_handling():
+    """Test error handling during startup."""
+    app = FastAPI()
+    with patch("src.infra.settings.settings.environment", "staging"):
+        with patch("src.app.ServiceContainer.create", side_effect=Exception("Startup failed")):
+            with pytest.raises(Exception, match="Startup failed"):
+                async with lifespan(app):
+                    pass
+
+
+@pytest.mark.unit
+async def test_shutdown_services():
+    """Test services are properly shutdown."""
+    app = FastAPI()
+    mock_container = AsyncMock(spec=ServiceContainer)
+
+    with patch("src.app.ServiceContainer.create", return_value=mock_container):
+        async with lifespan(app):
+            pass
+
+    mock_container.shutdown_services.assert_awaited_once()

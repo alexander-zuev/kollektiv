@@ -4,14 +4,15 @@ from src.api.dependencies import ContentServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse, SourceResponse
 from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
-from src.infrastructure.common.logger import get_logger
+from src.infra.logger import get_logger
+from fastapi import BackgroundTasks
 
 logger = get_logger()
-router = APIRouter(prefix=f"{V0_PREFIX}{Routes.V0.CONTENT}")
+router = APIRouter(prefix=f"{V0_PREFIX}")
 
 
 @router.post(
-    Routes.V0.Content.SOURCES,
+    Routes.V0.Sources.SOURCES,
     response_model=SourceResponse,
     responses={
         201: {"model": SourceResponse},
@@ -23,6 +24,7 @@ router = APIRouter(prefix=f"{V0_PREFIX}{Routes.V0.CONTENT}")
 async def add_source(
     request: AddContentSourceRequest,
     content_service: ContentServiceDep,
+    background_tasks: BackgroundTasks,
 ) -> SourceResponse:
     """
     Add a new content source.
@@ -39,7 +41,8 @@ async def add_source(
     """
     try:
         source = await content_service.add_source(request)
-        return SourceResponse(success=True, data=source, message="Source added successfully")
+        # source = background_tasks.add_task(content_service.add_source, request)
+        return SourceResponse(success=True, data=source, message="Started processing source")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

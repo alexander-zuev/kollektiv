@@ -5,18 +5,7 @@ from src.core.content.chunker import MarkdownChunker
 
 @pytest.mark.unit
 def test_markdown_chunker_initialization():
-    """
-    Test the initialization of the MarkdownChunker class.
-
-    Asserts:
-        - The chunker instance is not None.
-        - The max_tokens attribute is set to 1000.
-        - The soft_token_limit attribute is set to 800.
-
-    Raises:
-        AssertionError: If any of the assertions fail.
-    """
+    """Test that MarkdownChunker initializes with correct settings."""
     chunker = MarkdownChunker()
-    assert chunker is not None
-    assert chunker.max_tokens == 1000
-    assert chunker.soft_token_limit == 800
+    assert chunker.chunk_size == 512  # Updated to match current implementation
+    assert chunker.chunk_overlap == 50

@@ -386,8 +386,8 @@ logs/*
 .env
 .env.*
 !.env.example
-config/environments/*
-!config/environments/.env.example
+config/*
+!config/.env.example
 .secrets/
 
 # === Development Tools ===
@@ -452,13 +452,13 @@ id_rsa.pub
 # === Dependencies ===
 # Poetry (uncomment if you want to version lock file)
 # poetry.lock
-src/infrastructure/storage/vector/chroma/chroma.sqlite3
-src/core/content/crawler/*.json
 
 # === Internal docs ===
 docs/internal/*
-output_chunks/
 
 # === Monitoring ===
 .sentry/
 .logfire/
+
+scripts/docker/ngrok.yml
+

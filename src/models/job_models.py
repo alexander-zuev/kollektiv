@@ -1,7 +1,7 @@
 # TODO: Transition to redis for job management. There is no reason to use custom implementation.
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, ClassVar
 from uuid import UUID, uuid4
@@ -12,17 +12,7 @@ from src.models.base_models import SupabaseModel
 
 
 class JobStatus(str, Enum):
-    """
-
-    Represents the status of a web crawling job.
-
-    Attributes:
-        PENDING: Indicates that the crawl job is pending and has not yet been started.
-        IN_PROGRESS: Indicates that the crawl job is currently in progress.
-        COMPLETED: Indicates that the crawl job has completed successfully.
-        FAILED: Indicates that the crawl job has failed.
-        CANCELLED: Indicates the job was cancelled by the user.
-    """
+    """Job status enum."""
 
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -80,26 +70,31 @@ class Job(SupabaseModel):
     _protected_fields: set[str] = PrivateAttr(default={"job_id", "job_type", "created_at"})
 
     def update(self, **kwargs: Any) -> Job:
-        """
-        Update job fields while preserving protected fields.
+        """Update job fields while preserving protected fields."""
+        if "details" in kwargs and isinstance(kwargs["details"], dict):
+            # Get current details as dict
+            current_details = self.details.model_dump()
+            # Update with new values
+            current_details.update(kwargs["details"])
+            # Replace details update with merged version
+            kwargs["details"] = current_details
 
-        Args:
-            **kwargs: Fields to update and their new values
-
-        Returns:
-            Job: Updated job instance
-
-        Example:
-            job.update(status=CrawlJobStatus.COMPLETED, completed_at=datetime.now(UTC))
-        """
-        # If updating details and it's a CRAWL job, validate details
-        if "details" in kwargs and self.job_type == JobType.CRAWL:
-            current_details = CrawlJobDetails.model_validate(self.details)
-            new_details = current_details.model_copy(update=kwargs["details"])
-            kwargs["details"] = new_details.model_dump()
-
-        # Use parent's update method for the rest
         return super().update(**kwargs)
+
+    def complete(self) -> None:
+        """Mark job as completed."""
+        if self.status == JobStatus.COMPLETED:
+            return
+        self.status = JobStatus.COMPLETED
+        self.completed_at = datetime.now(UTC)
+
+    def fail(self, error: str) -> None:
+        """Mark job as failed."""
+        if self.status == JobStatus.FAILED:
+            return
+        self.status = JobStatus.FAILED
+        self.error = error
+        self.completed_at = datetime.now(UTC)
 
     class Config:
         """Configuration class for CrawlJob model."""

@@ -1,20 +1,15 @@
-# TODO: Add validation to ensure non-empty content is passed into the chunker (fail gracefully if invalid content).
-# TODO: Refine error handling in chunking process, provide clear feedback to the user when chunking fails and why.
-# TODO: Consider implementing partial chunking: allow chunking of valid content even if some pages fail.
-# TODO: Introduce logging or metrics for tracking the success/failure rate of the chunking process.
-# TODO: Investigate possible automation for retrying failed chunking jobs if the failure is recoverable.
 import json
 import os
 import re
-import statistics
 import uuid
 from typing import Any
+from uuid import uuid4
 
 import tiktoken
 
-from src.infrastructure.common.decorators import generic_error_handler
-from src.infrastructure.common.logger import configure_logging, get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.decorators import generic_error_handler
+from src.infra.logger import get_logger
+from src.models.content_models import Chunk
 
 logger = get_logger()
 
@@ -51,27 +46,18 @@ class MarkdownChunker:
 
     def __init__(
         self,
-        output_dir: str = str(settings.processed_data_dir),
         max_tokens: int = 512,
         soft_token_limit: int = 400,
         min_chunk_size: int = 100,
         overlap_percentage: float = 0.05,
         save: bool = False,
     ):
-        self.output_dir = output_dir
         self.input_filename: str | None
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         self.max_tokens = max_tokens  # Hard limit
         self.soft_token_limit = soft_token_limit  # Soft limit
         self.min_chunk_size = min_chunk_size  # Minimum chunk size in tokens
         self.overlap_percentage = overlap_percentage  # 5% overlap
-        # Initialize the validator
-        self.validator = Validator(
-            min_chunk_size=self.min_chunk_size,
-            max_tokens=self.max_tokens,
-            output_dir=self.output_dir,
-            save=save,
-        )
 
         # Precompile regex patterns for performance
         self.boilerplate_patterns = [
@@ -89,36 +75,6 @@ class MarkdownChunker:
         self.h_pattern = re.compile(r"^\s*(?![-*]{3,})(#{1,3})\s*(.*)$", re.MULTILINE)
         self.code_block_start_pattern = re.compile(r"^(```|~~~)(.*)$")
         self.inline_code_pattern = re.compile(r"`([^`\n]+)`")
-
-    @generic_error_handler
-    def load_data(self, input_filename: str) -> dict[str, Any]:
-        """
-        Load data from a JSON file and return as a dictionary.
-
-        Args:
-            input_filename (str): The filename of the input file.
-
-        Returns:
-            dict[str, Any]: The JSON content parsed as a dictionary.
-
-        Raises:
-            FileNotFoundError: If the JSON file is not found.
-            json.JSONDecodeError: If the JSON file has invalid content.
-        """
-        self.input_filename = input_filename
-        input_filepath = os.path.join(settings.raw_data_dir, input_filename)
-
-        try:
-            with open(input_filepath, encoding="utf-8") as f:
-                doc = json.load(f)
-            logger.info(f"{input_filename} loaded")
-            return doc
-        except FileNotFoundError:
-            logger.error(f"File not found: {input_filepath}")
-            raise
-        except json.JSONDecodeError:
-            logger.error(f"Invalid JSON in file: {input_filepath}")
-            raise
 
     @generic_error_handler
     def remove_images(self, content: str) -> str:
@@ -152,6 +108,23 @@ class MarkdownChunker:
         )
 
         return content
+
+    async def create_fake_chunks(self, n_chunks: int = 1000) -> list[Chunk]:
+        """Create fake chunks for testing."""
+        chunks = []
+        for i in range(n_chunks):
+            chunk = Chunk(
+                chunk_id=uuid4(),
+                document_id=uuid4(),
+                source_id=uuid4(),
+                text=f"Fake chunk content {i}",
+                token_count=100,
+                source_url="https://example.com",
+                page_title="Example Page",
+                headers={"header1": "value1", "header2": "value2"},
+            )
+            chunks.append(chunk)
+        return chunks
 
     @generic_error_handler
     def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:
@@ -836,244 +809,3 @@ class MarkdownChunker:
             "page_title": page_metadata.get("title", ""),
         }
         return metadata
-
-
-class Validator:
-    """
-    Validates and processes chunks of Markdown data.
-
-    Args:
-        min_chunk_size (int): Minimum size for a valid chunk.
-        max_tokens (int): Maximum allowable tokens per chunk.
-        output_dir (str): Directory to save output files.
-        save (bool): Flag to indicate whether to save incorrect chunks to a file.
-    """
-
-    def __init__(self, min_chunk_size, max_tokens, output_dir, save: bool = False):
-        self.min_chunk_size = min_chunk_size
-        self.max_tokens = max_tokens
-        self.output_dir = output_dir
-        self.save = save
-        # Validation-related attributes
-        self.validation_errors = []
-        self.total_chunks = 0
-        self.total_tokens = 0
-        self.chunk_token_counts = []
-        self.headings_preserved = {"h1": set(), "h2": set(), "h3": set()}
-        self.total_headings = {"h1": set(), "h2": set(), "h3": set()}
-        self.incorrect_counts = {"too_small": 0, "too_large": 0}
-        self.duplicates_removed = 0
-
-    def increment_total_headings(self, level, heading_text):
-        """
-        Add a heading text to the total_headings dictionary under the specified level.
-
-        Args:
-            level (int): The level of the heading.
-            heading_text (str): The text of the heading to add.
-
-        Returns:
-            None
-
-        Raises:
-            KeyError: If the specified level does not exist in the total_headings dictionary.
-        """
-        self.total_headings[level].add(heading_text.strip())
-
-    def add_preserved_heading(self, level, heading_text):
-        """
-        Add a heading to the preserved headings list at the specified level.
-
-        Args:
-            level (int): The level at which the heading should be preserved.
-            heading_text (str): The text of the heading to preserve.
-
-        Returns:
-            None
-
-        Raises:
-            KeyError: If the specified level does not exist in headings_preserved.
-        """
-        self.headings_preserved[level].add(heading_text.strip())
-
-    def add_chunk(self, token_count):
-        """
-        Add a chunk of tokens and update the tracking attributes.
-
-        Args:
-            token_count (int): The number of tokens in the new chunk.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        self.total_chunks += 1
-        self.total_tokens += token_count
-        self.chunk_token_counts.append(token_count)
-
-    def add_validation_error(self, error_message):
-        """
-        Add a validation error message to the validation errors list.
-
-        Args:
-            error_message (str): The error message to be added.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If error_message is not a string.
-        """
-        self.validation_errors.append(error_message)
-
-    def validate(self, chunks):
-        """
-        Validates the given chunks by checking for duplicates and finding incorrect chunks.
-
-        Args:
-            chunks: A list of data chunks to be validated.
-
-        Returns:
-            None
-
-        Raises:
-            ValidationError: If duplicates or incorrect chunks are found.
-        """
-        self.validate_duplicates(chunks)
-        self.find_incorrect_chunks(chunks, save=self.save)
-        self.log_summary()
-
-    def validate_duplicates(self, chunks: list[dict[str, Any]]) -> None:
-        """
-        Validate and remove duplicate chunks based on the text content.
-
-        Args:
-            chunks (list[dict[str, Any]]): The list of chunks where each chunk is a dictionary
-                containing text data under the "data" key.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        unique_chunks = {}
-        cleaned_chunks = []
-        for chunk in chunks:
-            text = chunk["data"]["text"]
-            if text in unique_chunks:
-                self.duplicates_removed += 1
-                # Log the duplicate chunk removal
-                continue
-            else:
-                unique_chunks[text] = True
-                cleaned_chunks.append(chunk)
-
-        # Update the chunks list to the cleaned_chunks without duplicates
-        chunks.clear()
-        chunks.extend(cleaned_chunks)
-        self.total_chunks = len(chunks)
-
-    def log_summary(self):
-        """
-        Log a summary of chunk creation, statistics, headers, validation errors, and incorrect chunks.
-
-        Args:
-            self: An instance of the class containing chunk and heading info, validation errors, etc.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        # Total chunks
-        logger.info(f"Total chunks created: {self.total_chunks}")
-
-        # Duplicate chunks removed
-        logger.warning(f"Duplicate chunks removed: {self.duplicates_removed}")
-
-        # Chunk statistics
-        if self.chunk_token_counts:
-            median_tokens = statistics.median(self.chunk_token_counts)
-            min_tokens = min(self.chunk_token_counts)
-            max_tokens = max(self.chunk_token_counts)
-            p25 = statistics.quantiles(self.chunk_token_counts, n=4)[0]
-            p75 = statistics.quantiles(self.chunk_token_counts, n=4)[2]
-            logger.info(
-                f"Chunk token statistics - Median: {median_tokens}, Min: {min_tokens}, "
-                f"Max: {max_tokens}, 25th percentile: {p25}, 75th percentile: {p75}"
-            )
-        else:
-            logger.warning("No chunks to calculate statistics.")
-
-        # Headers summary
-        headers_info = []
-        for level in ["h1", "h2", "h3"]:
-            total = len(self.total_headings.get(level, set()))
-            preserved = len(self.headings_preserved.get(level, set()))
-            percentage = (preserved / total * 100) if total > 0 else 0
-            headers_info.append(f"{level.upper()} preserved: {preserved}/{total} ({percentage:.2f}%)")
-        logger.info("Headers summary - " + ", ".join(headers_info))
-
-        # Validation errors summary
-        if self.validation_errors:
-            error_counts = {}
-            for error in self.validation_errors:
-                error_counts[error] = error_counts.get(error, 0) + 1
-            total_errors = sum(error_counts.values())
-            logger.warning(f"Validation issues encountered: {total_errors} issues found.")
-        else:
-            logger.info("No validation issues encountered.")
-
-        # Incorrect chunks summary
-        incorrect_chunks_info = (
-            f"Incorrect chunks - Too small: {self.incorrect_counts.get('too_small', 0)}, "
-            f"Too large: {self.incorrect_counts.get('too_large', 0)}"
-        )
-        logger.info(incorrect_chunks_info)
-
-    def find_incorrect_chunks(self, chunks: list[dict[str, Any]], save: bool = False) -> None:
-        """
-        Identify chunks that are too small or too large and optionally save them to a file.
-
-        Args:
-            chunks (list[dict[str, Any]]): List of chunk dictionaries containing metadata and data for each chunk.
-            save (bool, optional): If True, save the incorrect chunks to a file. Defaults to False.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        incorrect = {
-            "too_small": [
-                {
-                    "id": c["chunk_id"],
-                    "size": c["metadata"]["token_count"],
-                    "headers": c["data"]["headers"],
-                    "text": c["data"]["text"],
-                }
-                for c in chunks
-                if c["metadata"]["token_count"] < self.min_chunk_size
-            ],
-            "too_large": [
-                {
-                    "id": c["chunk_id"],
-                    "size": c["metadata"]["token_count"],
-                    "headers": c["data"]["headers"],
-                    "text": c["data"]["text"],
-                }
-                for c in chunks
-                if c["metadata"]["token_count"] > 2 * self.max_tokens
-            ],
-        }
-
-        # Store counts for logging summary
-        self.incorrect_counts = {"too_small": len(incorrect["too_small"]), "too_large": len(incorrect["too_large"])}
-
-        if not any(incorrect.values()):
-            logger.info("No incorrect chunks found.")

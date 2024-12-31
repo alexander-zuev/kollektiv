@@ -7,18 +7,16 @@ on:
     branches: [main]
 
 env:
+  # Python and Poetry settings
   PYTHON_VERSION: "3.12"
   POETRY_VERSION: "1.8.5"
   PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: "1"
+  
+  # Environment settings
   ENVIRONMENT: "staging"
-  PYTHONUNBUFFERED: 1
   WANDB_MODE: "disabled"
-  # Global env vars
-  BASE_URL: ${{ secrets.STAGING_BASE_URL}}
-  FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-  COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+
 
 jobs:
   quality:
@@ -82,21 +80,58 @@ jobs:
           poetry lock --no-update
           poetry install --with dev --no-interaction --no-root
 
-      - name: Start Redis
-        run: docker-compose -f scripts/deps/docker-compose.yml up -d
+      - name: Create env file
+        run: |
+          cat << EOF > config/.env
+          # Environment
+          ENVIRONMENT=staging
+          PYTHONUNBUFFERED=1
+          WANDB_MODE=disabled
 
-      - name: Run all tests
-        id: all-tests
+          # Service URLs
+          BASE_URL=${{ secrets.STAGING_BASE_URL }}
+
+          # API Keys
+          FIRECRAWL_API_KEY=${{ secrets.FIRECRAWL_API_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}
+          EOF
+
+      - name: Start services
+        run: docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d
+
+      - name: Wait for services to be ready
+        run: |
+          timeout 30s bash -c 'until docker exec docker-redis-1 redis-cli ping; do sleep 1; done'
+          timeout 30s bash -c 'until curl -s http://localhost:8000/api/v1/heartbeat > /dev/null; do sleep 1; done'
+
+      - name: Run unit tests
+        id: unit-tests
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           poetry run pytest \
-            tests/unit tests/integration \
+            tests/unit \
             --quiet \
             --cov=src \
             --cov-report=xml \
             --cov-report=term-missing:skip-covered \
-            --cov-config=pyproject.toml \
+            --cov-config=pyproject.toml
+
+      - name: Run integration tests
+        id: integration-tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          poetry run pytest \
+            tests/integration \
+            --quiet \
+            --cov=src \
+            --cov-append \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -105,6 +140,6 @@ jobs:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
-      - name: Stop Redis
+      - name: Stop services
         if: always()
-        run: docker-compose -f scripts/deps/docker-compose.yml down
+        run: docker compose --env-file config/.env -f scripts/docker/compose.yaml down

@@ -1,0 +1,57 @@
+name: kollektiv
+services:
+  redis:
+    image: redis:7.4.1-alpine
+    ports:
+      - "6379:6379"
+    container_name: redis
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+  chromadb:
+    image: chromadb/chroma:0.5.23
+    container_name: chromadb
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../../config/.env
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "${CHROMA_PRIVATE_URL}/api/v1/heartbeat" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+  celery-worker:
+    container_name: celery-worker
+    build:
+      context: ../../
+      dockerfile: scripts/docker/Dockerfile
+    command: celery -A src.infra.celery.worker:celery_app worker --loglevel=info
+    env_file:
+      - ../../config/.env
+    volumes:
+      - ../../:/app # this allows locally to not relaunch as code changes
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379
+      - CELERY_RESULT_BACKEND=redis://redis:6379
+      - REDIS_URL=redis://redis:6379 # need to connect to the redis service in the container, not localhost
+      - CHROMA_PRIVATE_URL=http://chromadb:8000 # need to connect to the chromadb service in the container, not localhost
+      - SERVICE=celery
+    depends_on:
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "celery", "-A", "src.infra.celery.worker:celery_app", "inspect", "ping", "-d", "celery@$HOSTNAME" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

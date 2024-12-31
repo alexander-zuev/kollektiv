@@ -1,6 +1,6 @@
 import chromadb.utils.embedding_functions as embedding_functions
 
-from src.infrastructure.config.settings import settings
+from src.infra.settings import settings
 from src.models.vector_models import (
     CohereEmbeddingModelName,
     EmbeddingProvider,

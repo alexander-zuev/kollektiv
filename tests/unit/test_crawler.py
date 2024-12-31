@@ -6,7 +6,7 @@ from tenacity import RetryError
 
 from src.core._exceptions import EmptyContentError, FireCrawlAPIError, FireCrawlConnectionError
 from src.core.content.crawler import FireCrawler
-from src.infrastructure.config.settings import settings
+from src.infra.settings import settings
 from src.models.firecrawl_models import CrawlParams, CrawlRequest
 
 
