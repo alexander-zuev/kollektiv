@@ -1,24 +1,12 @@
 from typing import Any
 from uuid import UUID
 
-import requests
+import httpx
 from firecrawl import FirecrawlApp
-from requests.exceptions import HTTPError, RequestException, Timeout
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
+from requests.exceptions import ConnectionError, HTTPError, RequestException, Timeout
 
-from src.core._exceptions import (
-    EmptyContentError,
-    FireCrawlAPIError,
-    FireCrawlConnectionError,
-    FireCrawlTimeoutError,
-    is_retryable_error,
-)
-from src.infra.decorators import generic_error_handler
+from src.core._exceptions import EmptyContentError, is_retryable_error
+from src.infra.decorators import generic_error_handler, tenacity_retry_wrapper
 from src.infra.logger import get_logger
 from src.infra.settings import settings
 from src.models.content_models import Document, DocumentMetadata
@@ -94,15 +82,7 @@ class FireCrawler:
 
         return params
 
-    @retry(
-        stop=stop_after_attempt(settings.max_retries),
-        retry=retry_if_exception_type((HTTPError, FireCrawlConnectionError, FireCrawlTimeoutError)),
-        wait=wait_exponential(multiplier=1, min=30, max=300),
-        before_sleep=lambda retry_state: logger.warning(
-            f"Retryable error occurred. Attempt {retry_state.attempt_number}/{settings.max_retries}. "
-            f"Retrying in {retry_state.next_action.sleep} seconds..."
-        ),
-    )
+    @tenacity_retry_wrapper((HTTPError, Timeout, ConnectionError))
     async def start_crawl(self, request: CrawlRequest) -> FireCrawlResponse:
         """Start a new crawl job with webhook configuration."""
         try:
@@ -119,11 +99,14 @@ class FireCrawler:
             should_retry, _ = is_retryable_error(err)
             if should_retry:
                 raise  # Let retry decorator handle it
-            raise FireCrawlAPIError(f"Non-retryable API error: {err}") from err
+            logger.exception(f"Non-retryable API error: {err}")
+            raise
         except Timeout as err:
-            raise FireCrawlTimeoutError(f"Request timed out: {err}") from err
+            logger.exception(f"Timeout fetching results from {request.url}: {err}")
+            raise
         except RequestException as err:
-            raise FireCrawlConnectionError(f"Connection error: {err}") from err
+            logger.exception(f"Connection error: {err}")
+            raise
 
     async def get_results(self, firecrawl_id: str, source_id: UUID) -> list[Document]:
         """Get final results for a completed job.
@@ -143,7 +126,7 @@ class FireCrawler:
             batch_data, next_url = await self._fetch_results_from_url(next_url)
 
             # Extract new list of documents
-            document_batch = await self._get_documents_from_batch(batch=batch_data, source_id=source_id)
+            document_batch = self._get_documents_from_batch(batch=batch_data, source_id=source_id)
             documents.extend(document_batch)
 
         # Only checks at the end if data exists
@@ -155,38 +138,42 @@ class FireCrawler:
 
         return documents
 
-    async def _get_documents_from_batch(self, batch: dict[str, Any], source_id: UUID) -> list[Document]:
+    def _get_documents_from_batch(self, batch: dict[str, Any], source_id: UUID) -> list[Document]:
         """Iterates over batch data and returns a list of documents."""
         document_batch: list[Document] = []
-        for page in batch["data"]:
-            # Create metadata
-            metadata = await self._create_metadata(data=page)
 
-            # Create Document
-            document = Document(source_id=source_id, content=page.get("markdown"), metadata=metadata.model_dump())
+        for page in batch.get("data", []):
+            if page.get("markdown"):
+                # Get necessary data
+                markdown_content = page.get("markdown")
 
-            document_batch.append(document)
+                metadata = self._create_metadata(page)
+
+                # Create Document
+                document = Document(source_id=source_id, content=markdown_content, metadata=metadata)
+
+                # Append to batch
+                document_batch.append(document)
+            else:
+                logger.warning("Skipping page as it has no markdown content")
 
         return document_batch
 
-    async def _create_metadata(self, data: dict[str, Any]) -> DocumentMetadata:
+    def _create_metadata(self, page: dict[str, Any]) -> DocumentMetadata:
         """Returns DocumentMetadata object based on data dict from firecrawl."""
-        return DocumentMetadata(
-            title=data["metadata"].get("title", ""),
-            description=data["metadata"].get("description", ""),
-            source_url=data["metadata"].get("sourceURL", ""),
-            og_url=data["metadata"].get("og:url", " "),
-        )
+        metadata = page.get("metadata")
+        if metadata:
+            return DocumentMetadata(
+                title=metadata.get("title", ""),
+                description=metadata.get("description", ""),
+                source_url=metadata.get("sourceURL", ""),
+                og_url=metadata.get("og:url", " "),
+            )
+        else:
+            logger.warning("Metadata not found in page")
+            return DocumentMetadata(title="", description="", source_url="", og_url="")
 
-    @retry(
-        stop=stop_after_attempt(settings.max_retries),
-        retry=retry_if_exception_type((HTTPError, FireCrawlConnectionError, FireCrawlTimeoutError)),
-        wait=wait_exponential(multiplier=1, min=10, max=60),
-        before_sleep=lambda retry_state: logger.warning(
-            f"Error fetching results. Attempt {retry_state.attempt_number}/{settings.max_retries}. "
-            f"Retrying in {retry_state.next_action.sleep} seconds..."
-        ),
-    )
+    @tenacity_retry_wrapper((HTTPError, Timeout, ConnectionError))
     async def _fetch_results_from_url(self, next_url: str) -> tuple[dict[str, Any], str | None]:
         """Fetch results with retries.
 
@@ -197,14 +184,19 @@ class FireCrawler:
             Tuple of (batch data dict, next URL string or None)
         """
         try:
-            response = requests.get(next_url, headers={"Authorization": f"Bearer {self.api_key}"}, timeout=30)
-            response.raise_for_status()
+            async with httpx.AsyncClient() as client:
+                response = await client.get(next_url, headers={"Authorization": f"Bearer {self.api_key}"}, timeout=30)
+                response.raise_for_status()
 
             batch_data = response.json()
             next_url = batch_data.get("next")  # This will be str | None
             return batch_data, next_url
-
+        except HTTPError as err:
+            logger.exception(f"HTTPError fetching results from {next_url}: {err}")
+            raise
         except Timeout as err:
-            raise FireCrawlTimeoutError(f"Request timed out: {err}") from err
-        except RequestException as err:
-            raise FireCrawlConnectionError(f"Connection error: {err}") from err
+            logger.exception(f"Timeout fetching results from {next_url}: {err}")
+            raise
+        except ConnectionError as err:
+            logger.exception(f"ConnectionError fetching results from {next_url}: {err}")
+            raise

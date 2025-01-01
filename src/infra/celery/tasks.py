@@ -1,9 +1,8 @@
 from typing import TypeVar
-from uuid import UUID
 
+from celery import group
 from pydantic import BaseModel
 
-from src.core.content.chunker import MarkdownChunker
 from src.infra.celery.worker import celery_app
 from src.infra.logger import get_logger
 from src.models.content_models import Chunk, Document
@@ -13,47 +12,53 @@ logger = get_logger()
 
 
 @celery_app.task
-def process_documents(document_ids: list[UUID], user_id: UUID) -> None:
+def process_documents(documents: list[Document]) -> None:
     """Entry point for processing documents."""
+    # Get access to the services
+    services = celery_app.services
 
-    # Task to load documents
+    # Get back the docs
+    docs = [model_validate(doc) for doc in documents]
+    logger.info(f"Processing {len(docs)} documents")
 
-    # Separate into batches
+    # Break down into batches
+    document_batches = services.chunker.batch_documents(docs)
 
-    # Add processing of batches tasks
-
-    # Aggregate
-
-    # [PARALLEL]
-    # Setup saving of saving of results
-
-
-@celery_app.task
-def aggregate_processing_results(results: list[UUID]) -> list[Chunk]:
-    """Aggregate the processing results."""
-
-    # Aggregate the results
-
-    # Return the aggregated results
+    # Setup batch processing of the documents
+    tasks = group(process_document_batch.s(doc_batch) for doc_batch in document_batches)
+    result = tasks.apply_async()
+    logger.info(f"Processing job in celery {result.task_id} enqueued")
 
 
 @celery_app.task
-def process_batch(batch: list[Document], chunker: MarkdownChunker) -> list[Chunk]:
+def process_document_batch(document_batch: list[Document]) -> None:
     """Process a batch of documents."""
+    # Get access to the services
+    services = celery_app.services
+    chunks = services.chunker.chunk_documents(document_batch)
 
-    # Process the batch
+    chunk_batches = services.chunker.batch_chunks(chunks)
 
-    # Return the chunks
-
-
-@celery_app.task
-def persist_data_to_db(data: list[T]) -> None:
-    """Save data to the database."""
-
-    # Save the data
+    task_group = group(process_chunk_batch.s(chunk_batch) for chunk_batch in chunk_batches)
+    result = task_group.apply_async()
+    logger.info(f"Processing job in celery {result.task_id} enqueued")
 
 
 @celery_app.task
-def load_data_from_db(ids: list[UUID]) -> list[T]:
-    """Abstract loading of data from the database using data repository."""
-    pass
+def process_chunk_batch(chunk_batch: list[Chunk]) -> None:
+    """Process a batch of chunks."""
+    # Get access to the services
+    services = celery_app.services
+
+    # 1. Store and embed the chunks
+    services.vector_service.embed_chunks(chunk_batch)
+
+    # 2. Persist the chunks to the database
+    persist_to_db.delay(chunk_batch)
+
+
+@celery_app.task
+def persist_to_db(chunks: list[Chunk]) -> None:
+    """Persist the chunks to the database."""
+    services = celery_app.services
+    services.data_service.save_chunks(chunks)

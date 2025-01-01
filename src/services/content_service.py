@@ -9,6 +9,7 @@ from src.api.v0.schemas.sources_schemas import (
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
 from src.core._exceptions import DataSourceError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
+from src.infra.celery.tasks import process_documents
 from src.infra.decorators import generic_error_handler
 from src.infra.logger import get_logger
 from src.models.content_models import DataSource, Document, SourceStatus
@@ -234,7 +235,7 @@ class ContentService:
         logger.debug(f"Successfully saved {len(document_ids)} documents for job {job.job_id}")
 
         # 3. Update source entty
-        crawl_metadata = await self._create_source_metadata(documents=documents)
+        crawl_metadata = self._create_source_metadata(documents=documents)
         await self.data_service.update_datasource(
             source_id=details.source_id,
             updates={
@@ -270,7 +271,8 @@ class ContentService:
         logger.debug(f"Updated source {details.source_id} status to PROCESSING")
 
         # 7. Enqueu processing job
-        # self.rq_manager.enqueue_job(process_documents, processing_job.job_id, document_ids)
+        result = process_documents.delay(documents=documents)
+        logger.info(f"Processing job in celery {result.task_id} enqueued")
 
     async def handle_pubsub_event(self, message: dict) -> None:
         """Handles a process documents jobs."""
@@ -323,7 +325,7 @@ class ContentService:
         )
         # TODO: retry potentially? or just inform the user
 
-    async def _create_source_metadata(self, documents: list[Document]) -> dict[str, Any]:
+    def _create_source_metadata(self, documents: list[Document]) -> dict[str, Any]:
         """Create updated source metadata after crawl completion.
 
         Args:
@@ -335,7 +337,7 @@ class ContentService:
         # Extract unique links from document metadata
         unique_links = set()
         for doc in documents:
-            if source_url := doc.metadata.get("source_url"):
+            if source_url := doc.metadata.source_url:
                 unique_links.add(source_url)
 
         # Create updated metadata

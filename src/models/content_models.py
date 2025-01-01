@@ -84,9 +84,7 @@ class Document(SupabaseModel):
         ...,  # Required
         description="Raw content of the document in markdown format",
     )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Flexible metadata storage for document-specific information"
-    )
+    metadata: DocumentMetadata = Field(..., description="Flexible metadata storage for document-specific information")
     _db_config: ClassVar[dict] = {"schema": "content", "table": "documents", "primary_key": "document_id"}
 
     class Config:
@@ -96,21 +94,12 @@ class Document(SupabaseModel):
 
 
 class DocumentMetadata(BaseModel):
-    """
-    Flexible metadata container for document-specific information.
+    """Metadata for a document."""
 
-    Accepts any number of keyword arguments which become metadata fields.
-    Common fields might include:
-    - description: Document description or summary
-    - keywords: List of keywords or tags
-    - author: Document author
-    - last_modified: Last modification timestamp
-    - language: Document language
-    """
-
-    def __init__(self, **kwargs: Any) -> None:
-        """Initialize metadata with arbitrary keyword arguments."""
-        super().__init__(**kwargs)
+    title: str = Field(..., description="Title of the document")
+    description: str = Field(..., description="Description of the document")
+    source_url: str = Field(..., description="Source URL of the document")
+    og_url: str = Field(..., description="Open Graph URL of the document")
 
 
 class Chunk(SupabaseModel):
@@ -127,5 +116,5 @@ class Chunk(SupabaseModel):
 
     # Metadata
     token_count: int = Field(..., description="Total number of tokens in the document")
-    source_url: str = Field(..., description="Source URL of the document")
     page_title: str = Field(..., description="Page title of the document")
+    page_url: str = Field(..., description="Page URL of the document")

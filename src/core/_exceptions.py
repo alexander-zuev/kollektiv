@@ -112,26 +112,8 @@ class CrawlerError(KollektivError):
     pass
 
 
-class FireCrawlAPIError(CrawlerError, NonRetryableError):
-    """Base for FireCrawl API errors."""
-
-    pass
-
-
 class FireCrawlJobNotFound(CrawlerError, NonRetryableError):
     """Job with given firecrawl ids not found"""
-
-    pass
-
-
-class FireCrawlConnectionError(CrawlerError, RetryableError):
-    """Connection issues with FireCrawl API."""
-
-    pass
-
-
-class FireCrawlTimeoutError(CrawlerError, RetryableError):
-    """Timeout from FireCrawl API."""
 
     pass
 

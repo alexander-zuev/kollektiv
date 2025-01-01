@@ -3,13 +3,12 @@ import os
 import re
 import uuid
 from typing import Any
-from uuid import uuid4
 
 import tiktoken
 
 from src.infra.decorators import generic_error_handler
 from src.infra.logger import get_logger
-from src.models.content_models import Chunk
+from src.models.content_models import Chunk, Document
 
 logger = get_logger()
 
@@ -21,28 +20,7 @@ class PreProcessor:
 
 
 class MarkdownChunker:
-    """Processes markdown, removes boilerplate, images, and validates chunks.
-
-    Args:
-        output_dir (str): The directory to save processed data. Defaults to PROCESSED_DATA_DIR.
-        max_tokens (int): Maximum tokens per chunk. Defaults to 1000.
-        soft_token_limit (int): Soft limit for tokens per chunk, aiming to avoid splitting phrases. Defaults to 800.
-        min_chunk_size (int): Minimum size of each chunk in tokens. Defaults to 100.
-        overlap_percentage (float): Percentage of token overlap between chunks. Defaults to 0.05.
-        save (bool): Whether or not to save the processed chunks. Defaults to False.
-
-    Methods:
-        load_data: Loads markdown from JSON and prepares for chunking.
-        remove_images: Removes all types of images from the content.
-        process_pages: Iterates through each page in the loaded data.
-        remove_boilerplate: Removes navigation and boilerplate content from markdown.
-        clean_header_text: Cleans unwanted markdown elements and artifacts from header text.
-        identify_sections: Identifies sections in the page content based on headers and preserves markdown structures.
-
-    Raises:
-        FileNotFoundError: If the input file is not found.
-        json.JSONDecodeError: If there is an issue decoding the JSON file.
-    """
+    """Processes markdown, removes boilerplate, images, and creates chunks."""
 
     def __init__(
         self,
@@ -51,17 +29,19 @@ class MarkdownChunker:
         min_chunk_size: int = 100,
         overlap_percentage: float = 0.05,
         save: bool = False,
+        document_batch_size: int = 50,
+        chunk_batch_size: int = 500,
     ):
-        self.input_filename: str | None
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         self.max_tokens = max_tokens  # Hard limit
         self.soft_token_limit = soft_token_limit  # Soft limit
         self.min_chunk_size = min_chunk_size  # Minimum chunk size in tokens
         self.overlap_percentage = overlap_percentage  # 5% overlap
+        self.document_batch_size = document_batch_size
+        self.chunk_batch_size = chunk_batch_size
 
         # Precompile regex patterns for performance
         self.boilerplate_patterns = [
-            r"\[Anthropic home page.*\]\(/.*\)",  # Matches the home page link with images
             r"^English$",  # Matches the language selection
             r"^Search\.\.\.$",
             r"^Ctrl K$",
@@ -109,36 +89,26 @@ class MarkdownChunker:
 
         return content
 
-    async def create_fake_chunks(self, n_chunks: int = 1000) -> list[Chunk]:
-        """Create fake chunks for testing."""
-        chunks = []
-        for i in range(n_chunks):
-            chunk = Chunk(
-                chunk_id=uuid4(),
-                document_id=uuid4(),
-                source_id=uuid4(),
-                text=f"Fake chunk content {i}",
-                token_count=100,
-                source_url="https://example.com",
-                page_title="Example Page",
-                headers={"header1": "value1", "header2": "value2"},
-            )
-            chunks.append(chunk)
-        return chunks
+    def batch_documents(self, documents: list[Document]) -> list[list[Document]]:
+        """Batch documents into smaller chunks."""
+        return [documents[i : i + self.document_batch_size] for i in range(0, len(documents), self.document_batch_size)]
+
+    def batch_chunks(self, chunks: list[Chunk]) -> list[list[Chunk]]:
+        """Batch chunks into smaller chunks."""
+        return [chunks[i : i + self.chunk_batch_size] for i in range(0, len(chunks), self.chunk_batch_size)]
 
     @generic_error_handler
-    def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:
+    def process_documents(self, documents: list[Document]) -> list[Chunk]:
         """
-        Process pages from JSON input and generate data chunks.
+        Process documents and generate chunks.
 
         Args:
-            json_input (dict[str, Any]): The input JSON containing page data and metadata.
+            documents (list[Document]): The documents to be processed.
 
         Returns:
-            list[dict[str, Any]]: A list of processed data chunks.
+            list[Chunk]: A list of processed chunks.
 
         Raises:
-            KeyError: If the JSON input does not contain the required keys.
             ValueError: If there is an issue with the page content processing.
         """
         all_chunks = []

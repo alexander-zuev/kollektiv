@@ -168,20 +168,12 @@ class VectorDatabase:
             for chunk in chunks
         ]
 
-        # Generate fake embeddings if fake_embeddings is True
-        if fake_embeddings:
-            import numpy as np
-
-            embeddings = [np.random.rand(1536).tolist() for _ in chunks]
-        else:
-            embeddings = None
-
         try:
             await collection.add(
                 ids=ids,
                 documents=documents,
                 metadatas=metadatas,
-                embeddings=embeddings,
+                # embeddings=embeddings, # relying on ChromaDB to generate embeddings
             )
         except ValueError:
             logger.exception(

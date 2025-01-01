@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from functools import lru_cache
+from multiprocessing import cpu_count
 from pathlib import Path
 
 from pydantic import Field
@@ -130,6 +131,37 @@ class Settings(BaseSettings):
     # Celery settings - only required when SERVICE=worker
     broker_url: str | None = Field(None, alias="CELERY_BROKER_URL", description="Celery broker URL")
     result_backend: str | None = Field(None, alias="CELERY_RESULT_BACKEND", description="Celery result backend")
+
+    @property
+    def worker_concurrency(self) -> int:
+        """Get number of Celery workers based on environment."""
+        if self.environment == Environment.LOCAL:
+            return cpu_count()
+        elif self.environment == Environment.STAGING:
+            # Lower for staging
+            return 2
+        else:
+            # Railway provides 8 vCPUs
+            return cpu_count()
+
+    @property
+    def reload(self) -> bool:
+        """Reload the app when code changes."""
+        return self.environment == Environment.LOCAL
+
+    @property
+    def gunicorn_workers(self) -> int:
+        """Get number of Gunicorn workers based on environment.
+
+        Staging: 2 workers for testing
+        Production: (2 * cpu_count) + 1 for optimal performance
+        """
+        if self.environment == Environment.STAGING:
+            return 2
+        else:
+            # Production: Using standard Gunicorn formula (2*CPU)+1
+            # Railway provides 8 vCPUs
+            return (2 * cpu_count()) + 1  # 17 workers
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", ".env"),
