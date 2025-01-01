@@ -1,29 +1,59 @@
-import asyncio
+from typing import TypeVar
 from uuid import UUID
 
-from src.infra.celery.worker import celery_app, worker_services
-from src.infra.logger import get_logger
+from pydantic import BaseModel
 
+from src.core.content.chunker import MarkdownChunker
+from src.infra.celery.worker import celery_app
+from src.infra.logger import get_logger
+from src.models.content_models import Chunk, Document
+
+T = TypeVar("T", bound=BaseModel)
 logger = get_logger()
 
 
 @celery_app.task
 def process_documents(document_ids: list[UUID], user_id: UUID) -> None:
-    """Process documents using chunker."""
-    logger.info(f"Processing documents: {document_ids}")
+    """Entry point for processing documents."""
 
-    try:
-        # Run the async chunking operation in a new event loop
-        chunks = asyncio.run(worker_services.chunker.create_fake_chunks(n_chunks=100))
+    # Task to load documents
 
-        # Here you could do more with the chunks:
-        # - Save to DB
-        # - Process further
-        # - etc.
+    # Separate into batches
 
-        logger.info(f"Created {len(chunks)} chunks")
-        return len(chunks)
+    # Add processing of batches tasks
 
-    except Exception as e:
-        logger.error(f"Error processing documents: {e}")
-        raise
+    # Aggregate
+
+    # [PARALLEL]
+    # Setup saving of saving of results
+
+
+@celery_app.task
+def aggregate_processing_results(results: list[UUID]) -> list[Chunk]:
+    """Aggregate the processing results."""
+
+    # Aggregate the results
+
+    # Return the aggregated results
+
+
+@celery_app.task
+def process_batch(batch: list[Document], chunker: MarkdownChunker) -> list[Chunk]:
+    """Process a batch of documents."""
+
+    # Process the batch
+
+    # Return the chunks
+
+
+@celery_app.task
+def persist_data_to_db(data: list[T]) -> None:
+    """Save data to the database."""
+
+    # Save the data
+
+
+@celery_app.task
+def load_data_from_db(ids: list[UUID]) -> list[T]:
+    """Abstract loading of data from the database using data repository."""
+    pass

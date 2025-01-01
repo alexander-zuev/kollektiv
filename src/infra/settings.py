@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic import Field
@@ -18,7 +19,7 @@ class ServiceType(str, Enum):
     """Type of service being run."""
 
     API = "api"
-    CELERY = "celery"
+    WORKER = "worker"
 
 
 class Settings(BaseSettings):
@@ -126,6 +127,10 @@ class Settings(BaseSettings):
         description="Type of service to run (api or celery)",
     )
 
+    # Celery settings - only required when SERVICE=worker
+    broker_url: str | None = Field(None, alias="CELERY_BROKER_URL", description="Celery broker URL")
+    result_backend: str | None = Field(None, alias="CELERY_RESULT_BACKEND", description="Celery result backend")
+
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", ".env"),
         env_file_encoding="utf-8",
@@ -152,29 +157,22 @@ class Settings(BaseSettings):
         """Dynamically generates the Firecrawl webhook URL."""
         return f"{self.public_url}{Routes.System.Webhooks.FIRECRAWL}"
 
-    # TODO: will refactor later
-    # TODO: settings need to eagerly validate
-    # TODO: settings need to be passed into container for access, not into individual module
     @property
-    def celery(self) -> CelerySettings:
-        """Celery-worker specicic settings. Do not apply to FastAPI service."""
-        if self.service != ServiceType.CELERY:
-            raise ValueError("Celery settings are only available for the celery service")
-        return CelerySettings()
-
-
-class CelerySettings(BaseSettings):
-    """Celery-worker specicic settings. Do not apply to FastAPI service."""
-
-    # Celery
-    broker_url: str = Field(..., alias="CELERY_BROKER_URL", description="Celery broker URL")
-    result_backend: str = Field(..., alias="CELERY_RESULT_BACKEND", description="Celery result backend")
+    def celery(self) -> Settings:
+        """Get Celery settings, validating they exist for worker service."""
+        if self.service == ServiceType.WORKER:
+            if not self.broker_url or not self.result_backend:
+                raise ValueError("Celery broker_url and result_backend must be set when running worker service")
+        return self
 
 
 def initialize_settings() -> Settings:
     """Initialize settings."""
     try:
         settings = Settings()
+        if settings.service == ServiceType.WORKER:
+            # Validate that the celery settings are set
+            settings.celery
         logger.info("✓ Initialized settings successfully.")
         return settings
     except ValueError as e:
@@ -186,3 +184,10 @@ def initialize_settings() -> Settings:
 
 
 settings = initialize_settings()
+
+
+# TODO: implement caching of the settings instance
+@lru_cache
+def get_settings() -> Settings:
+    """Get settings."""
+    return settings
