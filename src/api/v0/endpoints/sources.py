@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 from src.api.dependencies import ContentServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse, SourceResponse
-from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
+from src.models.content_models import AddContentSourceRequest
 from src.infra.logger import get_logger
 from fastapi import BackgroundTasks
 

@@ -2,7 +2,7 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-from src.api.v0.schemas.sources_schemas import SourceAPIResponse
+from src.models.content_models import SourceAPIResponse
 
 T = TypeVar("T")
 

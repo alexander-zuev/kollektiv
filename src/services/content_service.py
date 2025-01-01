@@ -1,18 +1,20 @@
+import asyncio
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID
 
-from src.api.v0.schemas.sources_schemas import (
-    AddContentSourceRequest,
-    SourceAPIResponse,
-)
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
-from src.core._exceptions import DataSourceError, JobNotFoundError
+from src.core._exceptions import JobNotFoundError
 from src.core.content.crawler import FireCrawler
 from src.infra.celery.tasks import process_documents
 from src.infra.decorators import generic_error_handler
 from src.infra.logger import get_logger
-from src.models.content_models import DataSource, Document, SourceStatus
+from src.models.content_models import (
+    AddContentSourceRequest,
+    DataSource,
+    FireCrawlSourceMetadata,
+    SourceAPIResponse,
+    SourceStatus,
+)
 from src.models.firecrawl_models import CrawlRequest
 from src.models.job_models import CrawlJobDetails, Job, JobStatus, JobType, ProcessingJobDetails
 from src.services.data_service import DataService
@@ -48,70 +50,67 @@ class ContentService:
             CrawlerError: If crawler fails to start
         """
         data_source = None
+        job = None
         try:
             logger.info(f"Starting to add source for request {request.request_id}")
 
-            # 1. Save user request
-            await self._save_user_request(request=request)
-            logger.debug("STEP 1 User request saved")
+            # Send a crawl request to firecrawl
+            crawl_request = self._create_crawl_request(request)
+            response = await self.crawler.start_crawl(request=crawl_request)
+            logger.debug("STEP 1. Crawl started")
 
-            # 2. Save datasource entry
-            data_source = await self._create_and_save_datasource(request=request)
-            logger.debug("STEP 2 Data source created")
+            if not response.success:
+                logger.debug("STEP 2. Crawl failed")
+                return SourceAPIResponse(
+                    source_id=data_source.source_id,
+                    source_type=data_source.source_type,
+                    status=SourceStatus.FAILED,
+                    created_at=data_source.created_at,
+                    error="Failed to start a crawl, please try again.",
+                )
 
-            # 3. Create CrawlRequest
-            crawl_request = await self._create_crawl_request(request)
-            logger.debug("STEP 3 Crawl Request created")
+            logger.debug("STEP 3. Crawl started successfully")
+            # 2. Only if crawl started successfully, create DB entries
+            await self._save_user_request(request)
+            data_source = await self._create_and_save_datasource(request)
 
-            # 4. Create Job
+            # 3. Create and link job with firecrawl_id
             job = await self.job_manager.create_job(
                 job_type=JobType.CRAWL,
                 details=CrawlJobDetails(
                     source_id=data_source.source_id,
                     url=request.request_config.url,
+                    firecrawl_id=response.job_id,
                 ),
             )
-            logger.debug("STEP 4 Job saved")
 
-            # 5. Update source with job_id
-            data_source = await self.data_service.update_datasource(
-                source_id=data_source.source_id, updates={"job_id": job.job_id}
+            # 4. Update source with job_id and status
+            await self.data_service.update_datasource(
+                source_id=data_source.source_id,
+                updates={
+                    "status": SourceStatus.CRAWLING,
+                    "job_id": job.job_id,
+                },
             )
-            logger.debug("STEP 5 Source linked to the job")
-
-            # 6. Start the crawl
-            response = await self.crawler.start_crawl(request=crawl_request)
-            logger.debug("STEP 6 Crawl started")
-
-            # 7. If crawl started successfully, update source and job
-            if response.success:
-                # Update job with firecrawl_id
-                await self.job_manager.update_job(
-                    job_id=job.job_id,
-                    updates={"details": {"firecrawl_id": response.job_id}, "status": JobStatus.IN_PROGRESS},
-                )
-                logger.debug("STEP 7 Job started")
-
-                # Update source status to CRAWLING
-                data_source = await self.data_service.update_datasource(
-                    source_id=data_source.source_id,
-                    updates={"status": SourceStatus.CRAWLING, "updated_at": datetime.now(UTC)},
-                )
-                logger.debug("STEP 8 Source updated")
-
-            if data_source is None:
-                raise DataSourceError(data_source.source_id, message="Data source creation failed.")
-
             return SourceAPIResponse.from_source(data_source)
-
-        except DataSourceError as e:
-            # Update source status to FAILED if it exists
+        except Exception as e:
+            logger.exception(f"Failed to add source: {e}")
             if data_source:
                 await self.data_service.update_datasource(
-                    source_id=data_source.source_id, updates={"status": SourceStatus.FAILED, "error": str(e)}
+                    source_id=data_source.source_id,
+                    updates={"status": SourceStatus.FAILED, "error": str(e)},
                 )
-            logger.error(f"Failed to save data source: {e}", exc_info=True)
-            raise
+            if job:
+                await self.job_manager.update_job(
+                    job_id=job.job_id, updates={"status": JobStatus.FAILED, "error": str(e)}
+                )
+            return SourceAPIResponse(
+                source_id=data_source.source_id,
+                source_type=data_source.source_type,
+                status=SourceStatus.FAILED,
+                created_at=data_source.created_at,
+                error=str(e),
+            )
 
     async def _create_and_save_datasource(self, request: AddContentSourceRequest) -> DataSource:
         """Initiates saving of the datasource record into the database."""
@@ -119,7 +118,10 @@ class ContentService:
             user_id=request.user_id,
             source_type=request.source_type,
             status=SourceStatus.PENDING,
-            metadata=request.request_config.model_dump(),
+            metadata=FireCrawlSourceMetadata(
+                crawl_config=request.request_config,
+                total_pages=0,
+            ),
             request_id=request.request_id,
         )
 
@@ -133,7 +135,7 @@ class ContentService:
         await self.data_service.save_user_request(request=request)
         logger.info(f"User request {request.request_id} saved successfully")
 
-    async def _create_crawl_request(self, request: AddContentSourceRequest) -> CrawlRequest:
+    def _create_crawl_request(self, request: AddContentSourceRequest) -> CrawlRequest:
         crawl_request = CrawlRequest(**request.request_config.model_dump())
         return crawl_request
 
@@ -218,61 +220,50 @@ class ContentService:
 
     async def _handle_crawl_completed(self, job: Job) -> None:
         """Handle crawl.completed event"""
-        if job.job_type != JobType.CRAWL:
-            raise ValueError(f"Expected CRAWL job type, got {job.job_type}")
-
-        details = job.details
-
-        # 1. Get documents
-        documents = await self.crawler.get_results(
-            firecrawl_id=details.firecrawl_id,  # Access as property, not dict
-            source_id=details.source_id,  # Access as property, not dict
+        # 1. Get source & documents
+        documents, source = await asyncio.gather(
+            self.crawler.get_results(
+                firecrawl_id=job.details.firecrawl_id,
+                source_id=job.details.source_id,
+            ),
+            self.data_service.get_datasource(job.details.source_id),
         )
 
-        # 2. Save documents into db and collect their IDs
-        saved_documents = await self.data_service.save_documents(documents=documents)
-        document_ids = [doc.document_id for doc in saved_documents]  # Collect document IDs
-        logger.debug(f"Successfully saved {len(document_ids)} documents for job {job.job_id}")
+        # 2. Enqueue processing job
+        result = process_documents.delay(documents=documents)
+        logger.info(f"Processing job in celery {result.task_id} enqueued")
 
-        # 3. Update source entty
-        crawl_metadata = self._create_source_metadata(documents=documents)
-        await self.data_service.update_datasource(
-            source_id=details.source_id,
-            updates={
-                "status": SourceStatus.CRAWLED,
-                "metadata": crawl_metadata,
-            },
-        )
-
-        # 4. complete the job
-        await self.job_manager.update_job(
-            job_id=job.job_id,
-            updates={
-                "status": JobStatus.COMPLETED,
-                "completed_at": datetime.now(UTC),
-            },
+        # 3. Update source, jobs, and save documents
+        saved_documents, _, processing_job = await asyncio.gather(
+            self.data_service.save_documents(documents=documents),
+            self.job_manager.update_job(
+                job_id=job.job_id,
+                updates={"status": JobStatus.COMPLETED, "completed_at": datetime.now(UTC)},
+            ),
+            self.job_manager.create_job(
+                job_type=JobType.PROCESSING,
+                details=ProcessingJobDetails(
+                    document_ids=[document.document_id for document in documents],
+                    source_id=source.source_id,
+                ),
+            ),
         )
         logger.debug(f"Updated job {job.job_id} status to COMPLETED")
 
-        # 5. Create a new processing job
-        processing_job = await self.job_manager.create_job(
-            job_type=JobType.PROCESSING,
-            details=ProcessingJobDetails(
-                document_ids=document_ids,
-                source_id=details.source_id,
-            ),
-        )
-
-        # 6. Update source status
+        # 4.  Update source
         await self.data_service.update_datasource(
-            source_id=details.source_id,  #
-            updates={"status": SourceStatus.PROCESSING, "job_id": processing_job.job_id},
+            source_id=source.source_id,
+            updates={
+                "metadata": FireCrawlSourceMetadata(
+                    crawl_config=source.metadata.crawl_config,  # Keep existing
+                    total_pages=len(documents),  # Update this
+                ),
+                "status": SourceStatus.PROCESSING,
+                "job_id": processing_job.job_id,
+                "updated_at": datetime.now(UTC),
+            },
         )
-        logger.debug(f"Updated source {details.source_id} status to PROCESSING")
-
-        # 7. Enqueu processing job
-        result = process_documents.delay(documents=documents)
-        logger.info(f"Processing job in celery {result.task_id} enqueued")
+        logger.debug(f"Updated source {source.source_id} status to PROCESSING")
 
     async def handle_pubsub_event(self, message: dict) -> None:
         """Handles a process documents jobs."""
@@ -324,27 +315,6 @@ class ContentService:
             updates={"status": JobStatus.FAILED, "completed_at": datetime.now(UTC), "error": error},
         )
         # TODO: retry potentially? or just inform the user
-
-    def _create_source_metadata(self, documents: list[Document]) -> dict[str, Any]:
-        """Create updated source metadata after crawl completion.
-
-        Args:
-            documents: List of saved documents
-
-        Returns:
-            Updated metadata dictionary
-        """
-        # Extract unique links from document metadata
-        unique_links = set()
-        for doc in documents:
-            if source_url := doc.metadata.source_url:
-                unique_links.add(source_url)
-
-        # Create updated metadata
-        return {
-            "total_pages": len(documents),
-            "unique_links": list(unique_links),
-        }
 
     async def _handle_failure(self, job: Job, error: str) -> None:
         """Handle crawl.failed event"""

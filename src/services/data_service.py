@@ -3,13 +3,12 @@ from typing import Any, TypeVar
 from uuid import UUID
 
 from src.api.v0.schemas.chat_schemas import ConversationSummary
-from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
 from src.core._exceptions import ConversationNotFoundError
 from src.infra.data.data_repository import DataRepository
 from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
 from src.models.chat_models import Conversation, ConversationHistory, ConversationMessage
-from src.models.content_models import Chunk, DataSource, Document, SourceSummary
+from src.models.content_models import AddContentSourceRequest, Chunk, DataSource, Document, SourceSummary
 from src.models.job_models import Job
 from src.models.vector_models import VectorCollection
 
@@ -208,3 +207,8 @@ class DataService:
         """Save collection to Supabase."""
         logger.debug(f"Saving collection {collection.name}")
         await self.repository.save(collection)
+
+    async def get_datasource(self, source_id: UUID) -> DataSource:
+        """Get data source by ID."""
+        result = await self.repository.find_by_id(DataSource, source_id)
+        return result
