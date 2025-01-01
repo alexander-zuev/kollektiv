@@ -42,8 +42,8 @@ logfire = { extras = [
 asyncpg = "^0.30.0"
 ngrok = "^1.4.0"
 celery = "^5.4.0"
-fastapi = {extras = ["standard"], version = "^0.115.6"}
-uvicorn = {extras = ["standard"], version = "^0.34.0"}
+fastapi = { extras = ["standard"], version = "^0.115.6" }
+uvicorn = { extras = ["standard"], version = "^0.34.0" }
 
 
 [tool.poetry.group.dev.dependencies]
@@ -67,7 +67,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 crawl = "src.core.content.crawler.crawler:run_crawler"
-kollektiv = "src.app:run"
+api = "src.app:run"
+worker = "src.infra.celery.worker:run_worker"
 
 
 [tool.pytest.ini_options]

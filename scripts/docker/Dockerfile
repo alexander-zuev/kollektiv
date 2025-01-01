@@ -6,10 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Set the working directory
+# Set the working directory of the container
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (runs in /bin/sh)
+# Shell form command
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
