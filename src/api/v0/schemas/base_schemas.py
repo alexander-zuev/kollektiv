@@ -2,7 +2,7 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-from src.models.content_models import SourceAPIResponse
+from src.models.content_models import AddContentSourceResponse
 
 T = TypeVar("T")
 
@@ -15,7 +15,7 @@ class BaseResponse(BaseModel, Generic[T]):
     message: str | None = None
 
 
-class SourceResponse(BaseResponse[SourceAPIResponse]):
+class SourceResponse(BaseResponse[AddContentSourceResponse]):
     """Concrete response model for source operations."""
 
     pass

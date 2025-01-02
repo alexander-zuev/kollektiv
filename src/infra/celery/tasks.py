@@ -3,14 +3,41 @@ from typing import TypeVar
 from uuid import UUID
 
 from celery import group
+from celery.result import AsyncResult
 from pydantic import BaseModel
 
 from src.infra.celery.worker import celery_app
 from src.infra.logger import get_logger
+from src.infra.settings import get_settings
 from src.models.content_models import Chunk, Document
 
 T = TypeVar("T", bound=BaseModel)
 logger = get_logger()
+settings = get_settings()
+
+
+@celery_app.task(
+    acks_late=True,
+    retry_backoff=True,
+    max_retries=3,
+)
+def notify_processing_complete(group_result: AsyncResult, user_id: str, source_id: str) -> None:
+    """
+    Task to be executed when all tasks in a group are complete.
+    Publishes a message to the pub/sub channel.
+    """
+    # 1. Get access to the services
+    services = celery_app.services
+    # 2. Publish to pub/sub
+    services.event_publisher.publish(
+        channel=settings.process_documents_channel,
+        message={
+            "event_type": "PROCESSING_COMPLETED",
+            "user_id": user_id,
+            "source_id": source_id,
+            "celery_job_id": group_result.id,  # or some other relevant identifier
+        },
+    )
 
 
 @celery_app.task(
@@ -19,12 +46,13 @@ logger = get_logger()
     retry_kwargs={"max_retries": 3},
     track_started=True,  # Allows tracking task progress
 )
-def process_documents(documents: list[str], user_id: str) -> dict:
+def process_documents(documents: list[str], user_id: str, source_id: str) -> dict:
     """Entry point for processing list[Document].
 
     Args:
     - list[Document]: serialized as JSON strings.
-    - user_id: str
+    - user_id: str of the user that is processing the documents
+    - source_id: str of the source to be processed
     """
     # Get access to the services
     services = celery_app.services
@@ -42,13 +70,14 @@ def process_documents(documents: list[str], user_id: str) -> dict:
 
         # Setup batch processing of the documents
         tasks = group(process_document_batch.s(doc_batch, user_id) for doc_batch in serialized_batches)
-        result = tasks.apply_async()
-        logger.info(f"Processing job in celery {result.id} enqueued")
+        callback = notify_processing_complete.s(user_id, source_id)
+        group_result = (tasks | callback).apply_async()
+        logger.info(f"Processing job in celery {group_result.id} enqueued")
 
         return {
             "status": "success",
             "total_documents": len(docs),
-            "task_group_id": result.id,
+            "task_group_id": group_result.id,
         }
     except Exception as e:
         logger.exception(f"Error processing documents: {e}")

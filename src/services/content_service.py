@@ -10,9 +10,9 @@ from src.infra.decorators import generic_error_handler
 from src.infra.logger import get_logger
 from src.models.content_models import (
     AddContentSourceRequest,
+    AddContentSourceResponse,
     DataSource,
     FireCrawlSourceMetadata,
-    SourceAPIResponse,
     SourceStatus,
 )
 from src.models.firecrawl_models import CrawlRequest
@@ -37,7 +37,7 @@ class ContentService:
         self.data_service = data_service
 
     @generic_error_handler
-    async def add_source(self, request: AddContentSourceRequest) -> SourceAPIResponse:
+    async def add_source(self, request: AddContentSourceRequest) -> AddContentSourceResponse:
         """POST /sources entrypoint.
 
         Args:
@@ -61,7 +61,7 @@ class ContentService:
 
             if not response.success:
                 logger.debug("STEP 2. Crawl failed")
-                return SourceAPIResponse(
+                return AddContentSourceResponse(
                     source_id=data_source.source_id,
                     source_type=data_source.source_type,
                     status=SourceStatus.FAILED,
@@ -93,7 +93,7 @@ class ContentService:
                     "job_id": job.job_id,
                 },
             )
-            return SourceAPIResponse.from_source(data_source)
+            return AddContentSourceResponse.from_source(data_source)
         except Exception as e:
             logger.exception(f"Failed to add source: {e}")
             if data_source:
@@ -105,7 +105,7 @@ class ContentService:
                 await self.job_manager.update_job(
                     job_id=job.job_id, updates={"status": JobStatus.FAILED, "error": str(e)}
                 )
-            return SourceAPIResponse(
+            return AddContentSourceResponse(
                 source_id=data_source.source_id,
                 source_type=data_source.source_type,
                 status=SourceStatus.FAILED,
@@ -140,15 +140,15 @@ class ContentService:
         crawl_request = CrawlRequest(**request.request_config.model_dump())
         return crawl_request
 
-    async def list_sources(self) -> list[SourceAPIResponse]:
+    async def list_sources(self) -> list[AddContentSourceResponse]:
         """GET /sources entrypoint"""
         sources = await self.data_service.list_datasources()
-        return [SourceAPIResponse.from_source(source) for source in sources]
+        return [AddContentSourceResponse.from_source(source) for source in sources]
 
-    async def get_source(self, source_id: UUID) -> SourceAPIResponse:
+    async def get_source(self, source_id: UUID) -> AddContentSourceResponse:
         """GET /sources/{source_id} entrypoint"""
         source = await self.data_service.retrieve_datasource(source_id=source_id)
-        return SourceAPIResponse.from_source(source)
+        return AddContentSourceResponse.from_source(source)
 
     async def handle_webhook_event(self, event: FireCrawlWebhookEvent) -> None:
         """Handles webhook events related to content ingestion."""
@@ -234,6 +234,7 @@ class ContentService:
         result = process_documents.delay(
             [document.model_dump(mode="json", serialize_as_any=True) for document in documents],
             user_id=str(source.user_id),
+            source_id=str(source.source_id),
         )
         logger.info(f"Processing job in celery {result.task_id} enqueued")
 
@@ -271,44 +272,28 @@ class ContentService:
 
     async def handle_pubsub_event(self, message: dict) -> None:
         """Handles a process documents jobs."""
-        # 1. Retrieve job by job_id
-        job = await self.data_service.get_job(UUID(message["job_id"]))
+        # 1. Pass into completed or failed processing job
+        if message["event_type"] == "PROCESSING_COMPLETED":
+            await self.handle_completed_processing_job(message)
+        elif message["event_type"] == "PROCESSING_FAILED":
+            await self.handle_failed_processing_job(message)
 
-        # 2. Handle event
-        match job.status:
-            case JobStatus.COMPLETED:
-                logger.info(f"Processing job {job.job_id} completed")
-                await self.handle_completed_processing_job(job)
-            case JobStatus.FAILED:
-                error = message.get("error")
-                logger.error(f"Processing job {job.job_id} failed")
-                await self.handle_failed_processing_job(job, error)
-
-    async def handle_completed_processing_job(self, job: Job) -> None:
+    async def handle_completed_processing_job(self, message: dict) -> None:
         """Completes the ingestion process by updating the source and returning the source metadata."""
-        # 1. Update source status
-        await self.data_service.update_datasource(
-            source_id=job.details.source_id,
-            updates={"status": SourceStatus.ADDING_SUMMARY, "updated_at": datetime.now(UTC)},
-        )
-
-        # 2. Update job status
-        await self.job_manager.update_job(
-            job_id=job.job_id,
-            updates={"status": JobStatus.COMPLETED, "completed_at": datetime.now(UTC)},
-        )
+        # 1. Get data source
+        source = await self.data_service.get_datasource(message["source_id"])
 
         # 3. Generate source summary
         # await self.assistant.generate_source_summary(source_id=source_id)
 
         # 5. Inform the client
-        logger.info(f"Source {source_id} completed!!!")
+        logger.info(f"Source {source.source_id} completed!!!")
 
-    async def handle_failed_processing_job(self, job: Job, error: str) -> None:
+    async def handle_failed_processing_job(self, message: dict) -> None:
         """Handles a failed processing job."""
         await self.job_manager.update_job(
-            job_id=job.job_id,
-            updates={"status": JobStatus.FAILED, "completed_at": datetime.now(UTC), "error": error},
+            job_id=message["celery_job_id"],
+            updates={"status": JobStatus.FAILED, "completed_at": datetime.now(UTC), "error": message["error"]},
         )
         # TODO: retry potentially? or just inform the user
 

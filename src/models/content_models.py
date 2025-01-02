@@ -120,7 +120,7 @@ class AddContentSourceRequest(SupabaseModel):
         }
 
 
-class SourceAPIResponse(BaseModel):
+class AddContentSourceResponse(BaseModel):
     """Simplified model inheriting from Source."""
 
     source_id: UUID = Field(...)
@@ -130,7 +130,7 @@ class SourceAPIResponse(BaseModel):
     error: str | None = Field(None, description="Error message, null if no error")
 
     @classmethod
-    def from_source(cls, source: DataSource) -> SourceAPIResponse:
+    def from_source(cls, source: DataSource) -> AddContentSourceResponse:
         return cls(
             source_id=source.source_id,
             status=source.status,
@@ -146,7 +146,6 @@ class SourceStatus(str, Enum):
     PENDING = "pending"  # right after creation
     CRAWLING = "crawling"  # after crawling started
     PROCESSING = "processing"  # during chunking and embedding
-    ADDING_SUMMARY = "adding_summary"  # during adding summaries
     COMPLETED = "completed"  # after processing is complete
     FAILED = "failed"  # if addition failed
 
