@@ -210,7 +210,7 @@ class Document(SupabaseModel):
     )
     content: str = Field(
         ...,  # Required
-        description="Raw content of the document in markdown format",
+        description="Raw markdown content of the document",
     )
     metadata: DocumentMetadata = Field(..., description="Flexible metadata storage for document-specific information")
     _db_config: ClassVar[dict] = {"schema": "content", "table": "documents", "primary_key": "document_id"}
@@ -224,10 +224,10 @@ class Document(SupabaseModel):
 class DocumentMetadata(BaseModel):
     """Metadata for a document."""
 
-    title: str = Field(..., description="Title of the document")
-    description: str = Field(..., description="Description of the document")
-    source_url: str = Field(..., description="Source URL of the document")
-    og_url: str = Field(..., description="Open Graph URL of the document")
+    title: str = Field(default="Untitled", description="Title of the document")
+    description: str = Field(default="No description", description="Description of the document")
+    source_url: str = Field(default="", description="Source URL of the document")
+    og_url: str = Field(default="", description="Open Graph URL of the document")
 
 
 class Chunk(SupabaseModel):
@@ -241,8 +241,8 @@ class Chunk(SupabaseModel):
     # Main content
     headers: dict[str, Any] = Field(..., description="Chunk headers")
     text: str = Field(..., description="Chunk text")
-    content: str = Field(
-        ..., description="Chunk content which is a combination of headers and text, used for embeddings"
+    content: str | None = Field(
+        default=None, description="Chunk content which is a combination of headers and text, used for embeddings"
     )
 
     # Metadata

@@ -3,6 +3,7 @@ from uuid import UUID
 
 import httpx
 from firecrawl import FirecrawlApp
+from httpx import HTTPError
 from requests.exceptions import ConnectionError, HTTPError, RequestException, Timeout
 
 from src.core._exceptions import EmptyContentError, is_retryable_error
@@ -173,7 +174,7 @@ class FireCrawler:
             logger.warning("Metadata not found in page")
             return DocumentMetadata(title="", description="", source_url="", og_url="")
 
-    @tenacity_retry_wrapper((HTTPError, Timeout, ConnectionError))
+    @tenacity_retry_wrapper((httpx.ConnectError, httpx.TimeoutException))
     async def _fetch_results_from_url(self, next_url: str) -> tuple[dict[str, Any], str | None]:
         """Fetch results with retries.
 
@@ -191,12 +192,12 @@ class FireCrawler:
             batch_data = response.json()
             next_url = batch_data.get("next")  # This will be str | None
             return batch_data, next_url
-        except HTTPError as err:
-            logger.exception(f"HTTPError fetching results from {next_url}: {err}")
+        except (httpx.ConnectError, httpx.TimeoutError) as err:
+            logger.exception(f"Network error fetching results from {next_url}: {err}")
             raise
-        except Timeout as err:
-            logger.exception(f"Timeout fetching results from {next_url}: {err}")
-            raise
-        except ConnectionError as err:
-            logger.exception(f"ConnectionError fetching results from {next_url}: {err}")
+        except httpx.HTTPStatusError as err:
+            if err.response.status_code in {502, 503, 504}:  # Retryable status codes
+                logger.warning(f"Retryable HTTP error: {err}")
+                raise
+            logger.error(f"Non-retryable HTTP error: {err}")
             raise

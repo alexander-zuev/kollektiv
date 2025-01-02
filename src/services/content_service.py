@@ -70,6 +70,7 @@ class ContentService:
                 )
 
             logger.debug("STEP 3. Crawl started successfully")
+
             # 2. Only if crawl started successfully, create DB entries
             await self._save_user_request(request)
             data_source = await self._create_and_save_datasource(request)
@@ -230,7 +231,10 @@ class ContentService:
         )
 
         # 2. Enqueue processing job
-        result = process_documents.delay(documents=documents)
+        result = process_documents.delay(
+            [document.model_dump(mode="json", serialize_as_any=True) for document in documents],
+            user_id=str(source.user_id),
+        )
         logger.info(f"Processing job in celery {result.task_id} enqueued")
 
         # 3. Update source, jobs, and save documents
@@ -282,11 +286,9 @@ class ContentService:
 
     async def handle_completed_processing_job(self, job: Job) -> None:
         """Completes the ingestion process by updating the source and returning the source metadata."""
-        source_id = job.details.source_id
-
         # 1. Update source status
         await self.data_service.update_datasource(
-            source_id=source_id,
+            source_id=job.details.source_id,
             updates={"status": SourceStatus.ADDING_SUMMARY, "updated_at": datetime.now(UTC)},
         )
 
@@ -298,12 +300,6 @@ class ContentService:
 
         # 3. Generate source summary
         # await self.assistant.generate_source_summary(source_id=source_id)
-
-        # 4. After all said and done
-        await self.data_service.update_datasource(
-            source_id=source_id,
-            updates={"status": SourceStatus.COMPLETED, "updated_at": datetime.now(UTC)},
-        )
 
         # 5. Inform the client
         logger.info(f"Source {source_id} completed!!!")

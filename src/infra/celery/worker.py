@@ -10,10 +10,6 @@ from src.infra.logger import configure_logging, get_logger
 from src.infra.settings import get_settings
 from src.models.base_models import Environment
 
-# Initialize logging
-configure_logging()
-logger = get_logger()
-
 # Get settings using the getter
 settings = get_settings()
 
@@ -31,6 +27,10 @@ def init_worker_process(*args: Any, **kwargs: Any) -> None:
     """Initialize worker services for each worker process."""
     try:
         process_id = os.getpid()
+        # Initialize logging
+        configure_logging()
+        logger = get_logger()
+
         logger.info(f"[Worker Process {process_id}] Starting service initialization")
 
         worker_services = asyncio.run(WorkerServices.create())

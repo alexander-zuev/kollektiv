@@ -135,10 +135,7 @@ class Settings(BaseSettings):
     @property
     def worker_concurrency(self) -> int:
         """Get number of Celery workers based on environment."""
-        if self.environment == Environment.LOCAL:
-            return cpu_count()
-        elif self.environment == Environment.STAGING:
-            # Lower for staging
+        if self.environment == (Environment.LOCAL or Environment.STAGING):
             return 2
         else:
             # Railway provides 8 vCPUs

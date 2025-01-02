@@ -7,7 +7,7 @@ from chromadb.api.async_api import AsyncCollection, GetResult
 from chromadb.errors import InvalidCollectionException
 
 from src.core.search.embedding_manager import EmbeddingManager
-from src.infra.decorators import base_error_handler
+from src.infra.decorators import generic_error_handler
 from src.infra.external.chroma_manager import ChromaManager
 from src.infra.logger import get_logger
 from src.models.content_models import Chunk
@@ -79,89 +79,15 @@ class VectorDatabase:
         except ValueError:
             logger.exception(f"Collection for user ID {str(user_id)} does not exist")
 
-    # # TODO: processing of the chunks for vector storage should NOT be done here - move to chunk processor
-    # def prepare_documents(self, chunks: list[dict]) -> dict[str, list[str]]:
-    #     """
-    #     Prepare documents by extracting and combining headers and content.
-
-    #     Args:
-    #         chunks (list[dict]): A list of dictionaries where each dictionary contains the chunk data.
-
-    #     Returns:
-    #         dict[str, list[str]]: A dictionary with keys 'ids', 'documents', and 'metadatas' each containing a list.
-
-    #     Raises:
-    #         KeyError: If the required keys are missing from the dictionaries in chunks.
-    #         TypeError: If the input is not a list of dictionaries.
-    #     """
-    #     ids = []
-    #     documents = []
-    #     metadatas = []  # used for filtering
-
-    #     for chunk in chunks:
-    #         # extract headers
-    #         data = chunk["data"]
-    #         headers = data["headers"]
-    #         header_text = " ".join(f"{key}: {value}" for key, value in headers.items() if value)
-
-    #         # extract content
-    #         content = data["text"]
-
-    #         # combine
-    #         combined_text = f"Headers: {header_text}\n\n Content: {content}"
-    #         ids.append(chunk["chunk_id"])
-
-    #         documents.append(combined_text)
-
-    #         metadatas.append(
-    #             {
-    #                 "source_url": chunk["metadata"]["source_url"],
-    #                 "page_title": chunk["metadata"]["page_title"],
-    #             }
-    #         )
-
-    #     return {"ids": ids, "documents": documents, "metadatas": metadatas}
-
-    # TODO: add to storage should be clean, this should not have any business logic, just adding & emebding - move to chunk processor
-    # def add_documents(self, chunks: list[Chunk], user_id: UUID) -> None:
-    #     """Add documents to the vector database."""
-    #     processed_docs = self.prepare_documents(json_data)
-
-    #     ids = processed_docs["ids"]
-    #     documents = processed_docs["documents"]
-    #     metadatas = processed_docs["metadatas"]
-
-    #     # Check which documents are missing
-    #     all_exist, missing_ids = self.check_documents_exist(ids)
-
-    #     if all_exist:
-    #         logger.info(f"All documents from {file_name} already loaded.")
-    #     else:
-    #         # Prepare data for missing documents only
-    #         missing_indices = [ids.index(m_id) for m_id in missing_ids]
-    #         missing_docs = [documents[i] for i in missing_indices]
-    #         missing_metas = [metadatas[i] for i in missing_indices]
-
-    #         # Add only missing documents
-    #         self.collection.add(
-    #             ids=missing_ids,
-    #             documents=missing_docs,
-    #             metadatas=missing_metas,
-    #         )
-    #         logger.info(f"Added {len(missing_ids)} new documents to ChromaDB.")
-
-    #     # Generate summary for the entire file if not already present
-    #     self.summary_manager.process_file(data=json_data, file_name=file_name)
-
     async def add_data(self, chunks: list[Chunk], user_id: UUID, fake_embeddings: bool = False) -> None:
         """Add data to the vector database."""
         collection = await self.get_or_create_collection(user_id)
 
         ids = [str(chunk.chunk_id) for chunk in chunks]
-        documents = [chunk.text for chunk in chunks]
+        documents = [chunk.content for chunk in chunks]
         metadatas = [
             {
-                "source_url": str(chunk.source_url),
+                "page_url": str(chunk.page_url),
                 "page_title": str(chunk.page_title),
                 "source_id": str(chunk.source_id),
             }
@@ -175,6 +101,8 @@ class VectorDatabase:
                 metadatas=metadatas,
                 # embeddings=embeddings, # relying on ChromaDB to generate embeddings
             )
+            doc_count_post = await collection.count()
+            logger.debug(f"Number of documents in collection {collection.name} after adding: {doc_count_post}")
         except ValueError:
             logger.exception(
                 f"Error adding documents to collection {collection.name}, please check the ids, documents, and metadatas"
@@ -187,38 +115,7 @@ class VectorDatabase:
         results = await collection.get(ids=ids)
         return results
 
-    # def check_documents_exist(self, document_ids: list[str]) -> tuple[bool, list[str]]:
-    #     """
-    #     Check if documents exist.
-
-    #     Args:
-    #         document_ids (list[str]): The list of document IDs to check.
-
-    #     Returns:
-    #         tuple[bool, list[str]]: A tuple where the first element is a boolean indicating if all documents exist,
-    #         and the second element is a list of missing document IDs.
-
-    #     Raises:
-    #         Exception: If an error occurs while checking the document existence.
-    #     """
-    #     try:
-    #         # Get existing document ids from the db
-    #         result = self.collection.get(ids=document_ids, include=[])
-    #         existing_ids = set(result["ids"])
-
-    #         # Find missing ids
-    #         missing_ids = list(set(document_ids) - existing_ids)
-    #         all_exist = len(missing_ids) == 0
-
-    #         if missing_ids:
-    #             logger.info(f"{len(missing_ids)} out of {len(document_ids)} documents are new and will be added.")
-    #         return all_exist, missing_ids
-
-    #     except Exception as e:
-    #         logger.error(f"Error checking document existence: {e}")
-    #         return False, document_ids
-
-    @base_error_handler
+    @generic_error_handler
     async def query(self, user_query: str | list[str], n_results: int = 10) -> dict[str, Any]:
         """
         Query the collection to retrieve documents based on the user's query.
