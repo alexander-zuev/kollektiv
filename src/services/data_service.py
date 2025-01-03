@@ -3,13 +3,12 @@ from typing import Any, TypeVar
 from uuid import UUID
 
 from src.api.v0.schemas.chat_schemas import ConversationSummary
-from src.api.v0.schemas.sources_schemas import AddContentSourceRequest
 from src.core._exceptions import ConversationNotFoundError
 from src.infra.data.data_repository import DataRepository
 from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
 from src.models.chat_models import Conversation, ConversationHistory, ConversationMessage
-from src.models.content_models import Chunk, DataSource, Document, SourceSummary
+from src.models.content_models import AddContentSourceRequest, Chunk, DataSource, Document, SourceSummary
 from src.models.job_models import Job
 from src.models.vector_models import VectorCollection
 
@@ -149,18 +148,18 @@ class DataService:
         conversation = await self.repository.find_by_id(Conversation, conversation_id)
         return conversation
 
-    async def get_conversation_history(self, conversation_id: UUID) -> ConversationHistory:
+    async def get_conversation_history(self, conversation_id: UUID, user_id: UUID) -> ConversationHistory:
         """Get a single conversation history by its ID in accordance with RLS policies."""
         try:
             # Find messages next
             messages = await self.repository.find(ConversationMessage, filters={"conversation_id": conversation_id})
             # Create ConversationHistory model
             conversation_history = ConversationHistory(
-                messages=messages,
+                messages=messages, user_id=user_id, conversation_id=conversation_id
             )
             # Return it
             return conversation_history
-        except ConversationNotFoundError:
+        except ConversationNotFoundError as e:
             logger.error(f"Conversation with id {conversation_id} not found", exc_info=True)
             raise ConversationNotFoundError(f"Conversation with id {conversation_id} not found") from e
 
@@ -174,6 +173,7 @@ class DataService:
     async def update_conversation(self, history: ConversationHistory, messages: list[ConversationMessage]) -> None:
         """Update conversation in Supabase."""
         # Extract message IDs from the new messages
+        logger.debug(f"Updating conversation {history.conversation_id} with {len(messages)} messages")
         new_message_ids = [message.message_id for message in messages]
 
         # Get the current conversation
@@ -208,3 +208,8 @@ class DataService:
         """Save collection to Supabase."""
         logger.debug(f"Saving collection {collection.name}")
         await self.repository.save(collection)
+
+    async def get_datasource(self, source_id: UUID) -> DataSource:
+        """Get data source by ID."""
+        result = await self.repository.find_by_id(DataSource, source_id)
+        return result

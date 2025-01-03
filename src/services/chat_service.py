@@ -49,6 +49,7 @@ class ChatService:
                 conversation = await self.conversation_manager.get_conversation_history(
                     conversation_id=conversation_id, message=user_message
                 )
+                logger.debug(f"Retrieved conversation with ID: {conversation.conversation_id}")
             else:
                 logger.info(f"Creating new conversation for user {user_message.user_id}")
                 conversation = await self.conversation_manager.create_conversation(message=user_message)
@@ -67,7 +68,6 @@ class ChatService:
             )
 
             # 4. Process stream
-            logger.info(f"Starting stream processing for conversation {conversation.conversation_id}")
             async for event in self._process_stream(conversation):
                 yield event
 
@@ -172,7 +172,14 @@ class ChatService:
         conversations = await self.data_service.get_conversations(user_id)
         return conversations
 
+    # TODO: this should load in the sources for the conversation
     async def get_conversation(self, conversation_id: UUID) -> Conversation:
         """Return a single conversation by its ID in accordance with RLS policies."""
         conversation = await self.data_service.get_conversation(conversation_id)
+
+        # Load data source summaries by id
+        # Update system prompt with data source summaries
+
         return conversation
+
+    # TODO: which endpoint and method should handle the update of the data sources linked to a conversation?

@@ -44,6 +44,7 @@ ngrok = "^1.4.0"
 celery = "^5.4.0"
 fastapi = { extras = ["standard"], version = "^0.115.6" }
 uvicorn = { extras = ["standard"], version = "^0.34.0" }
+flower = "^2.0.1"
 
 
 [tool.poetry.group.dev.dependencies]

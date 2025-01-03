@@ -1,257 +1,187 @@
 # TODO: Review the need for this class. How is this managed in other RAG systems?
 import json
-import os
-from typing import Any
+import random
+from uuid import UUID
 
-import aiofiles
 import anthropic
-import weave
-from anthropic.types import Message
+from anthropic.types import Message, MessageParam, TextBlockParam
 
-from src.infra.decorators import anthropic_error_handler, base_error_handler
+from src.core.chat.prompt_manager import PromptManager
+from src.core.chat.tool_manager import ToolManager, ToolName
+from src.infra.data.data_repository import DataRepository
+from src.infra.decorators import anthropic_error_handler
+from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
-from src.infra.settings import settings
+from src.infra.settings import get_settings
+from src.models.content_models import Document, SourceSummary
+from src.models.llm_models import PromptType
 from src.services.data_service import DataService
 
 logger = get_logger()
+settings = get_settings()
 
 MAX_RETRIES = 2
 
 
 class SummaryManager:
-    """Manages document summaries, including generation."""
+    """Responsible for generating summaries for data sources loaded into the system."""
 
-    def __init__(self, data_service: DataService | None = None, model_name: str = settings.main_model):
-        if settings.weave_project_name and settings.weave_project_name.strip():
-            weave.init(project_name=settings.weave_project_name)
-
-        self.client = anthropic.AsyncAnthropic(api_key=settings.main_model, max_retries=MAX_RETRIES)
-        self.model_name = model_name
+    def __init__(
+        self,
+        data_service: DataService | None = None,
+        prompt_manager: PromptManager | None = None,
+        tool_manager: ToolManager | None = None,
+        n_samples_max: int = 5,
+    ):
+        """Initialize the SummaryManager."""
+        self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         self.data_service = data_service
+        self.prompt_manager = prompt_manager
+        self.tool_manager = tool_manager
+        self.n_samples_max = n_samples_max
+
+    async def _prepare_data_for_summary(self, documents: list[Document]) -> tuple[list[str], list[str], list[Document]]:
+        """Prepare the data for summary generation."""
+        unique_urls = list(set(doc.metadata.source_url for doc in documents if doc.metadata.source_url))
+        unique_titles = list(set(doc.metadata.title for doc in documents if doc.metadata.title))
+        documents_sample = self._select_samples(documents)
+        return unique_urls, unique_titles, documents_sample
+
+    def _select_samples(self, documents: list[Document]) -> list[Document]:
+        """Select representative document samples."""
+        logger.debug(f"Selecting {self.n_samples_max} samples from {len(documents)} documents")
+        if len(documents) <= self.n_samples_max:
+            return documents
+        return random.sample(documents, self.n_samples_max)
+
+    def _format_summary_input(
+        self, documents_sample: list[Document], unique_urls: list[str], unique_titles: list[str]
+    ) -> str:
+        """Format input data for summary generation."""
+        return f"""
+        Analyze this web content and provide a summary and keywords.
+
+        Source URLs ({len(unique_urls)} total):
+        {json.dumps(unique_urls, indent=2)}
+
+        Document Titles ({len(unique_titles)} total):
+        {json.dumps(unique_titles, indent=2)}
+
+        Sample Content ({len(documents_sample)} documents):
+        {json.dumps([{
+            'title': doc.metadata.title,
+            'url': doc.metadata.source_url,
+            'content': doc.content[:500] + '...' if len(doc.content) > 500 else doc.content
+        } for doc in documents_sample], indent=2)}
+
+        Generate:
+        1. A concise summary (100-150 words) describing the main topics and content type
+        2. 5-10 specific keywords that appear in the content
+        
+        Return as JSON with 'summary' and 'keywords' fields.
+        """
 
     @anthropic_error_handler
-    @weave.op()
-    async def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
-        """Generates a document summary and keywords based on provided chunks.
+    async def generate_document_summary(
+        self, source_id: UUID, documents_sample: list[Document], unique_urls: list[str], unique_titles: list[str]
+    ) -> SourceSummary:
+        """Generates a document summary and keywords based on documents and metadata."""
+        input_text = self._format_summary_input(documents_sample, unique_urls, unique_titles)
 
-        Args:
-            chunks: A list of dictionaries, where each dictionary represents a chunk of text and its metadata.
+        messages = [MessageParam(role="user", content=[TextBlockParam(type="text", text=input_text)])]
+        logger.debug(f"Summary generation input: {messages}")
+        response = await self.client.messages.create(
+            model=settings.main_model,
+            max_tokens=1024,
+            messages=messages,
+            system=self.prompt_manager.return_system_prompt(PromptType.SUMMARY_PROMPT),
+            tools=[self.tool_manager.get_tool(ToolName.SUMMARY)],
+            tool_choice=self.tool_manager.force_tool_choice(ToolName.SUMMARY),
+        )
+        logger.debug(f"Summary generation response: {response}")
+        return self._parse_summary(response, source_id)
 
-        Returns:
-            A dictionary containing the generated summary and keywords.
-        """
-        unique_urls = {chunk["metadata"]["source_url"] for chunk in chunks}
-        unique_titles = {chunk["metadata"]["page_title"] for chunk in chunks}
+    def _parse_summary(self, response: Message, source_id: UUID) -> SourceSummary:
+        """Parse the summary response from Claude."""
+        try:
+            # Get tool calls from response
+            tool_calls = [block for block in response.content if block.type == "tool_use"]
+            if not tool_calls:
+                raise ValueError("No tool use in response")
 
-        # Select diverse content samples
-        sample_chunks = self._select_diverse_chunks(chunks, 15)
-        content_samples = [chunk["data"]["text"][:300] for chunk in sample_chunks]
+            # Parse the tool output
+            tool_output = json.loads(tool_calls[0].input)
+            logger.debug(f"Tool output: {tool_output}")
 
-        # Construct the summary prompt
-        system_prompt = """
-        You are a Document Analysis AI. Your task is to generate accurate, relevant and concise document summaries and
-        a list of key topics (keywords) based on a subset of chunks shown to you. Always respond in the following JSON
-        format.
+            return SourceSummary(
+                source_id=source_id,
+                summary=tool_output["summary"],
+                keywords=tool_output["keywords"],
+            )
 
-        General instructions:
-        1. Provide a 150-200 word summary that captures the essence of the documentation.
-        2. Mention any notable features or key points that stand out.
-        3. If applicable, briefly describe the type of documentation (e.g., API reference, user guide, etc.).
-        4. Do not use phrases like "This documentation covers" or "This summary describes". Start directly
-        with the key information.
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"Failed to parse summary response: {e}")
+            raise ValueError(f"Invalid summary format: {e}")
 
-        JSON Format:
-        {
-          "summary": "A concise summary of the document",
-          "keywords": ["keyword1", "keyword2", "keyword3", ...]
-        }
 
-        Ensure your entire response is a valid JSON
-        """
+if __name__ == "__main__":
+    import asyncio
+    from uuid import UUID
 
-        message = f"""
-        Analyze the following document and provide a list of keywords (key topics).
+    async def test_summary_generation() -> None:  # type: ignore
+        # Initialize dependencies
+        logger.info("Initializing dependencies...")
+        supabase_manager = await SupabaseManager.create_async()
+        data_repository = DataRepository(supabase_manager)
+        data_service = DataService(data_repository)
+        prompt_manager = PromptManager()
+        tool_manager = ToolManager()
 
-        Document Metadata:
-        - Unique URLs: {len(unique_urls)}
-        - Unique Titles: {unique_titles}
-
-        Content Structure:
-        {self._summarize_content_structure(chunks)}
-
-        Chunk Samples:
-        {self._format_content_samples(content_samples)}
-
-        """
-
-        response = self.client.messages.create(
-            model=self.model_name,
-            max_tokens=450,
-            system=system_prompt,
-            messages=[{"role": "user", "content": message}],
+        # Create summary manager
+        logger.info("Creating summary manager...")
+        summary_manager = SummaryManager(
+            data_service=data_service, prompt_manager=prompt_manager, tool_manager=tool_manager, n_samples_max=5
         )
 
-        summary, keywords = self._parse_summary(response)
+        # Test source ID - you'll provide this
+        source_id = UUID("123e4567-e89b-12d3-a456-426614174000")  # Replace with actual
+        logger.info(f"Testing with source_id: {source_id}")
 
-        return {
-            "summary": summary,
-            "keywords": keywords,
-        }
-
-    @base_error_handler
-    def _select_diverse_chunks(self, chunks: list[dict[str, Any]], n: int) -> list[dict[str, Any]]:
-        """Selects a diverse subset of chunks.
-
-        Args:
-            chunks: The list of chunks to select from.
-            n: The desired number of chunks to select.
-
-        Returns:
-            A list of selected chunks.
-        """
-        step = max(1, len(chunks) // n)
-        return chunks[::step][:n]
-
-    @base_error_handler
-    def _summarize_content_structure(self, chunks: list[dict[str, Any]]) -> str:
-        """Summarizes the content structure based on headers.
-
-        Args:
-            chunks: The list of chunks.
-
-        Returns:
-            A string summarizing the content structure.
-        """
-        header_structure = {}
-        for chunk in chunks:
-            headers = chunk["data"]["headers"]
-            for level, header in headers.items():
-                if header:
-                    header_structure.setdefault(level, set()).add(header)
-
-        return "\n".join([f"{level}: {', '.join(headers)}" for level, headers in header_structure.items()])
-
-    @base_error_handler
-    def _format_content_samples(self, samples: list[str]) -> str:
-        """Formats content samples for display.
-
-        Args:
-            samples: A list of content samples.
-
-        Returns:
-            A formatted string of content samples.
-        """
-        return "\n\n".join(f"Sample {i + 1}:\n{sample}" for i, sample in enumerate(samples))
-
-    @base_error_handler
-    def _parse_summary(self, response: Message) -> tuple[str, list[str]]:
-        """Parses the summary and keywords from an Anthropic Message.
-
-        Args:
-            response: The Anthropic Message object.
-
-        Returns:
-            A tuple containing the summary and a list of keywords.
-        """
-        content = response.content[0].text
-        logger.debug(f"Attempting to parse the summary json: {content}")
         try:
-            parsed = json.loads(content)
-            return parsed["summary"], parsed["keywords"]
-        except json.JSONDecodeError:
-            logger.error("Error: Response is not valid JSON")
-            return self._extract_data_from_text(content)
-        except KeyError as e:
-            logger.error(f"Error: JSON does not contain expected keys: {e}")
-            return self._extract_data_from_text(content)
+            # Fetch documents
+            logger.info("Fetching documents...")
+            documents = await data_service.get_documents_by_source(source_id=source_id)
+            logger.info(f"Found {len(documents)} documents")
 
-    @base_error_handler
-    def _extract_data_from_text(self, text: str) -> tuple[str, list[str]]:
-        """Extracts summary and keywords from text if JSON parsing fails.
+            # Prepare data
+            logger.info("Preparing data for summary...")
+            unique_urls, unique_titles, documents_sample = await summary_manager._prepare_data_for_summary(documents)
+            logger.info(f"Selected {len(documents_sample)} sample documents")
+            logger.info(f"Found {len(unique_urls)} unique URLs")
+            logger.info(f"Found {len(unique_titles)} unique titles")
 
-        This method acts as a fallback mechanism when the model's response
-        doesn't adhere to the expected JSON format. It attempts to extract
-        the summary and keywords by splitting the text based on predefined
-        delimiters.
+            # Generate summary
+            logger.info("Generating summary...")
+            summary = await summary_manager.generate_document_summary(
+                source_id=source_id,
+                documents_sample=documents_sample,
+                unique_urls=unique_urls,
+                unique_titles=unique_titles,
+            )
 
-        Args:
-            text: The raw text from the model's response.
+            # Print results
+            logger.info("Summary generation complete!")
+            logger.info("=== Generated Summary ===")
+            logger.info(f"Summary: {summary.summary}")
+            logger.info("=== Keywords ===")
+            logger.info(f"Keywords: {', '.join(summary.keywords)}")
 
-        Returns:
-            A tuple containing the extracted summary and a list of keywords.
-        """
-        summary = ""
-        keywords = []
-        if "summary:" in text.lower():
-            summary = text.lower().split("summary:")[1].split("keywords:")[0].strip()
-        if "keywords:" in text.lower():
-            keywords = text.lower().split("keywords:")[1].strip().split(",")
-        return summary, [k.strip() for k in keywords]
-
-    @base_error_handler
-    def load_summaries(self) -> dict[str, dict[str, Any]]:
-        """Loads document summaries from a JSON file."""
-        summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
-        if os.path.exists(summaries_file):
-            try:
-                with open(summaries_file) as f:
-                    return json.loads(f.read())
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to load document summaries: {e}")
-                return {}
-        return {}
-
-    @base_error_handler
-    async def save_summaries(self) -> None:
-        """Saves the document summaries to a JSON file."""
-        summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
-        try:
-            async with aiofiles.open(summaries_file, "w") as f:
-                await f.write(json.dumps(self.summaries, indent=2))
-            logger.info(f"Successfully saved new document summary to {summaries_file}")
         except Exception as e:
-            logger.error(f"Failed to save document summaries: {e}")
+            logger.error(f"Error during testing: {e}", exc_info=True)
+        finally:
+            # Cleanup
+            await supabase_manager.close()
+            logger.info("Test complete")
 
-    @base_error_handler
-    def get_all_summaries(self) -> list[str]:
-        """Returns a list of all document summaries."""
-        return list(self.summaries.values())
-
-    @base_error_handler
-    def clear_summaries(self) -> None:
-        """Clears the document summaries and removes the summaries file."""
-        self.summaries = {}
-        summaries_file = os.path.join(settings.vector_storage_dir, "document_summaries.json")
-        if os.path.exists(summaries_file):
-            os.remove(summaries_file)
-            logger.info("Document summaries cleared.")
-        self.save_summaries()
-
-    @base_error_handler
-    def process_file(self, data: list[dict], file_name: str) -> None:
-        """
-        Process the file and generate or load its summary.
-
-        Args:
-            data (list[dict]): The list of data dictionaries to be processed.
-            file_name (str): The name of the file to process.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        if file_name in self.summaries:
-            result = self.summaries[file_name]
-            logger.info(f"Loading existing summary for {file_name}.")
-        else:
-            logger.info(f"Summary for {file_name} not found, generating new one.")
-            result = self.generate_document_summary(data)
-            result["filename"] = file_name
-            self.summaries[file_name] = result
-
-        # Save updated summaries
-        self.save_summaries()
-
-        return result
+    # Run the test
+    asyncio.run(test_summary_generation())

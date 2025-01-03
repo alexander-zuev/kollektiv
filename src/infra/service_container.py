@@ -22,6 +22,7 @@ from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
+from src.core.chat.summary_manager import SummaryManager
 
 logger = get_logger()
 
@@ -50,6 +51,7 @@ class ServiceContainer:
         self.chroma_manager: ChromaManager | None = None
         self.event_publisher: EventPublisher | None = None
         self.event_consumer: EventConsumer | None = None
+        self.summary_manager: SummaryManager | None = None
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
@@ -62,6 +64,7 @@ class ServiceContainer:
             # Redis
             self.async_redis_manager = await RedisManager.create_async()
             self.redis_repository = RedisRepository(manager=self.async_redis_manager)
+            self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
 
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)
@@ -70,6 +73,8 @@ class ServiceContainer:
                 crawler=self.firecrawler,
                 job_manager=self.job_manager,
                 data_service=self.data_service,
+                redis_manager=self.async_redis_manager,
+                event_publisher=self.event_publisher,
             )
 
             # Vector operations
@@ -96,11 +101,13 @@ class ServiceContainer:
             self.ngrok_service = await NgrokService.create()
 
             # Events
-            self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
             self.event_consumer = await EventConsumer.create_async(
                 redis_manager=self.async_redis_manager, content_service=self.content_service
             )
             await self.event_consumer.start()
+
+            # Source summary
+            self.summary_manager = SummaryManager(data_service=self.data_service)
 
             # Log the successful initialization
             logger.info("✓ Initialized services successfully.")

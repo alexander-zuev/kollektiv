@@ -33,6 +33,7 @@ class Routes:
 
             SOURCES = "/sources"
             SOURCE = "/sources/{source_id}"
+            SOURCE_EVENTS = "/sources/{source_id}/events"
             SOURCE_STATUS = "/sources/{source_id}/status"
 
         class Chat:

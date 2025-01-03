@@ -3,7 +3,6 @@ import subprocess
 import uuid
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-import numpy as np
 import pytest
 from anthropic.types import (
     ContentBlockStartEvent,
@@ -13,7 +12,6 @@ from anthropic.types import (
     TextDelta,
 )
 from chromadb import AsyncClientAPI
-from chromadb.api.types import Document, Documents, Embedding, EmbeddingFunction
 from fastapi.testclient import TestClient
 from redis import Redis as SyncRedis
 from redis.asyncio import Redis as AsyncRedis
@@ -27,13 +25,12 @@ from src.core.content.crawler import FireCrawler
 from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.reranker import Reranker
 from src.core.search.retriever import Retriever
-from src.core.search.vector_db import VectorDB
+from src.core.search.vector_db import VectorDatabase
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.external.chroma_manager import ChromaManager
 from src.infra.external.redis_manager import RedisManager
 from src.infra.external.supabase_manager import SupabaseManager
-from src.infra.rq.rq_manager import RQManager
 from src.infra.service_container import ServiceContainer
 from src.models.chat_models import (
     ConversationHistory,
@@ -41,30 +38,12 @@ from src.models.chat_models import (
     Role,
     TextBlock,
 )
+from src.models.content_models import AddContentSourceRequest, DataSourceType, Document
+from src.models.job_models import CrawlJobDetails, Job, JobStatus, JobType
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
-
-
-class MockEmbeddingFunction(EmbeddingFunction):
-    """Mock embedding function that follows ChromaDB's interface."""
-
-    def __call__(self, input: Document | Documents) -> list[Embedding]:
-        """Return mock embeddings that match ChromaDB's expected types."""
-        mock_embedding = np.array([0.1, 0.2, 0.3], dtype=np.float32)
-
-        if isinstance(input, str):
-            return [mock_embedding]
-        return [mock_embedding for _ in input]
-
-
-@pytest.fixture
-def mock_openai_embeddings(monkeypatch):
-    """Mock OpenAI embeddings for unit tests."""
-    mock_func = MockEmbeddingFunction()
-    monkeypatch.setattr("chromadb.utils.embedding_functions.OpenAIEmbeddingFunction", lambda **kwargs: mock_func)
-    return mock_func
 
 
 @pytest.fixture(autouse=True)
@@ -105,13 +84,13 @@ def mock_environment_variables():
 @pytest.fixture
 def mock_vector_db():
     """Create a mock object for VectorDB."""
-    return MagicMock(spec=VectorDB)
+    return MagicMock(spec=VectorDatabase)
 
 
 @pytest.fixture
 def real_vector_db():
     """Create a real VectorDB instance for testing."""
-    return VectorDB()
+    return VectorDatabase()
 
 
 @pytest.fixture
@@ -288,9 +267,8 @@ async def mock_app():
     container.data_service = MagicMock(spec=DataService)
 
     # 2. Redis Layer
-    container.redis_client = MagicMock(spec=Redis)
+    container.redis_client = MagicMock(spec=AsyncRedis)
     container.redis_repository = MagicMock(spec=RedisRepository)
-    container.rq_manager = MagicMock(spec=RQManager)
 
     # 3. Job & Content Layer
     container.job_manager = MagicMock(spec=JobManager)
@@ -298,7 +276,7 @@ async def mock_app():
     container.content_service = AsyncMock(spec=ContentService)
 
     # 4. Vector & Search Layer
-    container.vector_db = MagicMock(spec=VectorDB)
+    container.vector_db = MagicMock(spec=VectorDatabase)
     container.embedding_manager = MagicMock(spec=EmbeddingManager)
     container.retriever = MagicMock(spec=Retriever)
     container.reranker = MagicMock(spec=Reranker)
@@ -320,9 +298,46 @@ async def integration_app():
     container = await ServiceContainer.create()
 
     # Mock only external services that can't be run in tests
-    container.firecrawler = MagicMock(spec=FireCrawler)
-    container.firecrawler.api_key = "test-key"
-    container.firecrawler.firecrawl_app = MagicMock()
+    mock_crawler = AsyncMock(spec=FireCrawler)
+    mock_crawler.api_key = "test-key"
+    mock_crawler.firecrawl_app = MagicMock()
+    mock_crawler.start_crawl = AsyncMock(return_value=MagicMock(success=True, job_id="test-crawl-id"))
+
+    # Mock get_results to return proper Document objects
+    mock_crawler.get_results = AsyncMock(
+        return_value=[
+            Document(
+                document_id=uuid.uuid4(),
+                source_id=uuid.uuid4(),
+                content="Test content",
+                metadata={
+                    "title": "Test Document",
+                    "description": "Test description",
+                    "source_url": "https://example.com/test",
+                    "og_url": "https://example.com/test",
+                },
+            )
+        ]
+    )
+
+    container.firecrawler = mock_crawler
+
+    # Mock job manager to handle firecrawl_id lookups
+    mock_job_manager = AsyncMock(spec=JobManager)
+    mock_job_manager.get_by_firecrawl_id = AsyncMock(
+        return_value=Job(
+            job_id=uuid.uuid4(),
+            status=JobStatus.IN_PROGRESS,
+            job_type=JobType.CRAWL,
+            details=CrawlJobDetails(
+                source_id=uuid.uuid4(),
+                firecrawl_id="test-crawl-id",
+                pages_crawled=0,
+                url="https://example.com",
+            ),
+        )
+    )
+    container.job_manager = mock_job_manager
 
     # Mock expensive services
     container.claude_assistant = MagicMock(spec=ClaudeAssistant)
@@ -450,7 +465,7 @@ async def redis_integration_repository(redis_integration_manager):
 @pytest.fixture
 def sample_uuid():
     """Sample UUID for testing."""
-    return uuid.UUID("12345678-1234-5678-1234-567812345678")
+    return uuid.UUID("00000000-0000-0000-0000-000000000000")
 
 
 @pytest.fixture
@@ -494,3 +509,48 @@ def mock_redis_with_pipeline(mock_redis, mock_redis_pipeline):
     """Mock Redis with pipeline support."""
     mock_redis.pipeline = AsyncMock(return_value=mock_redis_pipeline)
     return mock_redis
+
+
+@pytest.fixture
+async def mock_event_publisher():
+    """Mock event publisher for testing."""
+    mock_publisher = AsyncMock()
+    mock_publisher.publish_event = AsyncMock()
+    return mock_publisher
+
+
+@pytest.fixture
+async def integration_content_service(
+    integration_app,
+    redis_integration_repository,
+    redis_integration_manager,
+    mock_event_publisher,
+):
+    """Create a ContentService instance for integration testing."""
+    container = integration_app.state.container
+
+    # Create service with minimal mocking
+    service = ContentService(
+        crawler=container.firecrawler,
+        job_manager=container.job_manager,
+        data_service=container.data_service,
+        redis_manager=redis_integration_manager,
+        event_publisher=mock_event_publisher,
+    )
+
+    return service
+
+
+@pytest.fixture
+def sample_source_request():
+    """Sample source addition request for testing."""
+    return AddContentSourceRequest(
+        user_id=uuid.UUID("00000000-0000-0000-0000-000000000000"),
+        source_type=DataSourceType.WEB,
+        request_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        request_config={
+            "url": "https://example.com",
+            "max_pages": 10,
+            "crawl_pattern": "/**",
+        },
+    )

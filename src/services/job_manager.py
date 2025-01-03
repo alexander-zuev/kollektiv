@@ -33,7 +33,8 @@ class JobManager:
             Job: The created job instance
         """
         job = Job(job_type=job_type, details=details)
-        return await self.data_service.save_job(job)
+        await self.data_service.save_job(job)
+        return job
 
     async def update_job(self, job_id: UUID, updates: dict[str, Any]) -> Job:
         """

@@ -1,48 +1,24 @@
-import json
-import os
 import re
-import uuid
 from typing import Any
-from uuid import uuid4
+from uuid import UUID
 
 import tiktoken
 
+from src.infra.data.data_repository import DataRepository
 from src.infra.decorators import generic_error_handler
-from src.infra.logger import get_logger
-from src.models.content_models import Chunk
+from src.infra.external.supabase_manager import SupabaseManager
+from src.infra.logger import configure_logging, get_logger
+from src.infra.settings import get_settings
+from src.models.content_models import Chunk, Document
+from src.services.data_service import DataService
 
 logger = get_logger()
 
-
-class PreProcessor:
-    """Pre-processes data before chunking."""
-
-    pass
+settings = get_settings()
 
 
 class MarkdownChunker:
-    """Processes markdown, removes boilerplate, images, and validates chunks.
-
-    Args:
-        output_dir (str): The directory to save processed data. Defaults to PROCESSED_DATA_DIR.
-        max_tokens (int): Maximum tokens per chunk. Defaults to 1000.
-        soft_token_limit (int): Soft limit for tokens per chunk, aiming to avoid splitting phrases. Defaults to 800.
-        min_chunk_size (int): Minimum size of each chunk in tokens. Defaults to 100.
-        overlap_percentage (float): Percentage of token overlap between chunks. Defaults to 0.05.
-        save (bool): Whether or not to save the processed chunks. Defaults to False.
-
-    Methods:
-        load_data: Loads markdown from JSON and prepares for chunking.
-        remove_images: Removes all types of images from the content.
-        process_pages: Iterates through each page in the loaded data.
-        remove_boilerplate: Removes navigation and boilerplate content from markdown.
-        clean_header_text: Cleans unwanted markdown elements and artifacts from header text.
-        identify_sections: Identifies sections in the page content based on headers and preserves markdown structures.
-
-    Raises:
-        FileNotFoundError: If the input file is not found.
-        json.JSONDecodeError: If there is an issue decoding the JSON file.
-    """
+    """Processes markdown, removes boilerplate, images, and creates chunks."""
 
     def __init__(
         self,
@@ -51,17 +27,19 @@ class MarkdownChunker:
         min_chunk_size: int = 100,
         overlap_percentage: float = 0.05,
         save: bool = False,
+        document_batch_size: int = 50,
+        chunk_batch_size: int = 500,
     ):
-        self.input_filename: str | None
         self.tokenizer = tiktoken.get_encoding("cl100k_base")
         self.max_tokens = max_tokens  # Hard limit
         self.soft_token_limit = soft_token_limit  # Soft limit
         self.min_chunk_size = min_chunk_size  # Minimum chunk size in tokens
         self.overlap_percentage = overlap_percentage  # 5% overlap
+        self.document_batch_size = document_batch_size
+        self.chunk_batch_size = chunk_batch_size
 
         # Precompile regex patterns for performance
         self.boilerplate_patterns = [
-            r"\[Anthropic home page.*\]\(/.*\)",  # Matches the home page link with images
             r"^English$",  # Matches the language selection
             r"^Search\.\.\.$",
             r"^Ctrl K$",
@@ -76,6 +54,16 @@ class MarkdownChunker:
         self.code_block_start_pattern = re.compile(r"^(```|~~~)(.*)$")
         self.inline_code_pattern = re.compile(r"`([^`\n]+)`")
 
+    # Batching operations
+    def batch_documents(self, documents: list[Document]) -> list[list[Document]]:
+        """Batch documents into smaller chunks."""
+        return [documents[i : i + self.document_batch_size] for i in range(0, len(documents), self.document_batch_size)]
+
+    def batch_chunks(self, chunks: list[Chunk]) -> list[list[Chunk]]:
+        """Batch chunks into smaller chunks."""
+        return [chunks[i : i + self.chunk_batch_size] for i in range(0, len(chunks), self.chunk_batch_size)]
+
+    # Pre-processing operations
     @generic_error_handler
     def remove_images(self, content: str) -> str:
         """
@@ -108,75 +96,6 @@ class MarkdownChunker:
         )
 
         return content
-
-    async def create_fake_chunks(self, n_chunks: int = 1000) -> list[Chunk]:
-        """Create fake chunks for testing."""
-        chunks = []
-        for i in range(n_chunks):
-            chunk = Chunk(
-                chunk_id=uuid4(),
-                document_id=uuid4(),
-                source_id=uuid4(),
-                text=f"Fake chunk content {i}",
-                token_count=100,
-                source_url="https://example.com",
-                page_title="Example Page",
-                headers={"header1": "value1", "header2": "value2"},
-            )
-            chunks.append(chunk)
-        return chunks
-
-    @generic_error_handler
-    def process_pages(self, json_input: dict[str, Any]) -> list[dict[str, Any]]:
-        """
-        Process pages from JSON input and generate data chunks.
-
-        Args:
-            json_input (dict[str, Any]): The input JSON containing page data and metadata.
-
-        Returns:
-            list[dict[str, Any]]: A list of processed data chunks.
-
-        Raises:
-            KeyError: If the JSON input does not contain the required keys.
-            ValueError: If there is an issue with the page content processing.
-        """
-        all_chunks = []
-        # Access the nested data structure correctly
-        pages = json_input.get("data", {}).get("data", [])
-
-        for page in pages:
-            page_content = page.get("markdown", "")
-            page_metadata = page.get("metadata", {})
-
-            # Skip empty content
-            if not page_content.strip():
-                logger.warning(f"Skipping empty page content for URL: {page_metadata.get('sourceURL', 'unknown')}")
-                continue
-
-            page_content = self.remove_boilerplate(page_content)
-            page_content = self.remove_images(page_content)
-
-            sections = self.identify_sections(page_content, page_metadata)
-            chunks = self.create_chunks(sections, page_metadata)
-
-            # Post-processing: Ensure headers fallback to page title if missing
-            page_title = page_metadata.get("title", "Untitled")
-            for chunk in chunks:
-                if not chunk["data"]["headers"].get("h1"):
-                    chunk["data"]["headers"]["h1"] = page_title
-                    # Increment total headings for H1 when setting from page title
-                    if page_title.strip() not in self.validator.total_headings["h1"]:
-                        self.validator.increment_total_headings("h1", page_title)
-
-            all_chunks.extend(chunks)
-
-        # After processing all pages, perform validation
-        if not all_chunks:
-            logger.warning("No chunks were generated from the input data")
-
-        self.validator.validate(all_chunks)
-        return all_chunks
 
     @generic_error_handler
     def remove_boilerplate(self, content: str) -> str:
@@ -224,20 +143,65 @@ class MarkdownChunker:
             cleaned_text = ""  # Empty out any shell interface mistaken as headers
         return cleaned_text
 
+    # Main processing operations
+    @generic_error_handler
+    def process_documents(self, documents: list[Document]) -> list[Chunk]:
+        """
+        High-level pipeline to process a list of Documents into Chunks.
+
+        1) Skip empty docs
+        2) Preprocess (remove boilerplate, images)
+        3) Identify sections
+        4) Create chunks (calls self.create_chunks)
+        5) Post-process chunks
+        6) Validate
+        7) Return list of all chunks
+        """
+        processed_chunks: list[Chunk] = []
+
+        for document in documents:
+            # 1) Skip empty doc
+            logger.info(f"Processing document: {document.document_id}")
+            if not document.content.strip():
+                logger.warning(f"Empty content in document {document.document_id}, URL: {document.metadata.source_url}")
+                continue
+
+            # 2) Preprocess
+            cleaned_content = self.remove_boilerplate(document.content)
+            cleaned_content = self.remove_images(cleaned_content)
+            logger.debug(f"Cleaned document {document.document_id}: {len(cleaned_content)} chars")
+
+            # 3) Identify sections (returns intermediate data structures)
+            sections = self.identify_sections(
+                page_content=cleaned_content, page_metadata=document.metadata.model_dump()
+            )
+            logger.info("Broke down into sections")
+
+            # 4) Create chunks
+            #    Refactor create_chunks so it returns actual Chunk objects
+            #    and handle references to document.source_id, etc.
+            chunks = self.create_chunks(sections, document)
+            logger.info(f"Created {len(chunks)} chunks")
+
+            # 5) Post-process chunks (e.g. fallback for missing h1)
+            chunks = self.post_process_chunks(chunks, document)
+            logger.info(f"Post-processed {len(chunks)} chunks")
+
+            # Collect all
+            processed_chunks.extend(chunks)
+
+        # 6) Validate
+        if not processed_chunks:
+            logger.warning("No chunks were generated from the input data")
+
+        # 7) Return
+        return processed_chunks
+
     @generic_error_handler
     def identify_sections(self, page_content: str, page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
         """
         Identify the sections and headers in the provided page content.
-
-        Args:
-            page_content (str): The content of the page to be analyzed.
-            page_metadata (dict[str, Any]): Metadata of the page provided as a dictionary.
-
-        Returns:
-            list[dict[str, Any]]: A list of sections, each represented as a dictionary with headers and content.
-
-        Raises:
-            ValueError: If an unclosed code block is detected.
+        Returns a list of { headers: dict, content: str } sections.
         """
         sections = []
         in_code_block = False
@@ -293,8 +257,6 @@ class MarkdownChunker:
                 elif header_level == 3:
                     current_section["headers"]["h3"] = cleaned_header_text
 
-                # Update validator counts
-                self.validator.increment_total_headings(f"h{header_level}", cleaned_header_text)
             else:
                 accumulated_content += line + "\n"
 
@@ -305,61 +267,58 @@ class MarkdownChunker:
 
         # Check for unclosed code block
         if in_code_block:
-            self.validator.add_validation_error("Unclosed code block detected.")
+            logger.warning("Found unclosed code block - this might affect chunking quality")
 
+        logger.debug(
+            f"Section identification complete. Found {len(sections)} sections with "
+            f"{sum(1 for s in sections if s['headers']['h1'])} h1 headers"
+        )
         return sections
 
     @generic_error_handler
-    def create_chunks(self, sections: list[dict[str, Any]], page_metadata: dict[str, Any]) -> list[dict[str, Any]]:
+    def create_chunks(self, sections: list[dict[str, Any]], document: Document) -> list[Chunk]:
         """
-        Create chunks from sections and adjust them according to page metadata.
+        Converts the identified sections into final Chunk objects.
 
         Args:
-            sections (list[dict[str, Any]]): List of sections, where each section is a dictionary with "content" and
-            "headers".
-            page_metadata (dict[str, Any]): Metadata related to the page, used to enrich chunk metadata.
+            sections (list[dict[str, Any]]):
+                Each section is a dictionary containing headers & content, e.g.:
+                {
+                  "headers": {"h1": "...", "h2": "...", "h3": "..."},
+                  "content": "..."
+                }
+            document (Document):
+                The source Document, from which we can retrieve metadata like source_id, etc.
 
         Returns:
-            list[dict[str, Any]]: A list of adjusted and enriched chunks with ids, metadata, and data.
-
-        Raises:
-            CustomException: If validation or adjustment fails during the chunk creation process.
+            list[Chunk]: The final Chunk objects ready for embedding or storage.
         """
-        page_chunks = []
+        page_chunks: list[dict[str, Any]] = []  # Add this line at start of method
         for section in sections:
-            section_chunks = self._split_section(section["content"], section["headers"])
+            section_chunks = self.split_into_raw_chunks(section["content"], section["headers"])
             page_chunks.extend(section_chunks)
 
         # Adjust chunks for the entire page
         adjusted_chunks = self._adjust_chunks(page_chunks)
 
-        final_chunks = []
+        intermediate_chunks: list[Chunk] = []
         for chunk in adjusted_chunks:
-            chunk_id = str(self._generate_chunk_id())
-            token_count = self._calculate_tokens(chunk["content"])
-            self.validator.add_chunk(token_count)
-            metadata = self._create_metadata(page_metadata, token_count)
-            new_chunk = {
-                "chunk_id": chunk_id,
-                "metadata": metadata,
-                "data": {"headers": chunk["headers"], "text": chunk["content"]},
-            }
-            final_chunks.append(new_chunk)
+            new_chunk = Chunk(
+                source_id=document.source_id,
+                document_id=document.document_id,
+                headers=chunk["headers"],
+                text=chunk["content"],
+                token_count=self._calculate_tokens(chunk["content"]),
+                page_title=document.metadata.title or "Untitled",
+                page_url=document.metadata.source_url,
+            )
+            intermediate_chunks.append(new_chunk)
 
-        # After chunks are created, update headings preserved
-        for chunk in final_chunks:
-            headers = chunk["data"]["headers"]
-            for level in ["h1", "h2", "h3"]:
-                heading_text = headers.get(level)
-                if heading_text:
-                    self.validator.add_preserved_heading(level, heading_text)
-
-        # Add overlap as the final step
-        self._add_overlap(final_chunks)
-        return final_chunks
+        logger.debug(f"Created {len(intermediate_chunks)} final chunks")
+        return intermediate_chunks
 
     @generic_error_handler
-    def _split_section(self, content: str, headers: dict[str, str]) -> list[dict[str, Any]]:  # noqa: C901
+    def split_into_raw_chunks(self, content: str, headers: dict[str, str]) -> list[dict[str, Any]]:  # noqa: C901
         """
         Split the content into sections based on headers and code blocks.
 
@@ -413,7 +372,7 @@ class MarkdownChunker:
                             potential_chunk_content = current_chunk["content"] + code_chunk_content
                             token_count = self._calculate_tokens(potential_chunk_content)
                             if token_count <= 2 * self.max_tokens:
-                                current_chunk["content"] = potential_chunk_content
+                                current_chunk["text"] = potential_chunk_content
                             else:
                                 if current_chunk["content"].strip():
                                     chunks.append(current_chunk.copy())
@@ -465,7 +424,6 @@ class MarkdownChunker:
 
         # After processing all lines, check for any unclosed code block
         if in_code_block:
-            self.validator.add_validation_error("Unclosed code block detected.")
             # Add remaining code block content to current_chunk
             current_chunk["content"] += code_block_content
 
@@ -528,7 +486,7 @@ class MarkdownChunker:
         Adjusts the size of the given text chunks by merging small chunks and splitting large ones.
 
         Args:
-            chunks: A list of dictionaries, where each dictionary contains headers and content.
+            chunks: A list of dictionaries representing the chunks.
 
         Returns:
             A list of dictionaries representing the adjusted chunks.
@@ -543,6 +501,7 @@ class MarkdownChunker:
             current_tokens = self._calculate_tokens(current_chunk["content"])
             # If the chunk is too small, try to merge with adjacent chunks
             if current_tokens < self.min_chunk_size:
+                logger.debug(f"Found small chunk: {current_tokens} tokens")
                 merged = False
                 # Try merging with the next chunk
                 if i + 1 < len(chunks):
@@ -658,51 +617,6 @@ class MarkdownChunker:
                 merged[level] = ""
         return merged
 
-    @generic_error_handler
-    def _add_overlap(
-        self, chunks: list[dict[str, Any]], min_overlap_tokens: int = 50, max_overlap_tokens: int = 100
-    ) -> None:
-        """
-        Add overlap to chunks of text based on specified token limits.
-
-        Args:
-            chunks (list[dict[str, Any]]): List of text chunks with metadata.
-            min_overlap_tokens (int): Minimum number of tokens for the overlap.
-            max_overlap_tokens (int): Maximum number of tokens for the overlap.
-
-        Returns:
-            None.
-
-        Raises:
-            ValidationError: If adding overlap exceeds the maximum allowed tokens.
-        """
-        for i in range(1, len(chunks)):
-            prev_chunk = chunks[i - 1]
-            curr_chunk = chunks[i]
-            prev_chunk_text = prev_chunk["data"]["text"]
-
-            # Calculate overlap tokens
-            overlap_token_count = max(
-                int(self._calculate_tokens(prev_chunk_text) * self.overlap_percentage), min_overlap_tokens
-            )
-            overlap_token_count = min(overlap_token_count, max_overlap_tokens)
-
-            # Ensure that adding overlap does not exceed max_tokens
-            current_chunk_token_count = curr_chunk["metadata"]["token_count"]
-            available_space = self.max_tokens - current_chunk_token_count
-            allowed_overlap_tokens = min(overlap_token_count, available_space)
-            if allowed_overlap_tokens <= 0:
-                # Cannot add overlap without exceeding max_tokens
-                self.validator.add_validation_error(
-                    f"Cannot add overlap to chunk {curr_chunk['chunk_id']} without exceeding max_tokens"
-                )
-                continue
-
-            overlap_text = self._get_last_n_tokens(prev_chunk_text, allowed_overlap_tokens)
-            additional_tokens = self._calculate_tokens(overlap_text)
-            curr_chunk["data"]["text"] = overlap_text + curr_chunk["data"]["text"]
-            curr_chunk["metadata"]["token_count"] += additional_tokens
-
     def _split_long_line(self, line: str) -> list[str]:
         """
         Split a long line of text into smaller chunks based on token limits.
@@ -741,37 +655,6 @@ class MarkdownChunker:
         return self.tokenizer.decode(last_n_tokens)
 
     @generic_error_handler
-    def save_chunks(self, chunks: list[dict[str, Any]]) -> str:
-        """
-        Save the given chunks to a JSON file.
-
-        Args:
-            chunks (list of dict): A list of dictionaries containing chunk data.
-
-        Raises:
-            Exception: If an error occurs while saving the chunks to the file.
-        """
-        input_name = os.path.splitext(self.input_filename)[0]  # Remove the extension
-        output_filename = f"{input_name}-chunked.json"
-        output_filepath = os.path.join(self.output_dir, output_filename)
-        with open(output_filepath, "w", encoding="utf-8") as f:
-            json.dump(chunks, f, indent=2)
-        logger.info(f"Chunks saved to {output_filepath}")
-
-        return output_filename
-
-    @generic_error_handler
-    def _generate_chunk_id(self) -> uuid.UUID:
-        """
-        Generate a new UUID for chunk identification.
-
-        Returns:
-            uuid.UUID: A new unique identifier for the chunk.
-
-        """
-        return uuid.uuid4()
-
-    @generic_error_handler
     def _calculate_tokens(self, text: str) -> int:
         """
         Calculate the number of tokens in a given text.
@@ -788,24 +671,169 @@ class MarkdownChunker:
         token_count = len(self.tokenizer.encode(text))
         return token_count
 
+    # Post-processing operations
+    def post_process_chunks(self, chunk_list: list[Chunk], document: Document) -> list[Chunk]:
+        """Post-process chunks to ensure consistency and add metadata."""
+        page_title = document.metadata.title.strip() if document.metadata.title else "Untitled"
+
+        # Ensure headers
+        updated_chunks = [self.ensure_headers(chunk, page_title) for chunk in chunk_list]
+
+        # Add overlap
+        updated_chunks = self.add_overlap(updated_chunks)
+
+        # Combine headers and text
+        updated_chunks = self.combine_headers_and_text(updated_chunks)
+
+        return updated_chunks
+
+    def ensure_headers(self, chunk: Chunk, page_title: str) -> Chunk:
+        if "h1" not in chunk.headers or not chunk.headers["h1"]:
+            chunk.headers["h1"] = page_title
+        return chunk
+
     @generic_error_handler
-    def _create_metadata(self, page_metadata: dict[str, Any], token_count: int) -> dict[str, Any]:
+    def add_overlap(
+        self, chunks: list[Chunk], min_overlap_tokens: int = 50, max_overlap_tokens: int = 100
+    ) -> list[Chunk]:
         """
-        Create metadata dictionary for a page.
+        Add overlap to chunks of text based on specified token limits.
 
         Args:
-            page_metadata (dict[str, Any]): Metadata extracted from a page.
-            token_count (int): Number of tokens in the page content.
+            chunks (list[Chunk]): List of text chunks with metadata.
+            min_overlap_tokens (int): Minimum number of tokens for the overlap.
+            max_overlap_tokens (int): Maximum number of tokens for the overlap.
 
         Returns:
-            dict[str, Any]: A dictionary containing the token count, source URL, and page title.
+            list[Chunk]: List of chunks with overlap added.
 
         Raises:
-            None
+            ValidationError: If adding overlap exceeds the maximum allowed tokens.
         """
-        metadata = {
-            "token_count": token_count,
-            "source_url": page_metadata.get("sourceURL", ""),
-            "page_title": page_metadata.get("title", ""),
+        for i in range(1, len(chunks)):
+            prev_chunk = chunks[i - 1]
+            curr_chunk = chunks[i]
+            prev_chunk_text = prev_chunk.text
+
+            # Calculate overlap tokens
+            overlap_token_count = max(
+                int(self._calculate_tokens(prev_chunk_text) * self.overlap_percentage), min_overlap_tokens
+            )
+            overlap_token_count = min(overlap_token_count, max_overlap_tokens)
+
+            # Ensure that adding overlap does not exceed max_tokens
+            current_chunk_token_count = curr_chunk.token_count
+            available_space = self.max_tokens - current_chunk_token_count
+            allowed_overlap_tokens = min(overlap_token_count, available_space)
+            if allowed_overlap_tokens <= 0:
+                continue
+
+            overlap_text = self._get_last_n_tokens(prev_chunk_text, allowed_overlap_tokens)
+            additional_tokens = self._calculate_tokens(overlap_text)
+            curr_chunk.text = overlap_text + curr_chunk.text
+            curr_chunk.token_count += additional_tokens
+
+        return chunks
+
+    def combine_headers_and_text(self, chunk_list: list[Chunk]) -> list[Chunk]:
+        for chunk in chunk_list:
+            chunk.content = f"Headers: {chunk.headers}\n\n Content: {chunk.text}"
+        return chunk_list
+
+    def save_chunks(self, chunks: list[Chunk], output_path: str = "chunks.json") -> None:
+        """
+        Save chunks to a JSON file for inspection.
+
+        Args:
+            chunks: List of chunks to save
+            output_path: Where to save the chunks (defaults to chunks.json in current directory)
+        """
+        import json
+        from datetime import datetime
+
+        output = {
+            "metadata": {
+                "timestamp": datetime.now().isoformat(),
+                "num_chunks": len(chunks),
+                "settings": {
+                    "max_tokens": self.max_tokens,
+                    "soft_token_limit": self.soft_token_limit,
+                    "min_chunk_size": self.min_chunk_size,
+                    "overlap_percentage": self.overlap_percentage,
+                },
+            },
+            "chunks": [chunk.model_dump(mode="json") for chunk in chunks],
         }
-        return metadata
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(output, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Saved {len(chunks)} chunks to {output_path}")
+        logger.info(
+            f"Saved chunks. Stats: "
+            f"Min tokens: {min(c.token_count for c in chunks)}, "
+            f"Max tokens: {max(c.token_count for c in chunks)}, "
+            f"Avg tokens: {sum(c.token_count for c in chunks)/len(chunks):.1f}"
+        )
+
+    # Validation operations
+    # Calculate key chunking metrics
+
+
+async def get_documents(source_id: UUID) -> list[Document]:
+    """Get documents for a specific source from Supabase."""
+    # Setup
+    supabase_manager = await SupabaseManager.create_async()
+    repository = DataRepository(supabase_manager=supabase_manager)
+    data_service = DataService(repository=repository)
+
+    # Get documents (limit to 15)
+    documents = await data_service.get_documents_by_source(source_id=source_id)
+
+    return documents
+
+
+async def test_chunker(source_id: str) -> None:
+    """Test the chunker with documents from a specific source."""
+    try:
+        # Convert string to UUID
+        source_uuid = UUID(source_id)
+
+        # Get documents
+        documents = await get_documents(source_uuid)
+        logger.info(f"Retrieved {len(documents)} documents")
+
+        # Initialize chunker
+        chunker = MarkdownChunker()
+
+        # Process documents
+        chunks = chunker.process_documents(documents)
+        logger.info(f"Generated {len(chunks)} chunks")
+
+        # Save chunks for inspection
+        chunker.save_chunks(chunks, "test_chunks.json")
+
+        # Print some stats
+        total_tokens = sum(chunk.token_count for chunk in chunks)
+        avg_tokens = total_tokens / len(chunks) if chunks else 0
+
+        print("\nChunking Results:")
+        print(f"Total documents processed: {len(documents)}")
+        print(f"Total chunks generated: {len(chunks)}")
+        print(f"Average tokens per chunk: {avg_tokens:.1f}")
+        print("Results saved to: test_chunks.json")
+
+    except Exception as e:
+        logger.error(f"Error testing chunker: {str(e)}")
+        raise
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    configure_logging(debug=True)
+
+    SOURCE_ID = "37a806c4-6508-4bec-8e66-e6b142195838"
+
+    # Run the test
+    asyncio.run(test_chunker(SOURCE_ID))

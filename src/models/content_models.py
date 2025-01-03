@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, HttpUrl, PrivateAttr, field_validator
 
 from src.models.base_models import SupabaseModel
 
@@ -18,14 +19,152 @@ class DataSourceType(str, Enum):
     CONFLUENCE = "confluence"
 
 
+class ContentSourceConfig(BaseModel):
+    """Configuration parameters for a content source."""
+
+    url: str = Field(..., description="Base URL of the content to crawl.")
+    page_limit: int = Field(default=50, gt=0, description="Maximum number of pages to crawl.")
+    exclude_patterns: list[str] = Field(
+        default_factory=list,
+        alias="excludePaths",
+        description="The list of patterns to exclude, e.g., '/blog/*', '/author/*'.",
+    )
+    include_patterns: list[str] = Field(
+        default_factory=list,
+        alias="includePaths",
+        description="The list of patterns to include, e.g., '/blog/*', '/api/*'.",
+    )
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        """Validates start url of the crawl and returns a str."""
+        try:
+            parsed = HttpUrl(str(v))
+            return str(parsed)  # Convert to string immediately
+        except Exception as e:
+            raise ValueError("Invalid URL. It should start with 'http://' or 'https://'.") from e
+
+    @field_validator("exclude_patterns", "include_patterns")
+    def validate_patterns(cls, v: list[str]) -> list[str]:  # noqa: N805
+        """
+
+        Validates patterns to ensure they start with '/' and are not empty.
+
+        Args:
+            cls: The class instance.
+            v (list[str]): List of string patterns to validate.
+
+        Returns:
+            list[str]: The validated list of patterns.
+
+        Raises:
+            ValueError: If any pattern is empty or does not start with '/'.
+        """
+        for pattern in v:
+            if not pattern.strip():
+                raise ValueError("Empty patterns are not allowed")
+            if not pattern.startswith("/"):
+                raise ValueError("Pattern must start with '/', got: {pattern}")
+        return v
+
+
+class AddContentSourceRequest(SupabaseModel):
+    """
+    Request model for adding a new content source.
+
+    Attributes:
+        request_id: System-generated UUID for tracking the request. Auto-generated if not provided.
+        source_type: Type of content source (currently only 'web' is supported).
+        request_config: Configuration parameters for the content source.
+
+    Example:
+        ```json
+        {
+            "request_config": {
+                "url": "https://docs.example.com",
+                "page_limit": 50,
+                "exclude_patterns": ["/blog/*"],
+                "include_patterns": ["/api/*"]
+            },
+            "source_type": "web"  # Optional, defaults to "web"
+        }
+        ```
+    """
+
+    _db_config: ClassVar[dict] = {"schema": "content", "table": "user_requests", "primary_key": "request_id"}
+    user_id: UUID = Field(..., description="User id, FK, provided by Supabase base after auth.")
+    request_id: UUID = Field(default_factory=uuid4, description="System-generated id of a user request.")
+    source_type: DataSourceType = Field(
+        default=DataSourceType.WEB,  # Make web the default
+        description="Type of content source (currently only 'web' is supported).",
+    )
+    request_config: ContentSourceConfig = Field(
+        ...,  # Required
+        description="Configuration parameters for the content source",
+    )
+
+    class Config:
+        """Example configuration."""
+
+        json_schema_extra = {
+            "example": {
+                "request_config": {
+                    "url": "https://docs.example.com",
+                    "page_limit": 50,
+                    "exclude_patterns": ["/blog/*"],
+                    "include_patterns": ["/api/*"],
+                },
+                "source_type": "web",
+            }
+        }
+
+
+class AddContentSourceResponse(BaseModel):
+    """Simplified model inheriting from Source."""
+
+    source_id: UUID = Field(...)
+    status: SourceStatus = Field(..., description="Status of the data source")
+    error: str | None = Field(None, description="Error message, null if no error")
+
+    @classmethod
+    def from_source(cls, source: DataSource) -> AddContentSourceResponse:
+        return cls(
+            source_id=source.source_id,
+            status=source.status,
+            error=source.error,
+        )
+
+
+class SourceEvent(BaseModel):
+    """Base model for all source-related events."""
+
+    source_id: UUID = Field(..., description="ID of the source this event belongs to")
+    status: SourceStatus = Field(..., description="Type of the event")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
+    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
+    error: str | None = Field(default=None, description="Error message, null if no error")
+
+
+class ProcessingEvent(BaseModel):
+    """Events emitted by celery worker."""
+
+    source_id: UUID = Field(..., description="ID of the source this event belongs to")
+    event_type: Literal["processing", "completed", "failed", "generating_summary"] = Field(
+        ..., description="Type of the event"
+    )
+    error: str | None = Field(default=None, description="Error message, null if no error")
+    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
+
+
 class SourceStatus(str, Enum):
     """Model of Source Status."""
 
     PENDING = "pending"  # right after creation
     CRAWLING = "crawling"  # after crawling started
-    CRAWLED = "crawled"  # after loading is complete
     PROCESSING = "processing"  # during chunking and embedding
-    ADDING_SUMMARY = "adding_summary"  # during adding summaries
+    GENERATING_SUMMARY = "generating_summary"  # during summary generation
     COMPLETED = "completed"  # after processing is complete
     FAILED = "failed"  # if addition failed
 
@@ -35,24 +174,31 @@ class DataSource(SupabaseModel):
 
     _db_config: ClassVar[dict] = {"schema": "content", "table": "data_sources", "primary_key": "source_id"}
 
-    # User-related
+    source_id: UUID = Field(default_factory=uuid4, description="UUID of the source")
     user_id: UUID = Field(..., description="User id, FK, provided by Supabase base after auth.")
+    request_id: UUID = Field(..., description="Request id of the user request to add content")
+    job_id: UUID | None = Field(default=None, description="UUID of the job that is processing this source")
 
-    source_id: UUID = Field(default_factory=uuid4)
     source_type: DataSourceType = Field(
         ..., description="Type of the data source corresponding to supported data source types"
     )
     status: SourceStatus = Field(..., description="Status of the content source in the system.")
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Source-specific configuration and metadata. Schema depends on source_type"
+
+    metadata: FireCrawlSourceMetadata = Field(
+        ..., description="Source-specific configuration. Schema depends on source_type"
     )
-    request_id: UUID = Field(..., description="Request id of the user request to add content")
-    job_id: UUID | None = Field(default=None, description="UUID of the job in the system.")
 
     error: str | None = Field(default=None, description="Error message, null if no error")
 
     # Define protected fields that cannot be updated
     _protected_fields: set[str] = PrivateAttr(default={"source_id", "source_type", "created_at"})
+
+
+class FireCrawlSourceMetadata(BaseModel):
+    """Metadata for a FireCrawl source."""
+
+    crawl_config: ContentSourceConfig = Field(..., description="Configuration of the crawl")
+    total_pages: int = Field(default=0, description="Total number of pages in the source")
 
 
 class SourceSummary(SupabaseModel):
@@ -82,11 +228,9 @@ class Document(SupabaseModel):
     )
     content: str = Field(
         ...,  # Required
-        description="Raw content of the document in markdown format",
+        description="Raw markdown content of the document",
     )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Flexible metadata storage for document-specific information"
-    )
+    metadata: DocumentMetadata = Field(..., description="Flexible metadata storage for document-specific information")
     _db_config: ClassVar[dict] = {"schema": "content", "table": "documents", "primary_key": "document_id"}
 
     class Config:
@@ -96,21 +240,12 @@ class Document(SupabaseModel):
 
 
 class DocumentMetadata(BaseModel):
-    """
-    Flexible metadata container for document-specific information.
+    """Metadata for a document."""
 
-    Accepts any number of keyword arguments which become metadata fields.
-    Common fields might include:
-    - description: Document description or summary
-    - keywords: List of keywords or tags
-    - author: Document author
-    - last_modified: Last modification timestamp
-    - language: Document language
-    """
-
-    def __init__(self, **kwargs: Any) -> None:
-        """Initialize metadata with arbitrary keyword arguments."""
-        super().__init__(**kwargs)
+    title: str = Field(default="Untitled", description="Title of the document")
+    description: str = Field(default="No description", description="Description of the document")
+    source_url: str = Field(default="", description="Source URL of the document")
+    og_url: str = Field(default="", description="Open Graph URL of the document")
 
 
 class Chunk(SupabaseModel):
@@ -124,8 +259,11 @@ class Chunk(SupabaseModel):
     # Main content
     headers: dict[str, Any] = Field(..., description="Chunk headers")
     text: str = Field(..., description="Chunk text")
+    content: str | None = Field(
+        default=None, description="Chunk content which is a combination of headers and text, used for embeddings"
+    )
 
     # Metadata
     token_count: int = Field(..., description="Total number of tokens in the document")
-    source_url: str = Field(..., description="Source URL of the document")
     page_title: str = Field(..., description="Page title of the document")
+    page_url: str = Field(..., description="Page URL of the document")

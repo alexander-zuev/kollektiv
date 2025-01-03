@@ -1,4 +1,4 @@
-import subprocess
+import argparse
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -26,10 +26,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Handle application startup and shutdown events."""
     container = None  # Initialize container to None
     try:
-        # 1. Start external dependencies for local development
-        if settings.environment == Environment.LOCAL:
-            subprocess.run(["make", "up"])
-
         # 2. Initialize services
         container = await ServiceContainer.create()
 
@@ -42,8 +38,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     finally:
         if container:  # Always try to shutdown if container exists, not just in LOCAL
             await container.shutdown_services()
-            if settings.environment == Environment.LOCAL:
-                subprocess.run(["make", "down"])
 
 
 def create_app() -> FastAPI:
@@ -87,14 +81,34 @@ def create_app() -> FastAPI:
 
 
 def run() -> None:
-    """Run the FastAPI application."""
+    """Run the FastAPI application with environment-specific settings."""
     try:
-        uvicorn.run(
-            app=create_app(),
-            host=settings.api_host,
-            port=settings.api_port,
-            log_level="debug" if settings.debug else "info",
-        )
+        if settings.environment == Environment.LOCAL:
+            # Parse arguments only in local development
+            parser = argparse.ArgumentParser()
+            parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
+            parser.add_argument("--workers", type=int, help="Number of workers")
+            args = parser.parse_args()
+
+            # Development mode: Use Uvicorn with auto-reload
+            uvicorn.run(
+                factory=True,
+                app="src.app:create_app",
+                host=settings.api_host,
+                port=settings.api_port,
+                reload=args.reload or settings.reload,  # Use parsed argument
+                log_level="debug" if settings.debug else "info",
+            )
+        else:
+            # Staging/Production: Use Uvicorn with more workers
+            uvicorn.run(
+                factory=True,
+                app="src.app:create_app",
+                host=settings.api_host,
+                port=settings.api_port,
+                workers=settings.gunicorn_workers,
+                log_level="debug" if settings.debug else "info",
+            )
     except KeyboardInterrupt:
         raise
 

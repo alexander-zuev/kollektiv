@@ -2,8 +2,6 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-from src.api.v0.schemas.sources_schemas import SourceAPIResponse
-
 T = TypeVar("T")
 
 
@@ -13,12 +11,6 @@ class BaseResponse(BaseModel, Generic[T]):
     success: bool
     data: T | None = None
     message: str | None = None
-
-
-class SourceResponse(BaseResponse[SourceAPIResponse]):
-    """Concrete response model for source operations."""
-
-    pass
 
 
 class ErrorResponse(BaseModel):

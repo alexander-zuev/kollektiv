@@ -202,7 +202,8 @@ class Conversation(SupabaseModel):
 class ConversationHistory(BaseModel):
     """A list of messages for a conversation"""
 
-    conversation_id: UUID = Field(default_factory=uuid4, description="FK reference to UUID of the conversation")
+    user_id: UUID = Field(..., description="FK reference to UUID of the user")
+    conversation_id: UUID = Field(..., description="FK reference to UUID of the conversation")
     messages: list[ConversationMessage] = Field(
         default_factory=list, description="List of messages in the conversation"
     )
@@ -213,7 +214,6 @@ class ConversationHistory(BaseModel):
     def to_anthropic_messages(self) -> Iterable[MessageParam]:
         """Convert entire history to Anthropic format"""
         result = [msg.to_anthropic() for msg in self.messages]
-        logger.debug(f"To Anthropic conversion result: {result}")
         return result
 
 
