@@ -200,7 +200,7 @@ class ContentService:
                         await self._handle_crawl_completed(job)
 
                     case FireCrawlEventType.CRAWL_FAILED:
-                        await self._handle_failure(job, event.data.error or "Unknown error")
+                        await self._handle_crawl_failure(job, event.data.error or "Unknown error")
 
         except JobNotFoundError:
             logger.exception("Job not found", {"firecrawl_id": event.data.firecrawl_id})
@@ -229,7 +229,7 @@ class ContentService:
             logger.debug(f"Updated source {job.details.source_id} status to CRAWLING")
         except Exception as e:
             logger.error(f"Failed to handle start event for job {job.job_id}: {e}")
-            await self._handle_failure(job, str(e))
+            await self._handle_crawl_failure(job, str(e))
             raise
 
     async def _handle_page_crawled(self, job: Job, event: FireCrawlWebhookEvent) -> None:
@@ -279,7 +279,7 @@ class ContentService:
         )
         logger.debug(f"Updated job {job.job_id} status to COMPLETED")
 
-        # 4.  Update source
+        # 4. Update source
         await asyncio.gather(
             self.data_service.update_datasource(
                 source_id=source.source_id,
@@ -329,7 +329,7 @@ class ContentService:
             error=message.error,
         )
 
-    async def _handle_failure(self, job: Job, error: str) -> None:
+    async def _handle_crawl_failure(self, job: Job, error: str) -> None:
         """Handle crawl.failed event"""
         # Update job with error
         await self.job_manager.update_job(
@@ -345,6 +345,12 @@ class ContentService:
             updates={"status": SourceStatus.FAILED, "error": error, "updated_at": datetime.now(UTC)},
         )
         logger.debug(f"Updated source {source_id} status to FAILED")
+
+        await self._publish_source_event(
+            source_id=source_id,
+            status=SourceStatus.FAILED,
+            error=error,
+        )
 
     async def stream_source_events(
         self,

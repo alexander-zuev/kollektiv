@@ -150,7 +150,9 @@ class ProcessingEvent(BaseModel):
     """Events emitted by celery worker."""
 
     source_id: UUID = Field(..., description="ID of the source this event belongs to")
-    event_type: Literal["processing", "completed", "failed"] = Field(..., description="Type of the event")
+    event_type: Literal["processing", "completed", "failed", "generating_summary"] = Field(
+        ..., description="Type of the event"
+    )
     error: str | None = Field(default=None, description="Error message, null if no error")
     metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
@@ -162,6 +164,7 @@ class SourceStatus(str, Enum):
     PENDING = "pending"  # right after creation
     CRAWLING = "crawling"  # after crawling started
     PROCESSING = "processing"  # during chunking and embedding
+    GENERATING_SUMMARY = "generating_summary"  # during summary generation
     COMPLETED = "completed"  # after processing is complete
     FAILED = "failed"  # if addition failed
 

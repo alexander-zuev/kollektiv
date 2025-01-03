@@ -47,8 +47,16 @@ class Tool(BaseModel):
         return data
 
 
+class PromptType(str, Enum):
+    """Enum for prompt types for PromptManager."""
+
+    LLM_ASSISTANT_PROMPT = "llm_assistant_prompt"  # Used for the LLM assistant
+    MULTI_QUERY_PROMPT = "multi_query_prompt"  # Used for the multi-query prompt
+    SUMMARY_PROMPT = "summary_prompt"  # Used for the summary prompt
+
+
 class SystemPrompt(BaseModel):
-    """System prompt for LLM."""
+    """System prompt model for Anthropic LLMs."""
 
     type: Literal["text"] = "text"
     text: str

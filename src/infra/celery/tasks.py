@@ -55,6 +55,17 @@ def notify_processing_complete(results: list, user_id: str, source_id: str) -> N
 
 
 @celery_app.task(
+    acks_late=True,
+    retry_backoff=True,
+    max_retries=3,
+)
+def generate_summary(source_id: str) -> None:
+    """Generate a summary for a source."""
+    logger.info(f"Chunking complete, generating summary for source {source_id}")
+    asyncio.run(celery_app.services.source_summary.generate_summary(source_id))
+
+
+@celery_app.task(
     acks_late=True,  # Only ack after successful completion
     retry_backoff=True,  # Exponential backoff between retries
     retry_kwargs={"max_retries": 3},
@@ -83,9 +94,10 @@ def process_documents(documents: list[str], user_id: str, source_id: str) -> dic
         ]
 
         # Setup batch processing of the documents
-        tasks = group(process_document_batch.s(doc_batch, user_id) for doc_batch in serialized_batches)
-        callback = notify_processing_complete.s(user_id, source_id)
-        chord(tasks)(callback)
+        processing_tasks = group(process_document_batch.s(doc_batch, user_id) for doc_batch in serialized_batches)
+        notification = notify_processing_complete.s(user_id, source_id)
+        summary_task = generate_summary.s(source_id)
+        chord(processing_tasks)(summary_task, notification)
 
         return {"status": "started", "total_documents": len(docs)}
     except Exception as e:

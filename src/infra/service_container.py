@@ -22,6 +22,7 @@ from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
+from src.core.chat.summary_manager import SummaryManager
 
 logger = get_logger()
 
@@ -50,6 +51,7 @@ class ServiceContainer:
         self.chroma_manager: ChromaManager | None = None
         self.event_publisher: EventPublisher | None = None
         self.event_consumer: EventConsumer | None = None
+        self.summary_manager: SummaryManager | None = None
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
@@ -103,6 +105,9 @@ class ServiceContainer:
                 redis_manager=self.async_redis_manager, content_service=self.content_service
             )
             await self.event_consumer.start()
+
+            # Source summary
+            self.summary_manager = SummaryManager(data_service=self.data_service)
 
             # Log the successful initialization
             logger.info("✓ Initialized services successfully.")
