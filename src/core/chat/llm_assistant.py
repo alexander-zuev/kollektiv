@@ -34,8 +34,8 @@ from src.infra.decorators import (
     anthropic_error_handler,
     base_error_handler,
 )
-from src.infra.logger import get_logger
-from src.infra.settings import settings
+from src.infra.logger import _truncate_message, get_logger
+from src.infra.settings import get_settings
 from src.models.chat_models import (
     AssistantMessageEvent,
     ConversationHistory,
@@ -50,6 +50,7 @@ from src.models.chat_models import (
 )
 from src.models.llm_models import SystemPrompt, Tool, ToolName
 
+settings = get_settings()
 logger = get_logger()
 
 
@@ -155,7 +156,7 @@ class ClaudeAssistant(Model):
 
             while retries < max_retries:
                 messages = conv_history.to_anthropic_messages()
-                logger.debug(f"Debugging messages list for Anthropic API: {messages}")
+                logger.debug(_truncate_message(f"Debugging messages list for Anthropic API: {messages}"))
                 async with self.client.messages.stream(
                     messages=messages,
                     system=self.cached_system_prompt,
@@ -364,7 +365,6 @@ class ClaudeAssistant(Model):
         results = await self.retriever.retrieve(
             rag_query=rag_query, combined_queries=combined_queries, top_n=3, user_id=user_id
         )
-        logger.debug(f"Retriever results: {results}")
 
         if not results:
             logger.warning("No search results found.")

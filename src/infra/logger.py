@@ -140,3 +140,10 @@ def get_logger() -> logging.LoggerAdapter:
 
     logger = logging.getLogger(f"kollektiv.{module_name}")
     return logging.LoggerAdapter(logger, extra={})
+
+
+def _truncate_message(message: str, max_length: int = 200) -> str:
+    """Truncate long messages for logging."""
+    if len(message) > max_length:
+        return f"{message[:max_length]}..."
+    return message

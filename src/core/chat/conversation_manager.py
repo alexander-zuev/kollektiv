@@ -1,12 +1,12 @@
 import json
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import redis
 import tiktoken
 
 from src.api.v0.schemas.chat_schemas import UserMessage
 from src.infra.data.redis_repository import RedisRepository
-from src.infra.logger import get_logger
+from src.infra.logger import _truncate_message, get_logger
 from src.models.chat_models import (
     Conversation,
     ConversationHistory,
@@ -43,7 +43,7 @@ class ConversationManager:
     async def create_conversation(self, message: UserMessage) -> ConversationHistory:
         """Creates a new conversation history."""
         # 1. Create an empty conversation
-        conversation = ConversationHistory(user_id=message.user_id)
+        conversation = ConversationHistory(user_id=message.user_id, conversation_id=uuid4())
         logger.info(f"Creating new conversation with ID: {conversation.conversation_id}")
 
         # 2. Save empty converstaion to redis
@@ -107,7 +107,7 @@ class ConversationManager:
         if conversation_history:
             # 3. Prune and save
             conversation_history = await self._prune_history(conversation_history)
-            await self._update_conversation_supabase(history=conversation_history, messages=pending_messages)
+            await self.data_service.update_conversation_supabase(conversation_history, pending_messages)
             logger.info(f"Committed {len(pending_messages)} messages for conversation: {conversation_id}")
 
     async def transfer_pending_to_history(
@@ -116,7 +116,8 @@ class ConversationManager:
         """Transfers pending messages to the active conversation in Redis."""
         logger.info(f"Transferring pending messages for conversation: {conversation_id}")
         # Create a pipeline
-        async with self.redis_repository.create_pipeline(transaction=True) as pipe:
+        client = await self.redis_repository.manager.get_async_client()
+        async with client.pipeline(transaction=True) as pipe:
             while True:
                 try:
                     # 1. Watch keys
@@ -136,7 +137,7 @@ class ConversationManager:
                     pending_messages = await self.redis_repository.lrange_method(
                         key=conversation_id, start=0, end=-1, model_class=ConversationMessage
                     )
-                    logger.debug(f"Pending messages: {pending_messages}")
+                    logger.debug(_truncate_message(f"Pending messages: {pending_messages}"))
 
                     # 3. Update conversation history
                     conversation.messages.extend(pending_messages)
@@ -158,12 +159,6 @@ class ConversationManager:
                     logger.error(f"Error transferring pending messages: {e}", exc_info=True)
                     # rollback redis transaction
                     raise
-
-    async def _update_conversation_supabase(
-        self, history: ConversationHistory, messages: list[ConversationMessage]
-    ) -> None:
-        """Updates the conversation in Supabase."""
-        await self.data_service.update_conversation_supabase(history, messages)
 
     async def _estimate_tokens(self, messages: list[ConversationMessage]) -> int:
         """Estimates the total token count for a list of messages."""
@@ -200,9 +195,18 @@ class ConversationManager:
         conversation = await self.redis_repository.get_method(conversation_id, ConversationHistory)
 
         # If no conversation in Redis, fetch from Supabase
+        if conversation and conversation.conversation_id != conversation_id:
+            # This is an error
+            logger.error(f"Conversation {conversation_id} not found in Redis, but found in Supabase")
+            conversation = None
+
+        # Try to fetch from Supabase
         if conversation is None:
             logger.info(f"Conversation {conversation_id} not found in Redis, fetching from Supabase")
             conversation = await self.data_service.get_conversation_history(conversation_id, user_id=message.user_id)
+
+            # Save to Redis
+            await self.redis_repository.set_method(conversation_id, conversation)
 
         # Add message to the conversation in-memory
         if message:

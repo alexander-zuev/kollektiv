@@ -154,7 +154,9 @@ class DataService:
             # Find messages next
             messages = await self.repository.find(ConversationMessage, filters={"conversation_id": conversation_id})
             # Create ConversationHistory model
-            conversation_history = ConversationHistory(messages=messages, user_id=user_id)
+            conversation_history = ConversationHistory(
+                messages=messages, user_id=user_id, conversation_id=conversation_id
+            )
             # Return it
             return conversation_history
         except ConversationNotFoundError as e:
@@ -171,6 +173,7 @@ class DataService:
     async def update_conversation(self, history: ConversationHistory, messages: list[ConversationMessage]) -> None:
         """Update conversation in Supabase."""
         # Extract message IDs from the new messages
+        logger.debug(f"Updating conversation {history.conversation_id} with {len(messages)} messages")
         new_message_ids = [message.message_id for message in messages]
 
         # Get the current conversation

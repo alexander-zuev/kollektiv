@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from redis.asyncio import Redis as AsyncRedis
 
 from src.infra.external.redis_manager import RedisManager
-from src.infra.logger import get_logger
+from src.infra.logger import _truncate_message, get_logger
 from src.models.chat_models import ConversationHistory, ConversationMessage
 
 logger = get_logger()
@@ -54,7 +54,7 @@ class RedisRepository:
 
     def _from_json(self, json_str: str, model_class: type[T]) -> T:
         """Convert a JSON string to a model."""
-        logger.debug(f"From JSON: {json_str}")
+        logger.debug(_truncate_message(f"From JSON: {json_str}"))
         result = model_class.model_validate_json(json_str)
         return result
 
@@ -75,7 +75,7 @@ class RedisRepository:
         else:
             client = await self.manager.get_async_client()
             await client.set(prefix, json_str, ex=ttl)
-            logger.info(f"Set Redis key: {prefix} (TTL: {ttl}s)")
+            logger.debug(f"Set Redis key: {prefix} (TTL: {ttl}s), data: {json_str}")
 
     async def get_method(self, key: UUID, model_class: type[T]) -> T | None:
         """Get a value from the Redis database."""
@@ -132,121 +132,3 @@ class RedisRepository:
         if data is None:
             return None
         return self._from_json(data, model_class)
-
-
-# async def test() -> None:
-#     client = RedisClient().client
-#     redis_repo = RedisRepository(client)
-
-#     conversation_prefix = redis_repo._get_prefix(ConversationHistory, conversation_id=uuid4())
-#     message_prefix = redis_repo._get_prefix(ConversationMessage, conversation_id=uuid4())
-
-#     print(conversation_prefix)
-#     print(message_prefix)
-
-#     some_key = uuid4()
-#     content_block = TextBlock(text="Hello, how are you?")
-#     conversation_example = ConversationHistory(
-#         conversation_id=some_key,
-#         messages=[
-#             ConversationMessage(
-#                 message_id=some_key,
-#                 role=Role.USER,
-#                 content=[content_block],
-#             )
-#         ],
-#     )
-
-#     await redis_repo.set_method(some_key, conversation_example)
-#     result = await redis_repo.get_method(some_key, ConversationHistory)
-#     print(result)
-
-#     message_example = ConversationMessage(
-#         message_id=some_key,
-#         role=Role.USER,
-#         content=[content_block],
-#     )
-#     message_example2 = ConversationMessage(
-#         message_id=some_key,
-#         role=Role.ASSISTANT,
-#         content=[content_block],
-#     )
-
-#     await redis_repo.rpush_method(some_key, message_example)
-#     await redis_repo.rpush_method(some_key, message_example2)
-
-#     result = await redis_repo.lrange_method(some_key, 0, -1, ConversationMessage)
-#     print(f"Before delete: {result}")
-
-#     await redis_repo.delete_method(some_key, ConversationMessage)
-
-#     result = await redis_repo.get_method(some_key, ConversationMessage)
-#     print(f"After delete: {result}")
-
-# await redis_repo.rpush_method(some_key, message_example)
-# await redis_repo.rpush_method(some_key, message_example2)
-
-# popped_item = await redis_repo.lpop_method(some_key, ConversationMessage)
-# print(f"After lpop: {popped_item}")
-
-# result = await redis_repo.lrange_method(some_key, 0, -1, ConversationMessage)
-# print(f"After lpop: {result}")
-
-# popped_item = await redis_repo.rpop_method(some_key, ConversationMessage)
-# print(f"After rpop: {popped_item}")
-
-# result = await redis_repo.lrange_method(some_key, 0, -1, ConversationMessage)
-# print(f"After rpop: {result}")
-
-
-# asyncio.run(test())
-
-
-# uuid = uuid4()
-# content_block = TextBlock(text="Hello, how are you?")
-# conversation_example = ConversationHistory(
-#     conversation_id=str(uuid),
-#     messages=[
-#         ConversationMessage(
-#             message_id=str(uuid),
-#             role=Role.USER,
-#             content=[content_block],
-#         )
-#     ],
-# )
-
-# message_example = ConversationMessage(
-#     message_id=str(uuid),
-#     role="user",
-#     content=[content_block],
-# )
-# message_example_2 = ConversationMessage(
-#     message_id=str(uuid),
-#     role="assistant",
-#     content=[content_block],
-# )
-# pending_list = [message_example, message_example_2]
-
-
-# async def test() -> None:
-#     """Test the Redis repository."""
-#     client = RedisClient().client
-#     repo = RedisRepository(client)
-
-#     # Checking saving
-#     # json_str = repo._to_json(conversation_example)
-#     # print("From model:", json_str)
-
-#     # await repo.set_method("conversations:1:history", conversation_example)
-#     # result = await repo.get_method("conversations:1:history", ConversationHistory)
-#     # print("From redis:", result)
-
-#     await repo.rpush_method("conversations:1:pending_messages", message_example)
-#     await repo.rpush_method("conversations:1:pending_messages", message_example_2)
-#     result = await repo.lrange_method("conversations:1:pending_messages", 0, -1, ConversationMessage)
-#     for message in result:
-#         print(f"Message: {message.model_dump_json()}")
-#     await repo.delete_method("conversations:1:pending_messages", ConversationMessage)
-
-
-# asyncio.run(test())

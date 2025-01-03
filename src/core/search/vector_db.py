@@ -132,7 +132,7 @@ class VectorDatabase:
         """
         collection = await self.get_or_create_collection(user_id)
         query_texts = [user_query] if isinstance(user_query, str) else user_query
-        search_results = collection.query(
+        search_results = await collection.query(
             query_texts=query_texts, n_results=n_results, include=["documents", "distances", "embeddings"]
         )
         return search_results
