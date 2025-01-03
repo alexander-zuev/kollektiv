@@ -19,6 +19,7 @@ class PromptManager:
         with open(self.prompt_path) as f:
             self.prompts = yaml.safe_load(f)
 
+    # TODO: Refactor to be prompt-agnostic
     def get_system_prompt(self, **kwargs: Any) -> SystemPrompt:
         """Get system prompt model with provided kwargs."""
         text = self.prompts[PromptType.LLM_ASSISTANT_PROMPT].format(**kwargs)
@@ -33,3 +34,19 @@ class PromptManager:
         if isinstance(text, str):
             return text
         raise ValueError("Multi-query prompt is not a string")
+
+    def get_summary_prompt(self, **kwargs: Any) -> str:
+        """Get summary prompt."""
+        try:
+            text = self.prompts[PromptType.SUMMARY_PROMPT].format(**kwargs)
+        except KeyError:
+            raise ValueError("Summary prompt not found")
+        return text
+
+    def return_system_prompt(self, prompt_type: PromptType, **kwargs: Any) -> SystemPrompt:
+        """Return a prompt-agnostic system prompt."""
+        try:
+            text = self.prompts[prompt_type].format(**kwargs)
+        except KeyError as e:
+            raise ValueError(f"System prompt not found for {prompt_type}") from e
+        return SystemPrompt(text=text)

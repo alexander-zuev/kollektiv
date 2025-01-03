@@ -172,7 +172,14 @@ class ChatService:
         conversations = await self.data_service.get_conversations(user_id)
         return conversations
 
+    # TODO: this should load in the sources for the conversation
     async def get_conversation(self, conversation_id: UUID) -> Conversation:
         """Return a single conversation by its ID in accordance with RLS policies."""
         conversation = await self.data_service.get_conversation(conversation_id)
+
+        # Load data source summaries by id
+        # Update system prompt with data source summaries
+
         return conversation
+
+    # TODO: which endpoint and method should handle the update of the data sources linked to a conversation?

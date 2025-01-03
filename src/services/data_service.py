@@ -148,18 +148,16 @@ class DataService:
         conversation = await self.repository.find_by_id(Conversation, conversation_id)
         return conversation
 
-    async def get_conversation_history(self, conversation_id: UUID) -> ConversationHistory:
+    async def get_conversation_history(self, conversation_id: UUID, user_id: UUID) -> ConversationHistory:
         """Get a single conversation history by its ID in accordance with RLS policies."""
         try:
             # Find messages next
             messages = await self.repository.find(ConversationMessage, filters={"conversation_id": conversation_id})
             # Create ConversationHistory model
-            conversation_history = ConversationHistory(
-                messages=messages,
-            )
+            conversation_history = ConversationHistory(messages=messages, user_id=user_id)
             # Return it
             return conversation_history
-        except ConversationNotFoundError:
+        except ConversationNotFoundError as e:
             logger.error(f"Conversation with id {conversation_id} not found", exc_info=True)
             raise ConversationNotFoundError(f"Conversation with id {conversation_id} not found") from e
 

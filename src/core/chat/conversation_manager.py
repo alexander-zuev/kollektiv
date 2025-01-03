@@ -43,7 +43,7 @@ class ConversationManager:
     async def create_conversation(self, message: UserMessage) -> ConversationHistory:
         """Creates a new conversation history."""
         # 1. Create an empty conversation
-        conversation = ConversationHistory()
+        conversation = ConversationHistory(user_id=message.user_id)
         logger.info(f"Creating new conversation with ID: {conversation.conversation_id}")
 
         # 2. Save empty converstaion to redis
@@ -202,7 +202,7 @@ class ConversationManager:
         # If no conversation in Redis, fetch from Supabase
         if conversation is None:
             logger.info(f"Conversation {conversation_id} not found in Redis, fetching from Supabase")
-            conversation = await self.data_service.get_conversation_history(conversation_id)
+            conversation = await self.data_service.get_conversation_history(conversation_id, user_id=message.user_id)
 
         # Add message to the conversation in-memory
         if message:

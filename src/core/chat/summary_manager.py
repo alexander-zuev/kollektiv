@@ -1,14 +1,24 @@
 # TODO: Review the need for this class. How is this managed in other RAG systems?
-from typing import Any
+import json
+import random
+from uuid import UUID
 
 import anthropic
+from anthropic.types import Message, MessageParam, TextBlockParam
 
+from src.core.chat.prompt_manager import PromptManager
+from src.core.chat.tool_manager import ToolManager, ToolName
+from src.infra.data.data_repository import DataRepository
 from src.infra.decorators import anthropic_error_handler
+from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
-from src.infra.settings import settings
+from src.infra.settings import get_settings
+from src.models.content_models import Document, SourceSummary
+from src.models.llm_models import PromptType
 from src.services.data_service import DataService
 
 logger = get_logger()
+settings = get_settings()
 
 MAX_RETRIES = 2
 
@@ -16,84 +26,162 @@ MAX_RETRIES = 2
 class SummaryManager:
     """Responsible for generating summaries for data sources loaded into the system."""
 
-    def __init__(self, data_service: DataService | None = None):
+    def __init__(
+        self,
+        data_service: DataService | None = None,
+        prompt_manager: PromptManager | None = None,
+        tool_manager: ToolManager | None = None,
+        n_samples_max: int = 5,
+    ):
         """Initialize the SummaryManager."""
         self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         self.data_service = data_service
+        self.prompt_manager = prompt_manager
+        self.tool_manager = tool_manager
+        self.n_samples_max = n_samples_max
 
-    #
-    async def _prepare_data_for_summary(self, source_id: str) -> None:
+    async def _prepare_data_for_summary(self, documents: list[Document]) -> tuple[list[str], list[str], list[Document]]:
         """Prepare the data for summary generation."""
-        # Fetches a list of unique links
-        # Fetches random documents
-        pass
+        unique_urls = list(set(doc.metadata.source_url for doc in documents if doc.metadata.source_url))
+        unique_titles = list(set(doc.metadata.title for doc in documents if doc.metadata.title))
+        documents_sample = self._select_samples(documents)
+        return unique_urls, unique_titles, documents_sample
 
-    # Add summary prompt to the manager
+    def _select_samples(self, documents: list[Document]) -> list[Document]:
+        """Select representative document samples."""
+        logger.debug(f"Selecting {self.n_samples_max} samples from {len(documents)} documents")
+        if len(documents) <= self.n_samples_max:
+            return documents
+        return random.sample(documents, self.n_samples_max)
+
+    def _format_summary_input(
+        self, documents_sample: list[Document], unique_urls: list[str], unique_titles: list[str]
+    ) -> str:
+        """Format input data for summary generation."""
+        return f"""
+        Analyze this web content and provide a summary and keywords.
+
+        Source URLs ({len(unique_urls)} total):
+        {json.dumps(unique_urls, indent=2)}
+
+        Document Titles ({len(unique_titles)} total):
+        {json.dumps(unique_titles, indent=2)}
+
+        Sample Content ({len(documents_sample)} documents):
+        {json.dumps([{
+            'title': doc.metadata.title,
+            'url': doc.metadata.source_url,
+            'content': doc.content[:500] + '...' if len(doc.content) > 500 else doc.content
+        } for doc in documents_sample], indent=2)}
+
+        Generate:
+        1. A concise summary (100-150 words) describing the main topics and content type
+        2. 5-10 specific keywords that appear in the content
+        
+        Return as JSON with 'summary' and 'keywords' fields.
+        """
 
     @anthropic_error_handler
-    async def generate_document_summary(self, chunks: list[dict[str, Any]]) -> dict[str, Any]:
-        """Generates a document summary and keywords based on provided chunks.
+    async def generate_document_summary(
+        self, source_id: UUID, documents_sample: list[Document], unique_urls: list[str], unique_titles: list[str]
+    ) -> SourceSummary:
+        """Generates a document summary and keywords based on documents and metadata."""
+        input_text = self._format_summary_input(documents_sample, unique_urls, unique_titles)
 
-        Args:
-            chunks: A list of dictionaries, where each dictionary represents a chunk of text and its metadata.
+        messages = [MessageParam(role="user", content=[TextBlockParam(type="text", text=input_text)])]
+        logger.debug(f"Summary generation input: {messages}")
+        response = await self.client.messages.create(
+            model=settings.main_model,
+            max_tokens=1024,
+            messages=messages,
+            system=self.prompt_manager.return_system_prompt(PromptType.SUMMARY_PROMPT),
+            tools=[self.tool_manager.get_tool(ToolName.SUMMARY)],
+            tool_choice=self.tool_manager.force_tool_choice(ToolName.SUMMARY),
+        )
+        logger.debug(f"Summary generation response: {response}")
+        return self._parse_summary(response, source_id)
 
-        Returns:
-            A dictionary containing the generated summary and keywords.
-        """
-        unique_urls = {chunk["metadata"]["source_url"] for chunk in chunks}
-        unique_titles = {chunk["metadata"]["page_title"] for chunk in chunks}
+    def _parse_summary(self, response: Message, source_id: UUID) -> SourceSummary:
+        """Parse the summary response from Claude."""
+        try:
+            # Get tool calls from response
+            tool_calls = [block for block in response.content if block.type == "tool_use"]
+            if not tool_calls:
+                raise ValueError("No tool use in response")
 
-        # Select diverse content samples
-        sample_chunks = self._select_diverse_chunks(chunks, 15)
-        content_samples = [chunk["data"]["text"][:300] for chunk in sample_chunks]
+            # Parse the tool output
+            tool_output = json.loads(tool_calls[0].input)
+            logger.debug(f"Tool output: {tool_output}")
 
-        # Construct the summary prompt
-        system_prompt = """
-        You are a Document Analysis AI. Your task is to generate accurate, relevant and concise document summaries and
-        a list of key topics (keywords) based on a subset of chunks shown to you. Always respond in the following JSON
-        format.
+            return SourceSummary(
+                source_id=source_id,
+                summary=tool_output["summary"],
+                keywords=tool_output["keywords"],
+            )
 
-        General instructions:
-        1. Provide a 150-200 word summary that captures the essence of the documentation.
-        2. Mention any notable features or key points that stand out.
-        3. If applicable, briefly describe the type of documentation (e.g., API reference, user guide, etc.).
-        4. Do not use phrases like "This documentation covers" or "This summary describes". Start directly
-        with the key information.
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"Failed to parse summary response: {e}")
+            raise ValueError(f"Invalid summary format: {e}")
 
-        JSON Format:
-        {
-          "summary": "A concise summary of the document",
-          "keywords": ["keyword1", "keyword2", "keyword3", ...]
-        }
 
-        Ensure your entire response is a valid JSON
-        """
+if __name__ == "__main__":
+    import asyncio
+    from uuid import UUID
 
-        message = f"""
-        Analyze the following document and provide a list of keywords (key topics).
+    async def test_summary_generation() -> None:  # type: ignore
+        # Initialize dependencies
+        logger.info("Initializing dependencies...")
+        supabase_manager = await SupabaseManager.create_async()
+        data_repository = DataRepository(supabase_manager)
+        data_service = DataService(data_repository)
+        prompt_manager = PromptManager()
+        tool_manager = ToolManager()
 
-        Document Metadata:
-        - Unique URLs: {len(unique_urls)}
-        - Unique Titles: {unique_titles}
-
-        Content Structure:
-        {self._summarize_content_structure(chunks)}
-
-        Chunk Samples:
-        {self._format_content_samples(content_samples)}
-
-        """
-
-        response = self.client.messages.create(
-            model=self.model_name,
-            max_tokens=450,
-            system=system_prompt,
-            messages=[{"role": "user", "content": message}],
+        # Create summary manager
+        logger.info("Creating summary manager...")
+        summary_manager = SummaryManager(
+            data_service=data_service, prompt_manager=prompt_manager, tool_manager=tool_manager, n_samples_max=5
         )
 
-        summary, keywords = self._parse_summary(response)
+        # Test source ID - you'll provide this
+        source_id = UUID("123e4567-e89b-12d3-a456-426614174000")  # Replace with actual
+        logger.info(f"Testing with source_id: {source_id}")
 
-        return {
-            "summary": summary,
-            "keywords": keywords,
-        }
+        try:
+            # Fetch documents
+            logger.info("Fetching documents...")
+            documents = await data_service.get_documents_by_source(source_id=source_id)
+            logger.info(f"Found {len(documents)} documents")
+
+            # Prepare data
+            logger.info("Preparing data for summary...")
+            unique_urls, unique_titles, documents_sample = await summary_manager._prepare_data_for_summary(documents)
+            logger.info(f"Selected {len(documents_sample)} sample documents")
+            logger.info(f"Found {len(unique_urls)} unique URLs")
+            logger.info(f"Found {len(unique_titles)} unique titles")
+
+            # Generate summary
+            logger.info("Generating summary...")
+            summary = await summary_manager.generate_document_summary(
+                source_id=source_id,
+                documents_sample=documents_sample,
+                unique_urls=unique_urls,
+                unique_titles=unique_titles,
+            )
+
+            # Print results
+            logger.info("Summary generation complete!")
+            logger.info("=== Generated Summary ===")
+            logger.info(f"Summary: {summary.summary}")
+            logger.info("=== Keywords ===")
+            logger.info(f"Keywords: {', '.join(summary.keywords)}")
+
+        except Exception as e:
+            logger.error(f"Error during testing: {e}", exc_info=True)
+        finally:
+            # Cleanup
+            await supabase_manager.close()
+            logger.info("Test complete")
+
+    # Run the test
+    asyncio.run(test_summary_generation())

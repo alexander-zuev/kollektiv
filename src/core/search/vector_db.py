@@ -116,7 +116,7 @@ class VectorDatabase:
         return results
 
     @generic_error_handler
-    async def query(self, user_query: str | list[str], n_results: int = 10) -> dict[str, Any]:
+    async def query(self, user_id: UUID, user_query: str | list[str], n_results: int = 10) -> dict[str, Any]:
         """
         Query the collection to retrieve documents based on the user's query.
 
@@ -130,9 +130,9 @@ class VectorDatabase:
         Raises:
             SomeSpecificException: If an error occurs while querying the collection.
         """
-        collection_name = self._generate_collection_name(user_id)
+        collection = await self.get_or_create_collection(user_id)
         query_texts = [user_query] if isinstance(user_query, str) else user_query
-        search_results = self.collection.query(
+        search_results = collection.query(
             query_texts=query_texts, n_results=n_results, include=["documents", "distances", "embeddings"]
         )
         return search_results

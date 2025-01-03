@@ -202,6 +202,7 @@ class Conversation(SupabaseModel):
 class ConversationHistory(BaseModel):
     """A list of messages for a conversation"""
 
+    user_id: UUID = Field(..., description="FK reference to UUID of the user")
     conversation_id: UUID = Field(default_factory=uuid4, description="FK reference to UUID of the conversation")
     messages: list[ConversationMessage] = Field(
         default_factory=list, description="List of messages in the conversation"

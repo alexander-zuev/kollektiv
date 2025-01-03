@@ -1,5 +1,6 @@
 import time
 from typing import Any
+from uuid import UUID
 
 from cohere.v2.types import V2RerankResponse
 
@@ -23,7 +24,9 @@ class Retriever:
         self.db = vector_db
         self.reranker = reranker
 
-    async def retrieve(self, rag_query: str, combined_queries: list[str], top_n: int | None) -> list[dict[str, Any]]:
+    async def retrieve(
+        self, rag_query: str, combined_queries: list[str], top_n: int | None, user_id: UUID
+    ) -> list[dict[str, Any]]:
         """
         Retrieve and rank documents based on user query and combined queries.
 
@@ -42,7 +45,7 @@ class Retriever:
         start_time = time.time()  # Start timing
 
         # get expanded search results
-        search_results = await self.db.query(combined_queries)
+        search_results = await self.db.query(user_id=user_id, user_query=combined_queries)
         if not search_results or not search_results.get("documents")[0]:
             logger.warning("No documents found in search results")
             return []
