@@ -5,9 +5,11 @@ from redis.asyncio.client import PubSub
 from redis.exceptions import ConnectionError, TimeoutError
 
 from src.infra.decorators import tenacity_retry_wrapper
+from src.infra.events.channels import Channels
 from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
 from src.infra.settings import settings
+from src.models.content_models import ProcessingEvent
 from src.services.content_service import ContentService
 
 logger = get_logger()
@@ -27,9 +29,13 @@ class EventConsumer:
         instance = cls(redis_manager=redis_manager, content_service=content_service)
         redis_client = await instance.redis_manager.get_async_client()
         instance.pubsub = redis_client.pubsub()
-        await instance.pubsub.subscribe(settings.process_documents_channel)
-        logger.info("✓ Event consumer subscribed successfully")
+        await instance.subscribe_on_startup()
         return instance
+
+    async def subscribe_on_startup(self) -> None:
+        """Subscribe to the processing channel on startup."""
+        await self.pubsub.subscribe(Channels.Sources.processing())
+        logger.info("✓ Event consumer subscribed successfully")
 
     @tenacity_retry_wrapper(exceptions=(ConnectionError, TimeoutError))
     async def start(self) -> None:
@@ -45,6 +51,7 @@ class EventConsumer:
         """Listen for events from the event bus."""
         try:
             async for message in self.pubsub.listen():
+                logger.debug(f"Received message: {message}")
                 if message["type"] == "message":
                     await self.handle_event(message["data"])
         except (ConnectionError, TimeoutError) as e:
@@ -58,11 +65,12 @@ class EventConsumer:
             await self.pubsub.aclose()
             logger.info("✓ Event consumer stopped successfully")
 
-    async def handle_event(self, message: bytes) -> None:
+    async def handle_event(self, message_data: bytes) -> None:
         """Handle an event from the event bus."""
         try:
-            message = json.loads(message)
+            message = ProcessingEvent(**json.loads(message_data))
 
+            logger.debug("Sending message to content service")
             await self.content_service.handle_pubsub_event(message)
         except Exception as e:
             logger.exception(f"Failed to handle event: {e}")

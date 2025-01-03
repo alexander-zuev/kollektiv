@@ -1,19 +1,32 @@
 import asyncio
-from typing import TypeVar
+from typing import Any, Literal, TypeVar
 from uuid import UUID
 
-from celery import group
-from celery.result import AsyncResult
+from celery import chord, group
 from pydantic import BaseModel
 
 from src.infra.celery.worker import celery_app
+from src.infra.events.channels import Channels
 from src.infra.logger import get_logger
 from src.infra.settings import get_settings
-from src.models.content_models import Chunk, Document
+from src.models.content_models import Chunk, Document, ProcessingEvent
 
 T = TypeVar("T", bound=BaseModel)
 logger = get_logger()
 settings = get_settings()
+
+
+def _publish_processing_event(
+    source_id: UUID,
+    event_type: Literal["processing", "completed", "failed"],
+    error: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    """Publish a processing event to the event bus."""
+    services = celery_app.services
+
+    event = ProcessingEvent(source_id=source_id, event_type=event_type, error=error, metadata=metadata)
+    asyncio.run(services.event_publisher.publish_event(channel=Channels.Sources.processing(), message=event))
 
 
 @celery_app.task(
@@ -21,23 +34,24 @@ settings = get_settings()
     retry_backoff=True,
     max_retries=3,
 )
-def notify_processing_complete(group_result: AsyncResult, user_id: str, source_id: str) -> None:
-    """
-    Task to be executed when all tasks in a group are complete.
-    Publishes a message to the pub/sub channel.
-    """
-    # 1. Get access to the services
-    services = celery_app.services
-    # 2. Publish to pub/sub
-    services.event_publisher.publish(
-        channel=settings.process_documents_channel,
-        message={
-            "event_type": "PROCESSING_COMPLETED",
-            "user_id": user_id,
-            "source_id": source_id,
-            "celery_job_id": group_result.id,  # or some other relevant identifier
-        },
-    )
+def notify_processing_complete(results: list, user_id: str, source_id: str) -> None:
+    """Task to be executed when all tasks in a group are complete."""
+    logger.info(f"Publishing to pub/sub channel {Channels.Sources.processing()}")
+
+    # Check if any tasks failed
+    failures = [r for r in results if r.get("status") == "failed"]
+
+    if failures:
+        _publish_processing_event(
+            source_id=UUID(source_id),
+            event_type="failed",
+            error=f"Failed to process {len(failures)} chunks",
+            metadata={"failures": failures},
+        )
+    else:
+        _publish_processing_event(
+            source_id=UUID(source_id), event_type="completed", metadata={"total_processed": len(results)}
+        )
 
 
 @celery_app.task(
@@ -50,7 +64,7 @@ def process_documents(documents: list[str], user_id: str, source_id: str) -> dic
     """Entry point for processing list[Document].
 
     Args:
-    - list[Document]: serialized as JSON strings.
+    - documents: serialized as JSON strings.
     - user_id: str of the user that is processing the documents
     - source_id: str of the source to be processed
     """
@@ -71,17 +85,13 @@ def process_documents(documents: list[str], user_id: str, source_id: str) -> dic
         # Setup batch processing of the documents
         tasks = group(process_document_batch.s(doc_batch, user_id) for doc_batch in serialized_batches)
         callback = notify_processing_complete.s(user_id, source_id)
-        group_result = (tasks | callback).apply_async()
-        logger.info(f"Processing job in celery {group_result.id} enqueued")
+        chord(tasks)(callback)
 
-        return {
-            "status": "success",
-            "total_documents": len(docs),
-            "task_group_id": group_result.id,
-        }
+        return {"status": "started", "total_documents": len(docs)}
     except Exception as e:
         logger.exception(f"Error processing documents: {e}")
-        return {"status": "error", "message": str(e)}
+        _publish_processing_event(source_id=UUID(source_id), event_type="failed", error=str(e))
+        return {"status": "failed", "message": str(e)}
 
 
 @celery_app.task(
@@ -104,7 +114,7 @@ def process_document_batch(document_batch: list[Document], user_id: str) -> dict
 
         task_group = group(add_chunk_to_storage.s(chunk_batch, user_id) for chunk_batch in serialized_batches)
         result = task_group.apply_async()
-        logger.info(f"Processing job in celery {result.id} enqueued")
+        logger.info(f"Processing job in celery enqueued with id {result.id}")
         return {"status": "success", "message": f"Successfully created {len(chunks)} chunks"}
     except Exception as e:
         logger.exception(f"Error processing document batch: {e}")

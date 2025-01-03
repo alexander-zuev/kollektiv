@@ -1,11 +1,8 @@
-import json
-
 from redis.exceptions import ConnectionError, TimeoutError
 
 from src.infra.decorators import tenacity_retry_wrapper
 from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
-from src.infra.settings import settings
 
 logger = get_logger()
 
@@ -23,12 +20,26 @@ class EventPublisher:
         return instance
 
     @tenacity_retry_wrapper(exceptions=(ConnectionError, TimeoutError))
-    async def publish_event(self, event: dict, queue: str = settings.process_documents_channel) -> None:
-        """Publish an event to the event bus."""
+    async def publish_event(
+        self,
+        channel: str,
+        message: dict,
+    ) -> None:
+        """
+        Publish a message to the event bus.
+
+        Args:
+            channel: The channel to publish to
+            message: The message to publish (will be JSON serialized)
+        """
         try:
             client = await self.redis_manager.get_async_client()
-            await client.publish(queue, json.dumps(event))
-            logger.info(f"Event published to {queue}: {event}")
+
+            message = message.model_dump_json()
+            logger.debug(f"Trying to save message type: {type(message)}")
+
+            await client.publish(channel, message)
+            logger.info(f"Event published to {channel}: {message}")
         except (ConnectionError, TimeoutError) as e:
-            logger.exception(f"Failed to publish event to {queue}: {e}")
+            logger.exception(f"Failed to publish event to {channel}: {e}")
             raise

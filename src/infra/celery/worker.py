@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from typing import Any
 
@@ -30,6 +31,11 @@ def init_worker_process(*args: Any, **kwargs: Any) -> None:
         # Initialize logging
         configure_logging()
         logger = get_logger()
+        # Set higher log levels for noisy components
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("celery").setLevel(logging.INFO)  # or WARNING
+        logging.getLogger("chromadb").setLevel(logging.INFO)
 
         logger.info(f"[Worker Process {process_id}] Starting service initialization")
 

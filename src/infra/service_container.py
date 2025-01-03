@@ -62,6 +62,7 @@ class ServiceContainer:
             # Redis
             self.async_redis_manager = await RedisManager.create_async()
             self.redis_repository = RedisRepository(manager=self.async_redis_manager)
+            self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
 
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)
@@ -70,6 +71,8 @@ class ServiceContainer:
                 crawler=self.firecrawler,
                 job_manager=self.job_manager,
                 data_service=self.data_service,
+                redis_manager=self.async_redis_manager,
+                event_publisher=self.event_publisher,
             )
 
             # Vector operations
@@ -96,7 +99,6 @@ class ServiceContainer:
             self.ngrok_service = await NgrokService.create()
 
             # Events
-            self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
             self.event_consumer = await EventConsumer.create_async(
                 redis_manager=self.async_redis_manager, content_service=self.content_service
             )

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, PrivateAttr, field_validator
@@ -124,9 +124,7 @@ class AddContentSourceResponse(BaseModel):
     """Simplified model inheriting from Source."""
 
     source_id: UUID = Field(...)
-    source_type: DataSourceType = Field(..., description="Data source type")
     status: SourceStatus = Field(..., description="Status of the data source")
-    created_at: datetime = Field(..., description="Date timestamp in UTC when data source was created.")
     error: str | None = Field(None, description="Error message, null if no error")
 
     @classmethod
@@ -134,10 +132,28 @@ class AddContentSourceResponse(BaseModel):
         return cls(
             source_id=source.source_id,
             status=source.status,
-            source_type=source.source_type,
-            created_at=source.created_at,
             error=source.error,
         )
+
+
+class SourceEvent(BaseModel):
+    """Base model for all source-related events."""
+
+    source_id: UUID = Field(..., description="ID of the source this event belongs to")
+    status: SourceStatus = Field(..., description="Type of the event")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
+    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
+    error: str | None = Field(default=None, description="Error message, null if no error")
+
+
+class ProcessingEvent(BaseModel):
+    """Events emitted by celery worker."""
+
+    source_id: UUID = Field(..., description="ID of the source this event belongs to")
+    event_type: Literal["processing", "completed", "failed"] = Field(..., description="Type of the event")
+    error: str | None = Field(default=None, description="Error message, null if no error")
+    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
 
 
 class SourceStatus(str, Enum):
