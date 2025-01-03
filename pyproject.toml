@@ -5,7 +5,7 @@ description = ""
 authors = ["AZ <azuev@outlook.com>"]
 readme = "README.md"
 package-mode = false
-packages = [{include = "src"}]
+packages = [{ include = "src" }]
 
 
 [tool.poetry.dependencies]
@@ -15,37 +15,43 @@ colorama = "^0.4.6"
 requests = "^2.32.3"
 tiktoken = "^0.7.0"
 markdown = "^3.7"
-google-cloud-aiplatform = "^1.64.0"
 cohere = "^5.9.0"
 firecrawl-py = "^1.2.3"
 jq = "^1.8.0"
 weave = "^0.51.12"
 wandb = "^0.18.3"
-uvicorn = ">=0.25.0,<0.26.0"
 anthropic = "^0.37.1"
 ragas = "^0.2.3"
-langchain = "^0.3.6"
 pydantic-settings = "^2.6.1"
 supabase = "^2.10.0"
 postgrest = "^0.18.0"
-langchain-community = "^0.3.7"
-unstructured-ingest = {extras = ["remote"], version = "^0.3.0"}
-unstructured = "^0.16.5"
 libmagic = "^1.0"
-rq = "^2.0.0"
-logfire = {extras = ["fastapi"], version = "^2.5.0"}
-sentry-sdk = {extras = ["fastapi"], version = "^2.19.0"}
+sentry-sdk = { extras = ["fastapi"], version = "^2.19.0" }
 sentry-cli = "^2.39.1"
 sse-starlette = "^2.1.3"
-redis = {version = "^5.2.1", extras = ["hiredis"]}
+redis = { version = "^5.2.1", extras = ["hiredis"] }
 chromadb = "^0.5.23"
+types-pyyaml = "^6.0.12.20241221"
+logfire = { extras = [
+    "asyncpg",
+    "fastapi",
+    "httpx",
+    "redis",
+    "system-metrics",
+], version = "^2.11.0" }
+asyncpg = "^0.30.0"
+ngrok = "^1.4.0"
+celery = "^5.4.0"
+fastapi = { extras = ["standard"], version = "^0.115.6" }
+uvicorn = { extras = ["standard"], version = "^0.34.0" }
+flower = "^2.0.1"
+
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
 pre-commit = "^4.0.1"
 ruff = "^0.7.3"
 mypy = "^1.13.0"
-pyngrok = "^7.2.1"
 pytest-cov = "^6.0.0"
 pytest-asyncio = "^0.24.0"
 types-requests = "^2.32.0.20241016"
@@ -62,8 +68,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 crawl = "src.core.content.crawler.crawler:run_crawler"
-# For production use (no reload)
-kollektiv = "app:run"
+api = "src.app:run"
+worker = "src.infra.celery.worker:run_worker"
 
 
 [tool.pytest.ini_options]
@@ -72,16 +78,11 @@ addopts = "-ra -q"
 testpaths = ["tests"]
 pythonpath = [".", "src"]
 asyncio_mode = "auto"
-asyncio_fixture_loop_scope = "function"
-asyncio_default_fixture_loop_scope = "function"
-filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::UserWarning",
-]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]
 markers = [
     "integration: mark test as integration test",
     "e2e: mark test as end-to-end test",
-    "slow: mark test as slow running"
+    "slow: mark test as slow running",
 ]
 
 [tool.coverage.run]
@@ -103,7 +104,6 @@ skip_empty = true
 precision = 2
 
 
-
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = false
@@ -117,19 +117,17 @@ warn_unreachable = true
 disallow_incomplete_defs = true
 no_implicit_optional = true
 
-plugins = [
-    "pydantic.mypy"
-]
+plugins = ["pydantic.mypy"]
 
 # Ignore noise
 disable_error_code = [
-    "attr-defined",      # Ignore dynamic attribute access
-    "no-untyped-call",  # Ignore calls to untyped functions
-    "misc",             # Ignore misc issues like untyped decorators
-    "union-attr",       # Ignore union attribute access
-    "type-arg",         # Reduces generic type noise
-    "var-annotated",    # Reduces variable annotation noise
-    "return-value",     # Less strict on return value matching
+    "attr-defined",    # Ignore dynamic attribute access
+    "no-untyped-call", # Ignore calls to untyped functions
+    "misc",            # Ignore misc issues like untyped decorators
+    "union-attr",      # Ignore union attribute access
+    "type-arg",        # Reduces generic type noise
+    "var-annotated",   # Reduces variable annotation noise
+    "return-value",    # Less strict on return value matching
 ]
 
 # For cleaner output
@@ -147,16 +145,16 @@ module = [
     "weave.*",
     "ragas.*",
     "wandb.*",
-    "cohere.*"
+    "cohere.*",
 ]
 ignore_missing_imports = true
 
 # More relaxed settings for tests
 [[tool.mypy.overrides]]
 module = ["tests.*"]
-disallow_untyped_defs = false    # Allow untyped definitions
-check_untyped_defs = false       # Don't check untyped definitions
-warn_return_any = false          # Don't warn about implicit Any returns
+disallow_untyped_defs = false       # Allow untyped definitions
+check_untyped_defs = false          # Don't check untyped definitions
+warn_return_any = false             # Don't warn about implicit Any returns
 warn_unused_ignores = true
 no_implicit_optional = false
 disallow_incomplete_defs = false
@@ -191,34 +189,34 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-    "E",    # pycodestyle errors
-    "D",    # pydocstyle
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort
-    "B",    # flake8-bugbear
-    "C4",   # flake8-comprehensions
-    "UP",   # pyupgrade
-    "PT",   # flake8-pytest-style
-    "S",    # Bandit security rules
-    "N",    # pep8-naming
-    "TCH",  # typechecking
-    "PYI",  # pyi
-    "ANN",  # type annotation checks
+    "E",   # pycodestyle errors
+    "D",   # pydocstyle
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "PT",  # flake8-pytest-style
+    "S",   # Bandit security rules
+    "N",   # pep8-naming
+    "TCH", # typechecking
+    "PYI", # pyi
+    "ANN", # type annotation checks
 ]
 fixable = ["ALL"]
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 ignore = [
-    "D100",  # Missing docstring in public module
-    "D212",  # Multi-line docstring should start at the first line
-    "D107",  # Missing docstring in __init__
-    "D415",  # First line should end with period
-    "ANN101",  # Missing type annotation for self in method
-    "ANN102",  # Missing type annotation for cls in classmethod
-    "ANN002",  # Missing type annotation for *args
-    "ANN003",  # Missing type annotation for **kwargs
-    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed
-    "ANN204",  # Missing return type annotation for special method __init__
+    "D100",   # Missing docstring in public module
+    "D212",   # Multi-line docstring should start at the first line
+    "D107",   # Missing docstring in __init__
+    "D415",   # First line should end with period
+    "ANN101", # Missing type annotation for self in method
+    "ANN102", # Missing type annotation for cls in classmethod
+    "ANN002", # Missing type annotation for *args
+    "ANN003", # Missing type annotation for **kwargs
+    "ANN401", # Dynamically typed expressions (typing.Any) are disallowed
+    "ANN204", # Missing return type annotation for special method __init__
     "E203",   # Whitespace before ':'
     "E266",   # Too many leading '#' for block comment
 ]
@@ -226,8 +224,14 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "D100", "D104", "D107", "D212"]
 "tests/*" = [
-    "D100", "D101", "D102", "D103", "S101",
-    "ANN001", "ANN201", "ANN101",  # Type annotation rules
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "S101",
+    "ANN001",
+    "ANN201",
+    "ANN101", # Type annotation rules
 ]
 
 [tool.ruff.lint.pydocstyle]

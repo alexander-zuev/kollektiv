@@ -6,6 +6,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from src.infra.logger import get_logger
+from src.models.base_models import SupabaseModel
+
+logger = get_logger()
+
 
 # Embedding models
 class EmbeddingProvider(str, Enum):
@@ -48,3 +53,16 @@ class VectorSearchParams(BaseModel):
     include: list[Literal["documents", "metadatas", "distances"]] = Field(
         ..., description="Fields to include in the search results"
     )
+
+
+class VectorCollection(SupabaseModel):
+    """Represents a vector collection consisting of vectors and metadata."""
+
+    user_id: UUID = Field(..., description="User ID to which the collection belongs to")
+    documents_cnt: int = Field(default=0, description="Number of documents in the collection")
+    deleted: bool = Field(default=False, description="Whether the collection is deleted")
+
+    @property
+    def name(self) -> str:
+        """Generate collection name based on user_id."""
+        return str(self.user_id)

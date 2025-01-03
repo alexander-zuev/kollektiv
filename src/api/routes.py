@@ -24,15 +24,16 @@ class Routes:
     class V0:  # Use lowercase for consistency with prefix
         """API routes (versioned)."""
 
-        CONTENT = "/content"
+        SOURCES = "/sources"
         CHAT = "/chat"
         CONVERSATIONS = "/conversations"
 
-        class Content:
+        class Sources:
             """Content management routes."""
 
             SOURCES = "/sources"
             SOURCE = "/sources/{source_id}"
+            SOURCE_EVENTS = "/sources/{source_id}/events"
             SOURCE_STATUS = "/sources/{source_id}/status"
 
         class Chat:

@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Any
 
 import yaml
+from anthropic.types import ToolChoiceToolParam, ToolParam
 from pydantic import ValidationError
 
 from src.core._exceptions import NonRetryableLLMError
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.logger import get_logger
+from src.infra.settings import settings
 from src.models.llm_models import Tool, ToolInputSchema, ToolName
 
 logger = get_logger()
@@ -43,14 +43,33 @@ class ToolManager:
         """Get all tools with caching enabled."""
         return list(self.tools.values())
 
-    def get_tool(self, name: ToolName) -> Tool | None:
+    def get_tool(self, name: ToolName) -> ToolParam:
         """Get a specific tool by name."""
         try:
-            return self.tools.get(name)
-        except KeyError:
+            tool = self.tools.get(name)
+            if not tool:
+                raise KeyError(f"Tool {name} not found")
+            return ToolParam(name=tool.name, input_schema=tool.input_schema, description=tool.description)
+        except KeyError as e:
             logger.error(f"Tool {name} not found")
-            raise NonRetryableLLMError(f"Tool {name} not found") from e
+            raise NonRetryableLLMError(original_error=e, message=f"Tool {name} not found") from e
 
-    def force_tool_choice(self, name: ToolName) -> dict[str, Any]:
-        """Force tool choice."""
-        return {"type": "tool", "name": name.value}
+    def force_tool_choice(self, name: ToolName) -> ToolChoiceToolParam:
+        """Forces Claude to always use the tool."""
+        return ToolChoiceToolParam(type="tool", name=name.value)
+
+
+if __name__ == "__main__":
+    # Initialize manager
+    manager = ToolManager()
+
+    # Test tool retrieval and conversion
+    rag_tool = manager.get_tool(ToolName.RAG_SEARCH)
+    # print(f"RAG tool: {rag_tool}")
+
+    my_tool = Tool.from_tool_param(rag_tool)
+    print(f"My tool: {my_tool}")
+
+    # Test tool choice
+    tool_choice = manager.force_tool_choice(ToolName.RAG_SEARCH)
+    print(f"Tool choice: {tool_choice}")

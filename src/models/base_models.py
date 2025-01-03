@@ -1,7 +1,16 @@
 from datetime import UTC, datetime
+from enum import Enum
 from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, Field, PrivateAttr
+
+
+class Environment(str, Enum):
+    """Supported application environments."""
+
+    LOCAL = "local"
+    STAGING = "staging"
+    PRODUCTION = "production"
 
 
 class SupabaseModel(BaseModel):

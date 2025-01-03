@@ -9,17 +9,21 @@ nixpkgs = ["python312", "gcc"]
 [phases.install]
 # Set up a virtual environment and install dependencies
 # Cache dependencies layer
-cache_directories = ["/root/.cache/pip", "/opt/venv"]
-commands = [
+cache_directories = [
+  "/root/.cache/pip",        # Pip downloads
+  "/opt/venv",               # Virtual env
+  "~/.cache/poetry",         # Poetry cache
+  "/root/.cache/pip/wheels", # Pre-built wheels
+]
+cmds = [
   "echo '🚀 Starting Kollektiv installation...'",
-  "echo '📦 Creating virtual environment...'",
   "python -m venv /opt/venv",
   ". /opt/venv/bin/activate",
-  "pip install poetry",
+  "pip install --no-cache-dir poetry",
   "poetry config virtualenvs.create false",
-  "poetry install --only main --no-interaction --no-ansi",
+  "poetry install --only main --no-interaction --no-ansi --no-root",
+  "echo \"🚀 Starting Kollektiv service: ${SERVICE}\"",
 ]
 
-[phases.start]
-# Command to start the application
-cmd = "poetry run kollektiv"
+[start]
+cmd = "poetry run $SERVICE"

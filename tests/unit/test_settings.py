@@ -1,11 +1,10 @@
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from src.api.routes import Routes
-from src.infrastructure.config.settings import Environment, Settings
+from src.infra.settings import Environment, Settings
 
 
 def test_environment_independent_settings():
@@ -15,10 +14,8 @@ def test_environment_independent_settings():
     # These should be constant regardless of environment
     assert settings.firecrawl_api_url == "https://api.firecrawl.dev/v1"
     assert settings.api_host == "127.0.0.1"
-    assert settings.api_port == 8000
-    assert settings.chainlit_host == "127.0.0.1"
-    assert settings.chainlit_port == 8001
-    assert settings.log_level == "debug"
+    assert settings.api_port == 8080
+    assert settings.debug == False
     assert settings.max_retries == 3
     assert settings.backoff_factor == 2.0
     assert settings.default_page_limit == 25
@@ -29,16 +26,13 @@ def test_path_settings():
     """Test path configurations that are environment-independent."""
     settings = Settings()
 
-    # Path structure should be consistent
-    assert settings.log_dir == Path("src/logs")
-    assert settings.raw_data_dir == Path("src/data/raw")
-    assert settings.processed_data_dir == Path("src/data/processed")
-    assert settings.chroma_db_dir == Path("src/infrastructure/storage/vector/chroma")
-
-    # Verify directories exist
-    for dir_path in [settings.log_dir, settings.raw_data_dir, settings.processed_data_dir, settings.chroma_db_dir]:
-        assert dir_path.exists()
-        assert dir_path.is_dir()
+    # Verify paths exist (not directories)
+    assert settings.src_dir.exists()
+    assert settings.eval_dir.parent.exists()  # Check parent since these are relative paths
+    assert settings.prompt_dir.parent.exists()
+    assert settings.tools_dir.parent.exists()
+    assert isinstance(settings.prompts_file, str)  # These are now strings, not paths
+    assert isinstance(settings.tools_file, str)
 
 
 def test_environment_specific_settings():
@@ -48,12 +42,12 @@ def test_environment_specific_settings():
 
     if current_env == "staging":
         assert settings.environment == Environment.STAGING
-        assert settings.base_url == "http://mock-api:8000"
-        assert settings.firecrawl_webhook_url == f"http://mock-api:8000{Routes.System.Webhooks.FIRECRAWL}"
+        assert settings.public_url.startswith("https://")  # Using public_url instead of base_url
+        assert settings.firecrawl_webhook_url == f"{settings.public_url}{Routes.System.Webhooks.FIRECRAWL}"
     else:
         assert settings.environment == Environment.LOCAL
         expected_url = f"http://{settings.api_host}:{settings.api_port}"
-        assert settings.base_url == expected_url
+        assert settings.public_url == expected_url  # Using public_url instead of base_url
         assert settings.firecrawl_webhook_url == f"{expected_url}{Routes.System.Webhooks.FIRECRAWL}"
 
 
@@ -74,22 +68,22 @@ def test_environment_override():
     with patch.dict(os.environ, {"ENVIRONMENT": "local"}):
         settings = Settings()
         assert settings.environment == Environment.LOCAL
-        assert settings.base_url == f"http://{settings.api_host}:{settings.api_port}"
+        assert settings.public_url == f"http://{settings.api_host}:{settings.api_port}"  # Using public_url
 
     # Test STAGING override
-    with patch.dict(os.environ, {"ENVIRONMENT": "staging", "BASE_URL": "http://mock-api:8000"}):
+    with patch.dict(os.environ, {"ENVIRONMENT": "staging", "RAILWAY_PUBLIC_DOMAIN": "test.railway.app"}):
         settings = Settings()
         assert settings.environment == Environment.STAGING
-        assert settings.base_url == "http://mock-api:8000"
+        assert settings.public_url == "https://test.railway.app"  # Using public_url with railway domain
 
 
 @pytest.mark.skipif("CI" in os.environ, reason="Local environment test only")
 def test_production_environment_validation():
-    """Test that production environment requires BASE_URL."""
-    with patch.dict(os.environ, {"ENVIRONMENT": "production"}, clear=True):  # Add clear=True
+    """Test that production environment requires RAILWAY_PUBLIC_DOMAIN."""
+    with patch.dict(os.environ, {"ENVIRONMENT": "production"}, clear=True):
         settings = Settings()
-        with pytest.raises(ValueError, match="BASE_URL environment variable is required"):
-            _ = settings.base_url
+        with pytest.raises(ValueError, match="RAILWAY_PUBLIC_DOMAIN must be set in staging/production"):
+            _ = settings.public_url  # Using public_url instead of base_url
 
 
 @pytest.mark.skipif("CI" in os.environ, reason="Local environment test only")
@@ -98,7 +92,7 @@ def test_local_env_file_loading():
     with patch.dict(os.environ, {"ENVIRONMENT": "local"}):
         settings = Settings()
         assert settings.environment == Environment.LOCAL
-        assert "http://127.0.0.1" in settings.base_url
+        assert settings.public_url.startswith("http://127.0.0.1")  # Using public_url
 
 
 @pytest.mark.skipif("CI" not in os.environ, reason="CI environment test only")
@@ -106,7 +100,9 @@ def test_ci_environment_settings():
     """Test settings specifically in CI environment."""
     settings = Settings()
     assert settings.environment == Environment.STAGING
-    assert settings.base_url == "http://mock-api:8000"
+    # In CI, we should have RAILWAY_PUBLIC_DOMAIN set
+    assert settings.railway_public_domain is not None
+    assert settings.public_url.startswith("https://")
     assert all(
         key is not None
         for key in [

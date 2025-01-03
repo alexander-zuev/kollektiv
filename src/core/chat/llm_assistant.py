@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncGenerator, Iterable
 from typing import Any
+from uuid import UUID
 
 import anthropic
 import weave
@@ -28,13 +29,13 @@ from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 from src.core.chat.prompt_manager import PromptManager
 from src.core.chat.tool_manager import ToolManager
 from src.core.search.retriever import Retriever
-from src.core.search.vector_db import VectorDB
-from src.infrastructure.common.decorators import (
+from src.core.search.vector_db import VectorDatabase
+from src.infra.decorators import (
     anthropic_error_handler,
     base_error_handler,
 )
-from src.infrastructure.common.logger import get_logger
-from src.infrastructure.config.settings import settings
+from src.infra.logger import _truncate_message, get_logger
+from src.infra.settings import get_settings
 from src.models.chat_models import (
     AssistantMessageEvent,
     ConversationHistory,
@@ -49,6 +50,7 @@ from src.models.chat_models import (
 )
 from src.models.llm_models import SystemPrompt, Tool, ToolName
 
+settings = get_settings()
 logger = get_logger()
 
 
@@ -68,7 +70,7 @@ class ClaudeAssistant(Model):
     """
 
     # Required fields
-    vector_db: VectorDB
+    vector_db: VectorDatabase
 
     # Client config
     client: anthropic.AsyncAnthropic | None = Field(default=None)
@@ -87,7 +89,7 @@ class ClaudeAssistant(Model):
 
     def __init__(
         self,
-        vector_db: VectorDB,
+        vector_db: VectorDatabase,
         retriever: Retriever,
         api_key: str | None = None,
         model_name: str | None = None,
@@ -107,10 +109,10 @@ class ClaudeAssistant(Model):
         )
 
         self.client = anthropic.AsyncAnthropic(api_key=self.api_key, max_retries=2)
-        self.tools = [self.tool_manager.get_tool(ToolName.RAG_SEARCH)]
+        self.tools = [Tool.from_tool_param(self.tool_manager.get_tool(ToolName.RAG_SEARCH))]
         self.system_prompt = self.prompt_manager.get_system_prompt(document_summaries="No documents loaded yet.")
         self.retriever = retriever
-        logger.debug("Claude assistant successfully initialized.")
+        logger.info("✓ Initialized Claude assistant successfully")
 
     # TODO: this method needs to be refactored completely
     @base_error_handler
@@ -142,6 +144,7 @@ class ClaudeAssistant(Model):
         try:
             logger.debug(f"Number of messages in conversation history: {len(conv_history.messages)}")
 
+            user_id = conv_history.user_id
             max_retries = 2
             retries = 0
             current_tool_use_block: ToolUseBlock | None = (
@@ -153,7 +156,7 @@ class ClaudeAssistant(Model):
 
             while retries < max_retries:
                 messages = conv_history.to_anthropic_messages()
-                logger.debug(f"Debugging messages list for Anthropic API: {messages}")
+                logger.debug(_truncate_message(f"Debugging messages list for Anthropic API: {messages}"))
                 async with self.client.messages.stream(
                     messages=messages,
                     system=self.cached_system_prompt,
@@ -180,6 +183,7 @@ class ClaudeAssistant(Model):
                                         event,
                                         current_tool_use_block,
                                         tool_input_json,  # type: ignore
+                                        user_id,
                                     )
                                     continue
                             case "message_stop":
@@ -245,7 +249,7 @@ class ClaudeAssistant(Model):
             return None, tool_input_json
 
     async def handle_content_block_stop(
-        self, event: ContentBlockStopEvent, current_tool_use_block: ToolUseBlock, tool_input_json: str
+        self, event: ContentBlockStopEvent, current_tool_use_block: ToolUseBlock, tool_input_json: str, user_id: UUID
     ) -> ToolResultBlock | None:
         """Handle content block stop event."""
         logger.debug("===== Stream content block ended =====")
@@ -258,7 +262,7 @@ class ClaudeAssistant(Model):
                 current_tool_use_block.tool_input = parsed_input
 
                 # Get tool result
-                tool_result = await self.handle_tool_call(tool_inputs=current_tool_use_block)
+                tool_result = await self.handle_tool_call(tool_inputs=current_tool_use_block, user_id=user_id)
                 return tool_result
 
             except json.JSONDecodeError as e:
@@ -267,6 +271,7 @@ class ClaudeAssistant(Model):
                 raise NonRetryableLLMError(
                     original_error=e, message="Failed to parse tool input JSON from LLM response"
                 ) from e
+        return None
 
     def handle_error(self, event: MessageStreamEvent) -> StreamingEvent:
         """Handle error event."""
@@ -302,17 +307,17 @@ class ClaudeAssistant(Model):
             event_data=AssistantMessageEvent(content=content),
         )
 
-    async def handle_tool_call(self, tool_inputs: ToolUseBlock) -> ToolResultBlock:
+    async def handle_tool_call(self, tool_inputs: ToolUseBlock, user_id: UUID) -> ToolResultBlock:
         """Handle tool use event."""
-        tool_result = await self.get_tool_result(tool_inputs)
+        tool_result = await self.get_tool_result(tool_inputs, user_id)
         logger.debug(f"Tool result: {tool_result}")
         return tool_result
 
-    async def get_tool_result(self, tool_inputs: ToolUseBlock) -> ToolResultBlock:
+    async def get_tool_result(self, tool_inputs: ToolUseBlock, user_id: UUID) -> ToolResultBlock:
         """Handle tool use for specified tools."""
         try:
             if tool_inputs.tool_name == "rag_search":
-                search_results = await self.use_rag_search(tool_inputs)
+                search_results = await self.use_rag_search(tool_inputs, user_id)
                 if search_results is None:
                     # Special tool use block for no context
                     tool_result = ToolResultBlock(
@@ -337,22 +342,29 @@ class ClaudeAssistant(Model):
             ) from e
 
     # TODO: this method belongs to retriever
-    async def use_rag_search(self, tool_inputs: ToolUseBlock) -> list[str] | None:
+    async def use_rag_search(self, tool_inputs: ToolUseBlock, user_id: UUID) -> list[str] | None:
         """Perform RAG search using the provided tool input.
 
         Args:
             tool_inputs: ToolUseBlock containing the rag_query
         """
         # Get the query from tool input
-        rag_query = tool_inputs.tool_input["rag_query"]  # This matches the new schema
+        if not isinstance(tool_inputs.tool_input, dict):
+            logger.error(f"Tool input is not a dictionary: {tool_inputs.tool_input}")
+            return None
+        rag_query = tool_inputs.tool_input.get("rag_query")  # This matches the new schema
+        if not rag_query:
+            logger.error(f"rag_query not found in tool input: {tool_inputs.tool_input}")
+            return None
         logger.debug(f"Using this query for RAG search: {rag_query}")
         # Merge these two methods
         multiple_queries = await self.generate_multi_query(rag_query)
         combined_queries = multiple_queries + [rag_query]
 
         # get ranked search results
-        results = await self.retriever.retrieve(rag_query=rag_query, combined_queries=combined_queries, top_n=3)
-        logger.debug(f"Retriever results: {results}")
+        results = await self.retriever.retrieve(
+            rag_query=rag_query, combined_queries=combined_queries, top_n=3, user_id=user_id
+        )
 
         if not results:
             logger.warning("No search results found.")
