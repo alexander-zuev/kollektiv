@@ -6,10 +6,11 @@ from uuid import UUID
 import anthropic
 from anthropic.types import Message, MessageParam, TextBlockParam
 
+from src.core._exceptions import KollektivError, NonRetryableLLMError, RetryableLLMError
 from src.core.chat.prompt_manager import PromptManager
 from src.core.chat.tool_manager import ToolManager, ToolName
 from src.infra.data.data_repository import DataRepository
-from src.infra.decorators import anthropic_error_handler
+from src.infra.decorators import anthropic_error_handler, tenacity_retry_wrapper
 from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
 from src.infra.settings import get_settings
@@ -28,19 +29,33 @@ class SummaryManager:
 
     def __init__(
         self,
-        data_service: DataService | None = None,
-        prompt_manager: PromptManager | None = None,
-        tool_manager: ToolManager | None = None,
+        data_service: DataService,
         n_samples_max: int = 5,
     ):
         """Initialize the SummaryManager."""
         self.client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         self.data_service = data_service
-        self.prompt_manager = prompt_manager
-        self.tool_manager = tool_manager
         self.n_samples_max = n_samples_max
 
-    async def _prepare_data_for_summary(self, documents: list[Document]) -> tuple[list[str], list[str], list[Document]]:
+        # stateless and can be created when needed
+        self._prompt_manager: PromptManager | None = None
+        self._tool_manager: ToolManager | None = None
+
+    @property
+    def prompt_manager(self) -> PromptManager:
+        """Get the prompt manager."""
+        if self._prompt_manager is None:
+            self._prompt_manager = PromptManager()
+        return self._prompt_manager
+
+    @property
+    def tool_manager(self) -> ToolManager:
+        """Get the tool manager."""
+        if self._tool_manager is None:
+            self._tool_manager = ToolManager()
+        return self._tool_manager
+
+    def _prepare_data_for_summary(self, documents: list[Document]) -> tuple[list[str], list[str], list[Document]]:
         """Prepare the data for summary generation."""
         unique_urls = list(set(doc.metadata.source_url for doc in documents if doc.metadata.source_url))
         unique_titles = list(set(doc.metadata.title for doc in documents if doc.metadata.title))
@@ -82,24 +97,34 @@ class SummaryManager:
         """
 
     @anthropic_error_handler
-    async def generate_document_summary(
-        self, source_id: UUID, documents_sample: list[Document], unique_urls: list[str], unique_titles: list[str]
+    @tenacity_retry_wrapper((RetryableLLMError,))
+    async def get_summary_response(
+        self, source_id: UUID, unique_urls: list[str], unique_titles: list[str], documents_sample: list[Document]
     ) -> SourceSummary:
         """Generates a document summary and keywords based on documents and metadata."""
         input_text = self._format_summary_input(documents_sample, unique_urls, unique_titles)
 
         messages = [MessageParam(role="user", content=[TextBlockParam(type="text", text=input_text)])]
         logger.debug(f"Summary generation input: {messages}")
-        response = await self.client.messages.create(
-            model=settings.main_model,
-            max_tokens=1024,
-            messages=messages,
-            system=self.prompt_manager.return_system_prompt(PromptType.SUMMARY_PROMPT),
-            tools=[self.tool_manager.get_tool(ToolName.SUMMARY)],
-            tool_choice=self.tool_manager.force_tool_choice(ToolName.SUMMARY),
-        )
-        logger.debug(f"Summary generation response: {response}")
-        return self._parse_summary(response, source_id)
+        try:
+            response = await self.client.messages.create(
+                model=settings.main_model,
+                max_tokens=1024,
+                messages=messages,
+                system=self.prompt_manager.return_system_prompt(PromptType.SUMMARY_PROMPT),
+                tools=[self.tool_manager.get_tool(ToolName.SUMMARY)],
+                tool_choice=self.tool_manager.force_tool_choice(ToolName.SUMMARY),
+            )
+            logger.debug(f"Summary generation response: {response}")
+            return self._parse_summary(response, source_id)
+        except ValueError as e:
+            raise KollektivError(f"Failed to parse summary response: {e}")
+        except RetryableLLMError:
+            # Tried to generate summary but failed, so we should raise an error
+            raise
+        except NonRetryableLLMError:
+            # Non-retryable error, so we should raise an error immediately
+            raise
 
     def _parse_summary(self, response: Message, source_id: UUID) -> SourceSummary:
         """Parse the summary response from Claude."""
@@ -123,10 +148,35 @@ class SummaryManager:
             logger.error(f"Failed to parse summary response: {e}")
             raise ValueError(f"Invalid summary format: {e}")
 
+    async def generate_summary(self, source_id: UUID, documents: list[Document]) -> SourceSummary | None:
+        """Orchestrates summary generation."""
+        if len(documents) == 0:
+            # We don't have any documents to summarize, so we should raise or log an error??
+            raise ValueError("No documents to summarize")
+        else:
+            # Prepare inputs
+            urls, titles, doc_sample = self._prepare_data_for_summary(documents)
+
+            # Generate summary response
+            try:
+                summary_response = await self.get_summary_response(source_id, urls, titles, doc_sample)
+            except (RetryableLLMError, NonRetryableLLMError, ValueError):
+                # We should retry the summary generation
+                raise  # just propagate up the stack
+            # Save summary to database
+            await self.data_service.save(SourceSummary, summary_response)
+
+        return summary_response
+
 
 if __name__ == "__main__":
     import asyncio
     from uuid import UUID
+
+    from src.infra.logger import configure_logging, get_logger
+
+    configure_logging()
+    logger = get_logger()
 
     async def test_summary_generation() -> None:  # type: ignore
         # Initialize dependencies
@@ -139,35 +189,16 @@ if __name__ == "__main__":
 
         # Create summary manager
         logger.info("Creating summary manager...")
-        summary_manager = SummaryManager(
-            data_service=data_service, prompt_manager=prompt_manager, tool_manager=tool_manager, n_samples_max=5
-        )
+        summary_manager = SummaryManager(data_service=data_service, n_samples_max=5)
 
         # Test source ID - you'll provide this
         source_id = UUID("123e4567-e89b-12d3-a456-426614174000")  # Replace with actual
         logger.info(f"Testing with source_id: {source_id}")
 
+        documents = await data_service.get_documents_by_source(source_id=source_id)
+
         try:
-            # Fetch documents
-            logger.info("Fetching documents...")
-            documents = await data_service.get_documents_by_source(source_id=source_id)
-            logger.info(f"Found {len(documents)} documents")
-
-            # Prepare data
-            logger.info("Preparing data for summary...")
-            unique_urls, unique_titles, documents_sample = await summary_manager._prepare_data_for_summary(documents)
-            logger.info(f"Selected {len(documents_sample)} sample documents")
-            logger.info(f"Found {len(unique_urls)} unique URLs")
-            logger.info(f"Found {len(unique_titles)} unique titles")
-
-            # Generate summary
-            logger.info("Generating summary...")
-            summary = await summary_manager.generate_document_summary(
-                source_id=source_id,
-                documents_sample=documents_sample,
-                unique_urls=unique_urls,
-                unique_titles=unique_titles,
-            )
+            summary = await summary_manager.generate_summary(source_id, documents)
 
             # Print results
             logger.info("Summary generation complete!")
@@ -180,7 +211,6 @@ if __name__ == "__main__":
             logger.error(f"Error during testing: {e}", exc_info=True)
         finally:
             # Cleanup
-            await supabase_manager.close()
             logger.info("Test complete")
 
     # Run the test

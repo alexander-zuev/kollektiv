@@ -126,14 +126,11 @@ class AddContentSourceResponse(BaseModel):
     source_id: UUID = Field(...)
     status: SourceStatus = Field(..., description="Status of the data source")
     error: str | None = Field(None, description="Error message, null if no error")
+    error_type: Literal["crawler", "infrastructure"] | None = Field(None, description="Type of the error")
 
     @classmethod
     def from_source(cls, source: DataSource) -> AddContentSourceResponse:
-        return cls(
-            source_id=source.source_id,
-            status=source.status,
-            error=source.error,
-        )
+        return cls(source_id=source.source_id, status=source.status, error=source.error, error_type=None)
 
 
 class SourceEvent(BaseModel):

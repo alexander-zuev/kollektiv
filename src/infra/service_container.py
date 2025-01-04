@@ -107,7 +107,9 @@ class ServiceContainer:
             await self.event_consumer.start()
 
             # Source summary
-            self.summary_manager = SummaryManager(data_service=self.data_service)
+            self.summary_manager = SummaryManager(
+                data_service=self.data_service,
+            )
 
             # Log the successful initialization
             logger.info("✓ Initialized services successfully.")

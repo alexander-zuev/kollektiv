@@ -50,6 +50,11 @@ class DataService:
         result = await self.repository.save(updated)
         return model_class.model_validate(result.model_dump())
 
+    async def save(self, model_class: type[T], entity: T) -> T:
+        """Generic save operation for any entity."""
+        result = await self.repository.save(entity)
+        return model_class.model_validate(result.model_dump())
+
     async def save_job(self, job: Job) -> Job:
         """Save or update a job."""
         result = await self.repository.save(job)

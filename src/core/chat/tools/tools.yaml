@@ -90,3 +90,20 @@ multi_query_tool:
           type: string
         description: The list of queries to generate
     required: ["queries"]
+
+summary_tool:
+  name: summary_tool
+  description: |
+    Generates a summary of the source content.
+  input_schema:
+    type: object
+    properties:
+      summary:
+        type: string
+        description: The summary of the source content
+      keywords:
+        type: array
+        items:
+          type: string
+        description: The keywords of the source content
+    required: ["summary", "keywords"]

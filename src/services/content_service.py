@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
-from src.core._exceptions import JobNotFoundError
+from src.core._exceptions import CrawlerError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
 from src.infra.celery.tasks import process_documents
 from src.infra.decorators import generic_error_handler
@@ -105,7 +105,17 @@ class ContentService:
             )
 
             return AddContentSourceResponse.from_source(updated_source)
+        except CrawlerError as e:
+            # Crawler error -> returns a response
+            logger.exception(f"Crawling of the source failed: {e}")
+            return AddContentSourceResponse(
+                source_id=source.source_id,
+                status=SourceStatus.FAILED,
+                error=str(e),
+                error_type="crawler",
+            )
         except Exception as e:
+            # Infrastructure error -> returns a response
             logger.exception(f"Failed to add source: {e}")
             if source:
                 await self.data_service.update_datasource(
@@ -125,10 +135,9 @@ class ContentService:
 
             return AddContentSourceResponse(
                 source_id=source.source_id,
-                source_type=source.source_type,
                 status=SourceStatus.FAILED,
-                created_at=source.created_at,
-                error=str(e),
+                error="An internal server error occured, we are working on it.",  # do not expose internal errors
+                error_type="infrastructure",
             )
 
     async def _create_and_save_datasource(self, request: AddContentSourceRequest) -> DataSource:
