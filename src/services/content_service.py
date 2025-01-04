@@ -77,16 +77,6 @@ class ContentService:
                 status=source.status,
             )
 
-            if not response.success:
-                logger.debug("STEP 2. Crawl failed")
-                return AddContentSourceResponse(
-                    source_id=source.source_id,
-                    source_type=source.source_type,
-                    status=SourceStatus.FAILED,
-                    created_at=source.created_at,
-                    error="Failed to start a crawl, please try again.",
-                )
-
             logger.debug("STEP 3. Crawl started successfully")
 
             # 3. Create and link job with firecrawl_id
