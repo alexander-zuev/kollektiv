@@ -92,7 +92,7 @@ class SummaryManager:
         Generate:
         1. A concise summary (100-150 words) describing the main topics and content type
         2. 5-10 specific keywords that appear in the content
-        
+
         Return as JSON with 'summary' and 'keywords' fields.
         """
 
@@ -103,15 +103,16 @@ class SummaryManager:
     ) -> SourceSummary:
         """Generates a document summary and keywords based on documents and metadata."""
         input_text = self._format_summary_input(documents_sample, unique_urls, unique_titles)
-
+        system_prompt = self.prompt_manager.return_system_prompt(PromptType.SUMMARY_PROMPT)
         messages = [MessageParam(role="user", content=[TextBlockParam(type="text", text=input_text)])]
         logger.debug(f"Summary generation input: {messages}")
+
         try:
             response = await self.client.messages.create(
                 model=settings.main_model,
                 max_tokens=1024,
                 messages=messages,
-                system=self.prompt_manager.return_system_prompt(PromptType.SUMMARY_PROMPT),
+                system=[system_prompt.without_cache()],
                 tools=[self.tool_manager.get_tool(ToolName.SUMMARY)],
                 tool_choice=self.tool_manager.force_tool_choice(ToolName.SUMMARY),
             )
@@ -135,7 +136,7 @@ class SummaryManager:
                 raise ValueError("No tool use in response")
 
             # Parse the tool output
-            tool_output = json.loads(tool_calls[0].input)
+            tool_output = tool_calls[0].input
             logger.debug(f"Tool output: {tool_output}")
 
             return SourceSummary(
@@ -153,7 +154,9 @@ class SummaryManager:
         if len(documents) == 0:
             # We don't have any documents to summarize, so we should raise or log an error??
             raise ValueError("No documents to summarize")
+
         else:
+            logger.info(f"Generating summary for {source_id} with {len(documents)} documents")
             # Prepare inputs
             urls, titles, doc_sample = self._prepare_data_for_summary(documents)
 
@@ -192,7 +195,7 @@ if __name__ == "__main__":
         summary_manager = SummaryManager(data_service=data_service, n_samples_max=5)
 
         # Test source ID - you'll provide this
-        source_id = UUID("123e4567-e89b-12d3-a456-426614174000")  # Replace with actual
+        source_id = UUID("40067acb-9079-4761-82e3-745c0a7cf395")  # Replace with actual
         logger.info(f"Testing with source_id: {source_id}")
 
         documents = await data_service.get_documents_by_source(source_id=source_id)

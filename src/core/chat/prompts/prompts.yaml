@@ -60,7 +60,7 @@ llm_assistant_prompt: |
 
 multi_query_prompt: |
   Your task is to generate multiple search queries to help retrieve relevant information from a document database.
-  For the given user question, generate {n_queries} focused, single-topic queries that cover different aspects 
+  For the given user question, generate {n_queries} focused, single-topic queries that cover different aspects
   of the information need.
 
   Guidelines:
@@ -96,12 +96,12 @@ summary_prompt: |
     2. 5-10 specific keywords that:
         - Are actually present in the content
         - Help identify when this source is relevant
-    
+
     Remember: Be specific but not too narrow. Focus on topics, not structure.
 
     INPUT:
     - Your input will typically be:
-    -- A sample of documents representing raw content from a website 
+    -- A sample of documents representing raw content from a website
     -- URL of the website
     -- A list of unique URLs that are present in the documents
 
@@ -111,4 +111,3 @@ summary_prompt: |
       "summary": "...",
       "keywords": ["..."]
     }}
-

@@ -51,7 +51,7 @@ rag_search:
 multi_query_tool:
   name: multi_query_tool
   description: |
-    Generates multiple search queries based on the user's original question to improve RAG retrieval results. 
+    Generates multiple search queries based on the user's original question to improve RAG retrieval results.
     You must return a JSON object with a "queries" array containing the generated queries.
 
     What this tool does:

@@ -147,7 +147,7 @@ class ProcessingEvent(BaseModel):
     """Events emitted by celery worker."""
 
     source_id: UUID = Field(..., description="ID of the source this event belongs to")
-    event_type: Literal["processing", "completed", "failed", "generating_summary"] = Field(
+    event_type: Literal["processing", "completed", "failed", "summary_generated"] = Field(
         ..., description="Type of the event"
     )
     error: str | None = Field(default=None, description="Error message, null if no error")

@@ -15,6 +15,11 @@ T = TypeVar("T", bound=BaseModel)
 logger = get_logger()
 settings = get_settings()
 
+# TODO: Implement general, abstract pydantic based serializer. I should not be f*cking with serialization every call.
+# TODO: Perhaps a feature request for celery?
+# TODO: There has to be a more manageble way
+# TODO: It should better handle partial processing failures.
+
 
 def _publish_processing_event(
     source_id: UUID,
@@ -59,11 +64,24 @@ def notify_processing_complete(results: list, user_id: str, source_id: str) -> N
     retry_backoff=True,
     max_retries=3,
 )
-def generate_summary(source_id: str, documents: list[str]) -> None:
+def generate_summary(results: list, source_id: str, documents: list[str]) -> None:
     """Generate a summary for a source."""
     logger.info(f"Chunking complete, generating summary for source {source_id}")
     documents = [Document.model_validate(doc) for doc in documents]
-    asyncio.run(celery_app.services.summary_manager.generate_summary(UUID(source_id), documents))
+    try:
+        asyncio.run(celery_app.services.summary_manager.generate_summary(UUID(source_id), documents))
+
+        event = ProcessingEvent(
+            source_id=UUID(source_id),
+            event_type="summary_generated",
+            metadata={"total_documents": len(documents)},
+        )
+        asyncio.run(
+            celery_app.services.event_publisher.publish_event(channel=Channels.Sources.processing(), message=event)
+        )
+    except Exception as e:
+        logger.exception(f"Error generating summary: {e}")
+        raise e
 
 
 @celery_app.task(

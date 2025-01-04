@@ -9,11 +9,11 @@ from anthropic.types import ToolUseBlock
 from src.core.chat.llm_assistant import ClaudeAssistant
 from src.core.search.reranker import Reranker
 from src.core.search.retriever import Retriever
-from src.core.search.vector_db import VectorDB
+from src.core.search.vector_db import VectorDatabase
 
 
 @pytest.fixture(scope="function")
-def test_claude_assistant(real_vector_db: VectorDB) -> Generator[ClaudeAssistant, None, None]:
+def test_claude_assistant(real_vector_db: VectorDatabase) -> Generator[ClaudeAssistant, None, None]:
     """Create a Claude Assistant instance with real vector DB."""
     # Create and initialize the retriever
     reranker = Reranker()

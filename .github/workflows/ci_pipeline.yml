@@ -12,7 +12,7 @@ env:
   POETRY_VERSION: "1.8.5"
   PYTHONPATH: ${{ github.workspace }}
   PYTHONUNBUFFERED: "1"
-  
+
   # Environment settings
   ENVIRONMENT: "staging"
   WANDB_MODE: "disabled"

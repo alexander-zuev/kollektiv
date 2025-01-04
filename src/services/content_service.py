@@ -89,22 +89,7 @@ class ContentService:
                 ),
             )
 
-            # 4. Update source with job_id and status
-            updated_source = await self.data_service.update_datasource(
-                source_id=source.source_id,
-                updates={
-                    "status": SourceStatus.CRAWLING,
-                    "job_id": job.job_id,
-                },
-            )
-
-            # 5. Publish crawling event
-            await self._publish_source_event(
-                source_id=updated_source.source_id,
-                status=updated_source.status,
-            )
-
-            return AddContentSourceResponse.from_source(updated_source)
+            return AddContentSourceResponse.from_source(source)
         except CrawlerError as e:
             # Crawler error -> returns a response
             logger.exception(f"Crawling of the source failed: {e}")
@@ -223,9 +208,19 @@ class ContentService:
             # Update source
             await self.data_service.update_datasource(
                 source_id=job.details.source_id,
-                updates={"status": SourceStatus.CRAWLING, "updated_at": datetime.now(UTC)},
+                updates={
+                    "status": SourceStatus.CRAWLING,
+                    "job_id": job.job_id,
+                    "updated_at": datetime.now(UTC),
+                },
             )
             logger.debug(f"Updated source {job.details.source_id} status to CRAWLING")
+
+            # Publish crawling event
+            await self._publish_source_event(
+                source_id=job.details.source_id,
+                status=SourceStatus.CRAWLING,
+            )
         except Exception as e:
             logger.error(f"Failed to handle start event for job {job.job_id}: {e}")
             await self._handle_crawl_failure(job, str(e))
