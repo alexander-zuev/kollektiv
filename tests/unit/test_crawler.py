@@ -1,14 +1,16 @@
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
-import httpx
 import pytest
-from requests.exceptions import HTTPError
+from requests.exceptions import HTTPError, Timeout
 from tenacity import RetryError
 
-from src.core._exceptions import CrawlerError, EmptyContentError
+from src.core._exceptions import CrawlerError
 from src.core.content.crawler import FireCrawler
-from src.infra.settings import settings
+from src.infra.settings import get_settings
 from src.models.firecrawl_models import CrawlParams, CrawlRequest
+
+settings = get_settings()
 
 
 # 1. Initialization Tests
@@ -44,7 +46,7 @@ async def test_start_crawl_retry_logic(mock_async_crawl_url):
     request = CrawlRequest(url="http://example.com", page_limit=10)
 
     # Mock the API call to fail with a retryable error
-    mock_async_crawl_url.side_effect = ConnectionError("Connection failed")
+    mock_async_crawl_url.side_effect = Timeout("Connection timed out")
 
     # Test that it eventually gives up after max retries
     with pytest.raises(RetryError):
@@ -82,26 +84,110 @@ async def test_start_crawl_non_retryable_error(mock_async_crawl_url):
 # 5. Result Fetching
 @pytest.mark.asyncio
 @pytest.mark.unit
-@patch("src.core.content.crawler.crawler.requests.get")
-async def test_accumulate_crawl_results_error_handling(mock_get):
+async def test_fetch_results_from_url():
+    """Test fetching and parsing results from FireCrawl API."""
+    # Setup mock response
     mock_response = MagicMock()
-    mock_response.json.return_value = {"data": []}
-    mock_get.return_value = mock_response
+    mock_response.json.return_value = {
+        "data": [
+            {
+                "markdown": "test content",
+                "metadata": {
+                    "title": "Test Title",
+                    "description": "Test Description",
+                    "sourceURL": "http://example.com",
+                    "og:url": "http://example.com",
+                },
+            }
+        ],
+        "next": "http://api.firecrawl.dev/v1/crawl/next-page",
+    }
+    mock_response.raise_for_status = MagicMock()
 
-    crawler = FireCrawler(api_key="test_key")
-    with pytest.raises(EmptyContentError):
-        await crawler._accumulate_crawl_results("job_id")
+    # Create async context manager mock
+    mock_client = AsyncMock()
+    mock_client.get.return_value = mock_response
+
+    with patch("httpx.AsyncClient") as mock_async_client:
+        mock_async_client.return_value.__aenter__.return_value = mock_client
+
+        crawler = FireCrawler(api_key="test_key")
+        test_url = "http://api.firecrawl.dev/v1/crawl/test-page"
+
+        batch_data, next_url = await crawler._fetch_results_from_url(test_url)
+
+        # Verify response parsing
+        assert batch_data == mock_response.json.return_value
+        assert next_url == "http://api.firecrawl.dev/v1/crawl/next-page"
+
+        # Verify request parameters
+        mock_client.get.assert_called_once_with(
+            test_url, headers={"Authorization": f"Bearer {crawler.api_key}"}, timeout=30
+        )
 
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-@patch("src.core.content.crawler.crawler.requests.get")
-async def test_fetch_results_from_url(mock_get):
-    mock_response = MagicMock()
-    mock_response.json.return_value = {"data": [], "next": None}
-    mock_get.return_value = mock_response
+async def test_get_results():
+    """Test full get_results flow including pagination and document creation."""
+    # Setup mock responses for pagination
+    responses = [
+        {
+            "data": [
+                {
+                    "markdown": "page 1",
+                    "metadata": {
+                        "title": "Title 1",
+                        "description": "Desc 1",
+                        "sourceURL": "http://example.com/1",
+                        "og:url": "http://example.com/1",
+                    },
+                }
+            ],
+            "next": "http://api.firecrawl.dev/v1/crawl/page2",
+        },
+        {
+            "data": [
+                {
+                    "markdown": "page 2",
+                    "metadata": {
+                        "title": "Title 2",
+                        "description": "Desc 2",
+                        "sourceURL": "http://example.com/2",
+                        "og:url": "http://example.com/2",
+                    },
+                }
+            ],
+            "next": None,
+        },
+    ]
 
-    crawler = FireCrawler(api_key="test_key")
-    batch_data, next_url = await crawler._fetch_results_from_url("http://example.com")
-    assert batch_data == {"data": [], "next": None}
-    assert next_url is None
+    mock_responses = []
+    for r in responses:
+        mock_response = MagicMock()
+        mock_response.json.return_value = r
+        mock_response.raise_for_status = MagicMock()
+        mock_responses.append(mock_response)
+
+    mock_client = AsyncMock()
+    mock_client.get.side_effect = mock_responses
+
+    with patch("httpx.AsyncClient") as mock_async_client:
+        mock_async_client.return_value.__aenter__.return_value = mock_client
+
+        crawler = FireCrawler(api_key="test_key")
+        source_id = UUID("00000000-0000-0000-0000-000000000000")
+
+        documents = await crawler.get_results("test_job_id", source_id)
+
+        # Verify we got documents from both pages
+        assert len(documents) == 2
+        assert documents[0].content == "page 1"
+        assert documents[1].content == "page 2"
+
+        # Verify source_id was set correctly
+        assert all(doc.source_id == source_id for doc in documents)
+
+        # Verify metadata was created correctly
+        assert documents[0].metadata.title == "Title 1"
+        assert documents[1].metadata.title == "Title 2"
