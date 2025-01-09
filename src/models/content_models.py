@@ -126,14 +126,11 @@ class AddContentSourceResponse(BaseModel):
     source_id: UUID = Field(...)
     status: SourceStatus = Field(..., description="Status of the data source")
     error: str | None = Field(None, description="Error message, null if no error")
+    error_type: Literal["crawler", "infrastructure"] | None = Field(None, description="Type of the error")
 
     @classmethod
     def from_source(cls, source: DataSource) -> AddContentSourceResponse:
-        return cls(
-            source_id=source.source_id,
-            status=source.status,
-            error=source.error,
-        )
+        return cls(source_id=source.source_id, status=source.status, error=source.error, error_type=None)
 
 
 class SourceEvent(BaseModel):
@@ -150,7 +147,7 @@ class ProcessingEvent(BaseModel):
     """Events emitted by celery worker."""
 
     source_id: UUID = Field(..., description="ID of the source this event belongs to")
-    event_type: Literal["processing", "completed", "failed", "generating_summary"] = Field(
+    event_type: Literal["processing", "completed", "failed", "summary_generated"] = Field(
         ..., description="Type of the event"
     )
     error: str | None = Field(default=None, description="Error message, null if no error")

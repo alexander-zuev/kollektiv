@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
-from src.core._exceptions import JobNotFoundError
+from src.core._exceptions import CrawlerError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
 from src.infra.celery.tasks import process_documents
 from src.infra.decorators import generic_error_handler
@@ -77,16 +77,6 @@ class ContentService:
                 status=source.status,
             )
 
-            if not response.success:
-                logger.debug("STEP 2. Crawl failed")
-                return AddContentSourceResponse(
-                    source_id=source.source_id,
-                    source_type=source.source_type,
-                    status=SourceStatus.FAILED,
-                    created_at=source.created_at,
-                    error="Failed to start a crawl, please try again.",
-                )
-
             logger.debug("STEP 3. Crawl started successfully")
 
             # 3. Create and link job with firecrawl_id
@@ -99,23 +89,18 @@ class ContentService:
                 ),
             )
 
-            # 4. Update source with job_id and status
-            updated_source = await self.data_service.update_datasource(
+            return AddContentSourceResponse.from_source(source)
+        except CrawlerError as e:
+            # Crawler error -> returns a response
+            logger.exception(f"Crawling of the source failed: {e}")
+            return AddContentSourceResponse(
                 source_id=source.source_id,
-                updates={
-                    "status": SourceStatus.CRAWLING,
-                    "job_id": job.job_id,
-                },
+                status=SourceStatus.FAILED,
+                error=str(e),
+                error_type="crawler",
             )
-
-            # 5. Publish crawling event
-            await self._publish_source_event(
-                source_id=updated_source.source_id,
-                status=updated_source.status,
-            )
-
-            return AddContentSourceResponse.from_source(updated_source)
         except Exception as e:
+            # Infrastructure error -> returns a response
             logger.exception(f"Failed to add source: {e}")
             if source:
                 await self.data_service.update_datasource(
@@ -135,10 +120,9 @@ class ContentService:
 
             return AddContentSourceResponse(
                 source_id=source.source_id,
-                source_type=source.source_type,
                 status=SourceStatus.FAILED,
-                created_at=source.created_at,
-                error=str(e),
+                error="An internal server error occured, we are working on it.",  # do not expose internal errors
+                error_type="infrastructure",
             )
 
     async def _create_and_save_datasource(self, request: AddContentSourceRequest) -> DataSource:
@@ -224,9 +208,19 @@ class ContentService:
             # Update source
             await self.data_service.update_datasource(
                 source_id=job.details.source_id,
-                updates={"status": SourceStatus.CRAWLING, "updated_at": datetime.now(UTC)},
+                updates={
+                    "status": SourceStatus.CRAWLING,
+                    "job_id": job.job_id,
+                    "updated_at": datetime.now(UTC),
+                },
             )
             logger.debug(f"Updated source {job.details.source_id} status to CRAWLING")
+
+            # Publish crawling event
+            await self._publish_source_event(
+                source_id=job.details.source_id,
+                status=SourceStatus.CRAWLING,
+            )
         except Exception as e:
             logger.error(f"Failed to handle start event for job {job.job_id}: {e}")
             await self._handle_crawl_failure(job, str(e))

@@ -11,6 +11,7 @@ class AllowedOrigins(str, Enum):
         "https://*.railway.app",
         "https://*.up.railway.app",
         "https://*.railway.internal",
+        "https://staging.thekollektiv.ai",
     ]
     PRODUCTION = [
         "https://thekollektiv.ai",

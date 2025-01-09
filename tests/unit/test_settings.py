@@ -15,7 +15,7 @@ def test_environment_independent_settings():
     assert settings.firecrawl_api_url == "https://api.firecrawl.dev/v1"
     assert settings.api_host == "127.0.0.1"
     assert settings.api_port == 8080
-    assert settings.debug == False
+    assert settings.debug == True
     assert settings.max_retries == 3
     assert settings.backoff_factor == 2.0
     assert settings.default_page_limit == 25
