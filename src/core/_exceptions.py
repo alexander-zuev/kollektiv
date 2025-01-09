@@ -1,8 +1,6 @@
 from typing import Self
 from uuid import UUID
 
-from requests.exceptions import HTTPError, Timeout
-
 
 class KollektivError(Exception):
     """Base class for Kollektiv exceptions."""
@@ -71,39 +69,6 @@ class DataSourceError(KollektivError):
 
 
 ## Firecrawl errors
-class RateLimitError(RetryableError):
-    """Rate limit exceeded."""
-
-    def __init__(self, retry_after: int | None = None):
-        super().__init__("Rate limit exceeded", retry_after)
-
-
-class TemporaryError(RetryableError):
-    """Temporary server error."""
-
-    pass
-
-
-def is_retryable_error(exception: Exception) -> tuple[bool, int | None]:
-    """
-    Determine if an error should trigger a retry attempt.
-
-    Returns:
-        tuple[bool, int | None]: (should_retry, retry_after_seconds)
-    """
-    if isinstance(exception, HTTPError):
-        status_code = exception.response.status_code
-        retry_after = exception.response.headers.get("Retry-After")
-
-        if status_code == 429:  # Rate limit
-            return True, int(retry_after) if retry_after else 30
-        if status_code in [500, 502, 503, 504]:  # Server errors
-            return True, None
-
-    if isinstance(exception, FireCrawlConnectionError | Timeout):
-        return True, None
-
-    return False, None
 
 
 class CrawlerError(KollektivError):

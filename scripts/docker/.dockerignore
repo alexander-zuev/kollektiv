@@ -67,5 +67,3 @@ poetry.lock  # Only if you want to use the one from build context
 .gitignore
 .gitattributes
 .github
-
-

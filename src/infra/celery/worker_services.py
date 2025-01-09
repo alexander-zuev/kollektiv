@@ -1,5 +1,6 @@
 from typing import Union
 
+from src.core.chat.summary_manager import SummaryManager
 from src.core.content.chunker import MarkdownChunker
 from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.vector_db import VectorDatabase
@@ -64,6 +65,9 @@ class WorkerServices:
 
             # Events
             self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
+
+            # Source summary
+            self.summary_manager = SummaryManager(data_service=self.data_service)
 
             # Result logging
             logger.info("✓ Initialized worker services successfully.")

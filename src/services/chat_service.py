@@ -7,6 +7,7 @@ from src.api.v0.schemas.chat_schemas import (
     AssistantResponseEvent,
     ChatResponse,
     ConversationListResponse,
+    ConversationResponse,
     MessageAcceptedEvent,
     MessageDeltaEvent,
     MessageDoneEvent,
@@ -17,7 +18,6 @@ from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
 from src.infra.logger import get_logger
 from src.models.chat_models import (
-    Conversation,
     ConversationHistory,
     ConversationMessage,
     Role,
@@ -173,13 +173,10 @@ class ChatService:
         return conversations
 
     # TODO: this should load in the sources for the conversation
-    async def get_conversation(self, conversation_id: UUID) -> Conversation:
+    # TODO: this should return ConversationResponse not Conversation
+    async def get_conversation(self, conversation_id: UUID) -> ConversationResponse:
         """Return a single conversation by its ID in accordance with RLS policies."""
         conversation = await self.data_service.get_conversation(conversation_id)
-
-        # Load data source summaries by id
-        # Update system prompt with data source summaries
-
-        return conversation
+        return await ConversationResponse.from_conversation(conversation=conversation, data_service=self.data_service)
 
     # TODO: which endpoint and method should handle the update of the data sources linked to a conversation?

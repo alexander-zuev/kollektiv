@@ -8,7 +8,7 @@ from src.api.dependencies import ContentServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
 from src.infra.logger import get_logger
-from src.models.content_models import AddContentSourceRequest, AddContentSourceResponse, SourceEvent
+from src.models.content_models import AddContentSourceRequest, AddContentSourceResponse, SourceEvent, SourceStatus
 
 logger = get_logger()
 router = APIRouter(prefix=f"{V0_PREFIX}")
@@ -41,14 +41,17 @@ async def add_source(
     Raises:
         HTTPException: If source creation fails
     """
-    try:
-        source_response = await content_service.add_source(request)
-        return source_response
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        logger.error(f"Failed to add source: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error") from e
+    response = await content_service.add_source(request)
+    match response.status:
+        case SourceStatus.PENDING:
+            return response
+        case SourceStatus.FAILED:
+            if response.error_type == "crawler":
+                raise HTTPException(status_code=400, detail=response.error)
+            else:
+                raise HTTPException(status_code=500, detail="Internal server error occurred, we are working on it.")
+        case _:
+            raise HTTPException(status_code=500, detail="Internal server error occurred, we are working on it.")
 
 
 @router.get(

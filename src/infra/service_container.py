@@ -4,6 +4,7 @@ from redis.asyncio import Redis
 
 from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
+from src.core.chat.summary_manager import SummaryManager
 from src.core.content.crawler import FireCrawler
 from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.reranker import Reranker
@@ -22,7 +23,6 @@ from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
-from src.core.chat.summary_manager import SummaryManager
 
 logger = get_logger()
 
@@ -107,7 +107,9 @@ class ServiceContainer:
             await self.event_consumer.start()
 
             # Source summary
-            self.summary_manager = SummaryManager(data_service=self.data_service)
+            self.summary_manager = SummaryManager(
+                data_service=self.data_service,
+            )
 
             # Log the successful initialization
             logger.info("✓ Initialized services successfully.")

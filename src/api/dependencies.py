@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from celery import Celery
 from fastapi import Depends, Request
 
 from src.core.content.crawler import FireCrawler
+from src.infra.celery.worker import celery_app
+from src.infra.external.chroma_manager import ChromaManager
+from src.infra.external.redis_manager import RedisManager
+from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.service_container import ServiceContainer
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
@@ -47,9 +52,41 @@ def get_chat_service(container: Annotated[ServiceContainer, Depends(get_containe
     return container.chat_service
 
 
+def get_chroma_manager(container: Annotated[ServiceContainer, Depends(get_container)]) -> ChromaManager:
+    """Get ChromaManager from app state."""
+    if container.chroma_manager is None:
+        raise RuntimeError("ChromaManager is not initialized")
+    return container.chroma_manager
+
+
+def get_redis_manager(container: Annotated[ServiceContainer, Depends(get_container)]) -> RedisManager:
+    """Get RedisManager from app state."""
+    if container.async_redis_manager is None:
+        raise RuntimeError("RedisManager is not initialized")
+    return container.async_redis_manager
+
+
+def get_supabase_manager(container: Annotated[ServiceContainer, Depends(get_container)]) -> SupabaseManager:
+    """Get SupabaseManager from app state."""
+    if container.supabase_manager is None:
+        raise RuntimeError("SupabaseManager is not initialized")
+    return container.supabase_manager
+
+
+def get_celery_app(container: Annotated[ServiceContainer, Depends(get_container)]) -> Celery:
+    """Get Celery app from app state."""
+    if celery_app is None:
+        raise RuntimeError("Celery app is not initialized")
+    return celery_app
+
+
 # Type aliases for cleaner dependency injection
 ContainerDep = Annotated[ServiceContainer, Depends(get_container)]
 ContentServiceDep = Annotated[ContentService, Depends(get_content_service)]
 JobManagerDep = Annotated[JobManager, Depends(get_job_manager)]
 FireCrawlerDep = Annotated[FireCrawler, Depends(get_crawler)]
 ChatServiceDep = Annotated[ChatService, Depends(get_chat_service)]
+ChromaManagerDep = Annotated[ChromaManager, Depends(get_chroma_manager)]
+SupabaseManagerDep = Annotated[SupabaseManager, Depends(get_supabase_manager)]
+RedisManagerDep = Annotated[RedisManager, Depends(get_redis_manager)]
+CeleryAppDep = Annotated[Celery, Depends(get_celery_app)]
