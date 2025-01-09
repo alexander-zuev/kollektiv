@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Response, status
 
 from src.api.dependencies import CeleryAppDep, ChromaManagerDep, RedisManagerDep, SupabaseManagerDep
-from src.api.routes import Routes
+from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.health_schemas import HealthCheckResponse
 from src.infra.logger import get_logger
 
 logger = get_logger()
 
-router = APIRouter()
+router = APIRouter(prefix=V0_PREFIX)
 
 
 @router.get(

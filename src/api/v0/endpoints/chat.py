@@ -8,14 +8,9 @@ from sse_starlette.sse import EventSourceResponse
 from src.api.dependencies import ChatServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
-from src.api.v0.schemas.chat_schemas import (
-    ChatResponse,
-    ConversationListResponse,
-    UserMessage,
-)
+from src.api.v0.schemas.chat_schemas import ChatResponse, ConversationListResponse, ConversationResponse, UserMessage
 from src.core._exceptions import DatabaseError, EntityNotFoundError, NonRetryableLLMError, RetryableLLMError
 from src.infra.logger import get_logger
-from src.models.chat_models import Conversation
 
 # Define routers with base prefix only
 chat_router = APIRouter(prefix=V0_PREFIX)
@@ -99,15 +94,15 @@ async def list_conversations(user_id: UUID, chat_service: ChatServiceDep) -> Con
 # Get messages in a conversation
 @conversations_router.get(
     Routes.V0.Conversations.GET,
-    response_model=Conversation,
+    response_model=ConversationResponse,
     responses={
-        200: {"model": Conversation},
+        200: {"model": ConversationResponse},
         400: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
 )
-async def get_conversation(conversation_id: UUID, chat_service: ChatServiceDep) -> Conversation:
+async def get_conversation(conversation_id: UUID, chat_service: ChatServiceDep) -> ConversationResponse:
     """Get all messages in a conversation."""
     try:
         return await chat_service.get_conversation(conversation_id)

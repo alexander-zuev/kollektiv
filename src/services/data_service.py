@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any, TypeVar
 from uuid import UUID
 
-from src.api.v0.schemas.chat_schemas import ConversationSummary
+from src.api.v0.schemas.chat_schemas import ConversationListResponse, ConversationSummary
 from src.core._exceptions import ConversationNotFoundError
 from src.infra.data.data_repository import DataRepository
 from src.infra.logger import get_logger
@@ -135,18 +135,24 @@ class DataService:
         """Update document status."""
         await self.update_entity(Document, document_id, {"error": error})
 
-    async def get_conversations(self, user_id: UUID) -> list[ConversationSummary]:
+    async def get_conversations(self, user_id: UUID) -> ConversationListResponse:
         """Get all conversations for a user."""
+        # Get conversations from database
         conversations = await self.repository.find(Conversation, filters={"user_id": str(user_id)})
-        return [
+
+        # Convert to summaries and sort by updated_at
+        summaries = [
             ConversationSummary(
-                conversation_id=c.conversation_id,
-                title=c.title,
-                data_sources=c.data_sources,
-                updated_at=c.updated_at,
+                conversation_id=conv.conversation_id,
+                title=conv.title,
+                updated_at=conv.updated_at or conv.created_at,
             )
-            for c in conversations
+            for conv in conversations
         ]
+        summaries.sort(key=lambda x: x.updated_at, reverse=True)
+
+        # Return response with empty list if no conversations
+        return ConversationListResponse(conversations=summaries)
 
     async def get_conversation(self, conversation_id: UUID) -> Conversation:
         """Get a single conversation by its ID in accordance with RLS policies."""
