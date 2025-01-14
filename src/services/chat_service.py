@@ -41,21 +41,10 @@ class ChatService:
     async def get_response(self, user_message: UserMessage) -> AsyncGenerator[ChatResponse, None]:
         """Process a user message and stream responses."""
         try:
-            # 1. Prepare conversation
-            if user_message.conversation_id:
-                # If it's an existing conversation
-                conversation_id = user_message.conversation_id
-                logger.info(f"Continuing conversation: {conversation_id}")
-                conversation = await self.conversation_manager.get_conversation_history(
-                    conversation_id=conversation_id, message=user_message
-                )
-                logger.debug(f"Retrieved conversation with ID: {conversation.conversation_id}")
-            else:
-                logger.info(f"Creating new conversation for user {user_message.user_id}")
-                conversation = await self.conversation_manager.create_conversation(message=user_message)
-                user_message.conversation_id = conversation.conversation_id
-                logger.debug(f"Created conversation with ID: {conversation.conversation_id}")
-
+            # 1. Get conversation history
+            conversation = await self.conversation_manager.get_conversation_history(
+                conversation_id=user_message.conversation_id, message=user_message
+            )
             # 2. Send conversation_id to client
             yield ChatResponse(event=MessageAcceptedEvent(conversation_id=conversation.conversation_id))
             logger.debug(f"Sent MessageAcceptedEvent for conversation: {conversation.conversation_id}")
@@ -176,7 +165,7 @@ class ChatService:
     # TODO: this should return ConversationResponse not Conversation
     async def get_conversation(self, conversation_id: UUID) -> ConversationResponse:
         """Return a single conversation by its ID in accordance with RLS policies."""
-        conversation = await self.data_service.get_conversation(conversation_id)
+        conversation = await self.data_service.get_or_create_conversation(conversation_id)
         return await ConversationResponse.from_conversation(conversation=conversation, data_service=self.data_service)
 
     # TODO: which endpoint and method should handle the update of the data sources linked to a conversation?
