@@ -93,16 +93,14 @@ class ContentBlockType(str, Enum):
 class TextBlock(BaseModel):
     """Simple text content"""
 
-    block_type: ContentBlockType = Field(ContentBlockType.TEXT, description="Type of the content block", alias="type")
+    type: ContentBlockType = Field(ContentBlockType.TEXT, description="Type of the content block", alias="type")
     text: str = Field(..., description="Text content of the block")
 
 
 class ToolUseBlock(BaseModel):
     """Tool usage by assistant"""
 
-    block_type: ContentBlockType = Field(
-        ContentBlockType.TOOL_USE, description="Type of the content block", alias="type"
-    )
+    type: ContentBlockType = Field(ContentBlockType.TOOL_USE, description="Type of the content block", alias="type")
     tool_use_id: str = Field(..., description="ID of the tool use", alias="id")
     tool_name: str = Field(..., description="Name of the tool", alias="name")
     tool_input: dict = Field(..., description="Input to the tool", alias="input")
@@ -111,9 +109,7 @@ class ToolUseBlock(BaseModel):
 class ToolResultBlock(BaseModel):
     """Tool result from assistant"""
 
-    block_type: ContentBlockType = Field(
-        ContentBlockType.TOOL_RESULT, description="Type of the content block", alias="type"
-    )
+    type: ContentBlockType = Field(ContentBlockType.TOOL_RESULT, description="Type of the content block", alias="type")
     tool_use_id: str = Field(..., description="ID of the tool use")
     content: str = Field(..., description="Result returned from the tool")
     is_error: bool = Field(False, description="Error returned from the tool")
