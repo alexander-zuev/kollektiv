@@ -110,11 +110,11 @@ class ClaudeAssistant(Model):
 
         self.client = anthropic.AsyncAnthropic(api_key=self.api_key, max_retries=2)
         self.tools = [Tool.from_tool_param(self.tool_manager.get_tool(ToolName.RAG_SEARCH))]
-        self.system_prompt = self.prompt_manager.get_system_prompt(document_summaries="No documents loaded yet.")
+        self.system_prompt = self.prompt_manager.get_system_prompt(document_summary_prompt="NO DOCUMENTS LOADED YET")
         self.retriever = retriever
         logger.info("✓ Initialized Claude assistant successfully")
 
-    # TODO: this method needs to be refactored completely
+    # TODO: this method needs to be refactored completely and use Supabase stored summaries
     @base_error_handler
     async def update_system_prompt(self, document_summaries: list[dict[str, Any]]) -> None:
         """Update the system prompt with document summaries."""
@@ -397,9 +397,7 @@ class ClaudeAssistant(Model):
             text = result.get("text")
 
             # create a structured format
-            formatted_document = (
-                f"Document's relevance score: {relevance_score}: \n" f"Document text: {text}: \n" f"--------\n"
-            )
+            formatted_document = f"Document's relevance score: {relevance_score}: \nDocument text: {text}: \n--------\n"
             preprocessed_context.append(formatted_document)
 
         return preprocessed_context

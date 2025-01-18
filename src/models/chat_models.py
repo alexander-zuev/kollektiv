@@ -192,7 +192,7 @@ class Conversation(SupabaseModel):
     )
     token_count: int = Field(default=0, description="Total token count for the conversation, initially 0")
     data_sources: list[UUID] = Field(
-        default=...,
+        default_factory=list,
         description="FK references to UUIDs of the data sources last active for the conversation",
     )
 
@@ -202,7 +202,9 @@ class Conversation(SupabaseModel):
 class ConversationHistory(BaseModel):
     """A list of messages for a conversation"""
 
-    user_id: UUID = Field(..., description="FK reference to UUID of the user")
+    user_id: UUID | None = Field(
+        None, description="FK reference to UUID of the user, TODO: remove as it's linked to conversation"
+    )
     conversation_id: UUID = Field(..., description="FK reference to UUID of the conversation")
     messages: list[ConversationMessage] = Field(
         default_factory=list, description="List of messages in the conversation"

@@ -135,6 +135,11 @@ class DataService:
         """Update document status."""
         await self.update_entity(Document, document_id, {"error": error})
 
+    async def get_conversation(self, conversation_id: UUID) -> Conversation | None:
+        """Get a single conversation by its ID in accordance with RLS policies."""
+        conversation = await self.repository.find_by_id(Conversation, conversation_id)
+        return conversation
+
     async def get_conversations(self, user_id: UUID) -> ConversationListResponse:
         """Get all conversations for a user."""
         # Get conversations from database
@@ -154,16 +159,17 @@ class DataService:
         # Return response with empty list if no conversations
         return ConversationListResponse(conversations=summaries)
 
-    async def get_conversation(self, conversation_id: UUID) -> Conversation:
-        """Get a single conversation by its ID in accordance with RLS policies."""
-        conversation = await self.repository.find_by_id(Conversation, conversation_id)
-        return conversation
+    async def get_conversation_messages(self, conversation_id: UUID) -> list[ConversationMessage]:
+        """Get all messages for a conversation."""
+        messages = await self.repository.find(ConversationMessage, filters={"conversation_id": conversation_id})
+        return messages
 
-    async def get_conversation_history(self, conversation_id: UUID, user_id: UUID) -> ConversationHistory:
+    async def get_conversation_history(self, conversation_id: UUID, user_id: UUID) -> ConversationHistory | None:
         """Get a single conversation history by its ID in accordance with RLS policies."""
         try:
-            # Find messages next
-            messages = await self.repository.find(ConversationMessage, filters={"conversation_id": conversation_id})
+            # Find messages
+            messages = await self.get_conversation_messages(conversation_id)
+
             # Create ConversationHistory model
             conversation_history = ConversationHistory(
                 messages=messages, user_id=user_id, conversation_id=conversation_id

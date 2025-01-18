@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from redis.asyncio import Redis as AsyncRedis
 
 from src.infra.external.redis_manager import RedisManager
-from src.infra.logger import _truncate_message, get_logger
+from src.infra.logger import get_logger
 from src.models.chat_models import ConversationHistory, ConversationMessage
 
 logger = get_logger()
@@ -54,7 +54,7 @@ class RedisRepository:
 
     def _from_json(self, json_str: str, model_class: type[T]) -> T:
         """Convert a JSON string to a model."""
-        logger.debug(_truncate_message(f"From JSON: {json_str}"))
+        # logger.debug(_truncate_message(f"From JSON: {json_str}"))
         result = model_class.model_validate_json(json_str)
         return result
 
