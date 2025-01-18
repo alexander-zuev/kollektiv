@@ -98,16 +98,13 @@ class ChatService:
                     yield ChatResponse(event=MessageDeltaEvent(text_delta=event.event_data.text))
 
                 case StreamingEventType.ASSISTANT_MESSAGE:
-                    logger.info(f"Processing assistant message for conversation {conversation.conversation_id}")
                     assistant_message = ConversationMessage(
                         conversation_id=conversation.conversation_id,
                         role=Role.ASSISTANT,
                         content=event.event_data.content,
                     )
                     await self.conversation_manager.add_pending_message(message=assistant_message)
-                    logger.debug(f"Added assistant message to pending for conversation {conversation.conversation_id}")
                     yield ChatResponse(event=AssistantResponseEvent(response=assistant_message))
-                    logger.debug(f"ASSISTANT RESPONSE FOR DEBUGGING AFTER ADDING TO PENDING: {assistant_message}")
 
                 case StreamingEventType.TOOL_RESULT:
                     if tool_use_count >= max_tool_retries_per_turn:

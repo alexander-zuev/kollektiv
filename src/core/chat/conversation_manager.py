@@ -8,7 +8,7 @@ from redis.exceptions import RedisError
 from src.api.v0.schemas.chat_schemas import UserMessage
 from src.core._exceptions import KollektivError
 from src.infra.data.redis_repository import RedisRepository
-from src.infra.logger import _truncate_message, get_logger
+from src.infra.logger import get_logger
 from src.models.chat_models import (
     Conversation,
     ConversationHistory,
@@ -68,14 +68,30 @@ class ConversationManager:
         logger.debug(f"conversation_message: {conversation_message.model_dump(serialize_as_any=True)}")
         return conversation_message
 
+    async def _create_new_redis_history(self, conversation_id: UUID) -> None:
+        """Creates a new conversation history in Redis."""
+        conversation = await self.data_service.get_conversation(conversation_id)
+
+        # Create empty history using user_id from Supabase conversation
+        history = ConversationHistory(
+            conversation_id=conversation_id,
+            user_id=conversation.user_id,  # Get from Supabase conversation
+        )
+        await self.redis_repository.set_method(conversation_id, history)
+
     async def commit_pending(self, conversation_id: UUID) -> None:
         """Commits pending messages to Redis and Supabase."""
         logger.info(f"Starting commit of pending messages for conversation: {conversation_id}")
 
-        # 1. Atomically update conversation history with pending messages
+        # 1. Ensure history exists in Redis for new conversations
+        conversation = await self.redis_repository.get_method(conversation_id, ConversationHistory)
+        if not conversation:
+            await self._create_new_redis_history(conversation_id)
+
+        # 2. Atomically update conversation history with pending messages
         conversation_history, pending_messages = await self.transfer_pending_to_history(conversation_id)
 
-        # 2. Save data to Supabase
+        # 3. Save data to Supabase
         if conversation_history:
             # 3. Prune and save
             conversation_history = await self._prune_history(conversation_history)
@@ -104,12 +120,13 @@ class ConversationManager:
                     # 2. Get the current state of the conversation and pending messages
                     conversation = await self.redis_repository.get_method(conversation_id, ConversationHistory)
                     if not conversation:
+                        # TODO: create a
                         raise ValueError(f"No conversation found for ID {conversation_id}")
 
                     pending_messages = await self.redis_repository.lrange_method(
                         key=conversation_id, start=0, end=-1, model_class=ConversationMessage
                     )
-                    logger.debug(_truncate_message(f"Pending messages: {pending_messages}"))
+                    # logger.debug(_truncate_message(f"Pending messages: {pending_messages}"))
 
                     # 3. Update conversation history
                     conversation.messages.extend(pending_messages)
@@ -246,13 +263,16 @@ class ConversationManager:
             conversation_id=conversation_id,
             user_id=message.user_id,
         )
-        # Add the initial message to the history
-        history = self._add_message_if_passed(history, message)
+        # TODO: REMOVE HERE
+        # # Cache history in Redis
+        # # await self.redis_repository.set_method(conversation_id, initial_history)
+        # logger.debug(
+        #     f"Conversation {conversation_id} history in Redis is created with n_messages: {len(initial_history.messages)}"
+        # )
 
-        # Cache history in Redis
-        await self.redis_repository.set_method(conversation_id, history)
-        logger.debug(f"Conversation {conversation_id} history created in Redis and returned")
-        return history
+        # Add the initial message to the history
+        history_with_message = self._add_message_if_passed(history, message)
+        return history_with_message
 
     async def get_conversation_history(
         self, conversation_id: UUID, message: UserMessage | None = None
@@ -269,13 +289,16 @@ class ConversationManager:
         # Try and return from Redis first
         history = await self._get_history_from_redis(conversation_id)
         if history:
+            logger.debug(f"Returning history from Redis with n_messages: {len(history.messages)}")
             return self._add_message_if_passed(history, message)
 
         # Try and return from Supabase second
         history = await self._get_history_from_supabase(conversation_id)
         if history:
+            logger.debug(f"Returning history from Supabase with n_messages: {len(history.messages)}")
             return self._add_message_if_passed(history, message)
 
         # If neither, build and return from scratch
         history = await self._create_history(conversation_id, message)
+        logger.debug(f"Created history from scratch with n_messages: {len(history.messages)}")
         return history
