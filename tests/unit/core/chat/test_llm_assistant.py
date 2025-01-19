@@ -263,8 +263,8 @@ async def test_handle_content_block_start_tool_use(claude_assistant_with_mocks: 
     )
     result = claude_assistant_with_mocks.handle_content_block_start(event)
     assert isinstance(result, ToolUseBlock)
-    assert result.tool_use_id == "test-id"
-    assert result.tool_name == "test-tool"
+    assert result.id == "test-id"
+    assert result.name == "test-tool"
 
 
 @pytest.mark.asyncio
@@ -387,4 +387,4 @@ async def test_handle_full_message(claude_assistant_with_mocks: ClaudeAssistant)
     assert isinstance(result.event_data.content[0], TextBlock)
     assert isinstance(result.event_data.content[1], ToolUseBlock)
     assert result.event_data.content[0].text == "test text"
-    assert result.event_data.content[1].tool_use_id == "test-id"
+    assert result.event_data.content[1].id == "test-id"

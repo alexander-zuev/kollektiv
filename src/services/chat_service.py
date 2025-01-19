@@ -159,7 +159,7 @@ class ChatService:
                             f"skipping commit"
                         )
                     yield ChatResponse(event=MessageDoneEvent())
-                    return
+                    # return
 
     async def get_conversations(self, user_id: UUID) -> ConversationListResponse:
         """Return a list of all conversations for a users, ordered into time groups."""

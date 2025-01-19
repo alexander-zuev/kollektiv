@@ -93,23 +93,23 @@ class ContentBlockType(str, Enum):
 class TextBlock(BaseModel):
     """Simple text content"""
 
-    type: ContentBlockType = Field(ContentBlockType.TEXT, description="Type of the content block", alias="type")
+    type: ContentBlockType = Field(ContentBlockType.TEXT, description="Type of the content block")
     text: str = Field(..., description="Text content of the block")
 
 
 class ToolUseBlock(BaseModel):
     """Tool usage by assistant"""
 
-    type: ContentBlockType = Field(ContentBlockType.TOOL_USE, description="Type of the content block", alias="type")
-    tool_use_id: str = Field(..., description="ID of the tool use", alias="id")
-    tool_name: str = Field(..., description="Name of the tool", alias="name")
-    tool_input: dict = Field(..., description="Input to the tool", alias="input")
+    type: ContentBlockType = Field(ContentBlockType.TOOL_USE, description="Type of the content block")
+    id: str = Field(..., description="ID of the tool use")
+    name: str = Field(..., description="Name of the tool")
+    input: dict = Field(..., description="Input to the tool")
 
 
 class ToolResultBlock(BaseModel):
     """Tool result from assistant"""
 
-    type: ContentBlockType = Field(ContentBlockType.TOOL_RESULT, description="Type of the content block", alias="type")
+    type: ContentBlockType = Field(ContentBlockType.TOOL_RESULT, description="Type of the content block")
     tool_use_id: str = Field(..., description="ID of the tool use")
     content: str = Field(..., description="Result returned from the tool")
     is_error: bool = Field(False, description="Error returned from the tool")
@@ -198,8 +198,9 @@ class Conversation(SupabaseModel):
 class ConversationHistory(BaseModel):
     """A list of messages for a conversation"""
 
-    user_id: UUID | None = Field(
-        None, description="FK reference to UUID of the user, TODO: remove as it's linked to conversation"
+    user_id: UUID = Field(
+        ...,
+        description="Mandatory FK reference to UUID of the user. Kept for easier access to user data and to eliminate the need to query for user id.",
     )
     conversation_id: UUID = Field(..., description="FK reference to UUID of the conversation")
     messages: list[ConversationMessage] = Field(

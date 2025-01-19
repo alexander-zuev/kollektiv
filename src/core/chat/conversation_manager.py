@@ -158,8 +158,8 @@ class ConversationManager:
                     total_tokens += len(self.tokenizer.encode(block.text))
                     logger.debug(f"Token count for text: {total_tokens}")
                 elif isinstance(block, ToolUseBlock):
-                    total_tokens += len(self.tokenizer.encode(block.tool_name))
-                    total_tokens += len(self.tokenizer.encode(json.dumps(block.tool_input, sort_keys=True)))
+                    total_tokens += len(self.tokenizer.encode(block.name))
+                    total_tokens += len(self.tokenizer.encode(json.dumps(block.input, sort_keys=True)))
                     logger.debug(f"Token count for tool use: {total_tokens}")
                 elif isinstance(block, ToolResultBlock):
                     if block.content is not None:

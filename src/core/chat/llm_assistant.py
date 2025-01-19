@@ -188,6 +188,7 @@ class ClaudeAssistant(Model):
                                     continue
                             case "message_stop":
                                 message_stop_event = self.handle_message_stop(event)  # type: ignore
+                                # yield message_stop_event
                             case "error":
                                 yield self.handle_error(event)  # type: ignore
                     # Get final message
@@ -256,7 +257,7 @@ class ClaudeAssistant(Model):
                 parsed_input = json.loads(tool_input_json)
 
                 # Update the tool block with parsed input
-                current_tool_use_block.tool_input = parsed_input
+                current_tool_use_block.input = parsed_input
 
                 # Get tool result
                 tool_result = await self.handle_tool_call(tool_inputs=current_tool_use_block, user_id=user_id)
@@ -313,27 +314,27 @@ class ClaudeAssistant(Model):
     async def get_tool_result(self, tool_inputs: ToolUseBlock, user_id: UUID) -> ToolResultBlock:
         """Handle tool use for specified tools."""
         try:
-            if tool_inputs.tool_name == "rag_search":
+            if tool_inputs.name == "rag_search":
                 search_results = await self.use_rag_search(tool_inputs, user_id)
                 if search_results is None:
                     # Special tool use block for no context
                     tool_result = ToolResultBlock(
-                        tool_use_id=tool_inputs.tool_use_id,
+                        tool_use_id=tool_inputs.id,
                         content="No relevant context found for the original request.",
                     )
                 else:
                     # Regular tool use block with context
                     tool_result = ToolResultBlock(
-                        tool_use_id=tool_inputs.tool_use_id,
+                        tool_use_id=tool_inputs.id,
                         content=f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
                         f"Please use this context to answer my original request, if it's relevant.",
                     )
 
                 return tool_result
 
-            raise ValueError(f"Unknown tool: {tool_inputs.tool_name}")
+            raise ValueError(f"Unknown tool: {tool_inputs.name}")
         except Exception as e:
-            logger.error(f"Error executing tool {tool_inputs.tool_name}: {str(e)}", exc_info=True)
+            logger.error(f"Error executing tool {tool_inputs.name}: {str(e)}", exc_info=True)
             raise NonRetryableLLMError(
                 original_error=e, message=f"An error occurred while handling tool: {str(e)}"
             ) from e
@@ -346,12 +347,12 @@ class ClaudeAssistant(Model):
             tool_inputs: ToolUseBlock containing the rag_query
         """
         # Get the query from tool input
-        if not isinstance(tool_inputs.tool_input, dict):
-            logger.error(f"Tool input is not a dictionary: {tool_inputs.tool_input}")
+        if not isinstance(tool_inputs.input, dict):
+            logger.error(f"Tool input is not a dictionary: {tool_inputs.input}")
             return None
-        rag_query = tool_inputs.tool_input.get("rag_query")  # This matches the new schema
+        rag_query = tool_inputs.input.get("rag_query")  # This matches the new schema
         if not rag_query:
-            logger.error(f"rag_query not found in tool input: {tool_inputs.tool_input}")
+            logger.error(f"rag_query not found in tool input: {tool_inputs.input}")
             return None
         logger.debug(f"Using this query for RAG search: {rag_query}")
         # Merge these two methods
