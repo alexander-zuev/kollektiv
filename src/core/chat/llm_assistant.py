@@ -190,7 +190,6 @@ class ClaudeAssistant(Model):
                                 message_stop_event = self.handle_message_stop(event)  # type: ignore
                             case "error":
                                 yield self.handle_error(event)  # type: ignore
-
                     # Get final message
                     assistant_response = await self.handle_full_message(stream)  # type: ignore
                     yield assistant_response
@@ -200,9 +199,7 @@ class ClaudeAssistant(Model):
                     if tool_result:
                         yield StreamingEvent(
                             event_type=StreamingEventType.TOOL_RESULT,
-                            event_data=ToolResultEvent(
-                                content=tool_result,
-                            ),
+                            event_data=ToolResultEvent(content=tool_result),
                         )
                     # Finally
                     if message_stop_event:

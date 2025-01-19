@@ -11,6 +11,7 @@ from src.api.v0.schemas.chat_schemas import (
     MessageAcceptedEvent,
     MessageDeltaEvent,
     MessageDoneEvent,
+    ToolResultEvent,
     UserMessage,
 )
 from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
@@ -124,6 +125,8 @@ class ChatService:
                         role=Role.USER,
                         content=[tool_result],
                     )
+                    # Yield tool result to FE
+                    yield ChatResponse(event=ToolResultEvent(tool_result=tool_result))
 
                     await self.conversation_manager.add_pending_message(message=tool_result_message)
                     logger.debug(f"Added tool result to pending for conversation {tool_result_message}")

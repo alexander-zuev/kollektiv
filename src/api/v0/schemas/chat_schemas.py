@@ -36,6 +36,7 @@ class ChatEventType(str, Enum):
     MESSAGE_ERROR = "message_error"  # error message
 
     TOOL_USE = "tool_use"  # tool use event
+    TOOL_RESULT = "tool_result"  # tool result event
     ASSISTANT_RESPONSE = "assistant_response"  # full content message of the assistant
 
 
@@ -68,6 +69,13 @@ class ToolUseEvent(BaseModel):
     tool_use: ToolUseBlock = Field(..., description="Tool use block")
 
 
+class ToolResultEvent(BaseModel):
+    """Represents a tool result event."""
+
+    event_type: Literal[ChatEventType.TOOL_RESULT] = ChatEventType.TOOL_RESULT
+    tool_result: ToolResultBlock = Field(..., description="Tool result content block")
+
+
 class MessageDoneEvent(BaseModel):
     """Represents a message done event."""
 
@@ -85,7 +93,13 @@ class ChatResponse(BaseModel):
     """/chat response model."""
 
     event: (
-        MessageAcceptedEvent | MessageDeltaEvent | AssistantResponseEvent | ToolUseEvent | MessageDoneEvent | ErrorEvent
+        MessageAcceptedEvent
+        | MessageDeltaEvent
+        | AssistantResponseEvent
+        | ToolUseEvent
+        | ToolResultEvent
+        | MessageDoneEvent
+        | ErrorEvent
     ) = Field(..., description="Event data")
 
 
