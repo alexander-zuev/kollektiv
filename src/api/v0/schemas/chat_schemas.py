@@ -55,11 +55,11 @@ class MessageDeltaEvent(BaseModel):
     text_delta: str = Field(..., description="Delta of the message")
 
 
-class AssistantResponseEvent(BaseModel):
+class FullAssistantMessageEvent(BaseModel):
     """Represents a full assistant response aligned with the domain model."""
 
     event_type: Literal[ChatEventType.ASSISTANT_RESPONSE] = ChatEventType.ASSISTANT_RESPONSE
-    response: ConversationMessage = Field(..., description="Full message response")
+    message: ConversationMessage = Field(..., description="Full message response")
 
 
 class ToolUseEvent(BaseModel):
@@ -89,13 +89,13 @@ class ErrorEvent(BaseModel):
     error_message: str = Field(..., description="Error message")
 
 
-class ChatResponse(BaseModel):
+class ChatEvent(BaseModel):
     """/chat response model."""
 
     event: (
         MessageAcceptedEvent
         | MessageDeltaEvent
-        | AssistantResponseEvent
+        | FullAssistantMessageEvent
         | ToolUseEvent
         | ToolResultEvent
         | MessageDoneEvent

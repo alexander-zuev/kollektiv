@@ -9,7 +9,7 @@ from src.api.dependencies import ChatServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
 from src.api.v0.schemas.chat_schemas import (
-    ChatResponse,
+    ChatEvent,
     ConversationHistoryResponse,
     ConversationListResponse,
     UserMessage,
@@ -26,9 +26,9 @@ logger = get_logger()
 
 @chat_router.post(
     Routes.V0.Chat.CHAT,
-    response_model=ChatResponse,
+    response_model=ChatEvent,
     responses={
-        200: {"model": ChatResponse},
+        200: {"model": ChatEvent},
         400: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },

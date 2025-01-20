@@ -89,7 +89,7 @@ class ServiceContainer:
             self.retriever = Retriever(vector_db=self.vector_db, reranker=self.reranker)
 
             # Chat Services
-            self.claude_assistant = ClaudeAssistant(vector_db=self.vector_db, retriever=self.retriever)
+            self.claude_assistant = ClaudeAssistant(retriever=self.retriever)
             self.conversation_manager = ConversationManager(
                 redis_repository=self.redis_repository, data_service=self.data_service
             )

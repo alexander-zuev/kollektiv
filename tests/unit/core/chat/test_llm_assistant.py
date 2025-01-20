@@ -17,14 +17,14 @@ from anthropic.types import (
 from src.core._exceptions import NonRetryableLLMError
 from src.core.chat.llm_assistant import ClaudeAssistant
 from src.models.chat_models import (
-    AssistantMessageEvent,
+    AssistantMessage,
     ConversationHistory,
     ConversationMessage,
-    ErrorEvent,
     Role,
-    StreamingEventType,
-    StreamingTextDelta,
+    StreamErrorEvent,
+    StreamEventType,
     TextBlock,
+    TextDeltaStream,
     ToolResultBlock,
     ToolUseBlock,
 )
@@ -118,10 +118,10 @@ async def test_stream_response_text_only(
         events.append(event)
 
     # Verify event sequence
-    assert any(e.event_type == StreamingEventType.MESSAGE_START for e in events)
-    assert any(e.event_type == StreamingEventType.TEXT_TOKEN for e in events)
-    assert any(e.event_type == StreamingEventType.ASSISTANT_MESSAGE for e in events)
-    assert any(e.event_type == StreamingEventType.MESSAGE_STOP for e in events)
+    assert any(e.event_type == StreamEventType.MESSAGE_START for e in events)
+    assert any(e.event_type == StreamEventType.TEXT_TOKEN for e in events)
+    assert any(e.event_type == StreamEventType.ASSISTANT_MESSAGE for e in events)
+    assert any(e.event_type == StreamEventType.MESSAGE_STOP for e in events)
 
 
 @pytest.mark.asyncio
@@ -149,13 +149,13 @@ async def test_stream_response_with_tool_call(
         events.append(event)
 
     # Verify tool use sequence
-    assert any(e.event_type == StreamingEventType.MESSAGE_START for e in events)
-    assert any(e.event_type == StreamingEventType.TOOL_RESULT for e in events)
-    tool_result = next(e for e in events if e.event_type == StreamingEventType.TOOL_RESULT)
+    assert any(e.event_type == StreamEventType.MESSAGE_START for e in events)
+    assert any(e.event_type == StreamEventType.TOOL_RESULT for e in events)
+    tool_result = next(e for e in events if e.event_type == StreamEventType.TOOL_RESULT)
     assert isinstance(tool_result.event_data, ToolResultBlock)
     assert "Here is context retrieved by RAG search" in tool_result.event_data.content
-    assert any(e.event_type == StreamingEventType.ASSISTANT_MESSAGE for e in events)
-    assert any(e.event_type == StreamingEventType.MESSAGE_STOP for e in events)
+    assert any(e.event_type == StreamEventType.ASSISTANT_MESSAGE for e in events)
+    assert any(e.event_type == StreamEventType.MESSAGE_STOP for e in events)
 
 
 @pytest.mark.asyncio
@@ -245,7 +245,7 @@ async def test_handle_message_start(claude_assistant_with_mocks: ClaudeAssistant
         },
     )
     result = claude_assistant_with_mocks.handle_message_start(event)
-    assert result.event_type == StreamingEventType.MESSAGE_START
+    assert result.event_type == StreamEventType.MESSAGE_START
 
 
 @pytest.mark.asyncio
@@ -286,9 +286,9 @@ async def test_handle_content_block_delta_text(claude_assistant_with_mocks: Clau
         type="content_block_delta", delta=TextDelta(type="text_delta", text="test"), index=0
     )
     result, _ = claude_assistant_with_mocks.handle_content_block_delta(event, "")
-    assert isinstance(result.event_data, StreamingTextDelta)
-    assert result.event_data.text == "test"
-    assert result.event_type == StreamingEventType.TEXT_TOKEN
+    assert isinstance(result.data, TextDeltaStream)
+    assert result.data.text == "test"
+    assert result.event_type == StreamEventType.TEXT_TOKEN
 
 
 @pytest.mark.asyncio
@@ -351,9 +351,9 @@ async def test_handle_error(claude_assistant_with_mocks: ClaudeAssistant):
         },
     )
     result = claude_assistant_with_mocks.handle_error(event)
-    assert result.event_type == StreamingEventType.ERROR
-    assert isinstance(result.event_data, ErrorEvent)
-    assert result.event_data.data["error"] == "test error"
+    assert result.event_type == StreamEventType.ERROR
+    assert isinstance(result.data, StreamErrorEvent)
+    assert result.data.data["error"] == "test error"
 
 
 @pytest.mark.asyncio
@@ -361,7 +361,7 @@ async def test_handle_message_stop(claude_assistant_with_mocks: ClaudeAssistant)
     """Test handle message stop event."""
     event = RawMessageStopEvent(type="message_stop", message={})
     result = claude_assistant_with_mocks.handle_message_stop(event)
-    assert result.event_type == StreamingEventType.MESSAGE_STOP
+    assert result.event_type == StreamEventType.MESSAGE_STOP
 
 
 @pytest.mark.asyncio
@@ -381,10 +381,10 @@ async def test_handle_full_message(claude_assistant_with_mocks: ClaudeAssistant)
     mock_stream = AsyncMock()
     mock_stream.get_final_message.return_value = mock_message
     result = await claude_assistant_with_mocks.handle_full_message(mock_stream)
-    assert result.event_type == StreamingEventType.ASSISTANT_MESSAGE
-    assert isinstance(result.event_data, AssistantMessageEvent)
-    assert len(result.event_data.content) == 2
-    assert isinstance(result.event_data.content[0], TextBlock)
-    assert isinstance(result.event_data.content[1], ToolUseBlock)
-    assert result.event_data.content[0].text == "test text"
-    assert result.event_data.content[1].id == "test-id"
+    assert result.event_type == StreamEventType.ASSISTANT_MESSAGE
+    assert isinstance(result.data, AssistantMessage)
+    assert len(result.data.content) == 2
+    assert isinstance(result.data.content[0], TextBlock)
+    assert isinstance(result.data.content[1], ToolUseBlock)
+    assert result.data.content[0].text == "test text"
+    assert result.data.content[1].id == "test-id"

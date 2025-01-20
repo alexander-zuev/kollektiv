@@ -6,7 +6,7 @@ from enum import Enum
 from typing import ClassVar, Literal
 from uuid import UUID, uuid4
 
-from anthropic.types import MessageParam
+from anthropic.types import Delta, MessageDeltaUsage, MessageParam
 from pydantic import BaseModel, Field, model_validator
 
 from src.infra.logger import get_logger
@@ -15,69 +15,7 @@ from src.models.base_models import SupabaseModel
 logger = get_logger()
 
 
-# Anthropic streaming event types
-class StreamingEventType(str, Enum):
-    """Custom application event types loosely based on Anthropic API event types."""
-
-    # Streaming events
-    MESSAGE_START = "message_start"
-    CONTENT_BLOCK_DELTA = "content_block_delta"
-    MESSAGE_STOP = "message_stop"
-
-    # Error events
-    ERROR = "error"
-
-    # Custom events
-    TEXT_TOKEN = "text_token"
-    TOOL_RESULT = "tool_result"
-    ASSISTANT_MESSAGE = "assistant_message"
-
-
-class StreamingTextDelta(BaseModel):
-    """Text delta event."""
-
-    type: Literal["text_delta"] = "text_delta"
-    text: str = Field(..., description="Text delta")
-
-
-class ErrorEvent(BaseModel):
-    """Error event."""
-
-    type: Literal["error"] = "error"
-    data: dict = Field(..., description="Error data")
-
-
-class ToolUseEvent(BaseModel):
-    """Tool use event."""
-
-    type: Literal["tool_use"] = "tool_use"
-    content: ToolUseBlock = Field(..., description="Tool use inputs")
-
-
-class AssistantMessageEvent(BaseModel):
-    """Assistant message event."""
-
-    type: Literal["assistant_message"] = "assistant_message"
-    content: list[TextBlock | ToolUseBlock] = Field(..., description="Assistant response content blocks")
-
-
-class ToolResultEvent(BaseModel):
-    """Tool result event."""
-
-    type: Literal["tool_result"] = "tool_result"
-    content: ToolResultBlock = Field(..., description="Tool result content block")
-
-
-class StreamingEvent(BaseModel):
-    """Anthropic event structure for internal use."""
-
-    event_type: StreamingEventType = Field(..., description="Type of the event")
-    event_data: StreamingTextDelta | ErrorEvent | AssistantMessageEvent | ToolUseEvent | ToolResultEvent | None = Field(
-        None, description="Text delta or error event"
-    )
-
-
-# Content block types
+# BASIC ANTHROPIC CONTENT MODELS
 
 
 class ContentBlockType(str, Enum):
@@ -90,32 +28,243 @@ class ContentBlockType(str, Enum):
     DOCUMENT = "document"
 
 
-class TextBlock(BaseModel):
+class ContentBlock(BaseModel):
+    """Base content block model"""
+
+    type: ContentBlockType = Field(..., description="Type of the content block")
+    index: int | None = Field(None, description="Index of the content block during streaming. None if not streaming.")
+
+
+class TextBlock(ContentBlock):
     """Simple text content"""
 
-    type: ContentBlockType = Field(ContentBlockType.TEXT, description="Type of the content block")
+    type: Literal[ContentBlockType.TEXT] = Field(ContentBlockType.TEXT, description="Type of the content block")
     text: str = Field(..., description="Text content of the block")
 
 
-class ToolUseBlock(BaseModel):
+class ToolUseBlock(ContentBlock):
     """Tool usage by assistant"""
 
-    type: ContentBlockType = Field(ContentBlockType.TOOL_USE, description="Type of the content block")
+    type: Literal[ContentBlockType.TOOL_USE] = Field(ContentBlockType.TOOL_USE, description="Type of the content block")
     id: str = Field(..., description="ID of the tool use")
     name: str = Field(..., description="Name of the tool")
     input: dict = Field(..., description="Input to the tool")
 
 
-class ToolResultBlock(BaseModel):
+class ToolResultBlock(ContentBlock):
     """Tool result from assistant"""
 
-    type: ContentBlockType = Field(ContentBlockType.TOOL_RESULT, description="Type of the content block")
+    type: Literal[ContentBlockType.TOOL_RESULT] = Field(
+        ContentBlockType.TOOL_RESULT, description="Type of the content block"
+    )
     tool_use_id: str = Field(..., description="ID of the tool use")
     content: str = Field(..., description="Result returned from the tool")
     is_error: bool = Field(False, description="Error returned from the tool")
 
 
-# Messages
+# ANTHROPIC STREAMING EVENTS
+
+
+class StreamEventType(str, Enum):
+    """Anthropic streaming event types"""
+
+    # Events based on Anthropic streaming events
+    MESSAGE_START = "message_start"
+    CONTENT_BLOCK_START = "content_block_start"
+    CONTENT_BLOCK_DELTA = "content_block_delta"
+    CONTENT_BLOCK_STOP = "content_block_stop"
+    MESSAGE_DELTA = "message_delta"
+    MESSAGE_STOP = "message_stop"
+    ERROR = "error"
+
+
+class MessageStartEvent(BaseModel):
+    """Message start event."""
+
+    type: Literal[StreamEventType.MESSAGE_START] = StreamEventType.MESSAGE_START
+
+
+class ContentBlockStartEvent(BaseModel):
+    """Content block start event."""
+
+    type: Literal[StreamEventType.CONTENT_BLOCK_START] = StreamEventType.CONTENT_BLOCK_START
+    index: int = Field(..., description="Index of the content block that started streaming.")
+    content_block: ContentBlock = Field(..., description="Content block that started streaming.")
+
+
+class TextDeltaStream(BaseModel):
+    """Text delta event."""
+
+    type: Literal["text_delta"] = "text_delta"
+    text: str = Field(..., description="Text delta")
+
+
+class ToolInputJSONStream(BaseModel):
+    """Tool use event."""
+
+    type: Literal["input_json_delta"] = "input_json_delta"
+    partial_json: str = Field(..., description="Partial JSON for tool use")
+
+
+class ContentBlockDeltaEvent(BaseModel):
+    """Delta content for a block - can be text or JSON"""
+
+    type: Literal[StreamEventType.CONTENT_BLOCK_DELTA] = StreamEventType.CONTENT_BLOCK_DELTA
+    delta: TextDeltaStream | ToolInputJSONStream
+
+
+class ContentBlockStopEvent(BaseModel):
+    """Content block stop event."""
+
+    type: Literal[StreamEventType.CONTENT_BLOCK_STOP] = StreamEventType.CONTENT_BLOCK_STOP
+    index: int = Field(..., description="Index of the content block that stopped streaming.")
+
+
+class MessageStopEvent(BaseModel):
+    """Message stop event."""
+
+    type: Literal[StreamEventType.MESSAGE_STOP] = StreamEventType.MESSAGE_STOP
+
+
+class StreamErrorEvent(BaseModel):
+    """Error event."""
+
+    type: Literal[StreamEventType.ERROR] = StreamEventType.ERROR
+    error: dict = Field(..., description="Error data")
+
+
+class MessageDeltaEvent(BaseModel):
+    """Represents a message delta event."""
+
+    event_type: Literal[StreamEventType.MESSAGE_DELTA] = StreamEventType.MESSAGE_DELTA
+    delta: Delta = Field(..., description="Delta of the message")
+    usage: MessageDeltaUsage = Field(..., description="Usage of the message")
+
+
+class StreamEvent(BaseModel):
+    """Events emitted by the LLM assistant, based on Anthropic streaming events. These are not client-facing."""
+
+    event_type: StreamEventType = Field(..., description="Type of the event")
+    data: (
+        MessageStartEvent
+        | ContentBlockStartEvent
+        | ContentBlockDeltaEvent
+        | ContentBlockStopEvent
+        | MessageDeltaEvent
+        | MessageStopEvent
+        | StreamErrorEvent
+    ) = Field(..., description="Text delta or error event")
+
+
+# FRONTEND FACING EVENTS
+
+
+class FrontendEventType(str, Enum):
+    """Unified, flat frontend event types."""
+
+    # Streaming events
+    CONTENT_BLOCK_START = "content_block_start"
+    CONTENT_BLOCK_DELTA = "content_block_delta"
+    CONTENT_BLOCK_STOP = "content_block_stop"
+    MESSAGE_STOP = "message_stop"
+
+    # Custom chat events
+    MESSAGE_ACCEPTED = "message_accepted"
+    TOOL_RESULT_MESSAGE = "tool_result_message"
+    ASSISTANT_MESSAGE = "assistant_message"
+    ERROR = "message_error"
+
+
+class FrontendEvent(BaseModel):
+    """A unified, flat frontend chat events model. Incorporates both streaming and custom events. Allows for easier handling of events in the frontend."""
+
+    type: FrontendEventType = Field(..., description="Type of the event")
+
+    # Conversation attributes
+    conversation_id: UUID | None = Field(None, description="UUID of the conversation")
+    conversation_title: str | None = Field(None, description="Title of the conversation")
+
+    # Content block fields
+    index: int | None = Field(None, description="Index of the content block")
+    content_block: ContentBlock | None = Field(None, description="Content block")
+
+    # Delta content
+    text_delta: str | None = Field(None, description="Text delta")
+    tool_input_json_delta: str | None = Field(None, description="Tool input JSON delta")
+
+    # Complete message
+    message: ConversationMessage | None = Field(None, description="Complete message")
+
+    # Error handling
+    error_message: str | None = Field(None, description="Error message")
+
+    @classmethod
+    def from_stream_event(cls, event: StreamEvent) -> FrontendEvent:
+        """Convert internal stream event to frontend event"""
+        match event.event_type:
+            case StreamEventType.CONTENT_BLOCK_START:
+                return cls(
+                    type=FrontendEventType.CONTENT_BLOCK_START,
+                    index=event.data.index,
+                    content_block=event.data.content_block,
+                )
+            case StreamEventType.CONTENT_BLOCK_DELTA:
+                if isinstance(event.data.delta, TextDeltaStream):
+                    return cls(type=FrontendEventType.CONTENT_BLOCK_DELTA, text_delta=event.data.delta.text)
+                elif isinstance(event.data.delta, ToolInputJSONStream):
+                    return cls(
+                        type=FrontendEventType.CONTENT_BLOCK_DELTA,
+                        tool_input_json_delta=event.data.delta.partial_json,
+                    )
+                else:
+                    raise ValueError(f"Unknown content block delta type: {type(event.data.delta)}")
+            case StreamEventType.CONTENT_BLOCK_STOP:
+                return cls(type=FrontendEventType.CONTENT_BLOCK_STOP, index=event.data.index)
+            case StreamEventType.MESSAGE_STOP:
+                return cls(type=FrontendEventType.MESSAGE_STOP)
+            case StreamEventType.ERROR:
+                return cls(type=FrontendEventType.ERROR, error_message=str(event.data.error))
+            case _:
+                raise ValueError(f"Unknown stream event type: {event.event_type}")
+
+    @classmethod
+    def create_tool_result_message(cls, tool_result: ToolResultBlock, conversation_id: UUID) -> FrontendEvent:
+        """Create a ToolResultMessage with the tool result block"""
+        message = ConversationMessage(
+            conversation_id=conversation_id,
+            role=Role.USER,
+            content=[tool_result],
+        )
+        return cls(type=FrontendEventType.TOOL_RESULT_MESSAGE, message=message)
+
+    @classmethod
+    def create_assistant_message(cls, content_blocks: list[ContentBlock], conversation_id: UUID) -> FrontendEvent:
+        """Create an AssistantMessage with the assistant message"""
+        message = ConversationMessage(
+            conversation_id=conversation_id,
+            role=Role.ASSISTANT,
+            content=content_blocks,
+        )
+        return cls(type=FrontendEventType.ASSISTANT_MESSAGE, message=message)
+
+    @classmethod
+    def create_message_accepted_event(cls, conversation_id: UUID, title: str) -> FrontendEvent:
+        """Create a MessageAcceptedEvent"""
+        return cls(
+            type=FrontendEventType.MESSAGE_ACCEPTED,
+            conversation_id=conversation_id,
+            conversation_title=title,
+        )
+
+    @classmethod
+    def create_error_event(cls, error_message: str) -> FrontendEvent:
+        """Create an ErrorEvent"""
+        return cls(type=FrontendEventType.ERROR, error_message=error_message)
+
+
+# CONVERSATION AND MESSAGE DOMAIN MODELS
+
+
 class Role(str, Enum):
     """Roles in the conversation."""
 
@@ -172,11 +321,10 @@ class ConversationMessage(SupabaseModel):
         """Convert to Anthropic API format"""
         return {
             "role": self.role.value,
-            "content": [block.model_dump(by_alias=True) for block in self.content],
+            "content": [block.model_dump(exclude={"index"}) for block in self.content],
         }
 
 
-# Conversation
 class Conversation(SupabaseModel):
     """Domain model for a conversation in chat.."""
 
@@ -215,6 +363,15 @@ class ConversationHistory(BaseModel):
         result = [msg.to_anthropic() for msg in self.messages]
         return result
 
+    @model_validator(mode="after")
+    def validate_messages(self) -> ConversationHistory:
+        """Validate message order and roles"""
+        for i, msg in enumerate(self.messages[1:], 1):
+            prev_msg = self.messages[i - 1]
+            if msg.role == prev_msg.role:
+                raise ValueError("Consecutive messages cannot have the same role")
+        return self
+
 
 class ConversationSummary(BaseModel):
     """Summary of a conversation returned by GET /conversations"""
@@ -222,3 +379,36 @@ class ConversationSummary(BaseModel):
     conversation_id: UUID = Field(..., description="UUID of the conversation")
     title: str = Field(..., description="Title of the conversation")
     updated_at: datetime = Field(..., description="Last updated timestamp")
+
+
+# API MODELS
+# POST /chat models
+class UserMessage(BaseModel):
+    """/Chat request model."""
+
+    user_id: UUID = Field(..., description="UUID of the user provided by Supabase")
+    message_id: UUID = Field(..., description="UUID of the user message generated by frontend")
+    conversation_id: UUID = Field(..., description="UUID of the conversation, generated by FE for new conversations")
+    role: Role = Field(Role.USER, description="Role of tc message sender")
+    content: list[TextBlock | ToolUseBlock | ToolResultBlock] = Field(..., description="Content of the message")
+
+
+# GET /conversations
+
+
+class ConversationListResponse(BaseModel):
+    """List of conversations returned by GET /conversations."""
+
+    conversations: list[ConversationSummary] = Field(
+        default_factory=list, description="List of all user's conversations, empty list if no conversations exist"
+    )
+
+
+# GET /conversations/{conversation_id}
+class ConversationHistoryResponse(BaseModel):
+    """Object returned by GET /conversations/{conversation_id}."""
+
+    conversation_id: UUID = Field(..., description="UUID of the conversation")
+    messages: list[ConversationMessage] = Field(
+        default_factory=list, description="List of messages in the conversation"
+    )

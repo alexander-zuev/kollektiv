@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncGenerator, Iterable
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import anthropic
 import weave
-from anthropic import AsyncStream
 from anthropic.types import (
-    ContentBlockStartEvent,
-    ContentBlockStopEvent,
     InputJSONDelta,
     Message,
     MessageParam,
     RawContentBlockDeltaEvent,
+    RawContentBlockStartEvent,
+    RawContentBlockStopEvent,
+    RawMessageDeltaEvent,
     RawMessageStartEvent,
     RawMessageStopEvent,
     TextBlockParam,
@@ -25,11 +25,10 @@ from anthropic.types.message_stream_event import MessageStreamEvent
 from pydantic import ConfigDict, Field
 from weave import Model
 
-from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
+from src.core._exceptions import NonRetryableLLMError
 from src.core.chat.prompt_manager import PromptManager
 from src.core.chat.tool_manager import ToolManager
 from src.core.search.retriever import Retriever
-from src.core.search.vector_db import VectorDatabase
 from src.infra.decorators import (
     anthropic_error_handler,
     base_error_handler,
@@ -37,15 +36,20 @@ from src.infra.decorators import (
 from src.infra.logger import _truncate_message, get_logger
 from src.infra.settings import get_settings
 from src.models.chat_models import (
-    AssistantMessageEvent,
+    ContentBlockDeltaEvent,
+    ContentBlockStartEvent,
+    ContentBlockStopEvent,
     ConversationHistory,
-    ErrorEvent,
-    StreamingEvent,
-    StreamingEventType,
-    StreamingTextDelta,
+    MessageDeltaEvent,
+    MessageStartEvent,
+    MessageStopEvent,
+    StreamErrorEvent,
+    StreamEvent,
+    StreamEventType,
     TextBlock,
+    TextDeltaStream,
+    ToolInputJSONStream,
     ToolResultBlock,
-    ToolResultEvent,
     ToolUseBlock,
 )
 from src.models.llm_models import SystemPrompt, Tool, ToolName
@@ -59,7 +63,6 @@ class ClaudeAssistant(Model):
     Define the ClaudeAssistant class for managing AI assistant functionalities with various tools and configurations.
 
     Args:
-        vector_db (VectorDB): The vector database instance for retrieving contextual information.
         retriever (Retriever): The retriever instance for RAG operations.
         api_key (str, optional): The API key for the Anthropic client. Defaults to ANTHROPIC_API_KEY.
         model_name (str, optional): The name of the model to use. Defaults to MAIN_MODEL.
@@ -68,9 +71,6 @@ class ClaudeAssistant(Model):
         anthropic.exceptions.AnthropicError: If there's an error initializing the Anthropic client.
         NonRetryableLLMError: If there's an error initializing dependencies.
     """
-
-    # Required fields
-    vector_db: VectorDatabase
 
     # Client config
     client: anthropic.AsyncAnthropic | None = Field(default=None)
@@ -89,7 +89,6 @@ class ClaudeAssistant(Model):
 
     def __init__(
         self,
-        vector_db: VectorDatabase,
         retriever: Retriever,
         api_key: str | None = None,
         model_name: str | None = None,
@@ -103,7 +102,6 @@ class ClaudeAssistant(Model):
 
         # Initialize Pydantic model with required fields
         super().__init__(
-            vector_db=vector_db,
             api_key=api_key or settings.anthropic_api_key,
             model_name=model_name or settings.main_model,
         )
@@ -139,207 +137,173 @@ class ClaudeAssistant(Model):
         return [tool.with_cache() for tool in self.tools]
 
     @anthropic_error_handler
-    async def stream_response(self, conv_history: ConversationHistory) -> AsyncGenerator[StreamingEvent, None]:
-        """Stream responses from a conversation, handle tool use, and process assistant replies."""
-        try:
-            logger.debug(f"Number of messages in conversation history: {len(conv_history.messages)}")
+    async def stream_response(self, conv_history: ConversationHistory) -> AsyncGenerator[StreamEvent, None]:
+        """Setups a stream response for a conversation.
 
-            user_id = conv_history.user_id
-            max_retries = 2
-            retries = 0
-            current_tool_use_block: ToolUseBlock | None = (
-                None  # used to track if we have content block of type tool_use
-            )
-            tool_input_json = ""  # to accumulate tool use
-            tool_result = None
-            message_stop_event = None
+        Key architechtural decisions:
+        - stream_response is a "dumb" streamer. It's purpose is just to convert Anthropic stream events upwards.
+        1. Calls Anthropic API
+        2. Converts events to our format
+        3. Yields them immediately
+        """
+        logger.debug(f"Number of messages in conversation history: {len(conv_history.messages)}")
 
-            while retries < max_retries:
-                messages = conv_history.to_anthropic_messages()
-                logger.debug(_truncate_message(f"Debugging messages list for Anthropic API: {messages}"))
-                async with self.client.messages.stream(
-                    messages=messages,
-                    system=self.cached_system_prompt,
-                    max_tokens=8192,
-                    model=self.model_name,
-                    tools=self.cached_tools,
-                    extra_headers=self.extra_headers,
-                ) as stream:
-                    async for event in stream:
-                        # Match event type
-                        match event.type:
-                            case "message_start":
-                                yield self.handle_message_start(event)  # type: ignore
-                            case "content_block_start":
-                                current_tool_use_block = self.handle_content_block_start(event)  # type: ignore
-                            case "content_block_delta":
-                                result = self.handle_content_block_delta(event, tool_input_json)  # type: ignore
-                                event, tool_input_json = result
-                                if event:
-                                    yield event
-                            case "content_block_stop":
-                                if event.content_block.type == "tool_use" and current_tool_use_block:  # type: ignore
-                                    tool_result = await self.handle_content_block_stop(
-                                        event,
-                                        current_tool_use_block,
-                                        tool_input_json,  # type: ignore
-                                        user_id,
-                                    )
-                                    continue
-                            case "message_stop":
-                                message_stop_event = self.handle_message_stop(event)  # type: ignore
-                                # yield message_stop_event
-                            case "error":
-                                yield self.handle_error(event)  # type: ignore
-                    # Get final message
-                    assistant_response = await self.handle_full_message(stream)  # type: ignore
-                    yield assistant_response
-                    logger.debug(f" EVENT RESPONSE FOR DEBUGGING: {assistant_response}")
+        # 1. Build conversation historry in Anthropic API format
+        messages = conv_history.to_anthropic_messages()
+        logger.debug(_truncate_message(f"Debugging messages list for Anthropic API: {messages}"))
 
-                    # If tool result, yield tool result
-                    if tool_result:
-                        yield StreamingEvent(
-                            event_type=StreamingEventType.TOOL_RESULT,
-                            event_data=ToolResultEvent(content=tool_result),
-                        )
-                    # Finally
-                    if message_stop_event:
-                        yield message_stop_event
+        # 2. Setup stream
+        async with self.client.messages.stream(
+            messages=messages,
+            system=self.cached_system_prompt,
+            max_tokens=8192,
+            model=self.model_name,
+            tools=self.cached_tools,
+            extra_headers=self.extra_headers,
+        ) as stream:
+            async for event in stream:
+                match event.type:
+                    case RawMessageStartEvent():
+                        yield self.handle_message_start(cast(RawMessageStartEvent, event))
+                    case "content_block_start":
+                        yield self.handle_content_block_start(cast(RawContentBlockStartEvent, event))
+                    case "content_block_delta":
+                        yield self.handle_content_block_delta(cast(RawContentBlockDeltaEvent, event))
+                    case "content_block_stop":
+                        yield self.handle_content_block_stop(cast(RawContentBlockStopEvent, event))
+                    case "message_delta":
+                        yield self.handle_message_delta(cast(RawMessageDeltaEvent, event))
+                    case "message_stop":
+                        yield self.handle_message_stop(cast(RawMessageStopEvent, event))
+                    case "error":
+                        yield self.handle_error(cast(MessageStreamEvent, event))
 
-        except (RetryableLLMError, NonRetryableLLMError) as e:
-            logger.error(f"An error occured in stream response: {str(e)}", exc_info=True)
-            raise
-        except Exception as e:
-            logger.error(f"An unexpected error occurred in stream response: {str(e)}", exc_info=True)
-            raise
-
-    def handle_message_start(self, event: RawMessageStartEvent) -> StreamingEvent:
+    def handle_message_start(self, event: RawMessageStartEvent) -> StreamEvent:
         """Handle message start event."""
         logger.debug("===== Stream message started =====")
-        return StreamingEvent(
-            event_type=StreamingEventType.MESSAGE_START,
+        return StreamEvent(
+            event_type=StreamEventType.MESSAGE_START,
+            data=MessageStartEvent(),
         )
 
-    def handle_content_block_start(self, event: ContentBlockStartEvent) -> ToolUseBlock | None:
+    def handle_content_block_start(self, event: RawContentBlockStartEvent) -> StreamEvent:
         """Handle content block start event."""
-        if event.content_block.type == "tool_use":
-            current_tool_use_block = ToolUseBlock(
-                block_type=event.content_block.type,
-                id=event.content_block.id,
-                name=event.content_block.name,
-                input={},
-            )
-            return current_tool_use_block
-        return None
+        logger.debug("===== Stream content block started =====")
+        match event.content_block.type:
+            case "text":
+                text_block = TextBlock(index=event.index, text=event.content_block.text)
+                return StreamEvent(
+                    event_type=StreamEventType.CONTENT_BLOCK_START,
+                    data=ContentBlockStartEvent(
+                        index=event.index,
+                        content_block=text_block,
+                    ),
+                )
+            case "tool_use":
+                tool_use_block = ToolUseBlock(
+                    index=event.index,
+                    id=event.content_block.id,
+                    name=event.content_block.name,
+                    input=event.content_block.input,
+                )
+                return StreamEvent(
+                    event_type=StreamEventType.CONTENT_BLOCK_START,
+                    data=ContentBlockStartEvent(
+                        index=event.index,
+                        content_block=tool_use_block,
+                    ),
+                )
 
-    def handle_content_block_delta(
-        self, event: RawContentBlockDeltaEvent, tool_input_json: str
-    ) -> tuple[StreamingEvent | None, str]:
-        """Handle text token event."""
-        if isinstance(event.delta, TextDelta):
-            return StreamingEvent(
-                event_type=StreamingEventType.TEXT_TOKEN,
-                event_data=StreamingTextDelta(text=event.delta.text),
-            ), tool_input_json
-        elif isinstance(event.delta, InputJSONDelta):
-            tool_input_json += event.delta.partial_json
-            logger.debug(f"Updated tool input JSON: {tool_input_json}")
-            return None, tool_input_json
+    def handle_content_block_delta(self, event: RawContentBlockDeltaEvent) -> StreamEvent:
+        """Handles content block delta events."""
+        match event.delta:
+            case TextDelta():
+                text_delta = ContentBlockDeltaEvent(
+                    type=StreamEventType.CONTENT_BLOCK_DELTA,
+                    delta=TextDeltaStream(text=event.delta.text),
+                )
+                return StreamEvent(
+                    event_type=StreamEventType.CONTENT_BLOCK_DELTA,
+                    data=text_delta,
+                )
+            case InputJSONDelta():
+                tool_input_json_delta = ContentBlockDeltaEvent(
+                    type=StreamEventType.CONTENT_BLOCK_DELTA,
+                    delta=ToolInputJSONStream(partial_json=event.delta.partial_json),
+                )
+                return StreamEvent(
+                    event_type=StreamEventType.CONTENT_BLOCK_DELTA,
+                    data=tool_input_json_delta,
+                )
+            case _:
+                logger.error(f"Unexpected content block delta type: {event.delta}")
+                raise ValueError(f"Unexpected content block delta type: {event.delta}")
 
-    async def handle_content_block_stop(
-        self, event: ContentBlockStopEvent, current_tool_use_block: ToolUseBlock, tool_input_json: str, user_id: UUID
-    ) -> ToolResultBlock | None:
+    def handle_content_block_stop(
+        self,
+        event: RawContentBlockStopEvent,
+    ) -> StreamEvent:
         """Handle content block stop event."""
-        logger.debug("===== Stream content block ended =====")
-        if event.content_block.type == "tool_use" and current_tool_use_block:
-            try:
-                # Parse accumulated JSON string into dict
-                parsed_input = json.loads(tool_input_json)
-
-                # Update the tool block with parsed input
-                current_tool_use_block.input = parsed_input
-
-                # Get tool result
-                tool_result = await self.handle_tool_call(tool_inputs=current_tool_use_block, user_id=user_id)
-                return tool_result
-
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse tool input JSON: {tool_input_json}")
-                logger.error(f"JSON parse error: {str(e)}")
-                raise NonRetryableLLMError(
-                    original_error=e, message="Failed to parse tool input JSON from LLM response"
-                ) from e
-        return None
-
-    def handle_error(self, event: MessageStreamEvent) -> StreamingEvent:
-        """Handle error event."""
-        logger.error(f"===== Stream error: {event.error} =====")
-        return StreamingEvent(
-            event_type=StreamingEventType.ERROR,
-            event_data=ErrorEvent(data={"error": event.error}),
+        logger.debug("===== Content block stop event =====")
+        return StreamEvent(
+            event_type=StreamEventType.CONTENT_BLOCK_STOP,
+            data=ContentBlockStopEvent(
+                index=event.index,
+            ),
         )
 
-    def handle_message_stop(self, event: RawMessageStopEvent) -> StreamingEvent:
+    def handle_message_delta(self, event: RawMessageDeltaEvent) -> StreamEvent:
+        """Handle message delta event."""
+        logger.debug("===== Message delta event =====")
+        return StreamEvent(
+            event_type=StreamEventType.MESSAGE_DELTA,
+            data=MessageDeltaEvent(delta=event.delta, usage=event.usage),
+        )
+
+    def handle_message_stop(self, event: RawMessageStopEvent) -> StreamEvent:
         """Handle message stop event."""
         logger.debug("===== Stream message ended =====")
-        return StreamingEvent(
-            event_type=StreamingEventType.MESSAGE_STOP,
+        return StreamEvent(
+            event_type=StreamEventType.MESSAGE_STOP,
+            data=MessageStopEvent(),
         )
 
-    async def handle_full_message(self, stream: AsyncStream[MessageStreamEvent]) -> StreamingEvent:
-        """Handle full message event."""
-        full_response = await stream.get_final_message()
-        logger.debug(f"FULL ASSISTANT RESPONSE FOR DEBUGGING: {full_response}")
-
-        content = []
-        for block in full_response.content:
-            if block.type == "text":
-                content.append(TextBlock.model_validate(block.model_dump()))
-            elif block.type == "tool_use":
-                content.append(ToolUseBlock.model_validate(block.model_dump()))
-            else:
-                logger.warning(f"Unexpected block type in assistant message: {block.type}")
-
-        return StreamingEvent(
-            event_type=StreamingEventType.ASSISTANT_MESSAGE,
-            event_data=AssistantMessageEvent(content=content),
+    def handle_error(self, event: MessageStreamEvent) -> StreamEvent:
+        """Handle error event."""
+        logger.error(f"===== Stream error: {event.error} =====")
+        return StreamEvent(
+            event_type=StreamEventType.ERROR,
+            data=StreamErrorEvent(error=event.error),
         )
 
-    async def handle_tool_call(self, tool_inputs: ToolUseBlock, user_id: UUID) -> ToolResultBlock:
-        """Handle tool use event."""
-        tool_result = await self.get_tool_result(tool_inputs, user_id)
-        logger.debug(f"Tool result: {tool_result}")
-        return tool_result
-
-    async def get_tool_result(self, tool_inputs: ToolUseBlock, user_id: UUID) -> ToolResultBlock:
+    async def get_tool_result(self, tool_use_block: ToolUseBlock, user_id: UUID) -> ToolResultBlock:
         """Handle tool use for specified tools."""
         try:
-            if tool_inputs.name == "rag_search":
-                search_results = await self.use_rag_search(tool_inputs, user_id)
+            if tool_use_block.name == ToolName.RAG_SEARCH:
+                search_results = await self.use_rag_search(tool_use_block, user_id)
                 if search_results is None:
                     # Special tool use block for no context
                     tool_result = ToolResultBlock(
-                        tool_use_id=tool_inputs.id,
+                        tool_use_id=tool_use_block.id,
                         content="No relevant context found for the original request.",
                     )
+                    return tool_result
                 else:
                     # Regular tool use block with context
                     tool_result = ToolResultBlock(
-                        tool_use_id=tool_inputs.id,
+                        tool_use_id=tool_use_block.id,
                         content=f"Here is context retrieved by RAG search: \n\n{search_results}\n\n."
                         f"Please use this context to answer my original request, if it's relevant.",
                     )
-
-                return tool_result
-
-            raise ValueError(f"Unknown tool: {tool_inputs.name}")
+                    return tool_result
+            raise ValueError(f"Unknown tool: {tool_use_block.name}")
         except Exception as e:
-            logger.error(f"Error executing tool {tool_inputs.name}: {str(e)}", exc_info=True)
+            logger.error(f"Error executing tool {tool_use_block.name}: {str(e)}", exc_info=True)
             raise NonRetryableLLMError(
                 original_error=e, message=f"An error occurred while handling tool: {str(e)}"
             ) from e
 
-    # TODO: this method belongs to retriever
+    # TODO: this method belongs to retriever, it should not have user_id as an argument (naughty, naughty)
     async def use_rag_search(self, tool_inputs: ToolUseBlock, user_id: UUID) -> list[str] | None:
         """Perform RAG search using the provided tool input.
 
