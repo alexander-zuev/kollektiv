@@ -6,7 +6,7 @@ from enum import Enum
 from typing import ClassVar, Literal
 from uuid import UUID, uuid4
 
-from anthropic.types import Delta, MessageDeltaUsage, MessageParam
+from anthropic.types import MessageParam
 from pydantic import BaseModel, Field, model_validator
 
 from src.infra.logger import get_logger
@@ -31,21 +31,21 @@ class ContentBlockType(str, Enum):
 class ContentBlock(BaseModel):
     """Base content block model"""
 
-    type: ContentBlockType = Field(..., description="Type of the content block")
+    type: str = Field(..., description="Type of the content block")
     index: int | None = Field(None, description="Index of the content block during streaming. None if not streaming.")
 
 
 class TextBlock(ContentBlock):
     """Simple text content"""
 
-    type: Literal[ContentBlockType.TEXT] = Field(ContentBlockType.TEXT, description="Type of the content block")
+    type: Literal["text"] = Field(ContentBlockType.TEXT.value, description="Type of the content block")
     text: str = Field(..., description="Text content of the block")
 
 
 class ToolUseBlock(ContentBlock):
     """Tool usage by assistant"""
 
-    type: Literal[ContentBlockType.TOOL_USE] = Field(ContentBlockType.TOOL_USE, description="Type of the content block")
+    type: Literal["tool_use"] = Field(ContentBlockType.TOOL_USE.value, description="Type of the content block")
     id: str = Field(..., description="ID of the tool use")
     name: str = Field(..., description="Name of the tool")
     input: dict = Field(..., description="Input to the tool")
@@ -54,9 +54,7 @@ class ToolUseBlock(ContentBlock):
 class ToolResultBlock(ContentBlock):
     """Tool result from assistant"""
 
-    type: Literal[ContentBlockType.TOOL_RESULT] = Field(
-        ContentBlockType.TOOL_RESULT, description="Type of the content block"
-    )
+    type: Literal["tool_result"] = Field(ContentBlockType.TOOL_RESULT.value, description="Type of the content block")
     tool_use_id: str = Field(..., description="ID of the tool use")
     content: str = Field(..., description="Result returned from the tool")
     is_error: bool = Field(False, description="Error returned from the tool")
@@ -137,8 +135,8 @@ class MessageDeltaEvent(BaseModel):
     """Represents a message delta event."""
 
     event_type: Literal[StreamEventType.MESSAGE_DELTA] = StreamEventType.MESSAGE_DELTA
-    delta: Delta = Field(..., description="Delta of the message")
-    usage: MessageDeltaUsage = Field(..., description="Usage of the message")
+    delta: dict = Field(..., description="Delta of the message")
+    usage: dict = Field(..., description="Usage of the message")
 
 
 class StreamEvent(BaseModel):
@@ -175,7 +173,7 @@ class FrontendEventType(str, Enum):
     ERROR = "message_error"
 
 
-class FrontendEvent(BaseModel):
+class FrontendChatEvent(BaseModel):
     """A unified, flat frontend chat events model. Incorporates both streaming and custom events. Allows for easier handling of events in the frontend."""
 
     type: FrontendEventType = Field(..., description="Type of the event")
@@ -199,7 +197,7 @@ class FrontendEvent(BaseModel):
     error_message: str | None = Field(None, description="Error message")
 
     @classmethod
-    def from_stream_event(cls, event: StreamEvent) -> FrontendEvent:
+    def from_stream_event(cls, event: StreamEvent) -> FrontendChatEvent:
         """Convert internal stream event to frontend event"""
         match event.event_type:
             case StreamEventType.CONTENT_BLOCK_START:
@@ -228,7 +226,7 @@ class FrontendEvent(BaseModel):
                 raise ValueError(f"Unknown stream event type: {event.event_type}")
 
     @classmethod
-    def create_tool_result_message(cls, tool_result: ToolResultBlock, conversation_id: UUID) -> FrontendEvent:
+    def create_tool_result_message(cls, tool_result: ToolResultBlock, conversation_id: UUID) -> FrontendChatEvent:
         """Create a ToolResultMessage with the tool result block"""
         message = ConversationMessage(
             conversation_id=conversation_id,
@@ -238,7 +236,7 @@ class FrontendEvent(BaseModel):
         return cls(type=FrontendEventType.TOOL_RESULT_MESSAGE, message=message)
 
     @classmethod
-    def create_assistant_message(cls, content_blocks: list[ContentBlock], conversation_id: UUID) -> FrontendEvent:
+    def create_assistant_message(cls, content_blocks: list[ContentBlock], conversation_id: UUID) -> FrontendChatEvent:
         """Create an AssistantMessage with the assistant message"""
         message = ConversationMessage(
             conversation_id=conversation_id,
@@ -248,7 +246,7 @@ class FrontendEvent(BaseModel):
         return cls(type=FrontendEventType.ASSISTANT_MESSAGE, message=message)
 
     @classmethod
-    def create_message_accepted_event(cls, conversation_id: UUID, title: str) -> FrontendEvent:
+    def create_message_accepted_event(cls, conversation_id: UUID, title: str) -> FrontendChatEvent:
         """Create a MessageAcceptedEvent"""
         return cls(
             type=FrontendEventType.MESSAGE_ACCEPTED,
@@ -257,7 +255,7 @@ class FrontendEvent(BaseModel):
         )
 
     @classmethod
-    def create_error_event(cls, error_message: str) -> FrontendEvent:
+    def create_error_event(cls, error_message: str) -> FrontendChatEvent:
         """Create an ErrorEvent"""
         return cls(type=FrontendEventType.ERROR, error_message=error_message)
 
@@ -279,7 +277,7 @@ class ConversationMessage(SupabaseModel):
         default_factory=uuid4,
         description="UUID of a message. Generated by backend for assistant messages, sent by client for user messages.",
     )
-    conversation_id: UUID | None = Field(None, description="FK reference to a conversation.")
+    conversation_id: UUID = Field(..., description="FK reference to a conversation.")
     role: Role = Field(..., description="Role of the message sender")
     content: list[TextBlock | ToolUseBlock | ToolResultBlock] = Field(
         ...,
@@ -292,7 +290,7 @@ class ConversationMessage(SupabaseModel):
     def validate_content(cls, values: dict) -> dict:
         """Ensure the correct model is instantiated for each item in the `content` list."""
         content_data = values.get("content", [])
-        resolved_content: list[TextBlock | ToolUseBlock | ToolResultBlock] = []
+        resolved_content: list[ContentBlock] = []
 
         for item in content_data:
             # Inspect the `block_type` field to determine which model to use
@@ -330,7 +328,7 @@ class Conversation(SupabaseModel):
 
     conversation_id: UUID = Field(default_factory=uuid4, description="UUID of the conversation")
     user_id: UUID = Field(..., description="FK reference to UUID of the user")
-    title: str = Field(..., description="Title of the conversation")
+    title: str = Field(default="New Conversation", description="Title of the conversation")
     message_ids: list[UUID] | list = Field(
         default_factory=list, description="FK references to UUIDs of the messages in the conversation"
     )
@@ -369,6 +367,7 @@ class ConversationHistory(BaseModel):
         for i, msg in enumerate(self.messages[1:], 1):
             prev_msg = self.messages[i - 1]
             if msg.role == prev_msg.role:
+                logger.error(f"Consecutive messages cannot have the same role: {msg.role} and {prev_msg.role}")
                 raise ValueError("Consecutive messages cannot have the same role")
         return self
 
@@ -390,7 +389,7 @@ class UserMessage(BaseModel):
     message_id: UUID = Field(..., description="UUID of the user message generated by frontend")
     conversation_id: UUID = Field(..., description="UUID of the conversation, generated by FE for new conversations")
     role: Role = Field(Role.USER, description="Role of tc message sender")
-    content: list[TextBlock | ToolUseBlock | ToolResultBlock] = Field(..., description="Content of the message")
+    content: list[TextBlock | ToolResultBlock] = Field(..., description="Content of the message")
 
 
 # GET /conversations

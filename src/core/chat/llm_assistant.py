@@ -257,7 +257,7 @@ class ClaudeAssistant(Model):
         logger.debug("===== Message delta event =====")
         return StreamEvent(
             event_type=StreamEventType.MESSAGE_DELTA,
-            data=MessageDeltaEvent(delta=event.delta, usage=event.usage),
+            data=MessageDeltaEvent(delta=event.delta.model_dump(), usage=event.usage.model_dump()),
         )
 
     def handle_message_stop(self, event: RawMessageStopEvent) -> StreamEvent:
