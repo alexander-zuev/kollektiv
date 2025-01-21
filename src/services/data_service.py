@@ -2,12 +2,17 @@ from datetime import UTC, datetime
 from typing import Any, TypeVar
 from uuid import UUID
 
-from src.api.v0.schemas.chat_schemas import ConversationListResponse, ConversationSummary
 from src.core._exceptions import ConversationNotFoundError
 from src.infra.data.data_repository import DataRepository
 from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
-from src.models.chat_models import Conversation, ConversationHistory, ConversationMessage
+from src.models.chat_models import (
+    Conversation,
+    ConversationHistory,
+    ConversationListResponse,
+    ConversationMessage,
+    ConversationSummary,
+)
 from src.models.content_models import AddContentSourceRequest, Chunk, DataSource, Document, SourceSummary
 from src.models.job_models import Job
 from src.models.vector_models import VectorCollection
