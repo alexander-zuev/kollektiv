@@ -274,7 +274,10 @@ class ChatService:
 
             tool_result = await self.claude_assistant.get_tool_result(tool_use_block, state.user_id)
 
-            # Create user message
+            # Emit tool result message
+            yield FrontendChatEvent.create_tool_result_message(tool_result, state.conversation_id)
+
+            # Create user message with same content
             user_message = UserMessage(
                 conversation_id=state.conversation_id,
                 message_id=uuid4(),
@@ -304,6 +307,6 @@ class ChatService:
             raise ValueError(f"Conversation {conversation_id} not found")
 
         # Convert to response
-        return ConversationHistoryResponse(conversation_id=history.conversation_id, messages=history.messages)
+        return ConversationHistoryResponse.from_history(history)
 
     # TODO: which endpoint and method should handle the update of the data sources linked to a conversation?

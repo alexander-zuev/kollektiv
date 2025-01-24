@@ -38,14 +38,14 @@ class ContentBlock(BaseModel):
 class TextBlock(ContentBlock):
     """Simple text content"""
 
-    type: Literal["text"] = Field(ContentBlockType.TEXT.value, description="Type of the content block")
+    type: Literal[ContentBlockType.TEXT] = Field(ContentBlockType.TEXT, description="Type of the content block")
     text: str = Field(..., description="Text content of the block")
 
 
 class ToolUseBlock(ContentBlock):
     """Tool usage by assistant"""
 
-    type: Literal["tool_use"] = Field(ContentBlockType.TOOL_USE.value, description="Type of the content block")
+    type: Literal[ContentBlockType.TOOL_USE] = Field(ContentBlockType.TOOL_USE, description="Type of the content block")
     id: str = Field(..., description="ID of the tool use")
     name: str = Field(..., description="Name of the tool")
     input: dict = Field(..., description="Input to the tool")
@@ -54,7 +54,9 @@ class ToolUseBlock(ContentBlock):
 class ToolResultBlock(ContentBlock):
     """Tool result from assistant"""
 
-    type: Literal["tool_result"] = Field(ContentBlockType.TOOL_RESULT.value, description="Type of the content block")
+    type: Literal[ContentBlockType.TOOL_RESULT] = Field(
+        ContentBlockType.TOOL_RESULT, description="Type of the content block"
+    )
     tool_use_id: str = Field(..., description="ID of the tool use")
     content: str = Field(..., description="Result returned from the tool")
     is_error: bool = Field(False, description="Error returned from the tool")
@@ -408,6 +410,18 @@ class ConversationHistoryResponse(BaseModel):
     """Object returned by GET /conversations/{conversation_id}."""
 
     conversation_id: UUID = Field(..., description="UUID of the conversation")
+    user_id: UUID = Field(..., description="UUID of the user")
     messages: list[ConversationMessage] = Field(
         default_factory=list, description="List of messages in the conversation"
     )
+    updated_at: datetime = Field(..., description="Last updated timestamp")
+
+    @classmethod
+    def from_history(cls, history: ConversationHistory) -> ConversationHistoryResponse:
+        """Convert a ConversationHistory to a ConversationHistoryResponse"""
+        return cls(
+            conversation_id=history.conversation_id,
+            user_id=history.user_id,
+            messages=history.messages,
+            updated_at=history.updated_at,
+        )
