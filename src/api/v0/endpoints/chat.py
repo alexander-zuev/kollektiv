@@ -8,9 +8,14 @@ from sse_starlette.sse import EventSourceResponse
 from src.api.dependencies import ChatServiceDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
-from src.api.v0.schemas.chat_schemas import ChatResponse, ConversationListResponse, ConversationResponse, UserMessage
 from src.core._exceptions import DatabaseError, EntityNotFoundError, NonRetryableLLMError, RetryableLLMError
 from src.infra.logger import get_logger
+from src.models.chat_models import (
+    ConversationHistoryResponse,
+    ConversationListResponse,
+    FrontendChatEvent,
+    UserMessage,
+)
 
 # Define routers with base prefix only
 chat_router = APIRouter(prefix=V0_PREFIX)
@@ -21,9 +26,9 @@ logger = get_logger()
 
 @chat_router.post(
     Routes.V0.Chat.CHAT,
-    response_model=ChatResponse,
+    response_model=FrontendChatEvent,
     responses={
-        200: {"model": ChatResponse},
+        200: {"model": FrontendChatEvent},
         400: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
@@ -35,7 +40,7 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
     Returns Server-Sent Events with tokens.
     """
     try:
-        logger.debug(f"Request for debugging: {request.model_dump(serialize_as_any=True)}")
+        logger.debug(f"POST /chat request for debugging: {request.model_dump(serialize_as_any=True)}")
 
         async def event_stream() -> AsyncIterator[str]:
             async for event in chat_service.get_response(user_message=request):
@@ -94,15 +99,15 @@ async def list_conversations(user_id: UUID, chat_service: ChatServiceDep) -> Con
 # Get messages in a conversation
 @conversations_router.get(
     Routes.V0.Conversations.GET,
-    response_model=ConversationResponse,
+    response_model=ConversationHistoryResponse,
     responses={
-        200: {"model": ConversationResponse},
+        200: {"model": ConversationHistoryResponse},
         400: {"model": ErrorResponse},
         404: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
     },
 )
-async def get_conversation(conversation_id: UUID, chat_service: ChatServiceDep) -> ConversationResponse:
+async def get_conversation(conversation_id: UUID, chat_service: ChatServiceDep) -> ConversationHistoryResponse:
     """Get all messages in a conversation."""
     try:
         return await chat_service.get_conversation(conversation_id)

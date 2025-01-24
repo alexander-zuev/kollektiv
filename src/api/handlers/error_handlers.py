@@ -23,3 +23,4 @@ async def non_retryable_exception_handler(request: Request, exc: Exception) -> J
             status_code=500,
             content={"detail": f"An internal error occurred while processing your request: {exc.error_message}."},
         )
+    return None

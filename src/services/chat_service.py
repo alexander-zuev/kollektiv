@@ -1,35 +1,101 @@
 # Chat service is responsible for handling chat requests and responses.abs
 
+import json
 from collections.abc import AsyncGenerator
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from src.api.v0.schemas.chat_schemas import (
-    AssistantResponseEvent,
-    ChatResponse,
-    ConversationListResponse,
-    ConversationResponse,
-    MessageAcceptedEvent,
-    MessageDeltaEvent,
-    MessageDoneEvent,
-    UserMessage,
-)
 from src.core._exceptions import NonRetryableLLMError, RetryableLLMError
 from src.core.chat.conversation_manager import ConversationManager
 from src.core.chat.llm_assistant import ClaudeAssistant
 from src.infra.logger import get_logger
 from src.models.chat_models import (
+    ContentBlock,
     ConversationHistory,
+    ConversationHistoryResponse,
+    ConversationListResponse,
     ConversationMessage,
+    FrontendChatEvent,
     Role,
-    StreamingEventType,
+    StreamEvent,
+    StreamEventType,
+    TextBlock,
+    TextDeltaStream,
+    ToolInputJSONStream,
+    ToolUseBlock,
+    UserMessage,
 )
 from src.services.data_service import DataService
 
 logger = get_logger()
 
 
+class StreamState:
+    """State of the stream, including the current content block and the list of content blocks."""
+
+    def __init__(self, conversation_id: UUID, user_id: UUID):
+        self.conversation_id: UUID = conversation_id
+        self.user_id: UUID = user_id
+        self.current_blocks: list[ContentBlock] = []
+        self.current_block: ContentBlock | None = None
+        self.has_tool_use = False  # Track if we've seen a tool use block
+        self.tool_input: str = ""
+
+    def handle_block_start(self, block: ContentBlock) -> None:
+        """Start new content block"""
+        self.current_block = block
+        if isinstance(block, ToolUseBlock):
+            self.has_tool_use = True
+            self.tool_input = ""
+
+    def handle_delta(self, delta: TextDeltaStream | ToolInputJSONStream) -> None:
+        """Accumulate delta into current block"""
+        if self.current_block is None:
+            raise ValueError("No current block to accumulate delta into")
+
+        if isinstance(delta, TextDeltaStream):
+            if not isinstance(self.current_block, TextBlock):
+                raise ValueError("Text delta for non-text block")
+            self.current_block.text += delta.text
+
+        elif isinstance(delta, ToolInputJSONStream):
+            if not isinstance(self.current_block, ToolUseBlock):
+                raise ValueError("Tool input delta for non-tool block")
+            else:
+                self.tool_input += delta.partial_json
+
+    def handle_block_stop(self) -> None:
+        """Finalize current block"""
+        if self.current_block:
+            if isinstance(self.current_block, ToolUseBlock):
+                try:
+                    # Parse the accumulated string into a dictionary
+                    self.current_block.input = json.loads(self.tool_input)
+                    self.tool_input = ""
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse tool input: {self.tool_input}")
+                    self.current_block.input = {}  # Set to empty dict on error
+            self.current_blocks.append(self.current_block)
+            self.current_block = None
+
+
 class ChatService:
-    """Orchestrates chat operations, managing conversation state and LLM interactions."""
+    """
+    Orchestrates chat operations, managing conversation state and LLM interactions.
+
+    Stream Flow:
+    1. User message received -> get_response()
+    2. Setup conversation history
+    3. Start stream processing
+    4. Transform Anthropic events to frontend events
+    5. Handle tool use if needed
+    6. Complete conversation turn
+
+    Error Handling:
+    - RetryableLLMError: Temporary failures that can be retried
+    - NonRetryableLLMError: Permanent failures requiring user intervention
+    """
+
+    # TODO: clear pending on errirs
 
     def __init__(
         self, claude_assistant: ClaudeAssistant, conversation_manager: ConversationManager, data_service: DataService
@@ -38,43 +104,38 @@ class ChatService:
         self.conversation_manager = conversation_manager
         self.data_service = data_service
 
-    async def get_response(self, user_message: UserMessage) -> AsyncGenerator[ChatResponse, None]:
+    def get_message_accepted_event(self, conversation_id: UUID) -> FrontendChatEvent:
+        """Returns a MessageAcceptedEvent to the client"""
+        event = FrontendChatEvent.create_message_accepted_event(
+            conversation_id=conversation_id,
+            title="New conversation",
+        )
+        logger.debug(f"Sent MessageAcceptedEvent for conversation: {conversation_id}")
+        return event
+
+    async def get_response(self, user_message: UserMessage) -> AsyncGenerator[FrontendChatEvent, None]:
         """Process a user message and stream responses."""
         try:
-            # 1. Prepare conversation
-            if user_message.conversation_id:
-                # If it's an existing conversation
-                conversation_id = user_message.conversation_id
-                logger.info(f"Continuing conversation: {conversation_id}")
-                conversation = await self.conversation_manager.get_conversation_history(
-                    conversation_id=conversation_id, message=user_message
-                )
-                logger.debug(f"Retrieved conversation with ID: {conversation.conversation_id}")
-            else:
-                logger.info(f"Creating new conversation for user {user_message.user_id}")
-                conversation = await self.conversation_manager.create_conversation(message=user_message)
-                user_message.conversation_id = conversation.conversation_id
-                logger.debug(f"Created conversation with ID: {conversation.conversation_id}")
+            logger.info(f"Getting response for user message: {user_message}")
 
-            # 2. Send conversation_id to client
-            yield ChatResponse(event=MessageAcceptedEvent(conversation_id=conversation.conversation_id))
-            logger.debug(f"Sent MessageAcceptedEvent for conversation: {conversation.conversation_id}")
+            # Prepare conversation history
+            history = await self.conversation_manager.setup_new_conv_history_turn(user_message)
+            yield self.get_message_accepted_event(history.conversation_id)
 
-            # 3. Add user message to pending
-            await self.conversation_manager.add_pending_message(message=user_message)
-            logger.debug(
-                f"Added user message to pending for conversation {conversation.conversation_id}: "
-                f"{user_message.content[:100]}..."
-            )
+            # Setup stream
+            async for frontend_event in self.process_stream(history):
+                yield frontend_event
 
-            # 4. Process stream
-            async for event in self._process_stream(conversation):
-                yield event
+            # Handle conversation turn
+            await self.handle_conversation_turn(history)
 
-            logger.info(f"Completed message processing for conversation {conversation.conversation_id}")
+            logger.debug(f"Conversation turn handled for conversation: {history.conversation_id}")
 
         except RetryableLLMError as e:
             logger.error(f"Retryable error in conversation {user_message.conversation_id}: {str(e)}", exc_info=True)
+            yield FrontendChatEvent.create_error_event(
+                error_message=f"Error in chat service processing message: {str(e)} for user {user_message.user_id}",
+            )
             raise RetryableLLMError(
                 original_error=e,
                 message=f"Error in chat service processing message: {str(e)} for user {user_message.user_id}",
@@ -86,86 +147,151 @@ class ChatService:
                 message=f"Error in chat service processing message: {str(e)} for user {user_message.user_id}",
             ) from e
 
-    async def _process_stream(
-        self, conversation: ConversationHistory, tool_use_count: int = 0
-    ) -> AsyncGenerator[ChatResponse, None]:
-        """Process a stream of events and yield ChatResponse objects."""
-        max_tool_retries_per_turn = 2
-        tool_result_processed = False
+    def handle_content_block_start(self, event: StreamEvent) -> FrontendChatEvent:
+        """Yields a FrontendEvent with the content block which has just started"""
+        if isinstance(event.data.content_block, TextBlock):
+            return FrontendChatEvent.from_stream_event(event)
+        elif isinstance(event.data.content_block, ToolUseBlock):
+            return FrontendChatEvent.from_stream_event(event)
+        else:
+            raise ValueError(f"Unknown content block type: {type(event.data.content_block)}")
 
-        logger.debug(
-            f"Starting stream processing for conversation {conversation.conversation_id} "
-            f"(tool use count: {tool_use_count})"
+    def handle_content_block_delta(self, event: StreamEvent) -> FrontendChatEvent:
+        """Emits a FrontendEvent with the delta"""
+        if isinstance(event.data.delta, TextDeltaStream):
+            return FrontendChatEvent.from_stream_event(event)
+        elif isinstance(event.data.delta, ToolInputJSONStream):
+            return FrontendChatEvent.from_stream_event(event)
+        else:
+            raise ValueError(f"Unknown content block delta type: {type(event.data)}")
+
+    def handle_content_block_stop(self, event: StreamEvent) -> FrontendChatEvent:
+        """Content Block stop event"""
+        return FrontendChatEvent.from_stream_event(event)
+
+    def handle_message_stop(self, event: StreamEvent) -> FrontendChatEvent:
+        """Emits message stop event."""
+        #
+        return FrontendChatEvent.from_stream_event(event)
+
+    def handle_stream_error(self, event: StreamEvent) -> FrontendChatEvent:
+        """Emits error event."""
+        logger.warning(f"LLM error: {event.data.error}")
+        return FrontendChatEvent.from_stream_event(event)
+
+    async def handle_assistant_message(
+        self, conversation_history: ConversationHistory, state: StreamState
+    ) -> ConversationMessage:
+        """Emits assistant message event."""
+        # Emit assistant message
+        assistant_message = ConversationMessage(
+            conversation_id=conversation_history.conversation_id,
+            role=Role.ASSISTANT,
+            content=state.current_blocks,
         )
 
-        async for event in self.claude_assistant.stream_response(conv_history=conversation):
-            match event.event_type:
-                case StreamingEventType.TEXT_TOKEN:
-                    yield ChatResponse(event=MessageDeltaEvent(text_delta=event.event_data.text))
+        await self.conversation_manager.add_pending_message(message=assistant_message)
 
-                case StreamingEventType.ASSISTANT_MESSAGE:
-                    logger.info(f"Processing assistant message for conversation {conversation.conversation_id}")
-                    assistant_message = ConversationMessage(
-                        conversation_id=conversation.conversation_id,
-                        role=Role.ASSISTANT,
-                        content=event.event_data.content,
-                    )
-                    await self.conversation_manager.add_pending_message(message=assistant_message)
-                    logger.debug(f"Added assistant message to pending for conversation {conversation.conversation_id}")
-                    yield ChatResponse(event=AssistantResponseEvent(response=assistant_message))
-                    logger.debug(f"ASSISTANT RESPONSE FOR DEBUGGING AFTER ADDING TO PENDING: {assistant_message}")
+        return assistant_message
 
-                case StreamingEventType.TOOL_RESULT:
-                    if tool_use_count >= max_tool_retries_per_turn:
-                        logger.warning(
-                            f"Max tool retries ({max_tool_retries_per_turn}) reached for conversation "
-                            f"{conversation.conversation_id}"
+    def handle_assistant_message_event(self, assistant_message: ConversationMessage) -> FrontendChatEvent:
+        """Emits assistant message event."""
+        return FrontendChatEvent.create_assistant_message(
+            content_blocks=assistant_message.content, conversation_id=assistant_message.conversation_id
+        )
+
+    async def handle_conversation_turn(self, conversation_history: ConversationHistory) -> None:
+        """Handles update of the conversation history post-turn"""
+        await self.conversation_manager.commit_pending(conversation_id=conversation_history.conversation_id)
+
+    async def process_stream(
+        self, conversation_history: ConversationHistory
+    ) -> AsyncGenerator[FrontendChatEvent, None]:
+        """Process a stream of events and yield Client (FE) chat events"""
+        logger.debug(f"Starting stream processing for conversation {conversation_history.conversation_id}")
+
+        state = StreamState(conversation_id=conversation_history.conversation_id, user_id=conversation_history.user_id)
+
+        try:
+            async for event in self.claude_assistant.stream_response(conv_history=conversation_history):
+                match event.event_type:
+                    case StreamEventType.MESSAGE_START:
+                        continue  # not used right now
+                    case StreamEventType.CONTENT_BLOCK_START:
+                        # Emit event
+                        yield self.handle_content_block_start(event)
+
+                        # Update state
+                        state.handle_block_start(event.data.content_block)
+                    case StreamEventType.CONTENT_BLOCK_DELTA:
+                        # Emit event
+                        yield self.handle_content_block_delta(event)
+
+                        # Update state
+                        state.handle_delta(event.data.delta)
+                    case StreamEventType.CONTENT_BLOCK_STOP:
+                        # Emit event
+                        yield self.handle_content_block_stop(event)
+
+                        # Update state
+                        state.handle_block_stop()
+                    case StreamEventType.MESSAGE_DELTA:
+                        continue  # not used right now, but could be to update token count (later)
+                    case StreamEventType.MESSAGE_STOP:
+                        # Emit message stop event
+                        yield self.handle_message_stop(event)
+
+                        # Emit assistant message
+                        message = await self.handle_assistant_message(conversation_history, state)
+                        yield self.handle_assistant_message_event(message)
+                    case StreamEventType.ERROR:
+                        yield self.handle_stream_error(event)
+                        await self.conversation_manager.clear_pending(
+                            conversation_id=conversation_history.conversation_id
                         )
-                        continue
-
-                    logger.info(
-                        f"Processing tool result for conversation {conversation.conversation_id} "
-                        f"(attempt {tool_use_count + 1}/{max_tool_retries_per_turn})"
-                    )
-                    tool_result = event.event_data.content
-                    tool_result_message = ConversationMessage(
-                        conversation_id=conversation.conversation_id,
-                        role=Role.USER,
-                        content=[tool_result],
-                    )
-
-                    await self.conversation_manager.add_pending_message(message=tool_result_message)
-                    logger.debug(f"Added tool result to pending for conversation {tool_result_message}")
-
-                    await self.conversation_manager.commit_pending(conversation_id=conversation.conversation_id)
-                    logger.debug(f"Committed pending messages for conversation {conversation.conversation_id}")
-
-                    tool_result_processed = True
-                    conversation = await self.conversation_manager.get_conversation_history(
-                        conversation_id=conversation.conversation_id,
-                    )
-                    logger.debug(
-                        f"Retrieved updated conversation history for {conversation.conversation_id}. "
-                        f"Starting new stream..."
-                    )
-
-                    async for new_event in self._process_stream(conversation, tool_use_count + 1):
-                        yield new_event
-
-                case StreamingEventType.MESSAGE_STOP:
-                    if not tool_result_processed:
-                        logger.debug(
-                            f"No tool result processed, committing pending messages for conversation "
-                            f"{conversation.conversation_id}"
+                        raise NonRetryableLLMError(
+                            original_error=event.data.error,
+                            message=f"Stream processing failed: {str(event.data.error)}",
                         )
-                        await self.conversation_manager.commit_pending(conversation_id=conversation.conversation_id)
-                    else:
-                        logger.debug(
-                            f"Tool result already processed for conversation {conversation.conversation_id}, "
-                            f"skipping commit"
-                        )
-                    yield ChatResponse(event=MessageDoneEvent())
-                    return
+
+            if state.has_tool_use:
+                async for tool_event in self.handle_tool_use(state):
+                    yield tool_event
+        except Exception as e:
+            logger.error(f"Stream error: {str(e)}", exc_info=True)
+            await self.conversation_manager.clear_pending(conversation_id=conversation_history.conversation_id)
+            raise NonRetryableLLMError(original_error=e, message=f"Stream processing failed: {str(e)}") from e
+
+    async def handle_tool_use(self, state: StreamState) -> AsyncGenerator[FrontendChatEvent, None]:
+        """Handles tool use"""
+        # Add error handling
+        try:
+            # Get tool result
+            for block in state.current_blocks:
+                if isinstance(block, ToolUseBlock):
+                    tool_use_block = block
+                    break
+
+            tool_result = await self.claude_assistant.get_tool_result(tool_use_block, state.user_id)
+
+            # Emit tool result message
+            yield FrontendChatEvent.create_tool_result_message(tool_result, state.conversation_id)
+
+            # Create user message with same content
+            user_message = UserMessage(
+                conversation_id=state.conversation_id,
+                message_id=uuid4(),
+                user_id=state.user_id,
+                role=Role.USER,
+                content=[tool_result],
+            )
+
+            # Launch new stream
+            async for event in self.get_response(user_message):
+                yield event
+        except Exception as e:
+            logger.error(f"Error handling tool use: {str(e)}", exc_info=True)
+            yield FrontendChatEvent.create_error_event(f"Error handling tool use: {str(e)}")
 
     async def get_conversations(self, user_id: UUID) -> ConversationListResponse:
         """Return a list of all conversations for a users, ordered into time groups."""
@@ -173,10 +299,14 @@ class ChatService:
         return conversations
 
     # TODO: this should load in the sources for the conversation
-    # TODO: this should return ConversationResponse not Conversation
-    async def get_conversation(self, conversation_id: UUID) -> ConversationResponse:
+    async def get_conversation(self, conversation_id: UUID) -> ConversationHistoryResponse:
         """Return a single conversation by its ID in accordance with RLS policies."""
-        conversation = await self.data_service.get_conversation(conversation_id)
-        return await ConversationResponse.from_conversation(conversation=conversation, data_service=self.data_service)
+        # Get conversation history (RLS will ensure user can only access their conversations)
+        history = await self.conversation_manager.get_conversation_history(conversation_id)
+        if history is None:
+            raise ValueError(f"Conversation {conversation_id} not found")
+
+        # Convert to response
+        return ConversationHistoryResponse.from_history(history)
 
     # TODO: which endpoint and method should handle the update of the data sources linked to a conversation?

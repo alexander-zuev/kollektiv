@@ -28,5 +28,7 @@ def get_cors_config(environment: Environment) -> dict:
             "Authorization",
             "Content-Type",
             "X-Request-ID",
+            "baggage",
+            "sentry-trace",
         ],
     }
