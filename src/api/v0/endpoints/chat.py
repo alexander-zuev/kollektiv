@@ -1,11 +1,13 @@
 from collections.abc import AsyncIterator
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sse_starlette.sse import EventSourceResponse
 
-from src.api.dependencies import ChatServiceDep
+from src.api.dependencies import ChatServiceDep, SupabaseManagerDep
 from src.api.routes import V0_PREFIX, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
 from src.core._exceptions import DatabaseError, EntityNotFoundError, NonRetryableLLMError, RetryableLLMError
@@ -22,6 +24,8 @@ chat_router = APIRouter(prefix=V0_PREFIX)
 conversations_router = APIRouter(prefix=V0_PREFIX)
 
 logger = get_logger()
+
+security = HTTPBearer()
 
 
 @chat_router.post(
@@ -107,10 +111,24 @@ async def list_conversations(user_id: UUID, chat_service: ChatServiceDep) -> Con
         500: {"model": ErrorResponse},
     },
 )
-async def get_conversation(conversation_id: UUID, chat_service: ChatServiceDep) -> ConversationHistoryResponse:
+async def get_conversation(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    conversation_id: UUID,
+    chat_service: ChatServiceDep,
+    supabase: SupabaseManagerDep,
+) -> ConversationHistoryResponse:
     """Get all messages in a conversation."""
     try:
-        return await chat_service.get_conversation(conversation_id)
+        # Get the client
+        supabase_client = await supabase.get_async_client()
+
+        # Get the user
+        user_response = await supabase_client.auth.get_user(credentials.credentials)
+        user_id = UUID(user_response.user.id)
+        logger.debug(f"User ID: {user_id}")
+
+        # Get the conversation
+        return await chat_service.get_conversation(conversation_id, user_id)
     # Handle case where conversation is not found
     except EntityNotFoundError as e:
         logger.warning(f"Conversation not found: {conversation_id}")

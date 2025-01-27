@@ -310,10 +310,6 @@ class ClaudeAssistant(Model):
         Args:
             tool_inputs: ToolUseBlock containing the rag_query
         """
-        # Get the query from tool input
-        if not isinstance(tool_inputs.input, dict):
-            logger.error(f"Tool input is not a dictionary: {tool_inputs.input}")
-            return None
         rag_query = tool_inputs.input.get("rag_query")  # This matches the new schema
         if not rag_query:
             logger.error(f"rag_query not found in tool input: {tool_inputs.input}")
