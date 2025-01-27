@@ -100,6 +100,11 @@ async def list_conversations(user_id: UUID, chat_service: ChatServiceDep) -> Con
         ) from e
 
 
+# TODO: Refactor user id into a UserContext service that would be accesssible by any service / endpoint
+# TODO: API layer would set the user id in the request context
+# TODO: Chat service would get the user id from the user context service
+
+
 # Get messages in a conversation
 @conversations_router.get(
     Routes.V0.Conversations.GET,

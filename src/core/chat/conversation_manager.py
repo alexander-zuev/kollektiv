@@ -246,6 +246,7 @@ class ConversationManager:
             user_id=user_id,
             message_ids=[],
             token_count=0,
+            updated_at=datetime.now(),
         )
 
         # 3. Save to Supabase
