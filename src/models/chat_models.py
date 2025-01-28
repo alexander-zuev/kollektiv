@@ -356,7 +356,7 @@ class ConversationHistory(BaseModel):
     )
     token_count: int = Field(default=0, description="Total token count for the conversation, initially 0")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Creation timestamp")
-    updated_at: datetime | None = Field(default=None, description="Last updated timestamp")
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Last updated timestamp")
 
     def to_anthropic_messages(self) -> Iterable[MessageParam]:
         """Convert entire history to Anthropic format"""

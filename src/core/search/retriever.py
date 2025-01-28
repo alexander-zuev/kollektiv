@@ -21,7 +21,7 @@ class Retriever:
     """
 
     def __init__(self, vector_db: VectorDatabase, reranker: Reranker):
-        self.db = vector_db
+        self.vector_db = vector_db
         self.reranker = reranker
 
     async def retrieve(
@@ -45,12 +45,12 @@ class Retriever:
         start_time = time.time()  # Start timing
 
         # get expanded search results
-        search_results = await self.db.query(user_id=user_id, user_query=combined_queries)
+        search_results = await self.vector_db.query(user_id=user_id, user_query=combined_queries)
         if not search_results or not search_results.get("documents")[0]:
             logger.warning("No documents found in search results")
             return []
 
-        unique_documents = self.db.deduplicate_documents(search_results)
+        unique_documents = self.vector_db.deduplicate_documents(search_results)
         logger.info(f"Search returned {len(unique_documents)} unique chunks")
 
         # rerank the results

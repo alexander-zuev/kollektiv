@@ -4,6 +4,7 @@ from typing import Annotated
 
 from celery import Celery
 from fastapi import Depends, Request
+from fastapi.security import HTTPBearer
 
 from src.core.content.crawler import FireCrawler
 from src.infra.celery.worker import celery_app
@@ -14,6 +15,8 @@ from src.infra.service_container import ServiceContainer
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.job_manager import JobManager
+
+security = HTTPBearer()
 
 
 def get_container(request: Request) -> ServiceContainer:
