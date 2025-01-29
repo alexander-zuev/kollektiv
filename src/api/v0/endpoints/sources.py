@@ -5,13 +5,13 @@ from fastapi import APIRouter, HTTPException, status
 from sse_starlette.sse import EventSourceResponse
 
 from src.api.dependencies import ContentServiceDep
-from src.api.routes import V0_PREFIX, Routes
+from src.api.routes import CURRENT_API_VERSION, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
 from src.infra.logger import get_logger
 from src.models.content_models import AddContentSourceRequest, AddContentSourceResponse, SourceEvent, SourceStatus
 
 logger = get_logger()
-router = APIRouter(prefix=f"{V0_PREFIX}")
+router = APIRouter(prefix=f"{CURRENT_API_VERSION}")
 
 
 @router.post(
