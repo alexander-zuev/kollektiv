@@ -168,7 +168,7 @@ def tenacity_retry_wrapper(
     min_wait: int = 2,
     max_wait: int = 30,
     max_attempts: int = 3,
-) -> Callable:
+) -> Callable[..., RT]:
     """Create a retry decorator with configurable exceptions.
 
     Args:

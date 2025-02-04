@@ -3,7 +3,7 @@
 from typing import Final
 
 # API version prefix
-CURRENT_API_VERSION: Final = "/v0"  # Rename for clarity
+CURRENT_API_VERSION: Final = "/v0"
 
 
 class Routes:
