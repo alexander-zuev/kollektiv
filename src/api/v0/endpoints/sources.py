@@ -8,7 +8,13 @@ from src.api.dependencies import ContentServiceDep
 from src.api.routes import CURRENT_API_VERSION, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
 from src.infra.logger import get_logger
-from src.models.content_models import AddContentSourceRequest, AddContentSourceResponse, SourceEvent, SourceStatus
+from src.models.content_models import (
+    AddContentSourceRequest,
+    AddContentSourceResponse,
+    SourceEvent,
+    SourceStatus,
+    SourceSummary,
+)
 
 logger = get_logger()
 router = APIRouter(prefix=f"{CURRENT_API_VERSION}")
@@ -41,6 +47,7 @@ async def add_source(
     Raises:
         HTTPException: If source creation fails
     """
+    logger.debug(f"Dumping request for debugging: {request.model_dump()}")
     response = await content_service.add_source(request)
     match response.status:
         case SourceStatus.PENDING:
@@ -77,3 +84,71 @@ async def stream_source_events(source_id: UUID, content_service: ContentServiceD
         return EventSourceResponse(event_stream(), media_type="text/event-stream")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.get(
+    Routes.V0.Sources.SOURCES,
+    response_model=list[SourceSummary],
+    responses={
+        200: {"model": list[SourceSummary]},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def get_sources(content_service: ContentServiceDep) -> list[SourceSummary]:
+    """Returns a list of all sources that a user has."""
+    try:
+        # return await content_service.get_sources()
+        return []
+    # Do I need to handle 4xx errors here?
+    # Do I correctly handle the 500 error?
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="An error occured while trying to get the list of sources. We are working on it already.",
+        ) from e
+
+
+# @router.patch(
+#     Routes.V0.Sources.SOURCES,
+#     response_model=UpdateSourcesResponse,
+#     responses={
+#         200: {"model": UpdateSourcesResponse},
+#         400: {"model": ErrorResponse},
+#         404: {"model": ErrorResponse},
+#         500: {"model": ErrorResponse},
+#     },
+#     status_code=status.HTTP_200_OK,
+# )
+# async def update_sources(request: UpdateSourcesRequest, content_service: ContentServiceDep) -> UpdateSourcesResponse:
+#     """Updates a source."""
+#     try:
+#         return await content_service.update_sources(request)
+#     # How do we handle 400 and 404? What are those?
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail="An error occured while trying to update the source. We are working on it already.",
+#         ) from e
+
+
+# @router.delete(
+#     Routes.V0.Sources.SOURCES,
+#     response_model=DeleteSourcesResponse,
+#     responses={
+#         200: {"model": DeleteSourcesResponse},  # successfully deleted
+#         404: {"model": ErrorResponse},  # Source not found
+#         500: {"model": ErrorResponse},  # Internal error
+#     },
+#     status_code=status.HTTP_200_OK,
+# )
+# async def delete_sources(request: DeleteSourcesRequest, content_service: ContentServiceDep) -> DeleteSourcesResponse:
+#     """Deletes a source."""
+#     try:
+#         return await content_service.delete_sources(request)
+#     # How do we handle 404?
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail="An error occured while trying to delete the source. We are working on it already.",
+#         ) from e

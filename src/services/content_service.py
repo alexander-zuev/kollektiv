@@ -15,6 +15,7 @@ from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
 from src.models.content_models import (
     AddContentSourceRequest,
+    AddContentSourceRequestDB,
     AddContentSourceResponse,
     DataSource,
     FireCrawlSourceMetadata,
@@ -67,7 +68,7 @@ class ContentService:
 
             # Send a crawl request to firecrawl
             response = await self.crawler.start_crawl(request=CrawlRequest(**request.request_config.model_dump()))
-            await self._save_user_request(request)
+            await self._save_user_request(AddContentSourceRequestDB.from_api_to_db(request))
             source = await self._create_and_save_datasource(request)
             logger.debug("STEP 1. Crawl started")
 

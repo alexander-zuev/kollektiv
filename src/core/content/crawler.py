@@ -76,8 +76,8 @@ class FireCrawler:
                 url=str(request.url),
                 limit=request.page_limit,
                 max_depth=request.max_depth,
-                include_paths=request.include_patterns,
-                exclude_paths=request.exclude_patterns,
+                include_paths=request.include_paths,
+                exclude_paths=request.exclude_paths,
                 webhook=webhook_url,
                 scrape_options=ScrapeOptions(),
             )
