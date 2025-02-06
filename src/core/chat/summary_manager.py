@@ -119,7 +119,7 @@ class SummaryManager:
             logger.debug(f"Summary generation response: {response}")
             return self._parse_summary(response, source_id)
         except ValueError as e:
-            raise KollektivError(f"Failed to parse summary response: {e}")
+            raise KollektivError(f"Failed to parse summary response: {e}") from e
         except RetryableLLMError:
             # Tried to generate summary but failed, so we should raise an error
             raise
@@ -147,12 +147,12 @@ class SummaryManager:
 
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Failed to parse summary response: {e}")
-            raise ValueError(f"Invalid summary format: {e}")
+            raise ValueError(f"Invalid summary format: {e}") from e
 
     async def generate_summary(self, source_id: UUID, documents: list[Document]) -> SourceSummary | None:
         """Orchestrates summary generation."""
         if len(documents) == 0:
-            # We don't have any documents to summarize, so we should raise or log an error??
+            # We don't have any documents to summarize, so we should raise an error
             raise ValueError("No documents to summarize")
 
         else:
@@ -163,13 +163,10 @@ class SummaryManager:
             # Generate summary response
             try:
                 summary_response = await self.get_summary_response(source_id, urls, titles, doc_sample)
+                await self.data_service.save(SourceSummary, summary_response)
+                return summary_response
             except (RetryableLLMError, NonRetryableLLMError, ValueError):
-                # We should retry the summary generation
-                raise  # just propagate up the stack
-            # Save summary to database
-            await self.data_service.save(SourceSummary, summary_response)
-
-        return summary_response
+                raise  # propagate up the stack
 
 
 if __name__ == "__main__":

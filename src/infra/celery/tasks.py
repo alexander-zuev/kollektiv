@@ -186,10 +186,15 @@ def add_chunk_to_storage(chunk_batch: list[Chunk], user_id: str) -> dict:
 def persist_to_db(chunks: list[Chunk]) -> dict:
     """Persist the chunks to the database."""
     try:
+        # Get services container
         services = celery_app.services
+
+        # Validate and persist chunks
         logger.info(f"Persisting {len(chunks)} chunks to the database")
         chunks = [Chunk.model_validate(chunk) for chunk in chunks]
         asyncio.run(services.data_service.save_chunks(chunks))
+
+        # Return success message
         return {"status": "success", "message": f"Successfully persisted {len(chunks)} chunks to the database"}
     except Exception as e:
         logger.exception(f"Error persisting chunks to the database: {e}")
