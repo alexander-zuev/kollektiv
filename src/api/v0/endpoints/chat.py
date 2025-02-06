@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sse_starlette.sse import EventSourceResponse
 
 from src.api.dependencies import ChatServiceDep, SupabaseManagerDep
-from src.api.routes import V0_PREFIX, Routes
+from src.api.routes import CURRENT_API_VERSION, Routes
 from src.api.v0.schemas.base_schemas import ErrorResponse
 from src.core._exceptions import DatabaseError, EntityNotFoundError, NonRetryableLLMError, RetryableLLMError
 from src.infra.logger import get_logger
@@ -20,8 +20,8 @@ from src.models.chat_models import (
 )
 
 # Define routers with base prefix only
-chat_router = APIRouter(prefix=V0_PREFIX)
-conversations_router = APIRouter(prefix=V0_PREFIX)
+chat_router = APIRouter(prefix=CURRENT_API_VERSION)
+conversations_router = APIRouter(prefix=CURRENT_API_VERSION)
 
 logger = get_logger()
 
