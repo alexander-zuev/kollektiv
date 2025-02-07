@@ -1,27 +1,41 @@
 # Use a base image
-FROM python:3.12-slim
+##############################
+# Base stage
+##############################
+FROM python:3.12-slim AS base
 
-# Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Set the working directory of the container
 WORKDIR /app
 
-# Install system dependencies (runs in /bin/sh)
-# Shell form command
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+##############################
+# Builder stage: install deps
+##############################
+FROM base AS builder
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files
+# Install Poetry
+RUN pip install poetry
+
+# Copy only dependency files first to leverage caching
 COPY pyproject.toml poetry.lock ./
 
-# Install Poetry and dependencies
-RUN pip install poetry \
-    && poetry config virtualenvs.create false \
-    && poetry install --only main
+# Use a cache mount for Poetry’s cache
+RUN --mount=type=cache,target=/root/.cache/pypoetry \
+    poetry config virtualenvs.create false && \
+    poetry install --only main --no-interaction --no-ansi
 
-# Copy application code
-COPY . .
+# ##############################
+# # Final runtime stage
+# ##############################
+# FROM base AS runtime
+
+# COPY --from=builder /usr/local/bin/poetry* /usr/local/bin/
+
+# # Copy the installed dependencies and virtual environment from builder
+# COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, ClassVar, Literal
@@ -284,8 +285,24 @@ class Chunk(SupabaseModel):
     # DB config
     _db_config: ClassVar[dict] = {"schema": "content", "table": "chunks", "primary_key": "chunk_id"}
 
+    @field_validator("headers", mode="before")
+    @classmethod
+    def ensure_headers_is_dict(cls, value: Any) -> dict[str, Any]:
+        """Ensure headers is a dict."""
+        # If headers is provided as a JSON string, deserialize it.
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+
 
 # GET /sources
+class SourceOverview(BaseModel):
+    """An individual source with a summary and status. Displayed in the view sources form."""
+
+    source_id: UUID = Field(..., description="ID of the source")
+    is_active: bool = Field(..., description="Whether the source is active")
+    summary: SourceSummary = Field(default=..., description="Summary of the source")
+
 
 # PUT /sources/{source_id} <<< this can be a list
 # DELETE /sources/{source_id} <<< this can be a list

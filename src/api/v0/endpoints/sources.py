@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from sse_starlette.sse import EventSourceResponse
 
-from src.api.dependencies import ContentServiceDep
+from src.api.dependencies import ContentServiceDep, UserIdDep
 from src.api.routes import CURRENT_API_VERSION, Routes
 from src.api.v0.schemas.base_schemas import ErrorCode, ErrorResponse
 from src.infra.logger import get_logger
@@ -12,6 +12,7 @@ from src.models.content_models import (
     AddContentSourceRequest,
     AddContentSourceResponse,
     SourceEvent,
+    SourceOverview,
     SourceStatus,
     SourceSummary,
 )
@@ -77,9 +78,9 @@ async def stream_source_events(source_id: UUID, content_service: ContentServiceD
 
         async def event_stream() -> AsyncGenerator[str, None]:
             async for event in content_service.stream_source_events(source_id=source_id):
-                event = event.model_dump_json()
-                logger.debug(f"Printing event for debugging: {event}")
-                yield event
+                event_json = event.model_dump_json()
+                logger.debug(f"Printing event for debugging: {event_json}")
+                yield event_json
 
         return EventSourceResponse(event_stream(), media_type="text/event-stream")
     except ValueError as e:
@@ -88,20 +89,17 @@ async def stream_source_events(source_id: UUID, content_service: ContentServiceD
 
 @router.get(
     Routes.V0.Sources.SOURCES,
-    response_model=list[SourceSummary],
+    response_model=list[SourceOverview],
     responses={
-        200: {"model": list[SourceSummary]},
+        200: {"model": list[SourceOverview]},
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
     status_code=status.HTTP_200_OK,
 )
-async def get_sources(content_service: ContentServiceDep) -> list[SourceSummary]:
+async def get_sources(content_service: ContentServiceDep, user_id: UserIdDep) -> list[SourceSummary]:
     """Returns a list of all sources that a user has."""
     try:
-        # return await content_service.get_sources()
-        return []
-    # Do I need to handle 4xx errors here?
-    # Do I correctly handle the 500 error?
+        return await content_service.get_sources(user_id=user_id)
     except Exception as e:
         raise HTTPException(
             status_code=500,

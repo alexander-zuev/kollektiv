@@ -238,3 +238,8 @@ class DataService:
         """Get data source by ID."""
         result = await self.repository.find_by_id(DataSource, source_id)
         return result
+
+    async def list_source_summaries(self, user_id: UUID) -> list[SourceSummary]:
+        """Return a list of all source summaries for a user."""
+        result = await self.repository.find(SourceSummary, filters={"user_id": user_id})
+        return result

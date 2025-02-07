@@ -14,7 +14,7 @@ logs:
 	docker compose --env-file config/.env -f scripts/docker/compose.yaml logs -f
 
 rebuild:
-	docker compose --env-file config/.env -f scripts/docker/compose.yaml build --no-cache
+	docker compose --env-file config/.env -f scripts/docker/compose.yaml build
 	docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d --remove-orphans
 
 push-ghcr:
