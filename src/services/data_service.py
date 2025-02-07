@@ -13,7 +13,13 @@ from src.models.chat_models import (
     ConversationMessage,
     ConversationSummary,
 )
-from src.models.content_models import AddContentSourceRequest, Chunk, DataSource, Document, SourceSummary
+from src.models.content_models import (
+    AddContentSourceRequestDB,
+    Chunk,
+    DataSource,
+    Document,
+    SourceSummary,
+)
 from src.models.job_models import Job
 from src.models.vector_models import VectorCollection
 
@@ -89,11 +95,11 @@ class DataService:
         result = await self.update_entity(DataSource, source_id, updates)
         return DataSource.model_validate(result)
 
-    async def save_user_request(self, request: AddContentSourceRequest) -> AddContentSourceRequest:
+    async def save_user_request(self, request: AddContentSourceRequestDB) -> AddContentSourceRequestDB:
         """Save user request."""
         logger.debug(f"Saving user request {request.request_id}")
         result = await self.repository.save(request)
-        return result
+        return AddContentSourceRequestDB.model_validate(result)
 
     async def save_documents(self, documents: list[Document]) -> list[Document]:
         """Saves list of crawled documents."""

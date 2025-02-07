@@ -471,13 +471,22 @@ def sample_uuid():
 @pytest.fixture
 def sample_message(sample_uuid):
     """Sample message for testing."""
-    return ConversationMessage(message_id=sample_uuid, role=Role.USER, content=[TextBlock(text="Test message")])
+    return ConversationMessage(
+        message_id=sample_uuid,
+        conversation_id=sample_uuid,
+        role=Role.USER,
+        content=[TextBlock(text="Test message")],
+    )
 
 
 @pytest.fixture
 def sample_conversation(sample_uuid, sample_message):
     """Sample conversation for testing."""
-    return ConversationHistory(conversation_id=sample_uuid, messages=[sample_message])
+    return ConversationHistory(
+        conversation_id=sample_uuid,
+        user_id=sample_uuid,
+        messages=[sample_message],
+    )
 
 
 @pytest.fixture

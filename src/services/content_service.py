@@ -145,15 +145,10 @@ class ContentService:
 
         return data_source
 
-    async def _save_user_request(self, request: AddContentSourceRequest) -> None:
+    async def _save_user_request(self, request: AddContentSourceRequestDB) -> None:
         logger.debug(f"Saving user request {request.model_dump()}")
         await self.data_service.save_user_request(request=request)
         logger.info(f"User request {request.request_id} saved successfully")
-
-    async def list_sources(self) -> list[AddContentSourceResponse]:
-        """GET /sources entrypoint"""
-        sources = await self.data_service.list_source_summaries()
-        return [AddContentSourceResponse.from_source(source) for source in sources]
 
     async def get_source(self, source_id: UUID) -> AddContentSourceResponse:
         """GET /sources/{source_id} entrypoint"""

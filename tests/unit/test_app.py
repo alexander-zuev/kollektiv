@@ -12,6 +12,9 @@ def test_app_basic_configuration(mock_app):
     """Test basic FastAPI app configuration."""
     assert mock_app.title == "Kollektiv API"
     assert mock_app.description == "RAG-powered LLM chat application"
+    # Test error handlers are registered
+    assert mock_app.exception_handlers is not None
+    assert Exception in mock_app.exception_handlers
 
 
 @pytest.mark.unit
