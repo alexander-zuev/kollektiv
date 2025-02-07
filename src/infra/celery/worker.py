@@ -32,11 +32,6 @@ def init_worker_process(*args: Any, **kwargs: Any) -> None:
         # Initialize logging
         configure_logging()
         logger = get_logger()
-        # Set higher log levels for noisy components
-        # logging.getLogger("httpcore").setLevel(logging.WARNING)
-        # logging.getLogger("httpx").setLevel(logging.WARNING)
-        # logging.getLogger("celery").setLevel(logging.INFO)  # or WARNING
-        # logging.getLogger("chromadb").setLevel(logging.INFO)
 
         logger.info(f"[Worker Process {process_id}] Starting service initialization")
 
@@ -46,10 +41,15 @@ def init_worker_process(*args: Any, **kwargs: Any) -> None:
         # New event loop solution
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        worker_services = loop.run_until_complete(WorkerServices.create())
+        try:
+            worker_services = loop.run_until_complete(WorkerServices.create())
+        except Exception as e:
+            logger.exception(f"Failed to initialize worker services: {e}")
+            raise
+        finally:
+            loop.close()
 
         celery_app.services = worker_services
-        logger.info(f"[Worker Process {process_id}] ✓ Successfully initialized services")
     except Exception as e:
         logger.exception(f"Failed to initialize worker services: {e}")
         raise
@@ -58,6 +58,6 @@ def init_worker_process(*args: Any, **kwargs: Any) -> None:
 def run_worker() -> None:
     """Run the Celery worker programmatically."""
     if settings.environment in (Environment.LOCAL, Environment.STAGING):
-        celery_app.start(argv=["worker", "--loglevel=debug", f"--concurrency={settings.worker_concurrency}"])
+        celery_app.start(argv=["worker", "--loglevel=info", f"--concurrency={settings.worker_concurrency}"])
     else:
         celery_app.start(argv=["worker", "--loglevel=info", f"--concurrency={settings.worker_concurrency}"])

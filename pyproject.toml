@@ -46,6 +46,8 @@ fastapi = { extras = ["standard"], version = "^0.115.6" }
 uvicorn = { extras = ["standard"], version = "^0.34.0" }
 flower = "^2.0.1"
 git-filter-repo = "^2.47.0"
+arq = "^0.26.3"
+msgpack = "^1.1.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -71,6 +73,7 @@ build-backend = "poetry.core.masonry.api"
 crawl = "src.core.content.crawler.crawler:run_crawler"
 api = "src.app:run"
 worker = "src.infra.celery.worker:run_worker"
+arq_worker = "src.infra.arq.worker:run_worker"
 
 
 [tool.pytest.ini_options]
