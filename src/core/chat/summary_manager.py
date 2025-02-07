@@ -6,7 +6,7 @@ from uuid import UUID
 import anthropic
 from anthropic.types import Message, MessageParam, TextBlockParam
 
-from src.core._exceptions import KollektivError, NonRetryableLLMError, RetryableLLMError
+from src.core._exceptions import DatabaseError, NonRetryableLLMError, RetryableLLMError
 from src.core.chat.prompt_manager import PromptManager
 from src.core.chat.tool_manager import ToolManager, ToolName
 from src.infra.data.data_repository import DataRepository
@@ -98,7 +98,7 @@ class SummaryManager:
 
     @anthropic_error_handler
     @tenacity_retry_wrapper((RetryableLLMError,))
-    async def get_summary_response(
+    async def generate_summary(
         self, source_id: UUID, unique_urls: list[str], unique_titles: list[str], documents_sample: list[Document]
     ) -> SourceSummary:
         """Generates a document summary and keywords based on documents and metadata."""
@@ -118,8 +118,8 @@ class SummaryManager:
             )
             logger.debug(f"Summary generation response: {response}")
             return self._parse_summary(response, source_id)
-        except ValueError as e:
-            raise KollektivError(f"Failed to parse summary response: {e}") from e
+        except ValueError:
+            raise
         except RetryableLLMError:
             # Tried to generate summary but failed, so we should raise an error
             raise
@@ -131,42 +131,54 @@ class SummaryManager:
         """Parse the summary response from Claude."""
         try:
             # Get tool calls from response
-            tool_calls = [block for block in response.content if block.type == "tool_use"]
-            if not tool_calls:
+            tool_call = [block for block in response.content if block.type == "tool_use"]
+            if not tool_call:
                 raise ValueError("No tool use in response")
 
             # Parse the tool output
-            tool_output = tool_calls[0].input
-            logger.debug(f"Tool output: {tool_output}")
+            tool_inputs = tool_call[0].input
+            logger.debug(f"Tool output: {tool_inputs}")
 
             return SourceSummary(
                 source_id=source_id,
-                summary=tool_output["summary"],
-                keywords=tool_output["keywords"],
+                summary=tool_inputs["summary"],
+                keywords=tool_inputs["keywords"],
             )
 
         except (json.JSONDecodeError, KeyError) as e:
             logger.error(f"Failed to parse summary response: {e}")
             raise ValueError(f"Invalid summary format: {e}") from e
 
-    async def generate_summary(self, source_id: UUID, documents: list[Document]) -> SourceSummary | None:
+    async def prepare_summary(self, source_id: UUID, documents: list[Document]) -> SourceSummary:
         """Orchestrates summary generation."""
         if len(documents) == 0:
             # We don't have any documents to summarize, so we should raise an error
             raise ValueError("No documents to summarize")
 
-        else:
-            logger.info(f"Generating summary for {source_id} with {len(documents)} documents")
-            # Prepare inputs
-            urls, titles, doc_sample = self._prepare_data_for_summary(documents)
+        logger.info(f"Generating summary for {source_id} with {len(documents)} documents")
+        urls, titles, doc_sample = self._prepare_data_for_summary(documents)
 
-            # Generate summary response
+        try:
+            # First try to generate the summary
+            summary_response = await self.generate_summary(source_id, urls, titles, doc_sample)
+
             try:
-                summary_response = await self.get_summary_response(source_id, urls, titles, doc_sample)
+                # Then try to save it
                 await self.data_service.save(SourceSummary, summary_response)
-                return summary_response
-            except (RetryableLLMError, NonRetryableLLMError, ValueError):
-                raise  # propagate up the stack
+            except DatabaseError:
+                # Log the full trace for database errors
+                logger.error("Failed to save summary to database", exc_info=True)
+                # In this case, we might still want to return the summary even if save failed
+                raise
+            return summary_response
+        except (RetryableLLMError, NonRetryableLLMError) as e:
+            # Log LLM-related errors
+            logger.error(f"Failed to generate summary: {str(e)}", exc_info=True)
+            raise
+        except ValueError as e:
+            # Log validation errors
+            logger.error(f"Validation error in summary generation: {str(e)}", exc_info=True)
+            raise
 
 
 if __name__ == "__main__":
@@ -198,7 +210,7 @@ if __name__ == "__main__":
         documents = await data_service.get_documents_by_source(source_id=source_id)
 
         try:
-            summary = await summary_manager.generate_summary(source_id, documents)
+            summary = await summary_manager.prepare_summary(source_id, documents)
 
             # Print results
             logger.info("Summary generation complete!")

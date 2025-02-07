@@ -6,7 +6,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from src.api.dependencies import ContentServiceDep
 from src.api.routes import CURRENT_API_VERSION, Routes
-from src.api.v0.schemas.base_schemas import ErrorResponse
+from src.api.v0.schemas.base_schemas import ErrorCode, ErrorResponse
 from src.infra.logger import get_logger
 from src.models.content_models import (
     AddContentSourceRequest,
@@ -83,7 +83,7 @@ async def stream_source_events(source_id: UUID, content_service: ContentServiceD
 
         return EventSourceResponse(event_stream(), media_type="text/event-stream")
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=404, detail=ErrorResponse(code=ErrorCode.CLIENT_ERROR, detail=str(e))) from e
 
 
 @router.get(
@@ -105,7 +105,10 @@ async def get_sources(content_service: ContentServiceDep) -> list[SourceSummary]
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="An error occured while trying to get the list of sources. We are working on it already.",
+            detail=ErrorResponse(
+                code=ErrorCode.SERVER_ERROR,
+                detail="An error occured while trying to get the list of sources. We are working on it already.",
+            ),
         ) from e
 
 
