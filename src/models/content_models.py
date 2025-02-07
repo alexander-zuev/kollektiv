@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, ClassVar, Literal
@@ -7,7 +8,7 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl, PrivateAttr, field_validator
 
-from src.models.base_models import SupabaseModel
+from src.models.base_models import APIModel, SupabaseModel
 
 
 class DataSourceType(str, Enum):
@@ -19,19 +20,17 @@ class DataSourceType(str, Enum):
     CONFLUENCE = "confluence"
 
 
-class ContentSourceConfig(BaseModel):
+class ContentSourceConfig(APIModel):
     """Configuration parameters for a content source."""
 
-    url: str = Field(..., description="Base URL of the content to crawl.")
+    url: str = Field(..., description="Start URL of the crawl.")
     page_limit: int = Field(default=50, gt=0, description="Maximum number of pages to crawl.")
-    exclude_patterns: list[str] = Field(
+    exclude_paths: list[str] = Field(
         default_factory=list,
-        alias="excludePaths",
         description="The list of patterns to exclude, e.g., '/blog/*', '/author/*'.",
     )
-    include_patterns: list[str] = Field(
+    include_paths: list[str] = Field(
         default_factory=list,
-        alias="includePaths",
         description="The list of patterns to include, e.g., '/blog/*', '/api/*'.",
     )
 
@@ -45,8 +44,8 @@ class ContentSourceConfig(BaseModel):
         except Exception as e:
             raise ValueError("Invalid URL. It should start with 'http://' or 'https://'.") from e
 
-    @field_validator("exclude_patterns", "include_patterns")
-    def validate_patterns(cls, v: list[str]) -> list[str]:  # noqa: N805
+    @field_validator("exclude_paths", "include_paths")
+    def validate_paths(cls, v: list[str]) -> list[str]:  # noqa: N805
         """
 
         Validates patterns to ensure they start with '/' and are not empty.
@@ -69,7 +68,7 @@ class ContentSourceConfig(BaseModel):
         return v
 
 
-class AddContentSourceRequest(SupabaseModel):
+class AddContentSourceRequest(SupabaseModel, APIModel):
     """
     Request model for adding a new content source.
 
@@ -120,7 +119,29 @@ class AddContentSourceRequest(SupabaseModel):
         }
 
 
-class AddContentSourceResponse(BaseModel):
+class AddContentSourceRequestDB(SupabaseModel):
+    """Model for adding a new content source in the database."""
+
+    _db_config: ClassVar[dict] = {"schema": "content", "table": "user_requests", "primary_key": "request_id"}
+    user_id: UUID = Field(..., description="User id, FK, provided by Supabase base after auth.")
+    request_id: UUID = Field(default_factory=uuid4, description="System-generated id of a user request.")
+    source_type: DataSourceType = Field(
+        default=DataSourceType.WEB,  # Make web the default
+        description="Type of content source (currently only 'web' is supported).",
+    )
+    request_config: ContentSourceConfig = Field(
+        ...,  # Required
+        description="Configuration parameters for the content source",
+    )
+
+    @classmethod
+    def from_api_to_db(cls, request: AddContentSourceRequest) -> AddContentSourceRequestDB:
+        """Convert an AddContentSourceRequest to an AddContentSourceRequestDB."""
+        data = request.model_dump(by_alias=False)
+        return cls(**data)
+
+
+class AddContentSourceResponse(APIModel):
     """Simplified model inheriting from Source."""
 
     source_id: UUID = Field(...)
@@ -131,28 +152,6 @@ class AddContentSourceResponse(BaseModel):
     @classmethod
     def from_source(cls, source: DataSource) -> AddContentSourceResponse:
         return cls(source_id=source.source_id, status=source.status, error=source.error, error_type=None)
-
-
-class SourceEvent(BaseModel):
-    """Base model for all source-related events."""
-
-    source_id: UUID = Field(..., description="ID of the source this event belongs to")
-    status: SourceStatus = Field(..., description="Type of the event")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
-    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
-    error: str | None = Field(default=None, description="Error message, null if no error")
-
-
-class ProcessingEvent(BaseModel):
-    """Events emitted by celery worker."""
-
-    source_id: UUID = Field(..., description="ID of the source this event belongs to")
-    event_type: Literal["processing", "completed", "failed", "summary_generated"] = Field(
-        ..., description="Type of the event"
-    )
-    error: str | None = Field(default=None, description="Error message, null if no error")
-    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
 
 
 class SourceStatus(str, Enum):
@@ -198,6 +197,28 @@ class FireCrawlSourceMetadata(BaseModel):
     total_pages: int = Field(default=0, description="Total number of pages in the source")
 
 
+class SourceEvent(BaseModel):
+    """Base model for all source-related events."""
+
+    source_id: UUID = Field(..., description="ID of the source this event belongs to")
+    status: SourceStatus = Field(..., description="Type of the event")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
+    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
+    error: str | None = Field(default=None, description="Error message, null if no error")
+
+
+class ProcessingEvent(BaseModel):
+    """Events emitted by celery worker."""
+
+    source_id: UUID = Field(..., description="ID of the source this event belongs to")
+    event_type: Literal["processing", "completed", "failed", "summary_generated"] = Field(
+        ..., description="Type of the event"
+    )
+    error: str | None = Field(default=None, description="Error message, null if no error")
+    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
+
+
 class SourceSummary(SupabaseModel):
     """A summary of a source document generated by an LLM."""
 
@@ -206,7 +227,7 @@ class SourceSummary(SupabaseModel):
     summary: str = Field(..., description="Summary of the source document generated by the LLM")
     keywords: list[str] = Field(..., description="List of keywords or key topics generated by the LLM")
 
-    _db_config: ClassVar[dict] = {"schema": "chat", "table": "source_summaries", "primary_key": "summary_id"}
+    _db_config: ClassVar[dict] = {"schema": "content", "table": "source_summaries", "primary_key": "summary_id"}
 
     class Config:
         """Pydantic model configuration."""
@@ -228,12 +249,8 @@ class Document(SupabaseModel):
         description="Raw markdown content of the document",
     )
     metadata: DocumentMetadata = Field(..., description="Flexible metadata storage for document-specific information")
+
     _db_config: ClassVar[dict] = {"schema": "content", "table": "documents", "primary_key": "document_id"}
-
-    class Config:
-        """Pydantic model configuration."""
-
-        from_attributes = True
 
 
 class DocumentMetadata(BaseModel):
@@ -249,8 +266,8 @@ class Chunk(SupabaseModel):
     """Individual chunk of content with metadata"""
 
     # IDs
-    source_id: UUID = Field(..., description="UUID of the source this chunk belongs to")
     chunk_id: UUID = Field(default_factory=uuid4, description="Unique identifier for the chunk")
+    source_id: UUID = Field(..., description="UUID of the source this chunk belongs to")
     document_id: UUID = Field(..., description="UUID of the document this chunk belongs to")
 
     # Main content
@@ -264,3 +281,28 @@ class Chunk(SupabaseModel):
     token_count: int = Field(..., description="Total number of tokens in the document")
     page_title: str = Field(..., description="Page title of the document")
     page_url: str = Field(..., description="Page URL of the document")
+
+    # DB config
+    _db_config: ClassVar[dict] = {"schema": "content", "table": "chunks", "primary_key": "chunk_id"}
+
+    @field_validator("headers", mode="before")
+    @classmethod
+    def ensure_headers_is_dict(cls, value: Any) -> dict[str, Any]:
+        """Ensure headers is a dict."""
+        # If headers is provided as a JSON string, deserialize it.
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+
+
+# GET /sources
+class SourceOverview(BaseModel):
+    """An individual source with a summary and status. Displayed in the view sources form."""
+
+    source_id: UUID = Field(..., description="ID of the source")
+    is_active: bool = Field(..., description="Whether the source is active")
+    summary: SourceSummary = Field(default=..., description="Summary of the source")
+
+
+# PUT /sources/{source_id} <<< this can be a list
+# DELETE /sources/{source_id} <<< this can be a list

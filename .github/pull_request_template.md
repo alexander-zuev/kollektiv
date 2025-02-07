@@ -1,27 +1,29 @@
-## Description
-[A brief description of the changes in this PR]
+# PR Title
+
+## Key changes summary
+
+Provide a brief description of the changes and the problem they solve. Mention any related issues.
+- List the key changes made in this PR.
+- Highlight any new features, bug fixes, or improvements.
 
 ## Type of change
+
+Please delete options that are not relevant.
+- [ ] New feature (non-breaking change which adds functionality, including tests)
 - [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
 - [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
 - [ ] Documentation update
-- [ ] Re-factoring without changing existing functionality
+- [ ] Refactoring (no functional changes, no bug fixes)
 
-## How Has This Been Tested?
-[Describe the tests that you ran to verify your changes]
+## Testing
 
-## Checklist:
-- [ ] My code follows the style guidelines of this project
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
+- Describe how the changes were tested.
+- Mention any specific test cases or scenarios.
 
-## Related Issues
-[Link any related issues here]
+## MUST-HAVE
 
-## Additional Notes
-[Add any additional information that might be helpful for reviewers]
+- [X] Code follows project style guidelines
+- [X] Self-reviewed code
+- [X] Added/updated documentation
+- [X] Added/updated tests
+- [X] All tests pass

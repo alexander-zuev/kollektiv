@@ -15,11 +15,13 @@ from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
 from src.models.content_models import (
     AddContentSourceRequest,
+    AddContentSourceRequestDB,
     AddContentSourceResponse,
     DataSource,
     FireCrawlSourceMetadata,
     ProcessingEvent,
     SourceEvent,
+    SourceOverview,
     SourceStatus,
 )
 from src.models.firecrawl_models import CrawlRequest
@@ -67,7 +69,7 @@ class ContentService:
 
             # Send a crawl request to firecrawl
             response = await self.crawler.start_crawl(request=CrawlRequest(**request.request_config.model_dump()))
-            await self._save_user_request(request)
+            await self._save_user_request(AddContentSourceRequestDB.from_api_to_db(request))
             source = await self._create_and_save_datasource(request)
             logger.debug("STEP 1. Crawl started")
 
@@ -143,15 +145,10 @@ class ContentService:
 
         return data_source
 
-    async def _save_user_request(self, request: AddContentSourceRequest) -> None:
+    async def _save_user_request(self, request: AddContentSourceRequestDB) -> None:
         logger.debug(f"Saving user request {request.model_dump()}")
         await self.data_service.save_user_request(request=request)
         logger.info(f"User request {request.request_id} saved successfully")
-
-    async def list_sources(self) -> list[AddContentSourceResponse]:
-        """GET /sources entrypoint"""
-        sources = await self.data_service.list_datasources()
-        return [AddContentSourceResponse.from_source(source) for source in sources]
 
     async def get_source(self, source_id: UUID) -> AddContentSourceResponse:
         """GET /sources/{source_id} entrypoint"""
@@ -299,12 +296,18 @@ class ContentService:
         """Handles a process documents jobs."""
         # 1. Pass into completed or failed processing job
         match message.event_type:
+            case "summary_generated":
+                await self.handle_summary_generated(message)
             case "completed":
                 await self.handle_completed_processing_job(message)
             case "failed":
                 await self.handle_failed_processing_job(message)
             case _:
                 logger.warning(f"Unknown event type: {message.event_type}")
+
+    async def handle_summary_generated(self, message: ProcessingEvent) -> None:
+        """Handles a summary generated event."""
+        logger.info(f"Source {message.source_id} summary generated!!!")
 
     async def handle_completed_processing_job(self, message: ProcessingEvent) -> None:
         """Completes the ingestion process by updating the source and returning the source metadata."""
@@ -405,3 +408,17 @@ class ContentService:
             channel=Channels.Sources.events(source_id),
             message=event,
         )
+
+    async def get_sources(self, user_id: UUID) -> list[SourceOverview]:
+        """Build a list of SourceOverview objects from a list of SourceSummary objects."""
+        sources = await self.data_service.list_source_summaries(user_id=user_id)
+        if len(sources) == 0:
+            logger.debug(f"No sources found for user {user_id}")
+            return []
+
+        return [
+            SourceOverview(
+                source_id=source.source_id, is_active=source.status == SourceStatus.COMPLETED, summary=source.summary
+            )
+            for source in sources
+        ]

@@ -28,12 +28,13 @@ class TestRedisRepositoryIntegration:
         deleted = await redis_integration_repository.get_method(sample_uuid, ConversationHistory)
         assert deleted is None
 
-    async def test_message_queue_workflow(self, redis_integration_repository, sample_uuid):
+    async def test_message_queue_workflow(self, redis_integration_repository, sample_uuid, sample_message):
         """Test real message queueing workflow."""
-        # Create test messages
+        # Create test messages based on sample_message
         messages = [
             ConversationMessage(
                 message_id=uuid.uuid4(),
+                conversation_id=sample_uuid,  # Reuse the same conversation
                 role=Role.USER if i % 2 == 0 else Role.ASSISTANT,
                 content=[TextBlock(text=f"Message {i}")],
             )
@@ -74,16 +75,29 @@ class TestRedisRepositoryIntegration:
         """Test pipeline operations for atomic updates."""
         # 1. Setup initial conversation and pending messages
         initial_message = ConversationMessage(
-            message_id=uuid.uuid4(), role=Role.USER, content=[TextBlock(text="Initial message")]
+            message_id=uuid.uuid4(),
+            conversation_id=sample_uuid,
+            role=Role.USER,
+            content=[TextBlock(text="Initial message")],
         )
-        conversation = ConversationHistory(conversation_id=sample_uuid, messages=[initial_message])
+        conversation = ConversationHistory(
+            conversation_id=sample_uuid, user_id=uuid.uuid4(), messages=[initial_message]
+        )
         await redis_integration_repository.set_method(sample_uuid, conversation)
 
         pending_messages = [
             ConversationMessage(
-                message_id=uuid.uuid4(), role=Role.ASSISTANT, content=[TextBlock(text="Pending message 1")]
+                message_id=uuid.uuid4(),
+                conversation_id=sample_uuid,
+                role=Role.ASSISTANT,
+                content=[TextBlock(text="Pending message 1")],
             ),
-            ConversationMessage(message_id=uuid.uuid4(), role=Role.USER, content=[TextBlock(text="Pending message 2")]),
+            ConversationMessage(
+                message_id=uuid.uuid4(),
+                conversation_id=sample_uuid,
+                role=Role.USER,
+                content=[TextBlock(text="Pending message 2")],
+            ),
         ]
         for msg in pending_messages:
             await redis_integration_repository.rpush_method(sample_uuid, msg)

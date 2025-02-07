@@ -5,6 +5,7 @@ from uuid import UUID
 from celery import chord, group
 from pydantic import BaseModel
 
+from src.core._exceptions import DatabaseError
 from src.infra.celery.worker import celery_app
 from src.infra.events.channels import Channels
 from src.infra.logger import get_logger
@@ -69,7 +70,7 @@ def generate_summary(results: list, source_id: str, documents: list[str]) -> Non
     logger.info(f"Chunking complete, generating summary for source {source_id}")
     documents = [Document.model_validate(doc) for doc in documents]
     try:
-        asyncio.run(celery_app.services.summary_manager.generate_summary(UUID(source_id), documents))
+        asyncio.run(celery_app.services.summary_manager.prepare_summary(UUID(source_id), documents))
 
         event = ProcessingEvent(
             source_id=UUID(source_id),
@@ -186,11 +187,17 @@ def add_chunk_to_storage(chunk_batch: list[Chunk], user_id: str) -> dict:
 def persist_to_db(chunks: list[Chunk]) -> dict:
     """Persist the chunks to the database."""
     try:
+        # Get services container
         services = celery_app.services
+
+        # Validate and persist chunks
         logger.info(f"Persisting {len(chunks)} chunks to the database")
         chunks = [Chunk.model_validate(chunk) for chunk in chunks]
+        logger.debug(f"Headers type: {type(chunks[0].headers)}")
         asyncio.run(services.data_service.save_chunks(chunks))
+
+        # Return success message
         return {"status": "success", "message": f"Successfully persisted {len(chunks)} chunks to the database"}
-    except Exception as e:
+    except DatabaseError as e:
         logger.exception(f"Error persisting chunks to the database: {e}")
         return {"status": "error", "message": str(e)}
