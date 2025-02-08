@@ -34,7 +34,7 @@ class EventConsumer:
 
     async def subscribe_on_startup(self) -> None:
         """Subscribe to the processing channel on startup."""
-        await self.pubsub.subscribe(Channels.Sources.processing())
+        await self.pubsub.subscribe(Channels.Sources.processing_channel())
         logger.info("✓ Event consumer subscribed successfully")
 
     @tenacity_retry_wrapper(exceptions=(ConnectionError, TimeoutError))

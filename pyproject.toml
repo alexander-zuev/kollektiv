@@ -46,6 +46,8 @@ fastapi = { extras = ["standard"], version = "^0.115.6" }
 uvicorn = { extras = ["standard"], version = "^0.34.0" }
 flower = "^2.0.1"
 git-filter-repo = "^2.47.0"
+arq = "^0.26.3"
+msgpack = "^1.1.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -71,6 +73,7 @@ build-backend = "poetry.core.masonry.api"
 crawl = "src.core.content.crawler.crawler:run_crawler"
 api = "src.app:run"
 worker = "src.infra.celery.worker:run_worker"
+arq_worker = "src.infra.arq.worker:run_worker"
 
 
 [tool.pytest.ini_options]
@@ -107,47 +110,26 @@ precision = 2
 
 [tool.mypy]
 python_version = "3.12"
-ignore_missing_imports = false
-disallow_untyped_defs = true
-check_untyped_defs = true
-warn_return_any = true
-warn_unreachable = true
+strict = true
 
-# Add these to handle __init__ specifically
+# handle __init__ specifically
 disallow_incomplete_defs = true
-no_implicit_optional = true
+
+# For cleaner output
+disallow_subclassing_any = false
+disallow_any_explicit = false
+
+# For faster performance
+follow_imports = "normal"
 
 plugins = ["pydantic.mypy"]
 
 # Ignore noise
 disable_error_code = [
-    "attr-defined",    # Ignore dynamic attribute access
-    "no-untyped-call", # Ignore calls to untyped functions
     "misc",            # Ignore misc issues like untyped decorators
     "union-attr",      # Ignore union attribute access
-    "type-arg",        # Reduces generic type noise
-    "var-annotated",   # Reduces variable annotation noise
-    "return-value",    # Less strict on return value matching
 ]
 
-# For cleaner output
-warn_unused_ignores = false
-warn_redundant_casts = false
-disallow_subclassing_any = false
-disallow_any_explicit = false
-
-# Handle third-party libs that need stubs
-[[tool.mypy.overrides]]
-module = [
-    "pytz.*",
-    "aiofiles.*",
-    "chainlit.*",
-    "weave.*",
-    "ragas.*",
-    "wandb.*",
-    "cohere.*",
-]
-ignore_missing_imports = true
 
 # More relaxed settings for tests
 [[tool.mypy.overrides]]
@@ -159,14 +141,6 @@ warn_unused_ignores = true
 no_implicit_optional = false
 disallow_incomplete_defs = false
 disallow_untyped_decorators = false
-
-# Strict settings for core business logic
-[[tool.mypy.overrides]]
-module = ["src..*"]
-disallow_untyped_defs = true
-check_untyped_defs = true
-warn_return_any = true
-strict_optional = true
 
 
 [tool.ruff]

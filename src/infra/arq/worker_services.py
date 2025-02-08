@@ -75,6 +75,14 @@ class WorkerServices:
             logger.error(f"Error during worker service initialization: {e}", exc_info=True)
             raise
 
+    async def shutdown_services(self) -> None:
+        """Shutdown all services."""
+        try:
+            logger.info("Shutting down")
+
+        except Exception as e:
+            logger.error(f"Error during service shutdown: {e}", exc_info=True)
+
     @classmethod
     async def create(cls) -> "WorkerServices":
         """Create a new WorkerServices instance and initialize services."""
@@ -87,4 +95,6 @@ class WorkerServices:
     async def get_instance(cls) -> "WorkerServices":
         """Get the singleton instance of WorkerServices."""
         await cls.create()
+        if cls._instance is None:
+            raise RuntimeError("WorkerServices instance not initialized")
         return cls._instance

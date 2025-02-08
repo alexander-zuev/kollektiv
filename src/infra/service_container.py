@@ -126,6 +126,9 @@ class ServiceContainer:
 
     async def shutdown_services(self) -> None:
         """Shutdown all services."""
+        # First app layer (chat, content, job manager)
+        # Event layer
+        # Base layer - dbs, redis, chroms
         try:
             if self.ngrok_service is not None:
                 await self.ngrok_service.stop_tunnel()

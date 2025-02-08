@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 from enum import Enum
 from functools import lru_cache
-from multiprocessing import cpu_count
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -129,17 +129,18 @@ class Settings(BaseSettings):
     )
 
     # Celery settings - only required when SERVICE=worker
-    broker_url: str | None = Field(None, alias="CELERY_BROKER_URL", description="Celery broker URL")
-    result_backend: str | None = Field(None, alias="CELERY_RESULT_BACKEND", description="Celery result backend")
+    # broker_url: str | None = Field(None, alias="CELERY_BROKER_URL", description="Celery broker URL")
+    # result_backend: str | None = Field(None, alias="CELERY_RESULT_BACKEND", description="Celery result backend")
 
-    @property
-    def worker_concurrency(self) -> int:
-        """Get number of Celery workers based on environment."""
-        if self.environment == (Environment.LOCAL or Environment.STAGING):
-            return 2
-        else:
-            # Railway provides 8 vCPUs
-            return cpu_count()
+    # @property
+    # def worker_concurrency(self) -> int:
+    #     """Get number of Celery workers based on environment."""
+    #     if self.environment == (Environment.LOCAL or Environment.STAGING):
+    #         return 2
+    #     else:
+    #         # Railway provides 8 vCPUs
+    #         return 2  # but I am not ready to overpay for something I do not use
+    #         # return cpu_count()
 
     @property
     def reload(self) -> bool:
@@ -158,7 +159,9 @@ class Settings(BaseSettings):
         else:
             # Production: Using standard Gunicorn formula (2*CPU)+1
             # Railway provides 8 vCPUs
-            return (2 * cpu_count()) + 1  # 17 workers
+            # Start with smaller number
+            return 4
+            # return (2 * cpu_count()) + 1  # 17 workers
 
     model_config = SettingsConfigDict(
         env_file=os.path.join("config", ".env"),
@@ -186,22 +189,40 @@ class Settings(BaseSettings):
         """Dynamically generates the Firecrawl webhook URL."""
         return f"{self.public_url}{Routes.System.Webhooks.FIRECRAWL}"
 
+    # @property
+    # def arq_worker(self) -> Settings:
+    #     """Get Arq worker settings, validating they exist for worker service."""
+    #     if self.service == ServiceType.WORKER:
+    #         if not self.broker_url or not self.result_backend:
+    #             raise ValueError("Arq broker_url and result_backend must be set when running worker service")
+    #     return self
+
     @property
-    def celery(self) -> Settings:
-        """Get Celery settings, validating they exist for worker service."""
-        if self.service == ServiceType.WORKER:
-            if not self.broker_url or not self.result_backend:
-                raise ValueError("Celery broker_url and result_backend must be set when running worker service")
-        return self
+    def redis_host(self) -> str:
+        """Parses redis url and returns redis host."""
+        parsed_url = urlparse(self.redis_url)
+        redis_host = parsed_url.hostname
+        if redis_host is None:
+            raise ValueError("Redis host is not set")
+        return redis_host
+
+    @property
+    def redis_port(self) -> int:
+        """Parses redis url and returns redis port."""
+        parsed_url = urlparse(self.redis_url)
+        redis_port = parsed_url.port
+        if redis_port is None:
+            raise ValueError("Redis port is not set")
+        return redis_port
 
 
 def initialize_settings() -> Settings:
     """Initialize settings."""
     try:
         settings = Settings()
-        if settings.service == ServiceType.WORKER:
-            # Validate that the celery settings are set
-            settings.celery
+        # if settings.service == ServiceType.WORKER:
+        #     # Validate that the celery settings are set
+        #     settings.arq_worker
         logger.info("✓ Initialized settings successfully.")
         return settings
     except ValueError as e:

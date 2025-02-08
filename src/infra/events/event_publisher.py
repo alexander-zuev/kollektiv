@@ -1,3 +1,4 @@
+from pydantic import BaseModel
 from redis.exceptions import ConnectionError, TimeoutError
 
 from src.infra.decorators import tenacity_retry_wrapper
@@ -13,6 +14,14 @@ class EventPublisher:
     def __init__(self, redis_manager: RedisManager) -> None:
         self.redis_manager = redis_manager
 
+    async def publish(self, channel: str, message: str) -> None:
+        """Simple wrapper around publish_event."""
+        # get the client
+        client = await self.redis_manager.get_async_client()
+        # publish the message
+        await client.publish(channel, message)
+        logger.info(f"Event published to {channel}: {message}")
+
     @classmethod
     async def create_async(cls, redis_manager: RedisManager) -> "EventPublisher":
         """Creates an instance of EventPublisher."""
@@ -23,7 +32,7 @@ class EventPublisher:
     async def publish_event(
         self,
         channel: str,
-        message: dict,
+        message: BaseModel,
     ) -> None:
         """
         Publish a message to the event bus.
@@ -33,13 +42,7 @@ class EventPublisher:
             message: The message to publish (will be JSON serialized)
         """
         try:
-            client = await self.redis_manager.get_async_client()
-
-            message = message.model_dump_json()
-            logger.debug(f"Trying to save message type: {type(message)}")
-
-            await client.publish(channel, message)
-            logger.info(f"Event published to {channel}: {message}")
+            await self.publish(channel=channel, message=message.model_dump_json())
         except (ConnectionError, TimeoutError) as e:
             logger.exception(f"Failed to publish event to {channel}: {e}")
             raise

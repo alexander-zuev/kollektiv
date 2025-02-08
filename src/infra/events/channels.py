@@ -12,12 +12,12 @@ class Channels:
         """Sources-related channels"""
 
         @staticmethod
-        def events(source_id: UUID) -> str:
+        def source_events_channel(source_id: UUID) -> str:
             "Channel for source SSE events."
             return f"{Channels.SOURCES}/{str(source_id)}/events"
 
         @staticmethod
-        def processing() -> str:
+        def processing_channel() -> str:
             "Channel for source processing events."
             return f"{Channels.SOURCES}/processing"
 
