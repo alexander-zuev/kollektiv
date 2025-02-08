@@ -1,13 +1,15 @@
 from collections.abc import AsyncIterator
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sse_starlette.sse import EventSourceResponse
 
-from src.api.dependencies import ChatServiceDep
-from src.api.routes import V0_PREFIX, Routes
-from src.api.v0.schemas.base_schemas import ErrorResponse
+from src.api.dependencies import ChatServiceDep, SupabaseManagerDep
+from src.api.routes import CURRENT_API_VERSION, Routes
+from src.api.v0.schemas.base_schemas import ErrorCode, ErrorResponse
 from src.core._exceptions import DatabaseError, EntityNotFoundError, NonRetryableLLMError, RetryableLLMError
 from src.infra.logger import get_logger
 from src.models.chat_models import (
@@ -18,10 +20,12 @@ from src.models.chat_models import (
 )
 
 # Define routers with base prefix only
-chat_router = APIRouter(prefix=V0_PREFIX)
-conversations_router = APIRouter(prefix=V0_PREFIX)
+chat_router = APIRouter(prefix=CURRENT_API_VERSION)
+conversations_router = APIRouter(prefix=CURRENT_API_VERSION)
 
 logger = get_logger()
+
+security = HTTPBearer()
 
 
 @chat_router.post(
@@ -50,11 +54,19 @@ async def chat(request: UserMessage, chat_service: ChatServiceDep) -> EventSourc
 
     except NonRetryableLLMError as e:
         raise HTTPException(
-            status_code=500, detail=f"A non-retryable error occurred in the system:: {str(e)}. We are on it."
+            status_code=500,
+            detail=ErrorResponse(
+                code=ErrorCode.SERVER_ERROR,
+                detail=f"A non-retryable error occurred in the system:: {str(e)}. We are on it.",
+            ),
         ) from e
     except RetryableLLMError as e:
         raise HTTPException(
-            status_code=500, detail=f"An error occurred in the system:: {str(e)}. Can you please try again?"
+            status_code=500,
+            detail=ErrorResponse(
+                code=ErrorCode.SERVER_ERROR,
+                detail=f"An error occurred in the system:: {str(e)}. Can you please try again?",
+            ),
         ) from e
 
 
@@ -76,24 +88,25 @@ async def list_conversations(user_id: UUID, chat_service: ChatServiceDep) -> Con
         logger.error(f"Database error while getting conversations for user {user_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=ErrorResponse(
-                error="Database Error", code=500, detail="Failed to retrieve conversations."
-            ).model_dump(),
+            detail=ErrorResponse(code=ErrorCode.SERVER_ERROR, detail="Failed to retrieve conversations."),
         ) from e
     except RequestValidationError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorResponse(error="Bad Request", code=400, detail="Invalid request data.").model_dump(),
+            detail=ErrorResponse(code=ErrorCode.CLIENT_ERROR, detail="Invalid request data."),
         ) from e
     except Exception as e:
         logger.error(f"Unexpected error while getting conversations for user {user_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=ErrorResponse(
-                error="Internal Server Error", code=500, detail="An unexpected error occurred."
-            ).model_dump(),
+            detail=ErrorResponse(code=ErrorCode.SERVER_ERROR, detail="An unexpected error occurred."),
         ) from e
+
+
+# TODO: Refactor user id into a UserContext service that would be accesssible by any service / endpoint
+# TODO: API layer would set the user id in the request context
+# TODO: Chat service would get the user id from the user context service
 
 
 # Get messages in a conversation
@@ -107,38 +120,48 @@ async def list_conversations(user_id: UUID, chat_service: ChatServiceDep) -> Con
         500: {"model": ErrorResponse},
     },
 )
-async def get_conversation(conversation_id: UUID, chat_service: ChatServiceDep) -> ConversationHistoryResponse:
+async def get_conversation(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    conversation_id: UUID,
+    chat_service: ChatServiceDep,
+    supabase: SupabaseManagerDep,
+) -> ConversationHistoryResponse:
     """Get all messages in a conversation."""
     try:
-        return await chat_service.get_conversation(conversation_id)
+        # Get the client
+        supabase_client = await supabase.get_async_client()
+
+        # Get the user
+        user_response = await supabase_client.auth.get_user(credentials.credentials)
+        user_id = UUID(user_response.user.id)
+        logger.debug(f"User ID: {user_id}")
+
+        # Get the conversation
+        return await chat_service.get_conversation(conversation_id, user_id)
     # Handle case where conversation is not found
     except EntityNotFoundError as e:
         logger.warning(f"Conversation not found: {conversation_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=ErrorResponse(error="Not Found", code=404, detail="Conversation not found.").model_dump(),
+            detail=ErrorResponse(code=ErrorCode.CLIENT_ERROR, detail="Conversation not found."),
         ) from e
     # Handle all other database errors
     except DatabaseError as e:
         logger.error(f"Database error while getting conversation {conversation_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=ErrorResponse(
-                error="Database Error", code=500, detail="Failed to retrieve conversation."
-            ).model_dump(),
+            detail=ErrorResponse(code=ErrorCode.SERVER_ERROR, detail="Failed to retrieve conversation."),
         ) from e
     # Handle case when the client sends invalid request
     except RequestValidationError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ErrorResponse(error="Bad Request", code=400, detail="Invalid request data.").model_dump(),
+            detail=ErrorResponse(code=ErrorCode.CLIENT_ERROR, detail="Invalid request data."),
         ) from e
     except Exception as e:
         logger.error(f"Unexpected error while getting conversation {conversation_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=ErrorResponse(
-                error="Internal Server Error", code=500, detail="An unexpected error occurred."
-            ).model_dump(),
+            detail=ErrorResponse(code=ErrorCode.SERVER_ERROR, detail="An unexpected error occurred."),
         ) from e

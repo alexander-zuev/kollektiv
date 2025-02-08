@@ -3,7 +3,7 @@
 from typing import Final
 
 # API version prefix
-V0_PREFIX: Final = "/api/v0"  # Rename for clarity
+CURRENT_API_VERSION: Final = "/v0"
 
 
 class Routes:
@@ -32,9 +32,7 @@ class Routes:
             """Content management routes."""
 
             SOURCES = "/sources"
-            SOURCE = "/sources/{source_id}"
             SOURCE_EVENTS = "/sources/{source_id}/events"
-            SOURCE_STATUS = "/sources/{source_id}/status"
 
         class Chat:
             """Chat routes."""

@@ -103,18 +103,23 @@ class TestRedisRepository:
     ):
         """Test pipeline operations."""
         # Setup pipeline mock
-        mock_async_redis.pipeline = AsyncMock(return_value=mock_redis_pipeline)
+        mock_async_redis.pipeline = AsyncMock()
+        mock_async_redis.pipeline.return_value = mock_redis_pipeline
         mock_redis_pipeline.set = AsyncMock()
         mock_redis_pipeline.delete = AsyncMock()
+        mock_redis_pipeline.execute = AsyncMock()
 
         # Add operations to pipeline
-        await redis_repository.set_method(sample_uuid, sample_conversation, pipe=mock_redis_pipeline)
-        await redis_repository.delete_method(sample_uuid, ConversationMessage, pipe=mock_redis_pipeline)
+        pipe = await mock_async_redis.pipeline(transaction=True)
+        await redis_repository.set_method(sample_uuid, sample_conversation, pipe=pipe)
+        await redis_repository.delete_method(sample_uuid, ConversationMessage, pipe=pipe)
+        await pipe.execute()
 
         # Verify pipeline operations
+        mock_async_redis.pipeline.assert_called_once_with(transaction=True)
         mock_redis_pipeline.set.assert_called_once()
         mock_redis_pipeline.delete.assert_called_once()
-        mock_async_redis.pipeline.assert_called_once_with(transaction=True)
+        mock_redis_pipeline.execute.assert_awaited_once()
 
     async def test_error_handling(self, redis_repository, sample_uuid, mock_async_redis, sample_message):
         """Test error handling scenarios."""
@@ -137,4 +142,5 @@ class TestRedisRepository:
         # Test Redis rpush error (should not raise)
         mock_async_redis.rpush = AsyncMock(side_effect=Exception("Redis error"))
         mock_async_redis.expire = AsyncMock()
-        await redis_repository.rpush_method(sample_uuid, sample_message)  # Should not raise
+        with pytest.raises(Exception, match="Redis error"):
+            await redis_repository.rpush_method(sample_uuid, sample_message)

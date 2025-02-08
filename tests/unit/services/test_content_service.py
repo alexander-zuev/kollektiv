@@ -95,13 +95,13 @@ class TestContentService:
         mock_dependencies["data_service"].save_datasource.return_value = sample_data_source
         mock_dependencies["data_service"].save_user_request.return_value = sample_source_request
         mock_dependencies["data_service"].update_datasource.return_value = sample_data_source
-        mock_dependencies["data_service"].update_datasource.return_value.status = SourceStatus.CRAWLING
+        mock_dependencies["data_service"].update_datasource.return_value.status = SourceStatus.PENDING
 
         # Test
         response = await content_service.add_source(sample_source_request)
 
         # Verify
-        assert response.status == SourceStatus.CRAWLING
+        assert response.status == SourceStatus.PENDING  # Source starts as PENDING
         mock_dependencies["data_service"].save_datasource.assert_called_once()
         mock_dependencies["job_manager"].create_job.assert_called_once()
 
@@ -119,8 +119,17 @@ class TestContentService:
                 url="https://example.com",
             ),
         )
+        processing_job = Job(
+            job_id=UUID("00000000-0000-0000-0000-000000000003"),
+            status=JobStatus.PENDING,
+            job_type=JobType.PROCESSING,
+            details={"document_ids": [], "source_id": sample_data_source.source_id},
+        )
+
         mock_dependencies["job_manager"].get_by_firecrawl_id.return_value = job
+        mock_dependencies["job_manager"].create_job.return_value = processing_job
         mock_dependencies["data_service"].get_datasource.return_value = sample_data_source
+        mock_dependencies["crawler"].get_results.return_value = []
 
         # Test
         await content_service.handle_webhook_event(
@@ -138,7 +147,18 @@ class TestContentService:
 
         # Verify
         mock_dependencies["data_service"].update_datasource.assert_called_with(
-            source_id=sample_data_source.source_id, updates={"status": SourceStatus.PROCESSING}
+            source_id=sample_data_source.source_id,
+            updates={
+                "metadata": FireCrawlSourceMetadata(
+                    crawl_config=sample_data_source.metadata.crawl_config,
+                    total_pages=0,
+                ),
+                "status": SourceStatus.PROCESSING,
+                "job_id": processing_job.job_id,
+                "updated_at": mock_dependencies["data_service"].update_datasource.call_args.kwargs["updates"][
+                    "updated_at"
+                ],
+            },
         )
 
     async def test_handle_webhook_crawl_failed(self, content_service, mock_dependencies, sample_data_source):
@@ -176,5 +196,12 @@ class TestContentService:
 
         # Verify
         mock_dependencies["data_service"].update_datasource.assert_called_with(
-            source_id=sample_data_source.source_id, updates={"status": SourceStatus.FAILED, "error": error_message}
+            source_id=sample_data_source.source_id,
+            updates={
+                "status": SourceStatus.FAILED,
+                "error": error_message,
+                "updated_at": mock_dependencies["data_service"].update_datasource.call_args.kwargs["updates"][
+                    "updated_at"
+                ],
+            },
         )

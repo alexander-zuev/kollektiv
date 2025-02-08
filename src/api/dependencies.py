@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from typing import Annotated
+from uuid import UUID
 
-from celery import Celery
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from src.api.v0.schemas.base_schemas import ErrorCode, ErrorResponse
 from src.core.content.crawler import FireCrawler
-from src.infra.celery.worker import celery_app
+
+# from src.infra.celery.worker import celery_app
 from src.infra.external.chroma_manager import ChromaManager
 from src.infra.external.redis_manager import RedisManager
 from src.infra.external.supabase_manager import SupabaseManager
@@ -14,6 +17,8 @@ from src.infra.service_container import ServiceContainer
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.job_manager import JobManager
+
+security = HTTPBearer()
 
 
 def get_container(request: Request) -> ServiceContainer:
@@ -73,11 +78,24 @@ def get_supabase_manager(container: Annotated[ServiceContainer, Depends(get_cont
     return container.supabase_manager
 
 
-def get_celery_app(container: Annotated[ServiceContainer, Depends(get_container)]) -> Celery:
-    """Get Celery app from app state."""
-    if celery_app is None:
-        raise RuntimeError("Celery app is not initialized")
-    return celery_app
+# def get_celery_app(container: Annotated[ServiceContainer, Depends(get_container)]) -> Celery:
+#     """Get Celery app from app state."""
+#     if celery_app is None:
+#         raise RuntimeError("Celery app is not initialized")
+#     return celery_app
+
+
+async def get_user_id(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    supabase_manager: Annotated[SupabaseManager, Depends(get_supabase_manager)],
+) -> UUID:
+    """Retrieve the user id from the supabase client."""
+    if credentials is None:
+        raise HTTPException(status_code=401, detail=ErrorResponse(code=ErrorCode.CLIENT_ERROR, detail="Unauthorized"))
+
+    supabase_client = await supabase_manager.get_async_client()
+    user_response = await supabase_client.auth.get_user(credentials.credentials)
+    return UUID(user_response.user.id)
 
 
 # Type aliases for cleaner dependency injection
@@ -89,4 +107,5 @@ ChatServiceDep = Annotated[ChatService, Depends(get_chat_service)]
 ChromaManagerDep = Annotated[ChromaManager, Depends(get_chroma_manager)]
 SupabaseManagerDep = Annotated[SupabaseManager, Depends(get_supabase_manager)]
 RedisManagerDep = Annotated[RedisManager, Depends(get_redis_manager)]
-CeleryAppDep = Annotated[Celery, Depends(get_celery_app)]
+# CeleryAppDep = Annotated[Celery, Depends(get_celery_app)]
+UserIdDep = Annotated[UUID, Depends(get_user_id)]

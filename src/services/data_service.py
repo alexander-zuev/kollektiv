@@ -13,7 +13,13 @@ from src.models.chat_models import (
     ConversationMessage,
     ConversationSummary,
 )
-from src.models.content_models import AddContentSourceRequest, Chunk, DataSource, Document, SourceSummary
+from src.models.content_models import (
+    AddContentSourceRequestDB,
+    Chunk,
+    DataSource,
+    Document,
+    SourceSummary,
+)
 from src.models.job_models import Job
 from src.models.vector_models import VectorCollection
 
@@ -89,11 +95,11 @@ class DataService:
         result = await self.update_entity(DataSource, source_id, updates)
         return DataSource.model_validate(result)
 
-    async def save_user_request(self, request: AddContentSourceRequest) -> AddContentSourceRequest:
+    async def save_user_request(self, request: AddContentSourceRequestDB) -> AddContentSourceRequestDB:
         """Save user request."""
         logger.debug(f"Saving user request {request.request_id}")
         result = await self.repository.save(request)
-        return result
+        return AddContentSourceRequestDB.model_validate(result)
 
     async def save_documents(self, documents: list[Document]) -> list[Document]:
         """Saves list of crawled documents."""
@@ -200,6 +206,8 @@ class DataService:
 
         # Get the current conversation
         conversation = await self.get_conversation(history.conversation_id)
+        if conversation is None:
+            raise ConversationNotFoundError(f"Conversation with id {history.conversation_id} not found")
 
         # Append new message IDs to existing message IDs
         conversation.message_ids.extend(new_message_ids)
@@ -224,7 +232,8 @@ class DataService:
 
     async def save_chunks(self, chunks: list[Chunk]) -> None:
         """Save chunks to Supabase."""
-        logger.debug(f"Saving {len(chunks)} chunks")
+        await self.repository.save(chunks)
+        logger.debug(f"Saved {len(chunks)} chunks")
 
     async def save_collection(self, collection: VectorCollection) -> None:
         """Save collection to Supabase."""
@@ -234,4 +243,9 @@ class DataService:
     async def get_datasource(self, source_id: UUID) -> DataSource:
         """Get data source by ID."""
         result = await self.repository.find_by_id(DataSource, source_id)
+        return result
+
+    async def list_source_summaries(self, user_id: UUID) -> list[SourceSummary]:
+        """Return a list of all source summaries for a user."""
+        result = await self.repository.find(SourceSummary, filters={"user_id": user_id})
         return result

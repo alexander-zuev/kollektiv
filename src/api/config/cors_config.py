@@ -8,13 +8,16 @@ class AllowedOrigins(str, Enum):
 
     LOCAL = "*"  # Allow all origins for local development
     STAGING = [
+        "https://staging.thekollektiv.ai",
         "https://*.railway.app",
         "https://*.up.railway.app",
         "https://*.railway.internal",
-        "https://staging.thekollektiv.ai",
     ]
     PRODUCTION = [
         "https://thekollektiv.ai",
+        "https://*.railway.app",
+        "https://*.up.railway.app",
+        "https://*.railway.internal",
     ]
 
 

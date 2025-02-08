@@ -21,7 +21,7 @@ class Retriever:
     """
 
     def __init__(self, vector_db: VectorDatabase, reranker: Reranker):
-        self.db = vector_db
+        self.vector_db = vector_db
         self.reranker = reranker
 
     async def retrieve(
@@ -34,6 +34,7 @@ class Retriever:
             rag_query (str): The primary user query for retrieving documents.
             combined_queries (list[str]): A list of queries to combine for document retrieval.
             top_n (int, optional): The maximum number of top documents to return. Defaults to None.
+            user_id (UUID): The user ID for the query.w
 
         Returns:
             list: A list of limited, ranked, and relevant documents.
@@ -45,12 +46,12 @@ class Retriever:
         start_time = time.time()  # Start timing
 
         # get expanded search results
-        search_results = await self.db.query(user_id=user_id, user_query=combined_queries)
+        search_results = await self.vector_db.query(user_id=user_id, user_query=combined_queries)
         if not search_results or not search_results.get("documents")[0]:
             logger.warning("No documents found in search results")
             return []
 
-        unique_documents = self.db.deduplicate_documents(search_results)
+        unique_documents = self.vector_db.deduplicate_documents(search_results)
         logger.info(f"Search returned {len(unique_documents)} unique chunks")
 
         # rerank the results
@@ -102,7 +103,7 @@ class Retriever:
 
         return relevant_results
 
-    def limit_results(self, ranked_documents: dict[str, Any], top_n: int = None) -> dict[str, Any]:
+    def limit_results(self, ranked_documents: dict[str, Any], top_n: int | None = None) -> dict[str, Any]:
         """
         Limit the number of results based on the given top_n parameter.
 

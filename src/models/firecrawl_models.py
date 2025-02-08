@@ -177,13 +177,13 @@ class CrawlRequest(BaseModel):
         le=10,
         description="Maximum depth for crawling",
     )
-    exclude_patterns: list[str] = Field(
+    exclude_paths: list[str] = Field(
         default_factory=list,
-        description="The list of patterns to exclude, e.g., '/blog/*', '/author/*'.",
+        description="The list of paths to exclude, e.g., '/blog/*', '/author/*'.",
     )
-    include_patterns: list[str] = Field(
+    include_paths: list[str] = Field(
         default_factory=list,
-        description="The list of patterns to include, e.g., '/blog/*', '/api/*'.",
+        description="The list of paths to include, e.g., '/blog/*', '/api/*'.",
     )
     time_taken: float | None = Field(default=0.0, description="The time taken to crawl this request end to end.")
     webhook_url: str | None = Field(default=None, description="Optional webhook URL for updates")
@@ -212,8 +212,8 @@ class CrawlRequest(BaseModel):
             url += "/"
         return url
 
-    @field_validator("exclude_patterns", "include_patterns")
-    def validate_patterns(cls, v: list[str]) -> list[str]:  # noqa: N805
+    @field_validator("exclude_paths", "include_paths")
+    def validate_paths(cls, v: list[str]) -> list[str]:  # noqa: N805
         """
 
         Validates patterns to ensure they start with '/' and are not empty.
@@ -230,25 +230,25 @@ class CrawlRequest(BaseModel):
         """
         for pattern in v:
             if not pattern.strip():
-                raise ValueError("Empty patterns are not allowed")
+                raise ValueError("Empty paths are not allowed")
             if not pattern.startswith("/"):
-                raise ValueError("Pattern must start with '/', got: {pattern}")
+                raise ValueError("Path must start with '/', got: {pattern}")
         return v
 
     def __repr__(self) -> str:
         """Returns a detailed string representation of the CrawlRequest."""
-        patterns = []
-        if self.include_patterns:
-            patterns.append(f"include: {self.include_patterns}")
-        if self.exclude_patterns:
-            patterns.append(f"exclude: {self.exclude_patterns}")
-        patterns_str = f", patterns: [{', '.join(patterns)}]" if patterns else ""
+        paths = []
+        if self.include_paths:
+            paths.append(f"include: {self.include_paths}")
+        if self.exclude_paths:
+            paths.append(f"exclude: {self.exclude_paths}")
+        paths_str = f", paths: [{', '.join(paths)}]" if paths else ""
 
         return (
             f"CrawlRequest(url: {self.url}, "
             f"page_limit: {self.page_limit}, "
             f"max_depth: {self.max_depth}"
-            f"{patterns_str})"
+            f"{paths_str})"
         )
 
     class Config:

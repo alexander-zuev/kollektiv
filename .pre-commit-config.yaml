@@ -116,11 +116,3 @@ repos:
           "tests/integration/",
         ]
         verbose: true
-
-      - id: update-project-structure
-        name: Update project structure
-        entry: python scripts/maintenance/generate_structure.py
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit, manual]

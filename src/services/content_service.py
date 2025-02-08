@@ -7,7 +7,6 @@ from uuid import UUID
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
 from src.core._exceptions import CrawlerError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
-from src.infra.celery.tasks import process_documents
 from src.infra.decorators import generic_error_handler
 from src.infra.events.channels import Channels
 from src.infra.events.event_publisher import EventPublisher
@@ -15,11 +14,13 @@ from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
 from src.models.content_models import (
     AddContentSourceRequest,
+    AddContentSourceRequestDB,
     AddContentSourceResponse,
     DataSource,
     FireCrawlSourceMetadata,
     ProcessingEvent,
     SourceEvent,
+    SourceOverview,
     SourceStatus,
 )
 from src.models.firecrawl_models import CrawlRequest
@@ -67,7 +68,7 @@ class ContentService:
 
             # Send a crawl request to firecrawl
             response = await self.crawler.start_crawl(request=CrawlRequest(**request.request_config.model_dump()))
-            await self._save_user_request(request)
+            await self._save_user_request(AddContentSourceRequestDB.from_api_to_db(request))
             source = await self._create_and_save_datasource(request)
             logger.debug("STEP 1. Crawl started")
 
@@ -143,15 +144,10 @@ class ContentService:
 
         return data_source
 
-    async def _save_user_request(self, request: AddContentSourceRequest) -> None:
+    async def _save_user_request(self, request: AddContentSourceRequestDB) -> None:
         logger.debug(f"Saving user request {request.model_dump()}")
         await self.data_service.save_user_request(request=request)
         logger.info(f"User request {request.request_id} saved successfully")
-
-    async def list_sources(self) -> list[AddContentSourceResponse]:
-        """GET /sources entrypoint"""
-        sources = await self.data_service.list_datasources()
-        return [AddContentSourceResponse.from_source(source) for source in sources]
 
     async def get_source(self, source_id: UUID) -> AddContentSourceResponse:
         """GET /sources/{source_id} entrypoint"""
@@ -249,12 +245,12 @@ class ContentService:
         )
 
         # 2. Enqueue processing job
-        result = process_documents.delay(
-            [document.model_dump(mode="json", serialize_as_any=True) for document in documents],
-            user_id=str(source.user_id),
-            source_id=str(source.source_id),
-        )
-        logger.info(f"Processing job in celery {result.task_id} enqueued")
+        # result = process_documents.delay(
+        #     [document.model_dump(mode="json", serialize_as_any=True) for document in documents],
+        #     user_id=str(source.user_id),
+        #     source_id=str(source.source_id),
+        # )
+        # logger.info(f"Processing job in celery {result.task_id} enqueued")
 
         # 3. Update source, jobs, and save documents
         saved_documents, _, processing_job = await asyncio.gather(
@@ -299,12 +295,18 @@ class ContentService:
         """Handles a process documents jobs."""
         # 1. Pass into completed or failed processing job
         match message.event_type:
+            case "summary_generated":
+                await self.handle_summary_generated(message)
             case "completed":
                 await self.handle_completed_processing_job(message)
             case "failed":
                 await self.handle_failed_processing_job(message)
             case _:
                 logger.warning(f"Unknown event type: {message.event_type}")
+
+    async def handle_summary_generated(self, message: ProcessingEvent) -> None:
+        """Handles a summary generated event."""
+        logger.info(f"Source {message.source_id} summary generated!!!")
 
     async def handle_completed_processing_job(self, message: ProcessingEvent) -> None:
         """Completes the ingestion process by updating the source and returning the source metadata."""
@@ -363,7 +365,7 @@ class ContentService:
             # Get async client
             redis_client = await self.redis_manager.get_async_client()
             async with redis_client.pubsub() as pubsub:
-                await pubsub.subscribe(Channels.Sources.events(source_id))
+                await pubsub.subscribe(Channels.Sources.source_events_channel(source_id))
                 logger.info(f"Subscribed to source {source_id} events")
 
                 # Listen to events and emit events as they arrive
@@ -402,6 +404,17 @@ class ContentService:
         event = SourceEvent(source_id=source_id, status=status, error=error, metadata=metadata or {})
 
         await self.event_publisher.publish_event(
-            channel=Channels.Sources.events(source_id),
+            channel=Channels.Sources.source_events_channel(source_id),
             message=event,
         )
+
+    async def get_sources(self, user_id: UUID) -> list[SourceOverview]:
+        """Build a list of SourceOverview objects from a list of SourceSummary objects."""
+        sources = await self.data_service.list_source_summaries(user_id=user_id)
+        if len(sources) == 0:
+            logger.debug(f"No sources found for user {user_id}")
+            return []
+
+        return [
+            SourceOverview(source_id=source.source_id, is_active=True, summary=source.summary) for source in sources
+        ]

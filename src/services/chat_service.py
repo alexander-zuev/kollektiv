@@ -299,10 +299,10 @@ class ChatService:
         return conversations
 
     # TODO: this should load in the sources for the conversation
-    async def get_conversation(self, conversation_id: UUID) -> ConversationHistoryResponse:
+    async def get_conversation(self, conversation_id: UUID, user_id: UUID) -> ConversationHistoryResponse:
         """Return a single conversation by its ID in accordance with RLS policies."""
         # Get conversation history (RLS will ensure user can only access their conversations)
-        history = await self.conversation_manager.get_conversation_history(conversation_id)
+        history = await self.conversation_manager.get_conversation_history(conversation_id, user_id)
         if history is None:
             raise ValueError(f"Conversation {conversation_id} not found")
 

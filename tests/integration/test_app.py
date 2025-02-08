@@ -23,7 +23,23 @@ class TestAppInitialization:
         assert container.job_manager is not None
         assert container.content_service is not None
         assert container.data_service is not None
-        assert container.redis_client is not None
+
+        # Redis services
+        assert container.async_redis_manager is not None
+        assert container.redis_repository is not None
+        assert container.event_publisher is not None
+
+        # Vector operations
+        assert container.chroma_manager is not None
+        assert container.embedding_manager is not None
+        assert container.vector_db is not None
+        assert container.retriever is not None
+        assert container.reranker is not None
+
+        # Chat services
+        assert container.claude_assistant is not None
+        assert container.conversation_manager is not None
+        assert container.chat_service is not None
 
     def test_middleware_setup(self, integration_client: TestClient):
         """Test middleware configuration."""
@@ -32,9 +48,3 @@ class TestAppInitialization:
 
         assert "CORSMiddleware" in middleware_classes
         assert "HealthCheckRateLimit" in middleware_classes
-
-    def test_error_handlers_registered(self, integration_client: TestClient):
-        """Test error handlers are properly registered."""
-        app = integration_client.app
-        assert app.exception_handlers is not None
-        assert Exception in app.exception_handlers

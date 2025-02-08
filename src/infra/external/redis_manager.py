@@ -26,9 +26,7 @@ class RedisManager:
     def _create_sync_client(self, decode_responses: bool) -> SyncRedis:
         """Create sync Redis client."""
         client = SyncRedis.from_url(
-            settings.redis_url,
-            username=settings.redis_user if settings.redis_user != "default" else None,
-            password=settings.redis_password if settings.redis_password != "none" else None,
+            url=settings.redis_url,
             decode_responses=decode_responses,
         )
         return client
@@ -36,9 +34,7 @@ class RedisManager:
     def _create_async_client(self, decode_responses: bool) -> AsyncRedis:
         """Create async Redis client."""
         client = AsyncRedis.from_url(
-            settings.redis_url,
-            username=settings.redis_user if settings.redis_user != "default" else None,
-            password=settings.redis_password if settings.redis_password != "none" else None,
+            url=settings.redis_url,
             decode_responses=decode_responses,
         )
         return client
@@ -86,9 +82,13 @@ class RedisManager:
     def get_sync_client(self) -> SyncRedis:
         """Get the sync redis client"""
         self._connect_sync()
+        if self._sync_client is None:
+            raise RuntimeError("Sync Redis client not initialized")
         return self._sync_client
 
     async def get_async_client(self) -> AsyncRedis:
         """Get the async redis client"""
         await self._connect_async()
+        if self._async_client is None:
+            raise RuntimeError("Async Redis client not initialized")
         return self._async_client

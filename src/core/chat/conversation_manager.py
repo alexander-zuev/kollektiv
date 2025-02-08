@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from uuid import UUID
 
 import redis
@@ -132,11 +133,11 @@ class ConversationManager:
                     pending_messages = await self.redis_repository.lrange_method(
                         key=conversation_id, start=0, end=-1, model_class=ConversationMessage
                     )
-                    # logger.debug(_truncate_message(f"Pending messages: {pending_messages}"))
 
                     # 3. Update conversation history
                     conversation.messages.extend(pending_messages)
                     conversation.token_count += await self._estimate_tokens(pending_messages)
+                    conversation.updated_at = datetime.now()
 
                     # 4. Make atomic save & delete
                     pipe.multi()
@@ -270,7 +271,7 @@ class ConversationManager:
 
         Args:
             conversation_id: The ID of the conversation to fetch/create
-            message: Optional user message to add to the conversation
+            user_id: The ID of the user to fetch/create the conversation for
 
         Returns:
             ConversationHistory: The conversation history, either existing or newly created
