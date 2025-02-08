@@ -94,7 +94,9 @@ class Settings(BaseSettings):
     ngrok_url: str | None = Field(None, description="Used for local dev only", alias="NGROK_URL")
 
     # Monitoring
-    logfire_write_token: str = Field(..., alias="LOGFIRE_TOKEN", description="Logfire write token")
+    logfire_write_token: str | None = Field(
+        None, alias="LOGFIRE_TOKEN", description="Logfire write token, optional in CI."
+    )
     sentry_dsn: str = Field(
         "https://c2f1acc0646d1578b572e318b6b118d5@o4508393623257088.ingest.us.sentry.io/4508393650847744",
         alias="SENTRY_DSN",
