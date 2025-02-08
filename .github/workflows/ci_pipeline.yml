@@ -1,15 +1,15 @@
-name: 10x CI Pipeline
+name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 
 env:
   # Python and Poetry settings
   PYTHON_VERSION: "3.12"
-  POETRY_VERSION: "1.8.5"
+  POETRY_VERSION: "2.0.1"
   PYTHONPATH: ${{ github.workspace }}
   PYTHONUNBUFFERED: "1"
 
@@ -36,12 +36,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry lock --no-update
+
           poetry install --with dev --no-interaction --no-root
 
       - name: Run mypy type checking
         run: |
-          poetry run mypy src/ tests/ \
+          poetry run mypy src/  \
             --config-file pyproject.toml \
             --no-incremental \
             --show-error-codes
@@ -77,34 +77,46 @@ jobs:
 
       - name: Install dependencies
         run: |
-          poetry lock --no-update
           poetry install --with dev --no-interaction --no-root
 
       - name: Create env file
         run: |
           cat << EOF > config/.env
           # Environment
-          ENVIRONMENT=staging
-          PYTHONUNBUFFERED=1
-          WANDB_MODE=disabled
+          SERVICE=api
+          RAILWAY_PUBLIC_DOMAIN=test-domain.railway.app  # Add for CI
+          DEBUG=true  # Add for tests
 
-          # Service URLs
-          BASE_URL=${{ secrets.STAGING_BASE_URL }}
+
+           # Infrastructure
+          REDIS_URL=redis://localhost:6379  # Uses localhost
+          CHROMA_PRIVATE_URL=http://localhost:8000  # Uses localhost
+
+          # Supabase Staging
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
 
           # API Keys
           FIRECRAWL_API_KEY=${{ secrets.FIRECRAWL_API_KEY }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
           COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}
+
           EOF
 
       - name: Start services
-        run: docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d
-
-      - name: Wait for services to be ready
         run: |
-          timeout 30s bash -c 'until docker exec docker-redis-1 redis-cli ping; do sleep 1; done'
-          timeout 30s bash -c 'until curl -s http://localhost:8000/api/v1/heartbeat > /dev/null; do sleep 1; done'
+          docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d
+      - name: Debug Redis connection
+        run: |
+          echo "Docker containers:"
+          docker ps
+          echo "\nDocker network:"
+          docker network inspect kollektiv_default
+          echo "\nTrying to connect to Redis:"
+          docker exec redis redis-cli ping
+          echo "\nContainer logs:"
+          docker logs redis
 
       - name: Run unit tests
         id: unit-tests

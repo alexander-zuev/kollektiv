@@ -91,13 +91,13 @@ def configure_logging(debug: bool = False) -> None:
 
     # Setup log level
     log_level = logging.DEBUG if debug else logging.INFO
-
-    logfire.configure(
-        token=settings.logfire_write_token,
-        environment=settings.environment,
-        service_name=settings.project_name,
-        console=False,
-    )
+    if settings.logfire_write_token:
+        logfire.configure(
+            token=settings.logfire_write_token,
+            environment=settings.environment,
+            service_name=settings.project_name,
+            console=False,
+        )
 
     # 1. Configure kollektiv logger
     app_logger = logging.getLogger("kollektiv")

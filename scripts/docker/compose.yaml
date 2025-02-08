@@ -31,7 +31,8 @@ services:
     build:
       context: ../../
       dockerfile: scripts/docker/Dockerfile
-    command: [ "poetry", "run", "worker"]
+    entrypoint: ["/app/scripts/docker/entrypoint.sh"]
+    command: ["poetry", "run", "worker"]
     env_file:
       - ../../config/.env
     volumes:
@@ -40,8 +41,6 @@ services:
       - REDIS_URL=redis://redis:6379 # need to connect to the redis service in the container, not localhost
       - CHROMA_PRIVATE_URL=http://chromadb:8000 # need to connect to the chromadb service in the container, not localhost
       - SERVICE=worker
-      - ENVIRONMENT=local
-      - SUPABASE_URL=http://host.docker.internal:54321
     depends_on:
       redis:
         condition: service_healthy
