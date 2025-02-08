@@ -31,7 +31,7 @@ services:
     build:
       context: ../../
       dockerfile: scripts/docker/Dockerfile
-    command: [ "poetry", "run", "arq_worker"]
+    command: [ "poetry", "run", "worker"]
     env_file:
       - ../../config/.env
     volumes:

@@ -39,12 +39,12 @@ class ArqSettings(BaseSettings):
     def redis_settings(self) -> RedisSettings:
         """Get the Redis settings."""
         if self._redis_settings is None:
-            self._redis_settings = RedisSettings(
-                host=self.redis_host,
-                port=self.redis_port,
-                username=self.redis_user,
-                password=self.redis_password,
-            )
+            self._redis_settings = RedisSettings.from_dsn(settings.redis_url)
+            # host=self.redis_host,
+            # port=self.redis_port,
+            # username=None if self.redis_user == "default" else self.redis_user,
+            # password=None if self.redis_password == "none" else self.redis_password,
+            # )
         return self._redis_settings
 
     @property

@@ -72,8 +72,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.scripts]
 crawl = "src.core.content.crawler.crawler:run_crawler"
 api = "src.app:run"
-worker = "src.infra.celery.worker:run_worker"
-arq_worker = "src.infra.arq.worker:run_worker"
+worker = "src.infra.arq.worker:run_worker"
 
 
 [tool.pytest.ini_options]
