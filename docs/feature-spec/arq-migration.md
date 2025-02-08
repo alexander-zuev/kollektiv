@@ -21,7 +21,7 @@ Transition to [Arq](https://arq-docs.helpmanual.io/) because:
 2. **Lifecycle Hooks** ✅
    - **on_startup**: Initialize worker services (e.g. create a singleton for `WorkerServices`).
    - **on_shutdown**: Shutdown or clean up any resources. ✅
-3. **Worker Configuration**
+3. **Worker Configuration** ✅
    - Create a main function that:
      - Establishes the Redis pool.
      - Provides the list of async task functions.

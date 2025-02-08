@@ -1,4 +1,3 @@
-import asyncio
 from concurrent import futures
 from typing import Any
 
@@ -25,12 +24,6 @@ async def on_startup(ctx: dict[str, Any]) -> None:
 async def on_shutdown(ctx: dict[str, Any]) -> None:
     """Runs on shutdown."""
     await ctx["worker_services"].shutdown_services()
-
-
-async def some_task() -> None:
-    """Sample task"""
-    print("Just doing nothing, chilling.")
-    await asyncio.sleep(5)
 
 
 class WorkerSettings:

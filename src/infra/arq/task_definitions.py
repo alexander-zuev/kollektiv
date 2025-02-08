@@ -1,4 +1,3 @@
-import asyncio
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
@@ -53,20 +52,11 @@ SAMPLE_DOCUMENTS = [
 ]
 
 
-async def count_to_ten(ctx: dict[str, Any], n: int) -> None:
-    """Count to ten."""
-    logger.info(f"Counting to {n}")
-    for i in range(n):
-        logger.info(f"Counting: {i}")
-        await asyncio.sleep(1)
-    return {"status": "success", "count": n}
-
-
-async def process_documents_task(ctx: dict[str, Any], document_ids: list[str]) -> dict[str, Any]:
+async def process_documents_task(ctx: dict[str, Any], documents: list[Document]) -> dict[str, Any]:
     """Process documents by IDs."""
-    logger.info(f"Processing documents: {document_ids}")
-
-    return {"status": "success", "processed_docs": document_ids, "timestamp": time.time()}
+    logger.info(f"Processing documents: {documents}")
+    logger.info(f"Check nested model: {documents[0].metadata}")
+    return {"status": "success", "processed_docs": documents, "timestamp": time.time()}
 
 
 async def publish_event(ctx: dict[str, Any], event: ProcessingEvent) -> None:
@@ -80,8 +70,5 @@ async def publish_event(ctx: dict[str, Any], event: ProcessingEvent) -> None:
 
 # Export tasks
 task_list: list[TaskFunction] = [
-    # add tasks here
     process_documents_task,
-    count_to_ten,
-    # pydantic_test_task,
 ]
