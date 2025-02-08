@@ -366,7 +366,7 @@ class ContentService:
             # Get async client
             redis_client = await self.redis_manager.get_async_client()
             async with redis_client.pubsub() as pubsub:
-                await pubsub.subscribe(Channels.Sources.events(source_id))
+                await pubsub.subscribe(Channels.Sources.source_events_channel(source_id))
                 logger.info(f"Subscribed to source {source_id} events")
 
                 # Listen to events and emit events as they arrive
@@ -405,7 +405,7 @@ class ContentService:
         event = SourceEvent(source_id=source_id, status=status, error=error, metadata=metadata or {})
 
         await self.event_publisher.publish_event(
-            channel=Channels.Sources.events(source_id),
+            channel=Channels.Sources.source_events_channel(source_id),
             message=event,
         )
 

@@ -208,12 +208,15 @@ class SourceEvent(BaseModel):
 
 
 class ProcessingEvent(BaseModel):
-    """Events emitted by celery worker."""
+    """Events emitted by celery/arq worker."""
 
     source_id: UUID = Field(..., description="ID of the source this event belongs to")
-    event_type: Literal["processing", "completed", "failed", "summary_generated"] = Field(
-        ..., description="Type of the event"
-    )
+    event_type: Literal[
+        "processing",
+        "summary_generated",
+        "completed",
+        "failed",
+    ] = Field(..., description="Type of the event")
     error: str | None = Field(default=None, description="Error message, null if no error")
     metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")

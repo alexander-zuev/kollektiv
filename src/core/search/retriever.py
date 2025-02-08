@@ -34,6 +34,7 @@ class Retriever:
             rag_query (str): The primary user query for retrieving documents.
             combined_queries (list[str]): A list of queries to combine for document retrieval.
             top_n (int, optional): The maximum number of top documents to return. Defaults to None.
+            user_id (UUID): The user ID for the query.w
 
         Returns:
             list: A list of limited, ranked, and relevant documents.
@@ -102,7 +103,7 @@ class Retriever:
 
         return relevant_results
 
-    def limit_results(self, ranked_documents: dict[str, Any], top_n: int = None) -> dict[str, Any]:
+    def limit_results(self, ranked_documents: dict[str, Any], top_n: int | None = None) -> dict[str, Any]:
         """
         Limit the number of results based on the given top_n parameter.
 

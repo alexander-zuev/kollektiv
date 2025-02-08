@@ -7,7 +7,7 @@ from typing import Any
 from celery import Celery
 from celery.signals import worker_process_init
 
-from src.infra.celery.worker_services import WorkerServices
+from src.infra.arq.worker_services import WorkerServices
 from src.infra.logger import configure_logging, get_logger
 from src.infra.settings import get_settings
 from src.models.base_models import Environment
