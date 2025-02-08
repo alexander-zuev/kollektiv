@@ -7,7 +7,6 @@ from uuid import UUID
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
 from src.core._exceptions import CrawlerError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
-from src.infra.celery.tasks import process_documents
 from src.infra.decorators import generic_error_handler
 from src.infra.events.channels import Channels
 from src.infra.events.event_publisher import EventPublisher
@@ -246,12 +245,12 @@ class ContentService:
         )
 
         # 2. Enqueue processing job
-        result = process_documents.delay(
-            [document.model_dump(mode="json", serialize_as_any=True) for document in documents],
-            user_id=str(source.user_id),
-            source_id=str(source.source_id),
-        )
-        logger.info(f"Processing job in celery {result.task_id} enqueued")
+        # result = process_documents.delay(
+        #     [document.model_dump(mode="json", serialize_as_any=True) for document in documents],
+        #     user_id=str(source.user_id),
+        #     source_id=str(source.source_id),
+        # )
+        # logger.info(f"Processing job in celery {result.task_id} enqueued")
 
         # 3. Update source, jobs, and save documents
         saved_documents, _, processing_job = await asyncio.gather(
@@ -417,8 +416,5 @@ class ContentService:
             return []
 
         return [
-            SourceOverview(
-                source_id=source.source_id, is_active=source.status == SourceStatus.COMPLETED, summary=source.summary
-            )
-            for source in sources
+            SourceOverview(source_id=source.source_id, is_active=True, summary=source.summary) for source in sources
         ]

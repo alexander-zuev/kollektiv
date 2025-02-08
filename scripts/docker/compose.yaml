@@ -26,38 +26,6 @@ services:
       retries: 5
       start_period: 5s
     restart: unless-stopped
-  # worker:
-  #   container_name: worker
-  #   build:
-  #     context: ../../
-  #     dockerfile: scripts/docker/Dockerfile
-  #   command: [ "poetry", "run", "worker" ]
-  #   env_file:
-  #     - ../../config/.env
-  #   volumes:
-  #     - ../../:/app # this allows locally to not relaunch as code changes
-  #   environment:
-  #     - CELERY_BROKER_URL=redis://redis:6379
-  #     - CELERY_RESULT_BACKEND=redis://redis:6379
-  #     - REDIS_URL=redis://redis:6379 # need to connect to the redis service in the container, not localhost
-  #     - CHROMA_PRIVATE_URL=http://chromadb:8000 # need to connect to the chromadb service in the container, not localhost
-  #     - SERVICE=worker
-  #     - ENVIRONMENT=local
-  #     - SUPABASE_URL=http://host.docker.internal:54321
-  #   depends_on:
-  #     redis:
-  #       condition: service_healthy
-  #     chromadb:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test: [ "CMD", "poetry", "run", "celery", "-A", "src.infra.celery.worker:celery_app", "inspect", "ping" ]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 5s
-  #   restart: unless-stopped
-  #   extra_hosts:
-  #     - "host.docker.internal:host-gateway"
   arq_worker:
     container_name: arq_worker
     build:

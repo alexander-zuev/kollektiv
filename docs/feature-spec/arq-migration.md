@@ -16,11 +16,11 @@ Transition to [Arq](https://arq-docs.helpmanual.io/) because:
 - Native async design simplifies orchestration and error handling.
 
 ## Worker Setup Checklist
-1. **Redis Connection**
+1. **Redis Connection** ✅
    - Define `RedisSettings` for connecting to Redis since Arq uses Redis as its queue backend.
-2. **Lifecycle Hooks**
+2. **Lifecycle Hooks** ✅
    - **on_startup**: Initialize worker services (e.g. create a singleton for `WorkerServices`).
-   - **on_shutdown**: Shutdown or clean up any resources.
+   - **on_shutdown**: Shutdown or clean up any resources. ✅
 3. **Worker Configuration**
    - Create a main function that:
      - Establishes the Redis pool.
