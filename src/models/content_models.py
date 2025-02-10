@@ -197,29 +197,15 @@ class FireCrawlSourceMetadata(BaseModel):
     total_pages: int = Field(default=0, description="Total number of pages in the source")
 
 
+# FE <> BE SSE event model
 class SourceEvent(BaseModel):
-    """Base model for all source-related events."""
+    """SSE event model consumed by FE."""
 
     source_id: UUID = Field(..., description="ID of the source this event belongs to")
     status: SourceStatus = Field(..., description="Type of the event")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
     metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
     error: str | None = Field(default=None, description="Error message, null if no error")
-
-
-class ProcessingEvent(BaseModel):
-    """Events emitted by celery/arq worker."""
-
-    source_id: UUID = Field(..., description="ID of the source this event belongs to")
-    event_type: Literal[
-        "processing",
-        "summary_generated",
-        "completed",
-        "failed",
-    ] = Field(..., description="Type of the event")
-    error: str | None = Field(default=None, description="Error message, null if no error")
-    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
 
 
 class SourceSummary(SupabaseModel):

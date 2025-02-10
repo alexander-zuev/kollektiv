@@ -9,7 +9,7 @@ from src.infra.events.channels import Channels
 from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
 from src.infra.settings import settings
-from src.models.content_models import ProcessingEvent
+from src.models.pubsub_models import ContentProcessingEvent
 from src.services.content_service import ContentService
 
 logger = get_logger()
@@ -68,7 +68,7 @@ class EventConsumer:
     async def handle_event(self, message_data: bytes) -> None:
         """Handle an event from the event bus."""
         try:
-            message = ProcessingEvent(**json.loads(message_data))
+            message = ContentProcessingEvent(**json.loads(message_data))
 
             logger.debug("Sending message to content service")
             await self.content_service.handle_pubsub_event(message)

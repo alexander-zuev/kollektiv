@@ -36,6 +36,7 @@ def mock_dependencies():
 
     mock_redis = AsyncMock()
     mock_event_publisher = AsyncMock()
+    mock_arq_redis = AsyncMock()
 
     return {
         "crawler": mock_crawler,
@@ -43,6 +44,7 @@ def mock_dependencies():
         "data_service": mock_data_service,
         "redis_manager": mock_redis,
         "event_publisher": mock_event_publisher,
+        "arq_redis_pool": mock_arq_redis,
     }
 
 

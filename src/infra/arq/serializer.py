@@ -50,7 +50,9 @@ class MsgpackSerializer:
 
     def _get_model_reference(self, obj: BaseModel) -> str:
         """Get fully qualified reference for a Pydantic model."""
-        return f"{obj.__class__.__module__}.{obj.__class__.__qualname__}"
+        model_reference = f"{obj.__class__.__module__}.{obj.__class__.__qualname__}"
+        logger.debug(f"Model reference: {model_reference}")
+        return model_reference
 
     def _normalize(self, obj: Any) -> Any:
         """Convert objects to msgpack-serializable format."""
@@ -84,11 +86,14 @@ class MsgpackSerializer:
 
     def _serialize(self, obj: dict[str, Any]) -> bytes:
         """Serialize to msgpack bytes."""
+        logger.debug(f"Serializing object: {obj} with type: {type(obj)}")
         return msgpack.packb(self._normalize(obj))
 
     def _deserialize(self, data: bytes) -> dict[str, Any]:
         """Deserialize from msgpack bytes."""
-        return self._denormalize(msgpack.unpackb(data, raw=False))
+        deserialized = self._denormalize(msgpack.unpackb(data, raw=False))
+        logger.debug(f"Deserialized object: {deserialized} with type: {type(deserialized)}")
+        return deserialized
 
 
 # Export the serializer and deserializer

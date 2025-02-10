@@ -18,6 +18,7 @@ logger = get_logger()
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Runs on startup."""
     ctx["worker_services"] = await WorkerServices.create()
+    ctx["arq_redis"] = ctx["worker_services"].arq_redis_pool
     ctx["pool"] = futures.ProcessPoolExecutor()
 
 
