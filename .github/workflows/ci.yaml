@@ -1,0 +1,288 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  PYTHON_VERSION: "3.12.7"  # Manually keep in sync with pyproject.toml and local env
+  POETRY_VERSION: "2.0.1"
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: "1"
+  ENVIRONMENT: "staging"
+  WANDB_MODE: "disabled"
+  # Docker images (sync with compose.yaml)
+  REDIS_IMAGE: "redis"
+  REDIS_VERSION: "7.4.1-alpine"
+  CHROMA_IMAGE: "chromadb/chroma"
+  CHROMA_VERSION: "0.5.23"
+  WORKER_IMAGE: "kollektiv-worker"
+  WORKER_VERSION: "latest"
+
+jobs:
+  ci:
+    name: CI Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      #----------------------------------------------
+      #       Setup Python and Poetry
+      #----------------------------------------------
+      - name: Load cached Python installation
+        id: cached-python
+        uses: actions/cache@v4
+        with:
+          path: /opt/hostedtoolcache/Python/${{ env.PYTHON_VERSION }}/x64
+          key: python-${{ runner.os }}-${{ runner.arch }}-${{ env.PYTHON_VERSION }}
+    
+      - name: Setup Python
+        id: setup-python
+        if: steps.cached-python.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Load cached Poetry installation
+        id: cached-poetry
+        uses: actions/cache@v4
+        with:
+          path: ~/.local
+          key: poetry-${{ env.POETRY_VERSION }}
+
+      - name: Install Poetry
+        if: steps.cached-poetry.outputs.cache-hit != 'true'
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+
+      #----------------------------------------------
+      #       Install Dependencies
+      #----------------------------------------------
+      - name: Create virtualenv directory
+        run: mkdir -p ~/.cache/pypoetry/virtualenvs
+
+      - name: Load cached dependencies
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: venv-${{ runner.os }}-python-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --with dev
+
+      #----------------------------------------------
+      #       Code Quality Checks
+      #----------------------------------------------
+      - name: Run mypy type checking
+        run: |
+          poetry run mypy src/  \
+            --config-file pyproject.toml \
+            --no-incremental \
+            --show-error-codes
+        continue-on-error: true
+
+      - name: Run Ruff linting
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: check .
+        continue-on-error: true
+
+      - name: Check code formatting
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: format --check .
+        continue-on-error: true
+
+      #----------------------------------------------
+      #       Setup Docker Services
+      #----------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Cache buildx layers
+      - name: Cache buildx layers
+        id: buildx-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
+
+      # Cache final worker image
+      - name: Cache worker image
+        id: worker-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/worker-cache
+          key: worker-image-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
+
+      # Build worker if buildx cache miss
+      - name: Build worker (cache miss)
+        if: steps.buildx-cache.outputs.cache-hit != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: scripts/docker/Dockerfile
+          load: true
+          tags: ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # Move cache on buildx cache miss
+      - name: Move cache
+        if: steps.buildx-cache.outputs.cache-hit != 'true'
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      # Save image on buildx cache miss
+      - name: Save worker image (cache miss)
+        if: steps.buildx-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/worker-cache
+          docker save ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} > /tmp/worker-cache/worker.tar
+
+      # Create image from cached layers if no image
+      - name: Create image from cache
+        if: steps.buildx-cache.outputs.cache-hit == 'true' && steps.worker-cache.outputs.cache-hit != 'true'
+        run: |
+          docker buildx build \
+            --load \
+            --cache-from=type=local,src=/tmp/.buildx-cache \
+            -t ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} \
+            -f scripts/docker/Dockerfile .
+          mkdir -p /tmp/worker-cache
+          docker save ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} > /tmp/worker-cache/worker.tar
+
+      # Load existing image if cached
+      - name: Load cached worker image
+        if: steps.worker-cache.outputs.cache-hit == 'true'
+        run: docker load < /tmp/worker-cache/worker.tar
+
+      # Handle Redis and ChromaDB
+      - name: Cache Redis image
+        id: redis-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/redis-cache
+          key: redis-${{ env.REDIS_VERSION }}
+
+      - name: Pull Redis if needed
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/redis-cache
+          docker pull ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }}
+          docker save ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }} > /tmp/redis-cache/redis.tar
+
+      - name: Load Redis if cached
+        if: steps.redis-cache.outputs.cache-hit == 'true'
+        run: docker load < /tmp/redis-cache/redis.tar
+
+      - name: Cache ChromaDB image
+        id: chroma-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/chroma-cache
+          key: chroma-${{ env.CHROMA_VERSION }}
+
+      - name: Pull ChromaDB if needed
+        if: steps.chroma-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/chroma-cache
+          docker pull ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }}
+          docker save ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }} > /tmp/chroma-cache/chromadb.tar
+
+      - name: Load ChromaDB if cached
+        if: steps.chroma-cache.outputs.cache-hit == 'true'
+        run: docker load < /tmp/chroma-cache/chromadb.tar
+
+      # Prepare final images cache
+      - name: Create final images directory
+        run: mkdir -p /tmp/final-images
+
+      - name: Save all images for tests
+        run: |
+          docker save ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }} > /tmp/final-images/redis.tar
+          docker save ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }} > /tmp/final-images/chromadb.tar
+          docker save ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} > /tmp/final-images/worker.tar
+
+      - name: Cache final images
+        id: final-images-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/final-images
+          key: final-images-${{ env.REDIS_VERSION }}-${{ env.CHROMA_VERSION }}-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
+
+      #----------------------------------------------
+      #       Setup Test Environment
+      #----------------------------------------------
+      - name: Create env file
+        run: |
+          cat << EOF > config/.env
+          # Environment
+          SERVICE=api
+          RAILWAY_PUBLIC_DOMAIN=test-domain.railway.app
+          DEBUG=true
+
+          # Infrastructure
+          REDIS_URL=redis://localhost:6379
+          CHROMA_PRIVATE_URL=http://localhost:8000
+
+          # Supabase Staging
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+
+          # API Keys
+          FIRECRAWL_API_KEY=${{ secrets.FIRECRAWL_API_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}
+          EOF
+
+      - name: Start services
+        run: |
+          docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d
+
+      #----------------------------------------------
+      #       Run Tests
+      #----------------------------------------------
+      - name: Run unit tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          poetry run pytest \
+            tests/unit \
+            --quiet \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml
+
+      - name: Run integration tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          poetry run pytest \
+            tests/integration \
+            --quiet \
+            --cov=src \
+            --cov-append \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Stop services
+        if: always()
+        run: docker compose --env-file config/.env -f scripts/docker/compose.yaml down 
