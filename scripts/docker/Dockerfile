@@ -29,13 +29,3 @@ COPY pyproject.toml poetry.lock ./
 RUN --mount=type=cache,target=/root/.cache/pypoetry \
     poetry config virtualenvs.create false && \
     poetry install --only main --no-interaction --no-ansi
-
-# ##############################
-# # Final runtime stage
-# ##############################
-# FROM base AS runtime
-
-# COPY --from=builder /usr/local/bin/poetry* /usr/local/bin/
-
-# # Copy the installed dependencies and virtual environment from builder
-# COPY --from=builder /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
