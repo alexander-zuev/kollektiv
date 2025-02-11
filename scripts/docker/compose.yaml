@@ -32,7 +32,7 @@ services:
       context: ../../
       dockerfile: scripts/docker/Dockerfile
     entrypoint: ["/app/scripts/docker/entrypoint.sh"]
-    command: ["poetry", "run", "worker"]
+    command: ["watchfiles", "poetry run worker", "/app/src"]
     env_file:
       - ../../config/.env
     volumes:
