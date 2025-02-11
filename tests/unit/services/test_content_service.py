@@ -10,7 +10,7 @@ from src.models.content_models import (
     DataSource,
     DataSourceType,
     FireCrawlSourceMetadata,
-    SourceStatus,
+    SourceStage,
 )
 from src.models.job_models import CrawlJobDetails, Job, JobStatus, JobType
 from src.services.content_service import ContentService
@@ -78,7 +78,7 @@ def sample_data_source(sample_source_request):
         user_id=sample_source_request.user_id,
         request_id=sample_source_request.request_id,
         source_type=DataSourceType.WEB,
-        status=SourceStatus.PENDING,
+        status=SourceStage.CREATED,
         metadata=FireCrawlSourceMetadata(
             crawl_config=sample_source_request.request_config,
             total_pages=0,
@@ -97,13 +97,13 @@ class TestContentService:
         mock_dependencies["data_service"].save_datasource.return_value = sample_data_source
         mock_dependencies["data_service"].save_user_request.return_value = sample_source_request
         mock_dependencies["data_service"].update_datasource.return_value = sample_data_source
-        mock_dependencies["data_service"].update_datasource.return_value.status = SourceStatus.PENDING
+        mock_dependencies["data_service"].update_datasource.return_value.stage = SourceStage.CREATED
 
         # Test
         response = await content_service.add_source(sample_source_request)
 
         # Verify
-        assert response.status == SourceStatus.PENDING  # Source starts as PENDING
+        assert response.stage == SourceStage.CREATED  # Source starts as CREATED
         mock_dependencies["data_service"].save_datasource.assert_called_once()
         mock_dependencies["job_manager"].create_job.assert_called_once()
 
@@ -155,7 +155,7 @@ class TestContentService:
                     crawl_config=sample_data_source.metadata.crawl_config,
                     total_pages=0,
                 ),
-                "status": SourceStatus.PROCESSING,
+                "status": SourceStage.PROCESSING_SCHEDULED,
                 "job_id": processing_job.job_id,
                 "updated_at": mock_dependencies["data_service"].update_datasource.call_args.kwargs["updates"][
                     "updated_at"
@@ -200,7 +200,7 @@ class TestContentService:
         mock_dependencies["data_service"].update_datasource.assert_called_with(
             source_id=sample_data_source.source_id,
             updates={
-                "status": SourceStatus.FAILED,
+                "status": SourceStage.FAILED,
                 "error": error_message,
                 "updated_at": mock_dependencies["data_service"].update_datasource.call_args.kwargs["updates"][
                     "updated_at"

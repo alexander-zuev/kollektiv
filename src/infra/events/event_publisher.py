@@ -7,7 +7,8 @@ from redis.exceptions import ConnectionError, TimeoutError
 from src.infra.decorators import tenacity_retry_wrapper
 from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
-from src.models.pubsub_models import ContentProcessingEvent, ContentProcessingStage, EventType
+from src.models.content_models import ContentProcessingEvent, SourceStage
+from src.models.pubsub_models import EventType, KollektivEvent
 
 logger = get_logger()
 
@@ -33,25 +34,25 @@ class EventPublisher:
         return instance
 
     @classmethod
-    def _create_event(
+    def create_event(
         cls,
-        stage: ContentProcessingStage,
+        stage: SourceStage,
         source_id: UUID,
         error: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> ContentProcessingEvent:
-        """Creates a ContentProcessingEvent.
+    ) -> KollektivEvent:
+        """Creates a type of KollektivEvent.
 
         Args:
-            event_type: Stage of content processing (e.g. STARTED, COMPLETED)
             source_id: ID of the source being processed
+            stage: Enum of Sources tages
             error: Optional error message if something went wrong
             metadata: Optional metadata about the event
         """
         return ContentProcessingEvent(
+            source_id=source_id,
             event_type=EventType.CONTENT_PROCESSING,  # This is fixed for content processing events
             stage=stage,  # The stage parameter maps to what was previously event_type
-            source_id=source_id,
             error=error,
             metadata=metadata,
         )

@@ -13,8 +13,7 @@ from src.infra.events.channels import Channels
 from src.infra.events.event_publisher import EventPublisher
 from src.infra.logger import get_logger
 from src.infra.settings import get_settings
-from src.models.content_models import Chunk, Document
-from src.models.pubsub_models import ContentProcessingEvent, ContentProcessingStage
+from src.models.content_models import Chunk, ContentProcessingEvent, Document, SourceStage
 from src.models.task_models import KollektivTaskResult, KollektivTaskStatus
 
 # Define types
@@ -102,7 +101,9 @@ async def publish_event(ctx: dict[str, Any], event: ContentProcessingEvent) -> K
     services: WorkerServices = ctx["worker_services"]
 
     try:
-        await services.event_publisher.publish_event(channel=Channels.Sources.processing_channel(), message=event)
+        await services.event_publisher.publish_event(
+            channel=Channels.content_processing_channel(event.source_id), message=event
+        )
         logger.debug(f"Event published by arq worker for {event.source_id} with type: {event.event_type}")
 
         return KollektivTaskResult(status=KollektivTaskStatus.SUCCESS, message="Event published successfully")
@@ -171,16 +172,6 @@ async def process_documents(
             data={"batch_jobs": batch_jobs_ids, "checker_job_id": checker_job.job_id, "summary_job_id": summary_job_id},
         )
 
-        # 5. Publish processing scheduled event
-        await publish_event(
-            ctx,
-            EventPublisher._create_event(
-                stage=ContentProcessingStage.STARTED,
-                source_id=source_id,
-                metadata=result.data,
-            ),
-        )
-
         return result
     except Exception as e:
         logger.exception(f"Error processing documents: {e}")
@@ -195,8 +186,8 @@ async def process_documents(
         # Publish failure event
         await publish_event(
             ctx,
-            EventPublisher._create_event(
-                stage=ContentProcessingStage.FAILED,
+            EventPublisher.create_event(
+                stage=SourceStage.FAILED,
                 source_id=source_id,
                 error=result.message,
                 metadata=result.data,
@@ -288,8 +279,8 @@ async def generate_summary(ctx: dict[str, Any], documents: list[Document], sourc
         )
         await publish_event(
             ctx,
-            EventPublisher._create_event(
-                stage=ContentProcessingStage.SUMMARY_GENERATED,
+            EventPublisher.create_event(
+                stage=SourceStage.SUMMARY_GENERATED,
                 source_id=source_id,
                 metadata={"total_documents": len(documents)},
             ),
@@ -328,8 +319,8 @@ async def check_content_processing_complete(
             )
             await publish_event(
                 ctx,
-                EventPublisher._create_event(
-                    stage=ContentProcessingStage.FAILED,
+                EventPublisher.create_event(
+                    stage=SourceStage.FAILED,
                     source_id=source_id,
                     error=result.message,
                     metadata={"failures": chunk_failures},
@@ -340,8 +331,8 @@ async def check_content_processing_complete(
         # 2. Publish chunks generated event
         await publish_event(
             ctx,
-            EventPublisher._create_event(
-                stage=ContentProcessingStage.CHUNKS_GENERATED,
+            EventPublisher.create_event(
+                stage=SourceStage.CHUNKS_GENERATED,
                 source_id=source_id,
             ),
         )
@@ -356,8 +347,8 @@ async def check_content_processing_complete(
             )
             await publish_event(
                 ctx,
-                EventPublisher._create_event(
-                    stage=ContentProcessingStage.FAILED,
+                EventPublisher.create_event(
+                    stage=SourceStage.FAILED,
                     source_id=source_id,
                     error=result.message,
                 ),
@@ -367,8 +358,8 @@ async def check_content_processing_complete(
         # 4. Publish final completion event
         await publish_event(
             ctx,
-            EventPublisher._create_event(
-                stage=ContentProcessingStage.COMPLETED,
+            EventPublisher.create_event(
+                stage=SourceStage.COMPLETED,
                 source_id=source_id,
             ),
         )
@@ -384,8 +375,8 @@ async def check_content_processing_complete(
         )
         await publish_event(
             ctx,
-            EventPublisher._create_event(
-                stage=ContentProcessingStage.FAILED,
+            EventPublisher.create_event(
+                stage=SourceStage.FAILED,
                 source_id=source_id,
                 error=result.message,
                 metadata={"error_type": "completion_check_failed"},

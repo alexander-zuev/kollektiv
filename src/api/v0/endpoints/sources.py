@@ -7,13 +7,13 @@ from sse_starlette.sse import EventSourceResponse
 from src.api.dependencies import ContentServiceDep, UserIdDep
 from src.api.routes import CURRENT_API_VERSION, Routes
 from src.api.v0.schemas.base_schemas import ErrorCode, ErrorResponse
+from src.core._exceptions import CrawlerError, NonRetryableError
 from src.infra.logger import get_logger
 from src.models.content_models import (
     AddContentSourceRequest,
     AddContentSourceResponse,
     SourceEvent,
     SourceOverview,
-    SourceStatus,
     SourceSummary,
 )
 
@@ -49,17 +49,11 @@ async def add_source(
         HTTPException: If source creation fails
     """
     logger.debug(f"Dumping request for debugging: {request.model_dump()}")
-    response = await content_service.add_source(request)
-    match response.status:
-        case SourceStatus.PENDING:
-            return response
-        case SourceStatus.FAILED:
-            if response.error_type == "crawler":
-                raise HTTPException(status_code=400, detail=response.error)
-            else:
-                raise HTTPException(status_code=500, detail="Internal server error occurred, we are working on it.")
-        case _:
-            raise HTTPException(status_code=500, detail="Internal server error occurred, we are working on it.")
+    try:
+        response = await content_service.add_source(request)
+        return response
+    except (CrawlerError, NonRetryableError) as e:
+        raise HTTPException(status_code=500, detail=ErrorResponse(code=ErrorCode.SERVER_ERROR, detail=str(e))) from e
 
 
 @router.get(

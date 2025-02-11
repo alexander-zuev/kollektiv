@@ -32,7 +32,7 @@ def _publish_processing_event(
     services = celery_app.services
 
     event = ProcessingEvent(source_id=source_id, event_type=event_type, error=error, metadata=metadata)
-    asyncio.run(services.event_publisher.publish_event(channel=Channels.Sources.processing_channel(), message=event))
+    asyncio.run(services.event_publisher.publish_event(channel=Channels.CONTENT_PROCESSING, message=event))
 
 
 @celery_app.task(
@@ -42,7 +42,7 @@ def _publish_processing_event(
 )
 def notify_processing_complete(results: list, user_id: str, source_id: str) -> None:
     """Task to be executed when all tasks in a group are complete."""
-    logger.info(f"Publishing to pub/sub channel {Channels.Sources.processing_channel()}")
+    logger.info(f"Publishing to pub/sub channel {Channels.CONTENT_PROCESSING}")
 
     # Check if any tasks failed
     failures = [r for r in results if r.get("status") == "failed"]
@@ -78,9 +78,7 @@ def generate_summary(results: list, source_id: str, documents: list[str]) -> Non
             metadata={"total_documents": len(documents)},
         )
         asyncio.run(
-            celery_app.services.event_publisher.publish_event(
-                channel=Channels.Sources.processing_channel(), message=event
-            )
+            celery_app.services.event_publisher.publish_event(channel=Channels.CONTENT_PROCESSING, message=event)
         )
     except Exception as e:
         logger.exception(f"Error generating summary: {e}")

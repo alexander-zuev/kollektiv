@@ -113,13 +113,13 @@ class MsgpackSerializer:
 
     def _serialize(self, obj: dict[str, Any]) -> bytes:
         """Serialize to msgpack bytes."""
-        logger.debug(f"Serializing object: {obj} with type: {type(obj)}")
+        logger.debug(f"Serializing object with type: {type(obj)}")
         return msgpack.packb(self._normalize(obj))
 
     def _deserialize(self, data: bytes) -> dict[str, Any]:
         """Deserialize from msgpack bytes."""
         deserialized = self._denormalize(msgpack.unpackb(data, raw=False))
-        logger.debug(f"Deserialized object: {deserialized} with type: {type(deserialized)}")
+        logger.debug(f"Deserialized object with type: {type(deserialized)}")
         return deserialized
 
 
