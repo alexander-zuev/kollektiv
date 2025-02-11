@@ -1,0 +1,157 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  # Python and Poetry settings
+  PYTHON_VERSION: "3.12"
+  POETRY_VERSION: "2.0.1"
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: "1"
+
+  # Environment settings
+  ENVIRONMENT: "staging"
+  WANDB_MODE: "disabled"
+
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "poetry"
+
+      - name: Install dependencies
+        run: |
+
+          poetry install --with dev --no-interaction --no-root
+
+      - name: Run mypy type checking
+        run: |
+          poetry run mypy src/  \
+            --config-file pyproject.toml \
+            --no-incremental \
+            --show-error-codes
+        continue-on-error: true
+
+      - name: Run Ruff linting
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: check .
+        continue-on-error: true
+
+      - name: Check code formatting
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: format --check .
+        continue-on-error: true
+
+  test:
+    name: Unit and Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pip install poetry==${{ env.POETRY_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "poetry"
+
+      - name: Install dependencies
+        run: |
+          poetry install --with dev --no-interaction --no-root
+
+      - name: Create env file
+        run: |
+          cat << EOF > config/.env
+          # Environment
+          SERVICE=api
+          RAILWAY_PUBLIC_DOMAIN=test-domain.railway.app  # Add for CI
+          DEBUG=true  # Add for tests
+
+
+           # Infrastructure
+          REDIS_URL=redis://localhost:6379  # Uses localhost
+          CHROMA_PRIVATE_URL=http://localhost:8000  # Uses localhost
+
+          # Supabase Staging
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+
+          # API Keys
+          FIRECRAWL_API_KEY=${{ secrets.FIRECRAWL_API_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}
+
+          EOF
+
+      - name: Start services
+        run: |
+          docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d
+      - name: Debug Redis connection
+        run: |
+          echo "Docker containers:"
+          docker ps
+          echo "\nDocker network:"
+          docker network inspect kollektiv_default
+          echo "\nTrying to connect to Redis:"
+          docker exec redis redis-cli ping
+          echo "\nContainer logs:"
+          docker logs redis
+
+      - name: Run unit tests
+        id: unit-tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          poetry run pytest \
+            tests/unit \
+            --quiet \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml
+
+      - name: Run integration tests
+        id: integration-tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          poetry run pytest \
+            tests/integration \
+            --quiet \
+            --cov=src \
+            --cov-append \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Stop services
+        if: always()
+        run: docker compose --env-file config/.env -f scripts/docker/compose.yaml down
