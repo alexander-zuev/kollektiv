@@ -39,6 +39,7 @@ class WorkerSettings:
     max_retries = arq_settings.job_retries
     job_serializer = serialize
     job_deserializer = deserialize
+    keep_result = 60  # Keep results for 60 seconds after completion
 
 
 def run_worker() -> None:

@@ -6,7 +6,6 @@ from arq.connections import RedisSettings
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
-# Import custom serializer functions from our serializer module
 from src.infra.arq.serializer import deserialize, serialize
 from src.infra.logger import get_logger
 from src.infra.settings import get_settings

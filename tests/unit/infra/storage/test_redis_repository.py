@@ -101,19 +101,22 @@ class TestRedisRepository:
     async def test_pipeline_operations(
         self, redis_repository, sample_conversation, sample_uuid, mock_async_redis, mock_redis_pipeline
     ):
-        """Test pipeline operations."""
-        # Setup pipeline mock
-        mock_async_redis.pipeline = AsyncMock()
+        """Test pipeline operations with proper async handling."""
+        # Setup pipeline mock with async operations
         mock_async_redis.pipeline.return_value = mock_redis_pipeline
+        mock_redis_pipeline.__aenter__ = AsyncMock(return_value=mock_redis_pipeline)
+        mock_redis_pipeline.__aexit__ = AsyncMock()
         mock_redis_pipeline.set = AsyncMock()
         mock_redis_pipeline.delete = AsyncMock()
-        mock_redis_pipeline.execute = AsyncMock()
+        mock_redis_pipeline.execute = AsyncMock(return_value=[True, True])  # Mock successful execution
 
-        # Add operations to pipeline
-        pipe = await mock_async_redis.pipeline(transaction=True)
-        await redis_repository.set_method(sample_uuid, sample_conversation, pipe=pipe)
-        await redis_repository.delete_method(sample_uuid, ConversationMessage, pipe=pipe)
-        await pipe.execute()
+        # Use async context manager for pipeline
+        async with await mock_async_redis.pipeline(transaction=True) as pipe:
+            # Add operations to pipeline
+            await redis_repository.set_method(sample_uuid, sample_conversation, pipe=pipe)
+            await redis_repository.delete_method(sample_uuid, ConversationMessage, pipe=pipe)
+            # Execute pipeline
+            await pipe.execute()
 
         # Verify pipeline operations
         mock_async_redis.pipeline.assert_called_once_with(transaction=True)

@@ -1,6 +1,7 @@
 import os
 import subprocess
 import uuid
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -231,25 +232,40 @@ def pytest_addoption(parser):
     parser.addoption("--run-integration", action="store_true", default=False, help="run integration tests")
 
 
-def pytest_configure(config):
-    """Configure custom markers and start containers for integration tests."""
-    # Add test markers
-    config.addinivalue_line("markers", "integration: mark test as integration test")
-    config.addinivalue_line("markers", "e2e: mark test as end-to-end test")
+def is_integration_or_e2e_path(path: Path) -> bool:
+    """Check if path is in integration or e2e directories."""
+    parts = path.parts
+    return any(part in ["integration", "e2e"] for part in parts)
 
-    # Start containers for integration tests
-    if config.getoption("--run-integration"):
+
+def pytest_collection_modifyitems(session, config, items):
+    """After collection, check if we have any integration/e2e tests."""
+    needs_containers = any(is_integration_or_e2e_path(Path(item.fspath)) for item in items)
+    config.stash["needs_containers"] = needs_containers
+
+    if needs_containers:
+        print("\n🔍 Found integration/e2e tests, will manage containers")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def container_management(request):
+    """Session-level fixture to manage containers for integration/e2e tests."""
+    if not request.config.stash.get("needs_containers", False):
+        yield
+        return
+
+    print("🐳 Starting containers for integration/e2e tests...")
+    try:
         subprocess.run(
             ["docker", "compose", "--env-file", "config/.env", "-f", "scripts/docker/compose.yaml", "up", "-d"],
             check=True,
         )
-
-
-def pytest_unconfigure(config):
-    """Cleanup containers after tests."""
-    if config.getoption("--run-integration"):
+        yield
+    finally:
+        print("\n🧹 Cleaning up containers...")
         subprocess.run(
-            ["docker", "compose", "--env-file", "config/.env", "-f", "scripts/docker/compose.yaml", "down"], check=True
+            ["docker", "compose", "--env-file", "config/.env", "-f", "scripts/docker/compose.yaml", "down"],
+            check=True,
         )
 
 

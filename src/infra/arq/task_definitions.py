@@ -7,6 +7,7 @@ from uuid import UUID
 from arq.jobs import Job
 from pydantic import BaseModel
 
+from src.infra.arq.serializer import deserialize
 from src.infra.arq.worker_services import WorkerServices
 from src.infra.events.channels import Channels
 from src.infra.events.event_publisher import EventPublisher
@@ -44,22 +45,48 @@ async def _gather_job_results(
     """
     try:
         # Create Job objects from IDs
-        jobs = [Job(job_id=job_id, redis=ctx["arq_redis"]) for job_id in job_ids]
+        jobs = [_create_job_reference(ctx, job_id) for job_id in job_ids]
         results = await asyncio.gather(*[job.result() for job in jobs])
 
         # Check if any job returned a failure status
         failures = [r for r in results if r.status == KollektivTaskStatus.FAILED]
         if failures:
+            logger.error(
+                f"{operation_name} failed: {len(failures)} out of {len(results)} jobs failed. "
+                f"First failure: {failures[0].message}"
+            )
             raise Exception(
                 f"{operation_name} failed: {len(failures)} out of {len(results)} jobs failed. "
                 f"First failure: {failures[0].message}"
             )
+        else:
+            logger.info(f"{operation_name} completed successfully with {len(results)} jobs")
 
         return results
 
     except Exception as e:
         # This catches both gather exceptions and our failure check exception
         raise Exception(f"{operation_name} failed: {str(e)}") from e
+
+
+def _create_job_reference(ctx: dict[str, Any], job_id: str) -> Job:
+    """Create a job reference.
+
+    Args:
+        ctx: Context dictionary containing worker services
+        job_id: ID of the job to create a reference for
+
+    Returns:
+        Job: Job reference
+
+    Raises:
+        Exception: If any error occurs
+    """
+    try:
+        return Job(job_id=job_id, redis=ctx["arq_redis"], _deserializer=deserialize)
+    except Exception as e:
+        logger.exception(f"Error creating job reference: {e}")
+        raise
 
 
 async def publish_event(ctx: dict[str, Any], event: ContentProcessingEvent) -> KollektivTaskResult:
@@ -316,18 +343,16 @@ async def check_content_processing_complete(
             EventPublisher._create_event(
                 stage=ContentProcessingStage.CHUNKS_GENERATED,
                 source_id=source_id,
-                metadata={"total_chunks_processed": len(chunk_results)},
             ),
         )
 
         # 3. Check summary generation
-        summary_job = Job(job_id=summary_job_id, redis=ctx["arq_redis"])
-        summary_result = await summary_job.result()
+        summary_job_results = await _gather_job_results(ctx, [summary_job_id], "summary_generation")
+        summary_result = summary_job_results[0]
         if summary_result.status == KollektivTaskStatus.FAILED:
             result = KollektivTaskResult(
                 status=KollektivTaskStatus.FAILED,
                 message=f"Summary generation failed: {summary_result.message}",
-                data=summary_result.data,
             )
             await publish_event(
                 ctx,
@@ -335,7 +360,6 @@ async def check_content_processing_complete(
                     stage=ContentProcessingStage.FAILED,
                     source_id=source_id,
                     error=result.message,
-                    metadata=summary_result.data or {},
                 ),
             )
             return result
@@ -346,10 +370,6 @@ async def check_content_processing_complete(
             EventPublisher._create_event(
                 stage=ContentProcessingStage.COMPLETED,
                 source_id=source_id,
-                metadata={
-                    "total_chunks": len(chunk_results),
-                    "summary": summary_result.data.get("summary"),
-                },
             ),
         )
         return KollektivTaskResult(

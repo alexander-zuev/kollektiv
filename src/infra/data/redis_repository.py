@@ -153,7 +153,7 @@ class RedisRepository:
         prefix = self._get_prefix(type(value), conversation_id=key)
         ttl = self._get_ttl(type(value))
         if pipe:
-            pipe.set(prefix, self._to_json(value), ex=ttl)
+            await pipe.set(prefix, self._to_json(value), ex=ttl)
             logger.debug(f"Pipeline: SET {prefix} (TTL: {ttl}s)")
         else:
             client = await self.manager.get_async_client()
@@ -192,7 +192,7 @@ class RedisRepository:
         """Delete a key from the Redis database."""
         prefix = self._get_prefix(model_class=model_class, conversation_id=key)
         if pipe:
-            pipe.delete(prefix)
+            await pipe.delete(prefix)
             logger.debug(f"Pipeline: DELETE {prefix}")
         else:
             client = await self.manager.get_async_client()
