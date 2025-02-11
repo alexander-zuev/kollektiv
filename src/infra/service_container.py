@@ -10,6 +10,7 @@ from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.reranker import Reranker
 from src.core.search.retriever import Retriever
 from src.core.search.vector_db import VectorDatabase
+from src.infra.arq.redis_pool import RedisPool
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.events.event_consumer import EventConsumer
@@ -65,6 +66,7 @@ class ServiceContainer:
             self.async_redis_manager = await RedisManager.create_async()
             self.redis_repository = RedisRepository(manager=self.async_redis_manager)
             self.event_publisher = await EventPublisher.create_async(redis_manager=self.async_redis_manager)
+            self.arq_redis_pool = await RedisPool.create_redis_pool()
 
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)
@@ -75,6 +77,7 @@ class ServiceContainer:
                 data_service=self.data_service,
                 redis_manager=self.async_redis_manager,
                 event_publisher=self.event_publisher,
+                arq_redis_pool=self.arq_redis_pool,
             )
 
             # Vector operations
@@ -124,6 +127,7 @@ class ServiceContainer:
         await container.initialize_services()
         return container
 
+    # TODO: Implement proper service shutdown logic
     async def shutdown_services(self) -> None:
         """Shutdown all services."""
         # First app layer (chat, content, job manager)

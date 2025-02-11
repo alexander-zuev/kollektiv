@@ -114,13 +114,18 @@ def configure_logging(debug: bool = False) -> None:
     logfire_handler = logfire.LogfireLoggingHandler()
     app_logger.addHandler(logfire_handler)
 
-    # 4. Add third-party logging handlers
+    # 4. Add third-party logging handlers and configure their levels
     logging.getLogger("fastapi").setLevel(level=log_level)
     logging.getLogger("uvicorn.error").setLevel(level=log_level)
     logging.getLogger("docker").setLevel(level=log_level)
     logging.getLogger("wandb").setLevel(level=log_level)
 
-    # 4. Propagate to other loggers
+    # Set Chroma and its dependencies to WARNING to reduce noise
+    logging.getLogger("chromadb").setLevel(level=logging.WARNING)
+    logging.getLogger("chromadb.api").setLevel(level=logging.WARNING)
+    logging.getLogger("chromadb.telemetry").setLevel(level=logging.WARNING)
+
+    # 5. Propagate to other loggers
     app_logger.propagate = False
 
 

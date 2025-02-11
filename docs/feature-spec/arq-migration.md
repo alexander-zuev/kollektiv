@@ -97,18 +97,53 @@ Transition to [Arq](https://arq-docs.helpmanual.io/) because:
 
 ### Defining Tasks
 Plan to define these tasks as async functions:
-- `publish_event`
-- `check_for_processing_complete`
-- `generate_summary`
 - `process_documents`
-- `process_document_batch`
-- `store_chunks`
-- `persist_to_supabase`
+- `chunk_documents_batch`
+- `persist_chunks`
+- `check_chunking_complete`
+- `generate_summary`
+- `publish_event`
+
+
 
 Each task should:
 - Be written as an `async def` function.
 - Use `await` instead of `asyncio.run`.
 - Incorporate a retry mechanism via ARQ settings if necessary.
+
+#### Simplified workflow
+- `process_documents` -> accepts list of documents, user_id, source_id and fires up processing
+
+It should:
+- break down documents into batches (should be fast)
+- schedule processing of these batches
+- schedule check complition task with job ids
+- it doesn't need to await the completion
+
+- `chunk_documents_batch`
+- accepts list of documents
+- awaits processing of each batch
+- schedules storage of all batches AND awaits results?
+
+- `persist_chunks`
+- accepts list of chunks
+- sends them to vector db
+- sends them to supabase
+
+- `check_chunking_complete`
+- accepts list of job ids
+- awaits completion of all jobs
+- if all jobs finished successfully -> generates a summary and schedules event publishing
+- if some jobs failed -> schedules a notification to user with the error
+
+- `generate_summary`
+- accepts list of documents
+- generates LLM summary
+- schedules event publishing
+
+- `publish_event`
+- accepts event
+- publishes it to the event bus
 
 ---
 

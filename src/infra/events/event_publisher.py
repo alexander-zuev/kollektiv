@@ -1,9 +1,13 @@
+from typing import Any
+from uuid import UUID
+
 from pydantic import BaseModel
 from redis.exceptions import ConnectionError, TimeoutError
 
 from src.infra.decorators import tenacity_retry_wrapper
 from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
+from src.models.pubsub_models import ContentProcessingEvent, ContentProcessingStage, EventType
 
 logger = get_logger()
 
@@ -27,6 +31,30 @@ class EventPublisher:
         """Creates an instance of EventPublisher."""
         instance = cls(redis_manager)
         return instance
+
+    @classmethod
+    def _create_event(
+        cls,
+        stage: ContentProcessingStage,
+        source_id: UUID,
+        error: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> ContentProcessingEvent:
+        """Creates a ContentProcessingEvent.
+
+        Args:
+            event_type: Stage of content processing (e.g. STARTED, COMPLETED)
+            source_id: ID of the source being processed
+            error: Optional error message if something went wrong
+            metadata: Optional metadata about the event
+        """
+        return ContentProcessingEvent(
+            event_type=EventType.CONTENT_PROCESSING,  # This is fixed for content processing events
+            stage=stage,  # The stage parameter maps to what was previously event_type
+            source_id=source_id,
+            error=error,
+            metadata=metadata,
+        )
 
     @tenacity_retry_wrapper(exceptions=(ConnectionError, TimeoutError))
     async def publish_event(

@@ -1,9 +1,12 @@
 from typing import Union
 
+from arq import ArqRedis
+
 from src.core.chat.summary_manager import SummaryManager
 from src.core.content.chunker import MarkdownChunker
 from src.core.search.embedding_manager import EmbeddingManager
 from src.core.search.vector_db import VectorDatabase
+from src.infra.arq.redis_pool import RedisPool
 from src.infra.data.data_repository import DataRepository
 from src.infra.data.redis_repository import RedisRepository
 from src.infra.events.event_publisher import EventPublisher
@@ -37,6 +40,7 @@ class WorkerServices:
         self.chroma_manager: ChromaManager | None = None
         self.event_publisher: EventPublisher | None = None
         self.chunker: MarkdownChunker | None = None
+        self.arq_redis_pool: ArqRedis | None = None
 
     async def initialize_services(self) -> None:
         """Initialize all necesssary worker services."""
@@ -49,6 +53,7 @@ class WorkerServices:
             # Redis
             self.async_redis_manager = await RedisManager.create_async()
             self.redis_repository = RedisRepository(manager=self.async_redis_manager)
+            self.arq_redis_pool = await RedisPool.create_redis_pool()
 
             # Job & Content Services
             self.job_manager = JobManager(data_service=self.data_service)

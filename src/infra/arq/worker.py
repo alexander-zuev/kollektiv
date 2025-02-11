@@ -18,6 +18,7 @@ logger = get_logger()
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Runs on startup."""
     ctx["worker_services"] = await WorkerServices.create()
+    ctx["arq_redis"] = ctx["worker_services"].arq_redis_pool
     ctx["pool"] = futures.ProcessPoolExecutor()
 
 
@@ -38,6 +39,7 @@ class WorkerSettings:
     max_retries = arq_settings.job_retries
     job_serializer = serialize
     job_deserializer = deserialize
+    keep_result = 60  # Keep results for 60 seconds after completion
 
 
 def run_worker() -> None:

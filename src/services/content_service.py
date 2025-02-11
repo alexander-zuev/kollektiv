@@ -4,6 +4,8 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from uuid import UUID
 
+from arq import ArqRedis
+
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
 from src.core._exceptions import CrawlerError, JobNotFoundError
 from src.core.content.crawler import FireCrawler
@@ -18,13 +20,13 @@ from src.models.content_models import (
     AddContentSourceResponse,
     DataSource,
     FireCrawlSourceMetadata,
-    ProcessingEvent,
     SourceEvent,
     SourceOverview,
     SourceStatus,
 )
 from src.models.firecrawl_models import CrawlRequest
 from src.models.job_models import CrawlJobDetails, Job, JobStatus, JobType, ProcessingJobDetails
+from src.models.pubsub_models import ContentProcessingEvent, ContentProcessingStage
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
 
@@ -41,12 +43,14 @@ class ContentService:
         data_service: DataService,
         redis_manager: RedisManager,
         event_publisher: EventPublisher,
+        arq_redis_pool: ArqRedis,
     ):
         self.crawler = crawler
         self.job_manager = job_manager
         self.data_service = data_service
         self.redis_manager = redis_manager
         self.event_publisher = event_publisher
+        self.arq_redis_pool = arq_redis_pool
 
     @generic_error_handler
     async def add_source(self, request: AddContentSourceRequest) -> AddContentSourceResponse:
@@ -245,12 +249,13 @@ class ContentService:
         )
 
         # 2. Enqueue processing job
-        # result = process_documents.delay(
-        #     [document.model_dump(mode="json", serialize_as_any=True) for document in documents],
-        #     user_id=str(source.user_id),
-        #     source_id=str(source.source_id),
-        # )
-        # logger.info(f"Processing job in celery {result.task_id} enqueued")
+        processing_job = await self.arq_redis_pool.enqueue_job(
+            "process_documents",
+            documents,
+            user_id=source.user_id,
+            source_id=source.source_id,
+        )
+        logger.info(f"Enqueued processing job with id: {processing_job.job_id}")
 
         # 3. Update source, jobs, and save documents
         saved_documents, _, processing_job = await asyncio.gather(
@@ -276,10 +281,10 @@ class ContentService:
                 updates={
                     "metadata": FireCrawlSourceMetadata(
                         crawl_config=source.metadata.crawl_config,  # Keep existing
-                        total_pages=len(documents),  # Update this
+                        total_pages=len(documents),
                     ),
                     "status": SourceStatus.PROCESSING,
-                    "job_id": processing_job.job_id,
+                    "job_id": processing_job.job_id,  # How dirty. Overwriting of the job id.
                     "updated_at": datetime.now(UTC),
                 },
             ),
@@ -291,32 +296,32 @@ class ContentService:
 
         logger.debug(f"Updated source {source.source_id} status to PROCESSING")
 
-    async def handle_pubsub_event(self, message: ProcessingEvent) -> None:
+    async def handle_pubsub_event(self, message: ContentProcessingEvent) -> None:
         """Handles a process documents jobs."""
         # 1. Pass into completed or failed processing job
-        match message.event_type:
-            case "summary_generated":
+        match message.stage:
+            case ContentProcessingStage.SUMMARY_GENERATED:
                 await self.handle_summary_generated(message)
-            case "completed":
+            case ContentProcessingStage.COMPLETED:
                 await self.handle_completed_processing_job(message)
-            case "failed":
+            case ContentProcessingStage.FAILED:
                 await self.handle_failed_processing_job(message)
             case _:
-                logger.warning(f"Unknown event type: {message.event_type}")
+                logger.warning(f"Unknown stage: {message.stage}")
 
-    async def handle_summary_generated(self, message: ProcessingEvent) -> None:
+    async def handle_summary_generated(self, message: ContentProcessingEvent) -> None:
         """Handles a summary generated event."""
-        logger.info(f"Source {message.source_id} summary generated!!!")
+        logger.info(f"Source {message.source_id} summary generated!")
 
-    async def handle_completed_processing_job(self, message: ProcessingEvent) -> None:
+    async def handle_completed_processing_job(self, message: ContentProcessingEvent) -> None:
         """Completes the ingestion process by updating the source and returning the source metadata."""
-        logger.info(f"Source {message.source_id} completed!!!")
+        logger.info(f"Source {message.source_id} ingestion completed.")
         await self._publish_source_event(
             source_id=message.source_id,
             status=SourceStatus.COMPLETED,
         )
 
-    async def handle_failed_processing_job(self, message: ProcessingEvent) -> None:
+    async def handle_failed_processing_job(self, message: ContentProcessingEvent) -> None:
         """Handles a failed processing job."""
         logger.info(f"Source {message.source_id} failed!")
         await self._publish_source_event(
