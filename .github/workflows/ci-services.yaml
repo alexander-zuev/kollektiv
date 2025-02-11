@@ -1,0 +1,161 @@
+name: Setup Services
+
+on:
+  workflow_call:
+    outputs:
+      services-cache-hit:
+        description: "Whether there was a cache hit for service images"
+        value: ${{ jobs.services.outputs.cache-hit }}
+      redis-version:
+        description: "Redis version"
+        value: ${{ jobs.services.outputs.redis-version }}
+      chroma-version:
+        description: "ChromaDB version"
+        value: ${{ jobs.services.outputs.chroma-version }}
+
+# Sync with compose.yaml
+env:
+  REDIS_IMAGE: "redis"
+  REDIS_VERSION: "7.4.1-alpine"
+  CHROMA_IMAGE: "chromadb/chroma"
+  CHROMA_VERSION: "0.5.23"
+  WORKER_IMAGE: "kollektiv-worker"
+  WORKER_VERSION: "latest"
+
+jobs:
+  services:
+    name: Setup Docker Services
+    runs-on: ubuntu-latest
+    outputs:
+      cache-hit: ${{ steps.final-images-cache.outputs.cache-hit }}
+      redis-version: ${{ env.REDIS_VERSION }}
+      chroma-version: ${{ env.CHROMA_VERSION }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      #----------------------------------------------
+      #  Build or check worker image
+      #----------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Cache buildx layers
+      - name: Cache buildx layers
+        id: buildx-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
+
+      # Cache final worker image
+      - name: Cache worker image
+        id: worker-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/worker-cache
+          key: worker-image-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
+
+      # Build worker if buildx cache miss
+      - name: Build worker (cache miss)
+        if: steps.buildx-cache.outputs.cache-hit != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: scripts/docker/Dockerfile
+          load: true
+          tags: ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # Move cache on buildx cache miss
+      - name: Move cache
+        if: steps.buildx-cache.outputs.cache-hit != 'true'
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      # Save image on buildx cache miss
+      - name: Save worker image (cache miss)
+        if: steps.buildx-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/worker-cache
+          docker save ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} > /tmp/worker-cache/worker.tar
+
+      # Create image from cached layers if no image
+      - name: Create image from cache
+        if: steps.buildx-cache.outputs.cache-hit == 'true' && steps.worker-cache.outputs.cache-hit != 'true'
+        run: |
+          docker buildx build \
+            --load \
+            --cache-from=type=local,src=/tmp/.buildx-cache \
+            -t ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} \
+            -f scripts/docker/Dockerfile .
+          mkdir -p /tmp/worker-cache
+          docker save ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} > /tmp/worker-cache/worker.tar
+
+      # Load existing image if cached
+      - name: Load cached worker image
+        if: steps.worker-cache.outputs.cache-hit == 'true'
+        run: docker load < /tmp/worker-cache/worker.tar
+
+      #----------------------------------------------
+      #  Pull or load base images
+      #----------------------------------------------
+      # Redis
+      - name: Cache Redis image
+        id: redis-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/redis-cache
+          key: redis-${{ env.REDIS_VERSION }}
+
+      - name: Pull Redis if needed
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/redis-cache
+          docker pull ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }}
+          docker save ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }} > /tmp/redis-cache/redis.tar
+
+      - name: Load Redis if cached
+        if: steps.redis-cache.outputs.cache-hit == 'true'
+        run: docker load < /tmp/redis-cache/redis.tar
+
+      # ChromaDB
+      - name: Cache ChromaDB image
+        id: chroma-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/chroma-cache
+          key: chroma-${{ env.CHROMA_VERSION }}
+
+      - name: Pull ChromaDB if needed
+        if: steps.chroma-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/chroma-cache
+          docker pull ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }}
+          docker save ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }} > /tmp/chroma-cache/chromadb.tar
+
+      - name: Load ChromaDB if cached
+        if: steps.chroma-cache.outputs.cache-hit == 'true'
+        run: docker load < /tmp/chroma-cache/chromadb.tar
+
+      #----------------------------------------------
+      #  Prepare final images cache for tests
+      #----------------------------------------------
+      - name: Create final images directory
+        run: mkdir -p /tmp/final-images
+
+      - name: Save all images for tests
+        run: |
+          docker save ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }} > /tmp/final-images/redis.tar
+          docker save ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }} > /tmp/final-images/chromadb.tar
+          docker save ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} > /tmp/final-images/worker.tar
+
+      - name: Cache final images
+        id: final-images-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/final-images
+          key: final-images-${{ env.REDIS_VERSION }}-${{ env.CHROMA_VERSION }}-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
+

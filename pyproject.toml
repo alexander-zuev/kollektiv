@@ -48,6 +48,7 @@ flower = "^2.0.1"
 git-filter-repo = "^2.47.0"
 arq = "^0.26.3"
 msgpack = "^1.1.0"
+idna = "^3.10"
 
 
 [tool.poetry.group.dev.dependencies]

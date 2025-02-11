@@ -1,0 +1,149 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  ENVIRONMENT: "staging"
+  WANDB_MODE: "disabled"
+
+jobs:
+  setup:
+    name: Setup Environment
+    uses: ./.github/workflows/ci-setup.yaml
+  
+  services:
+    name: Setup Docker Services
+    uses: ./.github/workflows/ci-services.yaml
+
+  test:
+    name: Unit and Integration Tests
+    needs: [setup, services]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      #----------------------------------------------
+      #  restore cached environment
+      #----------------------------------------------
+      - name: Load cached Python installation
+        id: cached-python
+        uses: actions/cache@v4
+        with:
+          path: /opt/hostedtoolcache/Python/${{ needs.setup.outputs.python-version }}/x64
+          key: python-${{ runner.os }}-${{ runner.arch }}-${{ needs.setup.outputs.python-version }}
+
+      - name: Load cached Poetry installation
+        id: cached-poetry
+        uses: actions/cache@v4
+        with:
+          path: ~/.local
+          key: poetry-${{ needs.setup.outputs.poetry-version }}
+
+      - name: Load cached Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: venv-${{ runner.os }}-python-${{ needs.setup.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      #----------------------------------------------
+      #  setup environment variables
+      #----------------------------------------------
+      - name: Create env file
+        run: |
+          cat << EOF > config/.env
+          # Environment
+          SERVICE=api
+          RAILWAY_PUBLIC_DOMAIN=test-domain.railway.app  # Add for CI
+          DEBUG=true  # Add for tests
+
+          # Infrastructure
+          REDIS_URL=redis://localhost:6379  # Uses localhost
+          CHROMA_PRIVATE_URL=http://localhost:8000  # Uses localhost
+
+          # Supabase Staging
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+
+          # API Keys
+          FIRECRAWL_API_KEY=${{ secrets.FIRECRAWL_API_KEY }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          COHERE_API_KEY=${{ secrets.COHERE_API_KEY }}
+          EOF
+
+      #----------------------------------------------
+      #  setup docker images
+      #----------------------------------------------
+      - name: Check services cache status
+        run: |
+          echo "Services cache hit: ${{ needs.services.outputs.services-cache-hit }}"
+      
+      # Create directory for docker images
+      - name: Create docker images directory
+        run: mkdir -p /tmp/final-images
+
+      # Load Docker images from cache
+      - name: Load Docker images cache
+        id: docker-images-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/final-images
+          key: final-images-${{ needs.services.outputs.redis-version }}-${{ needs.services.outputs.chroma-version }}-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
+          fail-on-cache-miss: true  # Fail if images aren't cached
+
+      # Load the actual Docker images
+      - name: Load Docker images
+        run: |
+          docker load < /tmp/final-images/redis.tar
+          docker load < /tmp/final-images/chromadb.tar
+          docker load < /tmp/final-images/worker.tar
+
+      - name: Start services
+        run: |
+          docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d
+
+      #----------------------------------------------
+      #  Run tests
+      #----------------------------------------------
+      - name: Run unit tests
+        id: unit-tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          poetry run pytest \
+            tests/unit \
+            --quiet \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml
+
+      - name: Run integration tests
+        id: integration-tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          poetry run pytest \
+            tests/integration \
+            --quiet \
+            --cov=src \
+            --cov-append \
+            --cov-report=xml \
+            --cov-report=term-missing:skip-covered \
+            --cov-config=pyproject.toml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Stop services
+        if: always()
+        run: docker compose --env-file config/.env -f scripts/docker/compose.yaml down

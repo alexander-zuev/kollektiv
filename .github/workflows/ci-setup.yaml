@@ -1,0 +1,88 @@
+name: Setup Python Environment
+
+on:
+  workflow_call:
+    outputs:
+      python-cache-hit:
+        description: "Whether there was a cache hit for dependencies"
+        value: ${{ jobs.setup.outputs.python-cache-hit }}
+      poetry-cache-hit:
+        description: "Whether there was a cache hit for Poetry dependencies"
+        value: ${{ jobs.setup.outputs.poetry-cache-hit }}
+      python-version:
+        description: "Python version used in setup"
+        value: ${{ jobs.setup.outputs.python-version }}
+      poetry-version:
+        description: "Poetry version used in setup"
+        value: ${{ jobs.setup.outputs.poetry-version }}
+
+env:
+  PYTHON_VERSION: "3.12.7"  # Manually keep in sync with pyproject.toml and local env
+  POETRY_VERSION: "2.0.1"
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  setup:
+    name: Setup Python Environment
+    runs-on: ubuntu-latest
+    outputs:
+      python-cache-hit: ${{ steps.cached-python.outputs.cache-hit }}
+      poetry-cache-hit: ${{ steps.cached-poetry.outputs.cache-hit }}
+      python-version: ${{ env.PYTHON_VERSION }}
+      poetry-version: ${{ env.POETRY_VERSION }}
+
+    steps:
+      #----------------------------------------------
+      #       check-out repo and cache and install python
+      #----------------------------------------------
+      - uses: actions/checkout@v4
+
+      - name: Load cached Python installation
+        id: cached-python
+        uses: actions/cache@v4
+        with:
+          path: /opt/hostedtoolcache/Python/${{ env.PYTHON_VERSION }}/x64
+          key: python-${{ runner.os }}-${{ runner.arch }}-${{ env.PYTHON_VERSION }}
+    
+      - name: Setup Python
+        id: setup-python
+        if: steps.cached-python.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      #----------------------------------------------
+      #  -----  cache & install poetry  -----
+      #----------------------------------------------
+      - name: Load cached Poetry installation
+        id: cached-poetry
+        uses: actions/cache@v4
+        with:
+          path: ~/.local
+          key: poetry-${{ env.POETRY_VERSION }}
+
+      - name: Install & configure Poetry
+        if: steps.cached-poetry.outputs.cache-hit != 'true'
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+
+      #----------------------------------------------
+      # Create and populate virtualenv
+      #----------------------------------------------
+      - name: Create virtualenv directory
+        run: mkdir -p ~/.cache/pypoetry/virtualenvs
+
+      - name: Load cached dependencies
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: venv-${{ runner.os }}-python-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+      #----------------------------------------------
+      # install dependencies if cache does not exist
+      #----------------------------------------------
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --with dev

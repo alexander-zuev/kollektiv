@@ -1,0 +1,62 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  setup:
+    name: Setup Environment
+    uses: ./.github/workflows/ci-setup.yaml
+
+  quality:
+    name: Code Quality
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      #----------------------------------------------
+      #  restore cached environment
+      #----------------------------------------------
+      - name: Load cached Python installation
+        id: cached-python
+        uses: actions/cache@v4
+        with:
+          path: /opt/hostedtoolcache/Python/${{ needs.setup.outputs.python-version }}/x64
+          key: python-${{ runner.os }}-${{ runner.arch }}-${{ needs.setup.outputs.python-version }}
+
+      - name: Load cached Poetry installation
+        id: cached-poetry
+        uses: actions/cache@v4
+        with:
+          path: ~/.local
+          key: poetry-${{ needs.setup.outputs.poetry-version }}
+  
+      - name: Load cached Poetry dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: venv-${{ runner.os }}-python-${{ needs.setup.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Run mypy type checking
+        run: |
+          poetry run mypy src/  \
+            --config-file pyproject.toml \
+            --no-incremental \
+            --show-error-codes
+        continue-on-error: true
+
+      - name: Run Ruff linting
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: check .
+        continue-on-error: true
+
+      - name: Check code formatting
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: format --check .
+        continue-on-error: true
