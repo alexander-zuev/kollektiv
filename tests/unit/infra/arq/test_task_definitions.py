@@ -13,7 +13,8 @@ from src.infra.arq.task_definitions import (
     publish_event,
 )
 from src.infra.events.channels import Channels
-from src.models.pubsub_models import ContentProcessingEvent, ContentProcessingStage
+from src.models.content_models import ContentProcessingEvent, SourceStage
+from src.models.pubsub_models import EventType
 
 
 @pytest.fixture
@@ -130,8 +131,8 @@ async def test_publish_event_success(mock_context):
     source_id = uuid4()
     event = ContentProcessingEvent(
         source_id=source_id,
-        event_type="content_processing",  # Fixed: Use correct event type
-        stage=ContentProcessingStage.STARTED,  # Fixed: Add required stage field
+        event_type=EventType.CONTENT_PROCESSING,
+        stage=SourceStage.CREATED,  # Fixed: Add required stage field
     )
 
     mock_context["worker_services"].event_publisher.publish_event = AsyncMock()
@@ -139,7 +140,7 @@ async def test_publish_event_success(mock_context):
     result = await publish_event(mock_context, event)
 
     mock_context["worker_services"].event_publisher.publish_event.assert_called_once_with(
-        channel=Channels.Sources.processing_channel(), message=event
+        channel=Channels.content_processing_channel(source_id), message=event
     )
 
     assert result.status == KollektivTaskStatus.SUCCESS
@@ -151,7 +152,7 @@ async def test_publish_event_connection_error(mock_context):
     """Test event publishing with connection error."""
     source_id = uuid4()
     event = ContentProcessingEvent(
-        source_id=source_id, event_type="content_processing", stage=ContentProcessingStage.STARTED
+        source_id=source_id, event_type=EventType.CONTENT_PROCESSING, stage=SourceStage.CREATED
     )
 
     mock_context["worker_services"].event_publisher.publish_event = AsyncMock(
@@ -169,7 +170,7 @@ async def test_publish_event_unexpected_error(mock_context):
     """Test event publishing with unexpected error."""
     source_id = uuid4()
     event = ContentProcessingEvent(
-        source_id=source_id, event_type="content_processing", stage=ContentProcessingStage.STARTED
+        source_id=source_id, event_type=EventType.CONTENT_PROCESSING, stage=SourceStage.CREATED
     )
 
     mock_context["worker_services"].event_publisher.publish_event = AsyncMock(side_effect=Exception("Unexpected error"))

@@ -5,9 +5,10 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from arq import ArqRedis
+from pydantic import ValidationError
 
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
-from src.core._exceptions import CrawlerError, JobNotFoundError
+from src.core._exceptions import CrawlerError, JobNotFoundError, NonRetryableError
 from src.core.content.crawler import FireCrawler
 from src.infra.decorators import generic_error_handler
 from src.infra.events.channels import Channels
@@ -18,15 +19,15 @@ from src.models.content_models import (
     AddContentSourceRequest,
     AddContentSourceRequestDB,
     AddContentSourceResponse,
+    ContentProcessingEvent,
     DataSource,
     FireCrawlSourceMetadata,
     SourceEvent,
     SourceOverview,
-    SourceStatus,
+    SourceStage,
 )
 from src.models.firecrawl_models import CrawlRequest
 from src.models.job_models import CrawlJobDetails, Job, JobStatus, JobType, ProcessingJobDetails
-from src.models.pubsub_models import ContentProcessingEvent, ContentProcessingStage
 from src.services.data_service import DataService
 from src.services.job_manager import JobManager
 
@@ -77,9 +78,12 @@ class ContentService:
             logger.debug("STEP 1. Crawl started")
 
             # Publish event
-            await self._publish_source_event(
-                source_id=source.source_id,
-                status=source.status,
+            await self.event_publisher.publish_event(
+                channel=Channels.content_processing_channel(source.source_id),
+                message=ContentProcessingEvent(
+                    source_id=source.source_id,
+                    stage=source.stage,
+                ),
             )
 
             logger.debug("STEP 3. Crawl started successfully")
@@ -98,19 +102,14 @@ class ContentService:
         except CrawlerError as e:
             # Crawler error -> returns a response
             logger.exception(f"Crawling of the source failed: {e}")
-            return AddContentSourceResponse(
-                source_id=source.source_id,
-                status=SourceStatus.FAILED,
-                error=str(e),
-                error_type="crawler",
-            )
+            raise NonRetryableError(f"Crawling of the source failed: {e}") from e
         except Exception as e:
             # Infrastructure error -> returns a response
             logger.exception(f"Failed to add source: {e}")
             if source:
                 await self.data_service.update_datasource(
                     source_id=source.source_id,
-                    updates={"status": SourceStatus.FAILED, "error": str(e)},
+                    updates={"status": SourceStage.FAILED, "error": str(e)},
                 )
             if job:
                 await self.job_manager.update_job(
@@ -118,24 +117,21 @@ class ContentService:
                 )
 
             # Publish failed event
-            await self._publish_source_event(
-                source_id=source.source_id,
-                status=SourceStatus.FAILED,
+            await self.event_publisher.publish_event(
+                channel=Channels.content_processing_channel(source.source_id),
+                message=self.event_publisher.create_event(
+                    source_id=source.source_id,
+                    stage=SourceStage.FAILED,
+                ),
             )
-
-            return AddContentSourceResponse(
-                source_id=source.source_id,
-                status=SourceStatus.FAILED,
-                error="An internal server error occured, we are working on it.",  # do not expose internal errors
-                error_type="infrastructure",
-            )
+            raise NonRetryableError("An internal server error occured, we are working on it.") from e
 
     async def _create_and_save_datasource(self, request: AddContentSourceRequest) -> DataSource:
         """Initiates saving of the datasource record into the database."""
         data_source = DataSource(
             user_id=request.user_id,
             source_type=request.source_type,
-            status=SourceStatus.PENDING,
+            stage=SourceStage.CREATED,
             metadata=FireCrawlSourceMetadata(
                 crawl_config=request.request_config,
                 total_pages=0,
@@ -209,17 +205,20 @@ class ContentService:
             await self.data_service.update_datasource(
                 source_id=job.details.source_id,
                 updates={
-                    "status": SourceStatus.CRAWLING,
+                    "status": SourceStage.CRAWLING_STARTED,
                     "job_id": job.job_id,
                     "updated_at": datetime.now(UTC),
                 },
             )
             logger.debug(f"Updated source {job.details.source_id} status to CRAWLING")
 
-            # Publish crawling event
-            await self._publish_source_event(
-                source_id=job.details.source_id,
-                status=SourceStatus.CRAWLING,
+            # Publish crawling started event
+            await self.event_publisher.publish_event(
+                channel=Channels.content_processing_channel(job.details.source_id),
+                message=self.event_publisher.create_event(
+                    source_id=job.details.source_id,
+                    stage=SourceStage.CRAWLING_STARTED,
+                ),
             )
         except Exception as e:
             logger.error(f"Failed to handle start event for job {job.job_id}: {e}")
@@ -283,52 +282,21 @@ class ContentService:
                         crawl_config=source.metadata.crawl_config,  # Keep existing
                         total_pages=len(documents),
                     ),
-                    "status": SourceStatus.PROCESSING,
+                    "status": SourceStage.PROCESSING_SCHEDULED,
                     "job_id": processing_job.job_id,  # How dirty. Overwriting of the job id.
                     "updated_at": datetime.now(UTC),
                 },
             ),
-            self._publish_source_event(
-                source_id=source.source_id,
-                status=SourceStatus.PROCESSING,
+            self.event_publisher.publish_event(
+                channel=Channels.content_processing_channel(source.source_id),
+                message=self.event_publisher.create_event(
+                    source_id=source.source_id,
+                    stage=SourceStage.PROCESSING_SCHEDULED,
+                ),
             ),
         )
 
         logger.debug(f"Updated source {source.source_id} status to PROCESSING")
-
-    async def handle_pubsub_event(self, message: ContentProcessingEvent) -> None:
-        """Handles a process documents jobs."""
-        # 1. Pass into completed or failed processing job
-        match message.stage:
-            case ContentProcessingStage.SUMMARY_GENERATED:
-                await self.handle_summary_generated(message)
-            case ContentProcessingStage.COMPLETED:
-                await self.handle_completed_processing_job(message)
-            case ContentProcessingStage.FAILED:
-                await self.handle_failed_processing_job(message)
-            case _:
-                logger.warning(f"Unknown stage: {message.stage}")
-
-    async def handle_summary_generated(self, message: ContentProcessingEvent) -> None:
-        """Handles a summary generated event."""
-        logger.info(f"Source {message.source_id} summary generated!")
-
-    async def handle_completed_processing_job(self, message: ContentProcessingEvent) -> None:
-        """Completes the ingestion process by updating the source and returning the source metadata."""
-        logger.info(f"Source {message.source_id} ingestion completed.")
-        await self._publish_source_event(
-            source_id=message.source_id,
-            status=SourceStatus.COMPLETED,
-        )
-
-    async def handle_failed_processing_job(self, message: ContentProcessingEvent) -> None:
-        """Handles a failed processing job."""
-        logger.info(f"Source {message.source_id} failed!")
-        await self._publish_source_event(
-            source_id=message.source_id,
-            status=SourceStatus.FAILED,
-            error=message.error,
-        )
 
     async def _handle_crawl_failure(self, job: Job, error: str) -> None:
         """Handle crawl.failed event"""
@@ -343,14 +311,17 @@ class ContentService:
         source_id = job.details.source_id
         await self.data_service.update_datasource(
             source_id=source_id,
-            updates={"status": SourceStatus.FAILED, "error": error, "updated_at": datetime.now(UTC)},
+            updates={"status": SourceStage.FAILED, "error": error, "updated_at": datetime.now(UTC)},
         )
         logger.debug(f"Updated source {source_id} status to FAILED")
 
-        await self._publish_source_event(
-            source_id=source_id,
-            status=SourceStatus.FAILED,
-            error=error,
+        await self.event_publisher.publish_event(
+            channel=Channels.content_processing_channel(source_id),
+            message=self.event_publisher.create_event(
+                source_id=source_id,
+                stage=SourceStage.FAILED,
+                error=error,
+            ),
         )
 
     async def stream_source_events(
@@ -359,59 +330,32 @@ class ContentService:
     ) -> AsyncGenerator[SourceEvent, None]:
         """Stream SSE events for a source."""
         try:
-            source = await self.data_service.get_datasource(source_id)
-            yield SourceEvent(
-                source_id=source.source_id,
-                status=source.status,
-                metadata={},
-            )
-            logger.info(f"Streamed source {source_id} event {source.status}")
-
-            # Get async client
+            # Subscribe to ContentProcessingEvent channel
             redis_client = await self.redis_manager.get_async_client()
             async with redis_client.pubsub() as pubsub:
-                await pubsub.subscribe(Channels.Sources.source_events_channel(source_id))
-                logger.info(f"Subscribed to source {source_id} events")
+                await pubsub.subscribe(Channels.content_processing_channel(source_id))
+                logger.info(
+                    f"Subscribed to source {source_id} events on channel {Channels.content_processing_channel(source_id)}"
+                )
 
                 # Listen to events and emit events as they arrive
                 async for message in pubsub.listen():
+                    # This assumes events are ContentProcessingEvent which is correct
                     if message["type"] == "message":
                         try:
                             event_data = json.loads(message["data"])
-                            event = SourceEvent(**event_data)
+                            event = SourceEvent.from_processing_event(ContentProcessingEvent(**event_data))
                             yield event
 
-                            if event.status in (SourceStatus.COMPLETED, SourceStatus.FAILED):
+                            if event.stage in (SourceStage.COMPLETED, SourceStage.FAILED):
                                 break
-
-                        except json.JSONDecodeError:
-                            logger.error("Invalid JSON in message")
-                        except ValueError as e:
+                        except (json.JSONDecodeError, ValueError, ValidationError) as e:
                             logger.error(f"Invalid event data: {e}")
+                            raise
 
         except Exception as e:
             logger.exception(f"Failed to stream source {source_id} events: {e}")
-            yield SourceEvent(
-                source_id=source_id,
-                status=SourceStatus.FAILED,
-                error=str(e),
-                metadata={},
-            )
-
-    async def _publish_source_event(
-        self,
-        source_id: UUID,
-        status: SourceStatus,
-        error: str | None = None,
-        metadata: dict | None = None,
-    ) -> None:
-        """Publish source event to Redis."""
-        event = SourceEvent(source_id=source_id, status=status, error=error, metadata=metadata or {})
-
-        await self.event_publisher.publish_event(
-            channel=Channels.Sources.source_events_channel(source_id),
-            message=event,
-        )
+            raise
 
     async def get_sources(self, user_id: UUID) -> list[SourceOverview]:
         """Build a list of SourceOverview objects from a list of SourceSummary objects."""
