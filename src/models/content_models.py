@@ -3,12 +3,16 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, HttpUrl, PrivateAttr, field_validator
+from pydantic import BaseModel, Field, HttpUrl, PrivateAttr, ValidationError, field_validator
 
+from src.infra.logger import get_logger
 from src.models.base_models import APIModel, SupabaseModel
+from src.models.pubsub_models import EventType, KollektivEvent
+
+logger = get_logger()
 
 
 class DataSourceType(str, Enum):
@@ -145,22 +149,23 @@ class AddContentSourceResponse(APIModel):
     """Simplified model inheriting from Source."""
 
     source_id: UUID = Field(...)
-    status: SourceStatus = Field(..., description="Status of the data source")
-    error: str | None = Field(None, description="Error message, null if no error")
-    error_type: Literal["crawler", "infrastructure"] | None = Field(None, description="Type of the error")
+    stage: SourceStage = Field(..., description="Stage of the data source")
+    # error: str | None = Field(None, description="Error message, null if no error")
+    # error_type: Literal["crawler", "infrastructure"] | None = Field(None, description="Type of the error")
 
     @classmethod
     def from_source(cls, source: DataSource) -> AddContentSourceResponse:
-        return cls(source_id=source.source_id, status=source.status, error=source.error, error_type=None)
+        return cls(source_id=source.source_id, stage=source.stage, error=source.error, error_type=None)
 
 
-class SourceStatus(str, Enum):
-    """Model of Source Status."""
+class SourceStage(str, Enum):
+    """Model of Source source stages throught the processing pipeline."""
 
-    PENDING = "pending"  # right after creation
-    CRAWLING = "crawling"  # after crawling started
-    PROCESSING = "processing"  # during chunking and embedding
-    GENERATING_SUMMARY = "generating_summary"  # during summary generation
+    CREATED = "created"  # right after creation
+    CRAWLING_STARTED = "crawling_started"  # after crawling started
+    PROCESSING_SCHEDULED = "processing_scheduled"  # during chunking and embedding
+    CHUNKS_GENERATED = "chunks_generated"  # after chunks generated
+    SUMMARY_GENERATED = "generating_summary"  # during summary generation
     COMPLETED = "completed"  # after processing is complete
     FAILED = "failed"  # if addition failed
 
@@ -178,7 +183,9 @@ class DataSource(SupabaseModel):
     source_type: DataSourceType = Field(
         ..., description="Type of the data source corresponding to supported data source types"
     )
-    status: SourceStatus = Field(..., description="Status of the content source in the system.")
+    stage: SourceStage = Field(
+        SourceStage.CREATED, description="Stage of the content source in the system, starts with created"
+    )
 
     metadata: FireCrawlSourceMetadata = Field(
         ..., description="Source-specific configuration. Schema depends on source_type"
@@ -195,17 +202,6 @@ class FireCrawlSourceMetadata(BaseModel):
 
     crawl_config: ContentSourceConfig = Field(..., description="Configuration of the crawl")
     total_pages: int = Field(default=0, description="Total number of pages in the source")
-
-
-# FE <> BE SSE event model
-class SourceEvent(BaseModel):
-    """SSE event model consumed by FE."""
-
-    source_id: UUID = Field(..., description="ID of the source this event belongs to")
-    status: SourceStatus = Field(..., description="Type of the event")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
-    metadata: dict[str, Any] | None = Field(..., description="Optional metadata for the event")
-    error: str | None = Field(default=None, description="Error message, null if no error")
 
 
 class SourceSummary(SupabaseModel):
@@ -284,6 +280,40 @@ class Chunk(SupabaseModel):
         return value
 
 
+class ContentProcessingEvent(KollektivEvent):
+    """Events related to content ingestion."""
+
+    source_id: UUID = Field(..., description="ID of the source this event belongs to")
+    stage: SourceStage = Field(..., description="Status of the event")
+    event_type: EventType = Field(EventType.CONTENT_PROCESSING, description="Type of the event")
+
+
+# GET /sources/{source_id}/events
+class SourceEvent(BaseModel):
+    """SSE event model consumed by FE."""
+
+    source_id: UUID = Field(..., description="ID of the source this event belongs to")
+    stage: SourceStage = Field(..., description="Type of the event")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Timestamp of the event")
+    metadata: dict[str, Any] | None = Field(None, description="Optional metadata for the event")
+    error: str | None = Field(default=None, description="Error message, null if no error")
+
+    @classmethod
+    def from_processing_event(cls, event: ContentProcessingEvent) -> SourceEvent:
+        """Deserializes a bytes ContentProcessingEvent into a SourceEvent."""
+        try:
+            return SourceEvent(
+                source_id=event.source_id,
+                stage=event.stage,
+                metadata=event.metadata,
+                error=event.error,
+            )
+        except ValidationError as e:
+            logger.exception(
+                f"Could not create SourceEvent from ContentProcessingEvent from stage {event.stage}: {str(e)}"
+            )
+
+
 # GET /sources
 class SourceOverview(BaseModel):
     """An individual source with a summary and status. Displayed in the view sources form."""
@@ -294,4 +324,6 @@ class SourceOverview(BaseModel):
 
 
 # PUT /sources/{source_id} <<< this can be a list
+# DELETE /sources/{source_id} <<< this can be a list
+
 # DELETE /sources/{source_id} <<< this can be a list

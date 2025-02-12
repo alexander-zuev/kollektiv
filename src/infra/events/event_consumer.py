@@ -9,7 +9,7 @@ from src.infra.events.channels import Channels
 from src.infra.external.redis_manager import RedisManager
 from src.infra.logger import get_logger
 from src.infra.settings import settings
-from src.models.pubsub_models import ContentProcessingEvent
+from src.models.content_models import ContentProcessingEvent
 from src.services.content_service import ContentService
 
 logger = get_logger()
@@ -34,8 +34,9 @@ class EventConsumer:
 
     async def subscribe_on_startup(self) -> None:
         """Subscribe to the processing channel on startup."""
-        await self.pubsub.subscribe(Channels.Sources.processing_channel())
-        logger.info("✓ Event consumer subscribed successfully")
+        # Subscribe to all content processing events
+        await self.pubsub.subscribe(f"{Channels.CONTENT_PROCESSING}/*")  # Global subscriber pattern
+        logger.info("✓ Event consumer subscribed successfully to content processing events")
 
     @tenacity_retry_wrapper(exceptions=(ConnectionError, TimeoutError))
     async def start(self) -> None:
