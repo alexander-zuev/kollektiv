@@ -24,7 +24,7 @@ class ServiceType(str, Enum):
 
 
 class Settings(BaseSettings):
-    """Settings shared between API and Celery worker."""
+    """Settings shared between API and ARQ worker."""
 
     # General
     project_name: str = Field("kollektiv", description="Project name")
@@ -127,7 +127,7 @@ class Settings(BaseSettings):
     service: ServiceType = Field(
         ...,  # Make it required
         alias="SERVICE",
-        description="Type of service to run (api or celery)",
+        description="Type of service to run (api or worker)",
     )
 
     @property

@@ -46,7 +46,7 @@ async def add_source(
         AddContentSourceResponse: Created content source details
 
     Raises:
-        HTTPException: If source creation fails
+        HTTPException: If source creation fails for any reason
     """
     logger.debug(f"Dumping request for debugging: {request.model_dump()}")
     try:
