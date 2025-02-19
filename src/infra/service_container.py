@@ -101,18 +101,19 @@ class ServiceContainer:
                 data_service=self.data_service,
                 conversation_manager=self.conversation_manager,
             )
-            self.ngrok_service = await NgrokService.create()
+            # Source summary
+            self.summary_manager = SummaryManager(
+                data_service=self.data_service,
+            )
 
-            # Events
+            # Pub/Sub
             self.event_consumer = await EventConsumer.create_async(
                 redis_manager=self.async_redis_manager, content_service=self.content_service
             )
             await self.event_consumer.start()
 
-            # Source summary
-            self.summary_manager = SummaryManager(
-                data_service=self.data_service,
-            )
+            # Local development only
+            self.ngrok_service = await NgrokService.create()
 
             # Log the successful initialization
             logger.info("✓ Initialized services successfully.")

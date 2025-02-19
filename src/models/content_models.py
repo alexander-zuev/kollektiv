@@ -96,7 +96,6 @@ class AddContentSourceRequest(SupabaseModel, APIModel):
     """
 
     _db_config: ClassVar[dict] = {"schema": "content", "table": "user_requests", "primary_key": "request_id"}
-    user_id: UUID = Field(..., description="User id, FK, provided by Supabase base after auth.")
     request_id: UUID = Field(default_factory=uuid4, description="System-generated id of a user request.")
     source_type: DataSourceType = Field(
         default=DataSourceType.WEB,  # Make web the default

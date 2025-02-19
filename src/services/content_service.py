@@ -54,7 +54,7 @@ class ContentService:
         self.arq_redis_pool = arq_redis_pool
 
     @generic_error_handler
-    async def add_source(self, request: AddContentSourceRequest) -> AddContentSourceResponse:
+    async def add_source(self, request: AddContentSourceRequest, user_id: UUID) -> AddContentSourceResponse:
         """POST /sources entrypoint.
 
         Args:
@@ -74,7 +74,7 @@ class ContentService:
             # Send a crawl request to firecrawl
             response = await self.crawler.start_crawl(request=CrawlRequest(**request.request_config.model_dump()))
             await self._save_user_request(AddContentSourceRequestDB.from_api_to_db(request))
-            source = await self._create_and_save_datasource(request)
+            source = await self._create_and_save_datasource(request=request, user_id=user_id)
             logger.debug("STEP 1. Crawl started")
 
             # Publish event
@@ -126,10 +126,10 @@ class ContentService:
             )
             raise NonRetryableError("An internal server error occured, we are working on it.") from e
 
-    async def _create_and_save_datasource(self, request: AddContentSourceRequest) -> DataSource:
+    async def _create_and_save_datasource(self, request: AddContentSourceRequest, user_id: UUID) -> DataSource:
         """Initiates saving of the datasource record into the database."""
         data_source = DataSource(
-            user_id=request.user_id,
+            user_id=user_id,
             source_type=request.source_type,
             stage=SourceStage.CREATED,
             metadata=FireCrawlSourceMetadata(

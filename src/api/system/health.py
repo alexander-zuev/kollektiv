@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from src.api.dependencies import ChromaManagerDep, RedisManagerDep, SupabaseManagerDep
 from src.api.routes import CURRENT_API_VERSION, Routes
+from src.api.v0.schemas.base_schemas import ErrorCode, ErrorResponse
 from src.api.v0.schemas.health_schemas import HealthCheckResponse
 from src.infra.decorators import tenacity_retry_wrapper
 from src.infra.logger import get_logger
@@ -43,15 +44,14 @@ async def health_check(
             chroma_manager=chroma_manager,
             supabase_manager=supabase_manager,
             redis_manager=redis_manager,
-            # celery_app=celery_app,
         )
     except Exception as e:
-        logger.error(f"✗ Health check failed with error: {str(e)}", exc_info=True)
+        logger.exception(f"✗ Health check failed with error: {str(e)}")
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        return HealthCheckResponse(
-            status="down",
-            message=f"Service is currently unavailable: {str(e)}",
-        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=ErrorResponse(code=ErrorCode.SERVER_ERROR, detail=str(e)),
+        ) from e
 
 
 @tenacity_retry_wrapper(max_attempts=3, min_wait=10, max_wait=30)
@@ -81,22 +81,6 @@ async def get_services_health(
     else:
         logger.error("✗ ChromaDB client not initialized")
         raise RuntimeError("ChromaDB client not initialized")
-
-    # Check Celery workers - verify active workers
-    # if settings.service != ServiceType.API:  # Only check workers if we're not the API
-    #     # inspector = celery_app.control.inspect()
-    #     logger.debug(f"Celery broker URL: {celery_app.conf.broker_url}")
-    #     try:
-    #         active_workers = inspector.active()
-    #         if not active_workers:
-    #             logger.error("✗ No active Celery workers found")
-    #             raise RuntimeError("No active Celery workers found")
-    #     except ConnectionRefusedError as e:
-    #         logger.error(f"✗ Failed to connect to Celery broker: {str(e)}")
-    #         raise RuntimeError(f"Failed to connect to Celery broker: {str(e)}")
-    #     except Exception as e:
-    #         logger.error(f"✗ Unexpected Celery error: {str(e)}")
-    #         raise
 
     result: HealthCheckResponse = HealthCheckResponse(
         status="operational",

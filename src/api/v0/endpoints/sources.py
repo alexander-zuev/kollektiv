@@ -33,6 +33,7 @@ router = APIRouter(prefix=f"{CURRENT_API_VERSION}")
 )
 async def add_source(
     request: AddContentSourceRequest,
+    user_id: UserIdDep,
     content_service: ContentServiceDep,
 ) -> AddContentSourceResponse:
     """
@@ -50,7 +51,7 @@ async def add_source(
     """
     logger.debug(f"Dumping request for debugging: {request.model_dump()}")
     try:
-        response = await content_service.add_source(request)
+        response = await content_service.add_source(request, user_id)
         return response
     except (CrawlerError, NonRetryableError) as e:
         raise HTTPException(status_code=500, detail=ErrorResponse(code=ErrorCode.SERVER_ERROR, detail=str(e))) from e
