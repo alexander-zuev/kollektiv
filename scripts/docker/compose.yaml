@@ -56,14 +56,15 @@ services:
       # Rebuild the image on changes to the `pyproject.toml`
       - action: rebuild
         path: ./uv.lock
-    entrypoint: ["/app/scripts/docker/entrypoint.sh"]
-    command: ["uv", "run", "kollektiv", "worker"]
+    # Let Dockerfile's CMD handle the command based on SERVICE env var
     env_file:
       - ../../config/.env
     environment:
+      - SUPABASE_URL=http://host.docker.internal:54321 # need to connect to the supabase service in the container, not localhost
       - REDIS_URL=redis://redis:6379 # need to connect to the redis service in the container, not localhost
       - CHROMA_PRIVATE_URL=http://chromadb:8000 # need to connect to the chromadb service in the container, not localhost
       - SERVICE=worker
+    # command: ["kollektiv", "${SERVICE}"] # matches Dockerfile CMD and sets SERVICE=worker
     depends_on:
       redis:
         condition: service_healthy

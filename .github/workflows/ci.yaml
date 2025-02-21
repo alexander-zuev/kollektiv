@@ -145,61 +145,6 @@ jobs:
           docker pull ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }}
           docker pull ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }}
       
-      
-      #   # Handle Redis and ChromaDB
-      # - name: Cache Redis image
-      #   id: redis-cache
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: /tmp/redis-cache
-      #     key: redis-${{ env.REDIS_VERSION }}
-
-      # - name: Pull Redis if needed
-      #   if: steps.redis-cache.outputs.cache-hit != 'true'
-      #   run: |
-      #     mkdir -p /tmp/redis-cache
-      #     docker pull ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }}
-      #     docker save ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }} > /tmp/redis-cache/redis.tar
-
-      # - name: Load Redis if cached
-      #   if: steps.redis-cache.outputs.cache-hit == 'true'
-      #   run: docker load < /tmp/redis-cache/redis.tar
-
-      # - name: Cache ChromaDB image
-      #   id: chroma-cache
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: /tmp/chroma-cache
-      #     key: chroma-${{ env.CHROMA_VERSION }}
-
-      # - name: Pull ChromaDB if needed
-      #   if: steps.chroma-cache.outputs.cache-hit != 'true'
-      #   run: |
-      #     mkdir -p /tmp/chroma-cache
-      #     docker pull ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }}
-      #     docker save ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }} > /tmp/chroma-cache/chromadb.tar
-
-      # - name: Load ChromaDB if cached
-      #   if: steps.chroma-cache.outputs.cache-hit == 'true'
-      #   run: docker load < /tmp/chroma-cache/chromadb.tar
-
-      # # Prepare final images cache
-      # - name: Create final images directory
-      #   run: mkdir -p /tmp/final-images
-
-      # - name: Save all images for tests
-      #   run: |
-      #     docker save ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }} > /tmp/final-images/redis.tar
-      #     docker save ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }} > /tmp/final-images/chromadb.tar
-      #     docker save ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} > /tmp/final-images/worker.tar
-
-      # - name: Cache final images
-      #   id: final-images-cache
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: /tmp/final-images
-      #     key: final-images-${{ env.REDIS_VERSION }}-${{ env.CHROMA_VERSION }}-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
-
       #----------------------------------------------
       #       Setup Test Environment
       #----------------------------------------------

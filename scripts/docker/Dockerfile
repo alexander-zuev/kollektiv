@@ -32,6 +32,11 @@ ENV PATH="/root/.local/bin/:$PATH"
 # Copy the project into the image
 ADD . /app
 
-# Sync the project into a new environment, using the frozen lockfile
+# Sync the project into a new environment
 WORKDIR /app
-RUN uv sync --frozen
+RUN uv sync --frozen --no-dev
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Define the default command (runs at container start)
+CMD kollektiv ${SERVICE}
+

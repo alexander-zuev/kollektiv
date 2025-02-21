@@ -8,37 +8,27 @@ readme = "README.md"
 dependencies = [
     "openai>=1.42.0,<2",
     "colorama>=0.4.6,<0.5",
-    "requests>=2.32.3,<3",
     "tiktoken>=0.7.0,<0.8",
     "markdown~=3.7",
+    "numpy>=1.26.4,<2.0",  # Pinned to avoid GLIBC issues
     "cohere>=5.9.0,<6",
     "firecrawl-py>=1.2.3,<2",
-    "jq>=1.8.0,<2",
     "weave>=0.51.12,<0.52",
     "wandb>=0.18.3,<0.19",
     "anthropic>=0.37.1,<0.38",
     "ragas>=0.2.3,<0.3",
     "pydantic-settings>=2.6.1,<3",
     "supabase>=2.10.0,<3",
-    "postgrest>=0.18.0,<0.19",
-    "libmagic~=1.0",
     "sentry-sdk[fastapi]>=2.19.0,<3",
     "sentry-cli>=2.39.1,<3",
     "sse-starlette>=2.1.3,<3",
     "redis[hiredis]>=5.2.1,<6",
-    "chromadb>=0.5.23,<0.6",
-    "types-pyyaml>=6.0.12.20241221,<7",
     "logfire[asyncpg, fastapi, httpx, redis, system-metrics]>=2.11.0,<3",
-    "asyncpg>=0.30.0,<0.31",
-    "ngrok>=1.4.0,<2",
-    "celery>=5.4.0,<6",
     "fastapi[standard]>=0.115.6,<0.116",
     "uvicorn[standard]>=0.34.0,<0.35",
-    "flower>=2.0.1,<3",
-    "git-filter-repo>=2.47.0,<3",
     "arq>=0.26.3,<0.27",
     "msgpack>=1.1.0,<2",
-    "idna~=3.10",
+    "chromadb>=0.5,<0.6",
 ]
 
 [project.scripts]
@@ -58,6 +48,9 @@ dev = [
     "types-colorama>=0.4.15.20240311,<0.5",
     "types-markdown>=3.7.0.20240822,<4",
     "fakeredis>=2.26.2,<3",
+    "types-pyyaml>=6.0.12.20241230",
+    "git-filter-repo>=2.47.0",
+    "ngrok>=1.4.0",
 ]
 
 

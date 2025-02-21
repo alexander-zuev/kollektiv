@@ -3,8 +3,7 @@ from uuid import UUID
 
 import httpx
 from firecrawl import FirecrawlApp
-from requests.exceptions import ConnectionError, Timeout
-from requests.exceptions import HTTPError as RequestsHTTPError
+from httpx import ConnectError, HTTPStatusError, TimeoutException
 
 from src.core._exceptions import CrawlerError, EmptyContentError
 from src.infra.decorators import generic_error_handler, tenacity_retry_wrapper
@@ -88,7 +87,7 @@ class FireCrawler:
             logger.exception(f"Error building params: {e}")
             raise
 
-    @tenacity_retry_wrapper((Timeout, ConnectionError))
+    @tenacity_retry_wrapper((TimeoutException, ConnectError))
     async def start_crawl(self, request: CrawlRequest) -> FireCrawlResponse:
         """Start a new crawl job with webhook configuration."""
         try:
@@ -98,11 +97,11 @@ class FireCrawler:
 
             logger.info(f"Received response from FireCrawl: {firecrawl_response}")
             return firecrawl_response
-        except (ConnectionError, Timeout) as e:
+        except (ConnectError, TimeoutException) as e:
             # Network errors will be retried by tenacity
             logger.warning(f"Error starting crawl: {e}")
             raise
-        except RequestsHTTPError as e:
+        except HTTPStatusError as e:
             # Non-network errors will not be retried by tenacity
             logger.exception(f"Error starting crawl: {e}")
             raise CrawlerError(f"Error starting crawl: {e}") from e
