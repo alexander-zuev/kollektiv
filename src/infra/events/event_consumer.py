@@ -22,6 +22,7 @@ class EventConsumer:
         self.redis_manager = redis_manager
         self.content_service = content_service
         self.pubsub: PubSub | None = None
+        self.listen_task: asyncio.Task | None = None  # Store reference to the background task
 
     @classmethod
     async def create_async(cls, redis_manager: RedisManager, content_service: ContentService) -> "EventConsumer":
@@ -42,8 +43,10 @@ class EventConsumer:
     async def start(self) -> None:
         """Start listening for events from the event bus."""
         try:
-            asyncio.create_task(self.listen_for_events())
-
+            if self.listen_task is not None:
+                logger.warning("Event consumer already running")
+                return
+            self.listen_task = asyncio.create_task(self.listen_for_events())
         except (ConnectionError, TimeoutError) as e:
             logger.exception(f"Failed to subscribe to channel {settings.process_documents_channel}: {e}")
             raise
@@ -58,13 +61,27 @@ class EventConsumer:
         except (ConnectionError, TimeoutError) as e:
             logger.exception(f"Failed to listen for events: {e}")
             raise
+        except asyncio.CancelledError:
+            logger.info("Event listener task cancelled")
+            raise
 
     async def stop(self) -> None:
         """Stop listening for events from the event bus."""
-        if self.pubsub:
-            await self.pubsub.unsubscribe()
-            await self.pubsub.aclose()
-            logger.info("✓ Event consumer stopped successfully")
+        try:
+            if self.listen_task is not None:
+                self.listen_task.cancel()
+                try:
+                    await self.listen_task
+                except asyncio.CancelledError:
+                    pass
+                self.listen_task = None
+
+            if self.pubsub:
+                await self.pubsub.unsubscribe()
+                await self.pubsub.aclose()
+                logger.info("✓ Event consumer stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping event consumer: {e}")
 
     async def handle_event(self, message_data: bytes) -> None:
         """Handle an event from the event bus."""

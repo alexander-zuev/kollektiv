@@ -58,7 +58,6 @@ def content_service(mock_dependencies):
 def sample_source_request():
     """Sample source request for testing."""
     return AddContentSourceRequest(
-        user_id=UUID("00000000-0000-0000-0000-000000000000"),
         request_id=UUID("00000000-0000-0000-0000-000000000001"),
         source_type=DataSourceType.WEB,
         request_config=ContentSourceConfig(
@@ -75,7 +74,7 @@ def sample_data_source(sample_source_request):
     """Sample data source for testing."""
     return DataSource(
         source_id=UUID("00000000-0000-0000-0000-000000000002"),
-        user_id=sample_source_request.user_id,
+        user_id=UUID("00000000-0000-0000-0000-000000000003"),  # Hardcoded test user ID
         request_id=sample_source_request.request_id,
         source_type=DataSourceType.WEB,
         status=SourceStage.CREATED,
@@ -100,7 +99,10 @@ class TestContentService:
         mock_dependencies["data_service"].update_datasource.return_value.stage = SourceStage.CREATED
 
         # Test
-        response = await content_service.add_source(sample_source_request)
+        response = await content_service.add_source(
+            request=sample_source_request,
+            user_id=UUID("00000000-0000-0000-0000-000000000003"),  # Pass the same user_id as in sample_data_source
+        )
 
         # Verify
         assert response.stage == SourceStage.CREATED  # Source starts as CREATED

@@ -59,6 +59,7 @@ class ContentService:
 
         Args:
             request: Validated request containing source configuration
+            user_id: UUID of the user creating the source
 
         Returns:
             SourceAPIResponse: API response with source details
@@ -239,9 +240,13 @@ class ContentService:
     async def _handle_crawl_completed(self, job: Job) -> None:
         """Handle crawl.completed event"""
         # 1. Get source & documents
+        firecrawl_id = job.details.firecrawl_id
+        if not isinstance(firecrawl_id, str) or not firecrawl_id:
+            raise ValueError(f"Invalid firecrawl_id: {firecrawl_id}")
+
         documents, source = await asyncio.gather(
             self.crawler.get_results(
-                firecrawl_id=job.details.firecrawl_id,
+                firecrawl_id=firecrawl_id,  # Now type checker knows this is str
                 source_id=job.details.source_id,
             ),
             self.data_service.get_datasource(job.details.source_id),
