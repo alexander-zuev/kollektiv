@@ -1,4 +1,3 @@
-import argparse
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -84,19 +83,13 @@ def run() -> None:
     """Run the FastAPI application with environment-specific settings."""
     try:
         if settings.environment == Environment.LOCAL:
-            # Parse arguments only in local development
-            parser = argparse.ArgumentParser()
-            parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
-            parser.add_argument("--workers", type=int, help="Number of workers")
-            args = parser.parse_args()
-
             # Development mode: Use Uvicorn with auto-reload
             uvicorn.run(
                 factory=True,
                 app="src.app:create_app",
                 host=settings.api_host,
                 port=settings.api_port,
-                reload=args.reload or settings.reload,  # Use parsed argument
+                reload=settings.reload,
                 log_level="debug" if settings.debug else "info",
             )
         else:
