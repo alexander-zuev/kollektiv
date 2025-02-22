@@ -1,29 +1,27 @@
-[variables]
-NIXPACKS_PYTHON_VERSION = "3.12.7"
-NIXPACKS_POETRY_VERSION = "1.8.5"
+# Nixpacks not used since building from Docker image
+# [variables]
+# NIXPACKS_PYTHON_VERSION = "3.12.9"
+# NIXPACKS_UV_VERSION = "0.6.0"
 
-[phases.setup]
-# Specifies the required Python version
-nixpkgs = ["python312", "gcc"]
+# [phases.setup]
+# nixPkgs = ["python312", "gcc"]  
 
-[phases.install]
-# Set up a virtual environment and install dependencies
-# Cache dependencies layer
-cache_directories = [
-  "/root/.cache/pip",        # Pip downloads
-  "/opt/venv",               # Virtual env
-  "~/.cache/poetry",         # Poetry cache
-  "/root/.cache/pip/wheels", # Pre-built wheels
-]
-cmds = [
-  "echo '🚀 Starting Kollektiv installation...'",
-  "python -m venv /opt/venv",
-  ". /opt/venv/bin/activate",
-  "pip install --no-cache-dir poetry",
-  "poetry config virtualenvs.create false",
-  "poetry install --only main --no-interaction --no-ansi --no-root",
-  "echo \"🚀 Starting Kollektiv service: ${SERVICE}\"",
-]
 
-[start]
-cmd = "poetry run $SERVICE"
+# [phases.install]
+# # Cache dependencies layer
+# cache_directories = [
+#     "/root/.cache/uv"  # UV's cache for packages
+# ]
+# cmds = [
+#   # Download and install UV
+#   "curl -LsSf https://astral.sh/uv/${NIXPACKS_UV_VERSION}/install.sh | sh",
+#   "uv venv",
+#   "source /opt/venv/bin/activate",
+#   "uv pip install .",
+#   "echo \"🚀 Starting Kollektiv service: ${SERVICE}\"",
+# ]
+
+# [start]
+# cmd = "kollektiv $SERVICE"
+
+

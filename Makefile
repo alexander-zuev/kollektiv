@@ -4,6 +4,9 @@
 up:
 	docker compose --env-file config/.env -f scripts/docker/compose.yaml up -d --remove-orphans
 
+dev:
+	docker compose --env-file config/.env -f scripts/docker/compose.yaml up --remove-orphans --watch
+
 down:
 	docker compose --env-file config/.env -f scripts/docker/compose.yaml down
 

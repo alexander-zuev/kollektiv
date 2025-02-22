@@ -41,23 +41,37 @@ services:
     build:
       context: ../../
       dockerfile: scripts/docker/Dockerfile
-    entrypoint: ["/app/scripts/docker/entrypoint.sh"]
-    command: ["watchfiles", "poetry run worker", "/app/src"]
+    develop:
+      watch:
+    # Sync the working directory with the `/app` directory in the container
+      - action: sync
+        path: .
+        target: /app
+        # Exclude the project virtual environment
+        ignore:
+          - .venv/
+          - .git/
+          - __pycache__/
+          - "*.pyc"
+      # Rebuild the image on changes to the `pyproject.toml`
+      - action: rebuild
+        path: ./uv.lock
+    # Let Dockerfile's CMD handle the command based on SERVICE env var
     env_file:
       - ../../config/.env
-    volumes:
-      - ../../:/app # this allows locally to not relaunch as code changes
     environment:
+      - SUPABASE_URL=http://host.docker.internal:54321 # need to connect to the supabase service in the container, not localhost
       - REDIS_URL=redis://redis:6379 # need to connect to the redis service in the container, not localhost
       - CHROMA_PRIVATE_URL=http://chromadb:8000 # need to connect to the chromadb service in the container, not localhost
       - SERVICE=worker
+    # command: ["kollektiv", "${SERVICE}"] # matches Dockerfile CMD and sets SERVICE=worker
     depends_on:
       redis:
         condition: service_healthy
       chromadb:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD", "poetry", "run", "arq", "--check", "src.infra.arq.worker:WorkerSettings"]
+      test: [ "CMD", "uv", "run", "arq", "--check", "src.infra.arq.worker:WorkerSettings"]
       interval: 30s
       timeout: 10s
       retries: 3

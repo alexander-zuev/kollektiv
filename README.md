@@ -1,11 +1,40 @@
 # 🚀 Kollektiv - LLMs + Up-to-date knowledge
 
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![CI](https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml/badge.svg)](https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml)
-[![codecov](https://codecov.io/github/alexander-zuev/kollektiv/graph/badge.svg?token=FAT0JJNZG8)](https://codecov.io/github/alexander-zuev/kollektiv)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/alexander-zuev/kollektiv/graphs/commit-activity)
+<p align="center">
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12" /></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff" /></a>
+  <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/uv-package%20manager-blueviolet" alt="uv package manager" /></a>
+  <a href="https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml"><img src="https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml/badge.svg" alt="CI" /></a>
+  <a href="https://codecov.io/github/alexander-zuev/kollektiv"><img src="https://codecov.io/github/alexander-zuev/kollektiv/graph/badge.svg?token=FAT0JJNZG8" alt="codecov" /></a>
+  <a href="https://github.com/alexander-zuev/kollektiv/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License" /></a>
+  <a href="https://github.com/alexander-zuev/kollektiv/graphs/commit-activity"><img src="https://img.shields.io/badge/Maintained-Active-green.svg" alt="Status" /></a>
+</p>
+
+> ⚠️ **Important Notice**
+>
+> Kollektiv is undergoing a major transformation for v0.2! Key updates in progress:
+>
+> - Complete architectural overhaul to a distributed system
+> - Brand new React-based Chat UI
+> - Enhanced RAG pipeline with Claude 3.5 Sonnet
+> - Improved documentation and developer experience
+>
+> While the core functionality remains stable, some features and documentation might be outdated.
+> The project is actively maintained, and updates are coming soon!
+>
+> **Current Status:**
+> - ✅ Core RAG functionality works
+> - ✅ API and worker services are stable
+> - 🏗️ New UI in development
+> - 📝 Documentation being updated
+
+## v0.2 Release Plan
+Kollektiv is getting ready for it's first major release. I'm going to update the documentation to reflect the new changes soon, but for now here is a sneak peak of what's coming:
+
+- **New Chat UI**: Custom-built chat UI for talking with your docs
+- **Architecture overhaul**: From the ground up rewrite of the codebase to align with proper distributed architecture - api, worker, KV store, vector DB, frontend UI
+- **Improved RAG system**: Improved RAG system that provides more accurate replies for your queries
+- **New documentation**: I'm going to add a lot of new documentation once the new version is released
 
 ## 🌟 Overview
 
@@ -60,15 +89,15 @@ So do let me know if you are experiencing issues and I'll try to fix them.
 ## 🛠️ Technical Stack
 
 - **Backend**: Python/FastAPI
+- **Package Management**: UV
+- **Task queue**: Arq
 - **Storage**:
   - Supabase (auth/data)
   - ChromaDB (vectors)
   - Redis (queues/real-time)
-- **AI/ML**:
-  - OpenAI text-embedding-3-small (embeddings)
+- **LLM**:
   - Anthropic Claude 3.5 Sonnet (chat)
   - Cohere (re-ranking)
-- **Additional**: tiktoken, pydantic, pytest, ruff
 
 ## 🚀 Quick Start
 
@@ -90,99 +119,38 @@ So do let me know if you are experiencing issues and I'll try to fix them.
    ```
 
 3. **Install dependencies:**
-
    ```bash
-   poetry install
+   #  create a virtual environment
+   uv venv
+   # activate the virtual environment
+   source .venv/bin/activate
+   # install dependencies with dev group
+   uv sync --group dev
    ```
 
-4. **Start the application and Redis:**
+4. **Start the application:**
    ```bash
-   poetry run kollektiv
+   # start docker services
+   make up
+
+   # start the api
+   kollektiv api
+
+   # start the workers
+   kollektiv worker
    ```
-   This command will start the FastAPI application and a Redis server using Docker Compose. The `docker-compose.yml` file is located at `scripts/external_deps/docker-compose.yml`.
-
-## 💡 Usage
-
-1. **Start the Application:**
-
-   ```bash
-   # Run both API and Chainlit UI
-   poetry run kollektiv
-
-   # Or run only Chainlit UI
-   chainlit run main.py
-   ```
-
-2. **Add Documentation:**
-
-   ```bash
-   @docs add https://your-docs-url.com
-   ```
-
-   The system will guide you through:
-
-   - Setting crawling depth
-   - Adding exclude patterns (optional)
-   - Processing and embedding content
-
-3. **Manage Documents:**
-
-   ```bash
-   @docs list                  # List all documents
-   @docs remove [ID]          # Remove a document
-   @help                      # Show all commands
-   ```
-
-4. **Chat with Documentation:**
-   Simply ask questions in natural language. The system will:
-   - Search relevant documentation
-   - Re-rank results for accuracy
-   - Generate contextual responses
-
-## ❤️‍🩹 Current Limitations
-
-- Image content not supported (text-only embeddings)
-- No automatic re-indexing of documentation
-- URL validation limited to common formats
-- Exclude patterns must start with `/`
-
-## 🛣️ Roadmap
-
-For a brief roadmap please check out [project wiki page](https://github.com/alexander-zuev/kollektiv/wiki).
-
-## 📈 Performance Metrics
-
-Evaluation is currently done using `ragas` library. There are 2 key parts assessed:
-
-1. End-to-end generation
-   - Faithfulness
-   - Answer relevancy
-   - Answer correctness
-2. Retriever (TBD)
-   - Context recall
-   - Context precision
+5. **Deployment on Railway:**
+Deployment requires settins the following environment variables:
+- Service: api / worker
+- Dockerfile path: `scripts/docker/Dockerfile`
+- Build Command: `uv sync --frozen --no-dev`
+- Start Command: `kollektiv $SERVICE`
 
 ## 📜 License
 
-Kollektiv is licensed under a modified version of the Apache License 2.0. While it allows for free use, modification,
-and distribution for non-commercial purposes, any commercial use requires explicit permission from the copyright owner.
+Kollektiv is licensed under the Apache License 2.0. See the [LICENSE](LICENSE.md) file for the full license text.
 
-- For non-commercial use: You are free to use, modify, and distribute this software under the terms of the Apache License 2.0.
-- For commercial use: Please contact azuev@outlook.com to obtain a commercial license.
-
-See the [LICENSE](LICENSE.md) file for the full license text and additional conditions.
-
-## Project Renaming Notice
-
-The project has been renamed from **OmniClaude** to **Kollektiv** to:
-
-- avoid confusion / unintended copyright infringement of Anthropic
-- emphasize the goal to become a tool to enhance collaboration through simplifying access to knowledge
-- overall cool name (isn't it?)
-
-If you have any questions regarding the renaming, feel free to reach out.
-
-## 🙏 Acknowledgements
+## 🥳 Acknowledgements
 
 - [FireCrawl](https://firecrawl.dev/) for superb web crawling
 - [Chroma DB](https://www.trychroma.com/) for easy vector storage and retrieval

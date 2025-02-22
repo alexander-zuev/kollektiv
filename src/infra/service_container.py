@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from redis.asyncio import Redis
 
 from src.core.chat.conversation_manager import ConversationManager
@@ -19,7 +21,13 @@ from src.infra.external.chroma_manager import ChromaManager
 from src.infra.external.redis_manager import RedisManager
 from src.infra.external.supabase_manager import SupabaseManager
 from src.infra.logger import get_logger
-from src.infra.misc.ngrok_service import NgrokService
+from src.infra.settings import settings
+
+# Type checking imports
+if TYPE_CHECKING:
+    from src.infra.misc.ngrok_service import NgrokService
+
+from src.infra.settings import Environment
 from src.services.chat_service import ChatService
 from src.services.content_service import ContentService
 from src.services.data_service import DataService
@@ -53,6 +61,20 @@ class ServiceContainer:
         self.event_publisher: EventPublisher | None = None
         self.event_consumer: EventConsumer | None = None
         self.summary_manager: SummaryManager | None = None
+
+    async def _initialize_ngrok(self) -> None:
+        """Initialize ngrok service for local development."""
+        if settings.environment != Environment.LOCAL:
+            return
+
+        try:
+            from src.infra.misc.ngrok_service import NgrokService
+
+            self.ngrok_service = await NgrokService.create()
+            if self.ngrok_service:
+                logger.info("✓ Initialized ngrok service for local development")
+        except ImportError:
+            logger.debug("Skipping ngrok initialization - package not available")
 
     async def initialize_services(self) -> None:
         """Initialize all services."""
@@ -113,7 +135,7 @@ class ServiceContainer:
             await self.event_consumer.start()
 
             # Local development only
-            self.ngrok_service = await NgrokService.create()
+            await self._initialize_ngrok()
 
             # Log the successful initialization
             logger.info("✓ Initialized services successfully.")

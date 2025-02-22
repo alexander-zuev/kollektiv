@@ -8,7 +8,6 @@ on:
 
 env:
   PYTHON_VERSION: "3.12.7"  # Manually keep in sync with pyproject.toml and local env
-  POETRY_VERSION: "2.0.1"
   PYTHONPATH: ${{ github.workspace }}
   PYTHONUNBUFFERED: "1"
   ENVIRONMENT: "staging"
@@ -20,7 +19,7 @@ env:
   CHROMA_VERSION: "0.5.23"
   WORKER_IMAGE: "kollektiv-worker"
   WORKER_VERSION: "latest"
-
+  UV_VERSION: "0.6.0" # match pyproject.toml
 jobs:
   ci:
     name: CI Pipeline
@@ -32,56 +31,31 @@ jobs:
       #----------------------------------------------
       #       Setup Python and Poetry
       #----------------------------------------------
-      - name: Load cached Python installation
-        id: cached-python
-        uses: actions/cache@v4
+
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: /opt/hostedtoolcache/Python/${{ env.PYTHON_VERSION }}/x64
-          key: python-${{ runner.os }}-${{ runner.arch }}-${{ env.PYTHON_VERSION }}
-    
-      - name: Setup Python
-        id: setup-python
-        if: steps.cached-python.outputs.cache-hit != 'true'
+          version: ${{ env.UV_VERSION }}
+
+      - name: "Set up Python"
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version-file: ".python-version"
 
-      - name: Load cached Poetry installation
-        id: cached-poetry
-        uses: actions/cache@v4
-        with:
-          path: ~/.local
-          key: poetry-${{ env.POETRY_VERSION }}
-
-      - name: Install Poetry
-        if: steps.cached-poetry.outputs.cache-hit != 'true'
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
 
       #----------------------------------------------
       #       Install Dependencies
       #----------------------------------------------
-      - name: Create virtualenv directory
-        run: mkdir -p ~/.cache/pypoetry/virtualenvs
-
-      - name: Load cached dependencies
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pypoetry/virtualenvs
-          key: venv-${{ runner.os }}-python-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
-
-      - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --with dev
+      - name: Install the project
+        run: uv sync --all-extras --dev
 
       #----------------------------------------------
       #       Code Quality Checks
       #----------------------------------------------
       - name: Run mypy type checking
         run: |
-          poetry run mypy src/  \
+          uv run mypy src/  \
             --config-file pyproject.toml \
             --no-incremental \
             --show-error-codes
@@ -164,60 +138,13 @@ jobs:
         if: steps.worker-cache.outputs.cache-hit == 'true'
         run: docker load < /tmp/worker-cache/worker.tar
 
-      # Handle Redis and ChromaDB
-      - name: Cache Redis image
-        id: redis-cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/redis-cache
-          key: redis-${{ env.REDIS_VERSION }}
-
-      - name: Pull Redis if needed
-        if: steps.redis-cache.outputs.cache-hit != 'true'
+      
+      # Just pull Redis and Chroma directly - no caching needed
+      - name: Pull service images
         run: |
-          mkdir -p /tmp/redis-cache
           docker pull ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }}
-          docker save ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }} > /tmp/redis-cache/redis.tar
-
-      - name: Load Redis if cached
-        if: steps.redis-cache.outputs.cache-hit == 'true'
-        run: docker load < /tmp/redis-cache/redis.tar
-
-      - name: Cache ChromaDB image
-        id: chroma-cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/chroma-cache
-          key: chroma-${{ env.CHROMA_VERSION }}
-
-      - name: Pull ChromaDB if needed
-        if: steps.chroma-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /tmp/chroma-cache
           docker pull ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }}
-          docker save ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }} > /tmp/chroma-cache/chromadb.tar
-
-      - name: Load ChromaDB if cached
-        if: steps.chroma-cache.outputs.cache-hit == 'true'
-        run: docker load < /tmp/chroma-cache/chromadb.tar
-
-      # Prepare final images cache
-      - name: Create final images directory
-        run: mkdir -p /tmp/final-images
-
-      - name: Save all images for tests
-        run: |
-          docker save ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }} > /tmp/final-images/redis.tar
-          docker save ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }} > /tmp/final-images/chromadb.tar
-          docker save ${{ env.WORKER_IMAGE }}:${{ env.WORKER_VERSION }} > /tmp/final-images/worker.tar
-
-      - name: Cache final images
-        id: final-images-cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/final-images
-          key: final-images-${{ env.REDIS_VERSION }}-${{ env.CHROMA_VERSION }}-${{ hashFiles('pyproject.toml', 'poetry.lock', 'scripts/docker/Dockerfile') }}
-
+      
       #----------------------------------------------
       #       Setup Test Environment
       #----------------------------------------------
@@ -255,7 +182,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          poetry run pytest \
+          uv run pytest \
             tests/unit \
             --quiet \
             --cov=src \
@@ -267,7 +194,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          poetry run pytest \
+          uv run pytest \
             tests/integration \
             --quiet \
             --cov=src \
@@ -285,4 +212,4 @@ jobs:
 
       - name: Stop services
         if: always()
-        run: docker compose --env-file config/.env -f scripts/docker/compose.yaml down 
+        run: docker compose --env-file config/.env -f scripts/docker/compose.yaml down

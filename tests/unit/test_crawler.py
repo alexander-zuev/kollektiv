@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
-from requests.exceptions import HTTPError, Timeout
+from httpx import HTTPStatusError, TimeoutException
 from tenacity import RetryError
 
 from src.core._exceptions import CrawlerError
@@ -46,7 +46,7 @@ async def test_start_crawl_retry_logic(mock_async_crawl_url):
     request = CrawlRequest(url="http://example.com", page_limit=10)
 
     # Mock the API call to fail with a retryable error
-    mock_async_crawl_url.side_effect = Timeout("Connection timed out")
+    mock_async_crawl_url.side_effect = TimeoutException("Connection timed out")
 
     # Test that it eventually gives up after max retries
     with pytest.raises(RetryError):
@@ -71,7 +71,7 @@ async def test_start_crawl_non_retryable_error(mock_async_crawl_url):
     # Mock a 400 error response
     mock_response = MagicMock()
     mock_response.status_code = 400
-    http_error = HTTPError("HTTP Error")
+    http_error = HTTPStatusError("HTTP Error", request=request, response=mock_response)
     http_error.response = mock_response
     mock_async_crawl_url.side_effect = http_error
 
