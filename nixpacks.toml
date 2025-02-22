@@ -1,27 +1,25 @@
 # Nixpacks not used since building from Docker image
-# [variables]
-# NIXPACKS_PYTHON_VERSION = "3.12.9"
-# NIXPACKS_UV_VERSION = "0.6.0"
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.12.9"
+NIXPACKS_UV_VERSION = "0.6.0"
 
-# [phases.setup]
-# nixPkgs = ["python312", "gcc"]  
-
-
-# [phases.install]
-# # Cache dependencies layer
-# cache_directories = [
-#     "/root/.cache/uv"  # UV's cache for packages
-# ]
-# cmds = [
-#   # Download and install UV
-#   "curl -LsSf https://astral.sh/uv/${NIXPACKS_UV_VERSION}/install.sh | sh",
-#   "uv venv",
-#   "source /opt/venv/bin/activate",
-#   "uv pip install .",
-#   "echo \"🚀 Starting Kollektiv service: ${SERVICE}\"",
-# ]
-
-# [start]
-# cmd = "kollektiv $SERVICE"
+[phases.setup]
+nixPkgs = ["python312", "gcc"]
 
 
+[phases.install]
+# Cache dependencies layer
+cache_directories = [
+    "/root/.cache/uv"  # UV's cache for packages
+]
+cmds = [
+  # Download and install UV
+  "curl -LsSf https://astral.sh/uv/${NIXPACKS_UV_VERSION}/install.sh | sh",
+  "uv venv",
+  "source /opt/venv/bin/activate",
+  "uv pip install .",
+  "echo \"🚀 Starting Kollektiv service: ${SERVICE}\"",
+]
+
+[start]
+cmd = "kollektiv $SERVICE"

@@ -38,4 +38,3 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Define the default command (runs at container start)
 CMD kollektiv ${SERVICE}
-

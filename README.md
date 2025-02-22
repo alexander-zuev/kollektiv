@@ -4,7 +4,7 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12-blue" alt="Python 3.12" /></a>
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff" /></a>
   <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/badge/uv-package%20manager-blueviolet" alt="uv package manager" /></a>
-  <a href="https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml"><img src="https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/alexander-zuev/kollektiv/actions/workflows/ci_pipeline.yml"><img src="https://github.com/alexander-zuev/kollektiv/actions/workflows/ci.yaml/badge.svg" alt="CI" /></a>
   <a href="https://codecov.io/github/alexander-zuev/kollektiv"><img src="https://codecov.io/github/alexander-zuev/kollektiv/graph/badge.svg?token=FAT0JJNZG8" alt="codecov" /></a>
   <a href="https://github.com/alexander-zuev/kollektiv/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License" /></a>
   <a href="https://github.com/alexander-zuev/kollektiv/graphs/commit-activity"><img src="https://img.shields.io/badge/Maintained-Active-green.svg" alt="Status" /></a>
