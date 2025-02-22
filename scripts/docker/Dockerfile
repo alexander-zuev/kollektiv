@@ -17,8 +17,7 @@ WORKDIR /app
 FROM base AS builder
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git && rm -rf /var/lib/apt/lists/*
 
 # Download the latest installer
 ADD https://astral.sh/uv/${UV_VERSION}/install.sh /uv-installer.sh

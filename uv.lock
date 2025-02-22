@@ -1091,6 +1091,7 @@ wheels = [
 
 [[package]]
 name = "kollektiv"
+version = "0.2.0.dev1"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
