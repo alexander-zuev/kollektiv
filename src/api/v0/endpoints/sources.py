@@ -12,6 +12,7 @@ from src.infra.logger import get_logger
 from src.models.content_models import (
     AddContentSourceRequest,
     AddContentSourceResponse,
+    DataSourceStatusResponse,
     SourceEvent,
     SourceOverview,
     SourceSummary,
@@ -80,6 +81,30 @@ async def stream_source_events(source_id: UUID, content_service: ContentServiceD
         return EventSourceResponse(event_stream(), media_type="text/event-stream")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=ErrorResponse(code=ErrorCode.CLIENT_ERROR, detail=str(e))) from e
+
+
+@router.get(
+    Routes.V0.Sources.SOURCES,
+    response_model=DataSourceStatusResponse,
+    responses={
+        200: {"model": DataSourceStatusResponse},
+        404: {"model": ErrorResponse, "description": "Source not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    },
+    status_code=status.HTTP_200_OK,
+)
+async def get_source_status(source_id: UUID, content_service: ContentServiceDep) -> DataSourceStatusResponse:
+    """Returns a source status by ID."""
+    try:
+        response = await content_service.get_source_status(source_id=source_id)
+        if response is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ErrorResponse(code=ErrorCode.NOT_FOUND, detail=f"Source {source_id} not found").model_dump(),
+            )
+        return response
+    except NonRetryableError as e:
+        raise HTTPException(status_code=500, detail=ErrorResponse(code=ErrorCode.SERVER_ERROR, detail=str(e))) from e
 
 
 @router.get(

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Any, TypeVar
 from uuid import UUID
 
-from src.core._exceptions import ConversationNotFoundError
+from src.core._exceptions import ConversationNotFoundError, EntityNotFoundError
 from src.infra.data.data_repository import DataRepository
 from src.infra.logger import get_logger
 from src.models.base_models import SupabaseModel
@@ -116,6 +116,9 @@ class DataService:
     async def retrieve_datasource(self, source_id: UUID) -> DataSource:
         """Get data source by ID."""
         result = await self.repository.find_by_id(DataSource, source_id)
+        if result is None:
+            logger.error(f"Data source not found: {source_id}")
+            raise EntityNotFoundError(f"Data source {source_id} not found")
         return DataSource.model_validate(result)
 
     async def _load_summaries(self) -> list[SourceSummary]:

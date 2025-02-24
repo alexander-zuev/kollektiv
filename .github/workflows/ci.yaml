@@ -138,13 +138,13 @@ jobs:
         if: steps.worker-cache.outputs.cache-hit == 'true'
         run: docker load < /tmp/worker-cache/worker.tar
 
-      
+
       # Just pull Redis and Chroma directly - no caching needed
       - name: Pull service images
         run: |
           docker pull ${{ env.REDIS_IMAGE }}:${{ env.REDIS_VERSION }}
           docker pull ${{ env.CHROMA_IMAGE }}:${{ env.CHROMA_VERSION }}
-      
+
       #----------------------------------------------
       #       Setup Test Environment
       #----------------------------------------------

@@ -8,7 +8,7 @@ from arq import ArqRedis
 from pydantic import ValidationError
 
 from src.api.v0.schemas.webhook_schemas import FireCrawlEventType, FireCrawlWebhookEvent, WebhookProvider
-from src.core._exceptions import CrawlerError, JobNotFoundError, NonRetryableError
+from src.core._exceptions import CrawlerError, EntityNotFoundError, JobNotFoundError, NonRetryableError
 from src.core.content.crawler import FireCrawler
 from src.infra.decorators import generic_error_handler
 from src.infra.events.channels import Channels
@@ -21,6 +21,7 @@ from src.models.content_models import (
     AddContentSourceResponse,
     ContentProcessingEvent,
     DataSource,
+    DataSourceStatusResponse,
     FireCrawlSourceMetadata,
     SourceEvent,
     SourceOverview,
@@ -150,10 +151,16 @@ class ContentService:
         await self.data_service.save_user_request(request=request)
         logger.info(f"User request {request.request_id} saved successfully")
 
-    async def get_source(self, source_id: UUID) -> AddContentSourceResponse:
-        """GET /sources/{source_id} entrypoint"""
-        source = await self.data_service.retrieve_datasource(source_id=source_id)
-        return AddContentSourceResponse.from_source(source)
+    async def get_source_status(self, source_id: UUID) -> DataSourceStatusResponse | None:
+        """GET /sources/{source_id} entrypoint
+        Returns DataSourceStatusResponse if source exists, otherwise returns None
+        """
+        try:
+            source = await self.data_service.retrieve_datasource(source_id=source_id)
+            return DataSourceStatusResponse.from_source(source)
+        except EntityNotFoundError:
+            logger.warning(f"Source {source_id} not found")
+            return None
 
     async def handle_webhook_event(self, event: FireCrawlWebhookEvent) -> None:
         """Handles webhook events related to content ingestion."""
@@ -350,9 +357,29 @@ class ContentService:
                         try:
                             event_data = json.loads(message["data"])
                             event = SourceEvent.from_processing_event(ContentProcessingEvent(**event_data))
+                            logger.debug(f"Emitting event: {event}")
                             yield event
-
-                            if event.stage in (SourceStage.COMPLETED, SourceStage.FAILED):
+                            # Update source status based on final events
+                            if event.stage == SourceStage.COMPLETED:
+                                await self.data_service.update_datasource(
+                                    source_id=source_id,
+                                    updates={
+                                        "status": SourceStage.COMPLETED,
+                                        "updated_at": datetime.now(UTC),
+                                    },
+                                )
+                                logger.info(f"Updated source {source_id} status to COMPLETED")
+                                break
+                            elif event.stage == SourceStage.FAILED:
+                                await self.data_service.update_datasource(
+                                    source_id=source_id,
+                                    updates={
+                                        "status": SourceStage.FAILED,
+                                        "error": event.error,
+                                        "updated_at": datetime.now(UTC),
+                                    },
+                                )
+                                logger.info(f"Updated source {source_id} status to FAILED")
                                 break
                         except (json.JSONDecodeError, ValueError, ValidationError) as e:
                             logger.error(f"Invalid event data: {e}")

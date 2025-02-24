@@ -195,6 +195,19 @@ class DataSource(SupabaseModel):
     _protected_fields: set[str] = PrivateAttr(default={"source_id", "source_type", "created_at"})
 
 
+class DataSourceStatusResponse(APIModel):
+    """Response model for the status of a data source."""
+
+    source_id: UUID = Field(..., description="ID of the source")
+    stage: SourceStage = Field(..., description="Stage of the source")
+    error: str | None = Field(default=None, description="Error message, null if no error")
+
+    @classmethod
+    def from_source(cls, source: DataSource) -> DataSourceStatusResponse:
+        """Convert a DataSource to a DataSourceStatusResponse."""
+        return cls(source_id=source.source_id, stage=source.stage, error=source.error)
+
+
 class FireCrawlSourceMetadata(BaseModel):
     """Metadata for a FireCrawl source."""
 
